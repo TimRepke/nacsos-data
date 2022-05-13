@@ -1,3 +1,9 @@
 pydantic==1.9.0
-setuptools==61.3.1
-sqlmodel==0.0.6
+setuptools==62.2.0
+psycopg==3.0.13
+psycopg2==2.9.3
+#sqlalchemy2-stubs==0.0.2a22
+#sqlalchemy[asyncio]==1.4.36
+SQLAlchemy @ git+https://github.com/sqlalchemy/sqlalchemy.git@cd628fad7c92f5f54bf1bf6985fd983269b0ec19
+sqlalchemy-json==0.5.0
+alembic==1.7.7

@@ -6,3 +6,11 @@ The main purpose of this package is to be used in the NACSOS backend/frontend in
 It can also be imported in any other project, where accessing data through the proper API 
 does not provide the required functionality.
 
+## Creating database revision
+```bash
+# automatically creating up/downgrade script
+$ alembic revision --autogenerate -m "Helpful comment"
+
+# apply the migration
+$ alembic upgrade head
+```

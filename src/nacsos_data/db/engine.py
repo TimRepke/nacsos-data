@@ -1,6 +1,8 @@
-from sqlmodel import create_engine, SQLModel
-from sqlalchemy.orm import sessionmaker
+from typing import Optional
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.orm import sessionmaker, Session
 from contextlib import contextmanager
+from . import models
 
 
 class DatabaseEngine:
@@ -16,20 +18,20 @@ class DatabaseEngine:
         self._password = password
         self._database = database
 
-        self._connection_str = f'postgresql://{self._user}:{self._password}@{self._host}:{self._port}/{self._database}'
+        self._connection_str = f'postgresql+psycopg://{self._user}:{self._password}@' \
+                               f'{self._host}:{self._port}/{self._database}'
+        self.engine = create_async_engine(self._connection_str, echo=True, future=True)
 
-        self.engine = create_engine(self._connection_str, echo=True,
-                                    connect_args={'check_same_thread': False})
-        self._session = sessionmaker(bind=self.engine)
+        self._session = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
 
-    def startup(self) -> None:
-        """
-        Call this function to initialise the database engine.
-        """
-        SQLModel.metadata.create_all(self.engine)
+    # def startup(self) -> None:
+    #     """
+    #     Call this function to initialise the database engine.
+    #     """
+    #     SQLModel.metadata.create_all(self.engine)
 
     @contextmanager
-    def session(self):
+    def session(self) -> Optional[Session]:
         """
 
         :return:
