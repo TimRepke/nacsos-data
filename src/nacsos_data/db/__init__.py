@@ -1,4 +1,4 @@
-from .engine import DatabaseEngine
+from .engine import DatabaseEngine, DatabaseEngineAsync
 
 
-__all__ = ['DatabaseEngine']
+__all__ = ['DatabaseEngine', 'DatabaseEngineAsync']

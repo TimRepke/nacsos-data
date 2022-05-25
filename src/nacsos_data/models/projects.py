@@ -1,8 +1,11 @@
-from typing import Optional
-from pydantic import BaseModel
+from typing import Literal
+from uuid import UUID
+
+from nacsos_data.db.schemas.projects import ProjectType
+from . import SBaseModel
 
 
-class ProjectModel(BaseModel):
+class ProjectModel(SBaseModel):
     """
     Project is the basic structural and conceptual place around which all functionality evolves.
     It is essentially a container for a logically connected set of analyses, e.g. all work for a paper.
@@ -13,17 +16,21 @@ class ProjectModel(BaseModel):
     """
 
     # Unique identifier for this project
-    project_id: Optional[str]
+    project_id: str | UUID | None
 
     # Unique descriptive name/title for the project
     name: str
 
     # A brief description of that project.
     # Optional, but should be used and can be Markdown formatted
-    description: Optional[str]
+    description: str | None
+
+    # Defines what sort of data this project works with
+    # This is used to show item-type specific interface elements and join enriched meta-data
+    type: Literal['twitter', 'academic', 'patents'] | ProjectType
 
 
-class ProjectPermissions(BaseModel):
+class ProjectPermissionsModel(SBaseModel):
     """
     ProjectPermissions allows to define fine-grained project-level permission management.
     Once such an entry exists, the user is assumed to have very basic access to the respective project.
@@ -34,13 +41,13 @@ class ProjectPermissions(BaseModel):
     by giving them permission to view annotations, they can also see other users' annotations.
     """
     # Unique identifier for this set of permissions
-    project_permission_id: Optional[str]
+    project_permission_id: str | UUID | None
 
     # Refers to the project this permission relates to
-    project_id: str
+    project_id: str | UUID
 
     # Refers to the User this set of permissions for this project refers to
-    user_id: str
+    user_id: str | UUID
 
     # If true, the user has all permissions for this project
     # Note: All other permission settings below will be ignored if set to "true"
@@ -72,3 +79,13 @@ class ProjectPermissions(BaseModel):
     artefacts_read: bool = False
     # If true, the user has permission to edit and delete pipeline outputs (aka artefacts)
     artefacts_edit: bool = False
+
+    @classmethod
+    def get_virtual_admin(cls, project_id: str, user_id: str):
+        return cls(project_permission_id=None, project_id=project_id,
+                   user_id=user_id, owner=True,
+                   dataset_read=True, dataset_edit=True,
+                   queries_read=True, queries_edit=True,
+                   annotations_read=True, annotations_edit=True,
+                   pipelines_read=True, pipelines_edit=True,
+                   artefacts_read=True, artefacts_edit=True)

@@ -1,10 +1,17 @@
-from sqlalchemy import String, ForeignKey, Boolean, Column
+from sqlalchemy import String, ForeignKey, Boolean, Column, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
+from enum import Enum
 import uuid
 
 from ..base_class import Base
 
 from .users import User
+
+
+class ProjectType(Enum):
+    twitter = 'twitter'
+    academic = 'academic'
+    patents = 'patents'
 
 
 class Project(Base):
@@ -28,6 +35,10 @@ class Project(Base):
     # A brief description of that project.
     # Optional, but should be used and can be Markdown formatted
     description = Column(String, nullable=True)
+
+    # Defines what sort of data this project works with
+    # This is used to show item-type specific interface elements and join enriched meta-data
+    type = Column(SAEnum(ProjectType), nullable=False)
 
 
 class ProjectPermissions(Base):

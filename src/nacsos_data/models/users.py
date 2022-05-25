@@ -1,37 +1,39 @@
-from typing import Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import EmailStr
+from uuid import UUID
+
+from . import SBaseModel
 
 
 # Shared properties
-class UserBaseModel(BaseModel):
+class UserBaseModel(SBaseModel):
     """
     User represents a person.
     Most entries in the database will be (indirectly) linked to user accounts, so this is
     at the core of access management and ownership.
     """
     # Unique identifier for this user.
-    user_id: Optional[str]
+    user_id: str | UUID | None
 
     # Username for that user
     # -> nicer than using email and allows us to have multiple accounts per email
-    username: Optional[str] = None
+    username: str | None = None
 
     # Contact information for that user
-    email: Optional[EmailStr] = None
+    email: EmailStr | None = None
 
     # Real name of that user (or "descriptor" if this is a bot account)
-    full_name: Optional[str] = None
+    full_name: str | None = None
 
     # Affiliation of the user, helpful to keep track of external users
-    affiliation: Optional[str] = None
+    affiliation: str | None = None
 
     # Set this flag if this account has root access to the database
-    is_superuser: Optional[bool] = False
+    is_superuser: bool | None = False
 
     # Set this flag to indicate whether the account is active or not
     # Note: Deleting an account might lead to inconsistencies with other parts of the DB,
     #       so setting this to "false" to remove access should be preferred.
-    is_active: Optional[bool] = True
+    is_active: bool | None = True
 
 
 # Properties to receive via API on creation
@@ -43,11 +45,11 @@ class UserCreateModel(UserBaseModel):
 
 # Properties to receive via API on update
 class UserUpdateModel(UserBaseModel):
-    plain_password: Optional[str] = None
+    plain_password: str | None = None
 
 
 class UserInDBBaseModel(UserBaseModel):
-    id: Optional[str] = None
+    user_id: str | UUID | None = None
 
     # class Config:
     #     orm_mode = True
