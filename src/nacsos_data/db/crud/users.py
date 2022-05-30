@@ -6,7 +6,7 @@ from nacsos_data.db.schemas import User
 from nacsos_data.models.users import UserInDBModel, UserModel
 
 
-async def get_user_by_id(uid: str, engine: DatabaseEngineAsync) -> Optional[UserInDBModel]:
+async def read_user_by_id(uid: str, engine: DatabaseEngineAsync) -> Optional[UserInDBModel]:
     async with engine.session() as session:
         stmt = select(User).filter_by(user_id=uid)
         result = (await session.execute(stmt)).scalars().one_or_none()
@@ -14,7 +14,7 @@ async def get_user_by_id(uid: str, engine: DatabaseEngineAsync) -> Optional[User
             return UserInDBModel(**result.__dict__)
 
 
-async def get_user_by_name(username: str, engine: DatabaseEngineAsync) -> Optional[UserInDBModel]:
+async def read_user_by_name(username: str, engine: DatabaseEngineAsync) -> Optional[UserInDBModel]:
     async with engine.session() as session:
         stmt = select(User).filter_by(username=username)
         result = (await session.execute(stmt)).scalars().one_or_none()
@@ -22,14 +22,14 @@ async def get_user_by_name(username: str, engine: DatabaseEngineAsync) -> Option
             return UserInDBModel(**result.__dict__)
 
 
-async def get_all_users(engine: DatabaseEngineAsync) -> list[UserInDBModel]:
+async def read_all_users(engine: DatabaseEngineAsync) -> list[UserInDBModel]:
     async with engine.session() as session:
         stmt = select(User)
         result = await session.execute(stmt)
         return [UserInDBModel(**res.__dict__) for res in result.scalars().all()]
 
 
-def get_project_users(pid: str) -> list[UserModel]:
+def read_project_users(pid: str) -> list[UserModel]:
     # TODO implement function that returns all users with access to a project (pid = project id)
     pass
 

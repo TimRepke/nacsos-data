@@ -35,6 +35,8 @@ class Mention(SBaseModel):
     end: int
     # The part of text recognized as a user mention.
     username: str
+    # The twitter id for that user
+    user_id: int
 
 
 class URL(SBaseModel):
@@ -44,10 +46,10 @@ class URL(SBaseModel):
     end: int
     # from entities.urls.url
     # The URL in the format tweeted by the user.
-    url: list[str] | None
+    url: str
     # from entities.urls.expanded_url
     # The fully resolved URL(s).
-    url_expanded: list[str] | None
+    url_expanded: str
     # TODO: check how url_unwound differs ("The full destination URL.")
 
 
@@ -64,6 +66,9 @@ class TwitterItemModel(SBaseModel):
     twitter_id: int | None
     # Unique user identifier on Twitter
     twitter_author_id: int | None
+
+    # text of the tweet (in Twitter lingo, it's the "status")
+    status: str
 
     # date and time this tweet was posted Format: ISO 8601 (e.g. "2019-06-04T23:12:08.000Z")
     created_at: datetime

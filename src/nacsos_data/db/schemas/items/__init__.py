@@ -1,8 +1,9 @@
-from sqlalchemy import String, Column
+from sqlalchemy import String, Column, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
 from ...base_class import Base
+from ..projects import Project
 
 
 class Item(Base):
@@ -27,3 +28,12 @@ class Item(Base):
     #             and based on context, the same item (?) would point to different texts
     #             alternatively, we view the specific item as the unique reference and Item as the context-sensitive one
     #             which would lead to lots of repeated data though
+
+
+class M2MProjectItem(Base):
+    __tablename__ = 'm2m_project_item'
+
+    item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id),
+                     nullable=False, index=True, primary_key=True)
+    project_id = Column(UUID(as_uuid=True), ForeignKey(Project.project_id),
+                        nullable=False, index=True, primary_key=True)
