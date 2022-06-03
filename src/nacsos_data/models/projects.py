@@ -16,18 +16,26 @@ class ProjectModel(SBaseModel):
     """
 
     # Unique identifier for this project
-    project_id: str | UUID | None
+    project_id: str | UUID | None = None
 
     # Unique descriptive name/title for the project
     name: str
 
     # A brief description of that project.
     # Optional, but should be used and can be Markdown formatted
-    description: str | None
+    description: str | None = None
 
     # Defines what sort of data this project works with
     # This is used to show item-type specific interface elements and join enriched meta-data
     type: Literal['twitter', 'academic', 'patents'] | ProjectType
+
+
+ProjectPermission = Literal['owner',
+                            'dataset_read', 'dataset_edit',
+                            'queries_read', 'queries_edit',
+                            'annotations_read', 'annotations_edit',
+                            'pipelines_read', 'pipelines_edit',
+                            'artefacts_read', 'artefacts_edit']
 
 
 class ProjectPermissionsModel(SBaseModel):
@@ -41,7 +49,7 @@ class ProjectPermissionsModel(SBaseModel):
     by giving them permission to view annotations, they can also see other users' annotations.
     """
     # Unique identifier for this set of permissions
-    project_permission_id: str | UUID | None
+    project_permission_id: str | UUID | None = None
 
     # Refers to the project this permission relates to
     project_id: str | UUID

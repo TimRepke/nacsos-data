@@ -1,9 +1,10 @@
-from typing import Optional
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine
 from contextlib import contextmanager, asynccontextmanager
-from . import schemas  # unused import required so the engine sees the models!
+
+# unused import required so the engine sees the models!
+from . import schemas  # noqa F401
 
 
 class DatabaseEngineAsync:
@@ -13,7 +14,7 @@ class DatabaseEngineAsync:
     """
 
     def __init__(self, host: str, port: int, user: str, password: str,
-                 database: str = 'nacsos_core', sync: bool = True):
+                 database: str = 'nacsos_core'):
         self._host = host
         self._port = port
         self._user = user
@@ -53,7 +54,7 @@ class DatabaseEngine:
     """
 
     def __init__(self, host: str, port: int, user: str, password: str,
-                 database: str = 'nacsos_core', sync: bool = True):
+                 database: str = 'nacsos_core'):
         self._host = host
         self._port = port
         self._user = user

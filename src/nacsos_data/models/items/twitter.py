@@ -61,11 +61,11 @@ class TwitterItemModel(SBaseModel):
     https://developer.twitter.com/en/docs/twitter-api/data-dictionary/object-model/tweet
     """
     # Unique identifier for this TwitterItem, corresponds to Item
-    item_id: str | UUID | None
+    item_id: str | UUID | None = None
     # Unique identifier on Twitter
-    twitter_id: int | None
+    twitter_id: int | None = None
     # Unique user identifier on Twitter
-    twitter_author_id: int | None
+    twitter_author_id: int | None = None
 
     # text of the tweet (in Twitter lingo, it's the "status")
     status: str
@@ -74,13 +74,13 @@ class TwitterItemModel(SBaseModel):
     created_at: datetime
 
     # language of this tweet (as provided by Twitter)
-    language: str | None
+    language: str | None = None
 
     # The Tweet ID of the original Tweet of the conversation (which includes direct replies, replies of replies).
-    conversation_id: int | None
+    conversation_id: int | None = None
     # A list of Tweets this Tweet refers to. For example, if the parent Tweet is a Retweet, a Retweet with comment
     # (also known as Quoted Tweet) or a Reply, it will include the related Tweet referenced to by its parent.
-    referenced_tweets: list[ReferencedTweet] | None
+    referenced_tweets: list[ReferencedTweet] | None = None
 
     # Specifies the type of attachments (if any) present in this Tweet.
     # attachments: Optional[any] # TODO should we store that?
@@ -88,18 +88,18 @@ class TwitterItemModel(SBaseModel):
     # from geo.coordinates.coordinates:
     # A pair of decimal values representing the precise location of the user (latitude, longitude).
     # This value be null unless the user explicitly shared their precise location.
-    latitude: float | None
-    longitude: float | None
+    latitude: float | None = None
+    longitude: float | None = None
 
     # from entities.hashtags (Contains details about text recognized as a Hashtag.)
-    hashtags: list[Hashtag] | None
+    hashtags: list[Hashtag] | None = None
     # from entities.mentions (Contains details about text recognized as a user mention.)
-    mentions: list[Mention] | None
+    mentions: list[Mention] | None = None
     # from entities.urls (Contains details about text recognized as a URL.)
-    urls: list[URL] | None
+    urls: list[URL] | None = None
     # from entities.cashtag (Contains details about text recognized as a Cashtag.)
     # [Cashtags are stock price symbols]
-    cashtags: list[Cashtag] | None
+    cashtags: list[Cashtag] | None = None
 
     # Public engagement metrics for the Tweet at the time of the request.
     # taken from public_metrics.???

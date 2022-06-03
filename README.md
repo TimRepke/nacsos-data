@@ -14,3 +14,13 @@ $ alembic revision --autogenerate -m "Helpful comment"
 # apply the migration
 $ alembic upgrade head
 ```
+
+## Testing
+
+```bash
+# To check code style, run:
+flake8
+
+# To lint, run:
+mypy --config-file=pyproject.toml src/nacsos_data 
+```

@@ -12,7 +12,7 @@ class UserBaseModel(SBaseModel):
     at the core of access management and ownership.
     """
     # Unique identifier for this user.
-    user_id: str | UUID | None
+    user_id: str | UUID | None = None
 
     # Username for that user
     # -> nicer than using email and allows us to have multiple accounts per email

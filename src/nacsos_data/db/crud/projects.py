@@ -1,11 +1,9 @@
-from typing import Optional
 from sqlalchemy import select, delete
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
 from . import update_orm
 from nacsos_data.db.schemas import Project, ProjectPermissions
-from nacsos_data.models.users import UserInDBModel, UserModel
 from nacsos_data.models.projects import ProjectModel, ProjectPermissionsModel
 
 
@@ -36,7 +34,7 @@ async def read_project_by_id(project_id: str | UUID, engine: DatabaseEngineAsync
 
 
 async def read_project_permissions_by_id(permissions_id: str | UUID,
-                                        engine: DatabaseEngineAsync) -> ProjectPermissionsModel:
+                                         engine: DatabaseEngineAsync) -> ProjectPermissionsModel:
     async with engine.session() as session:
         stmt = select(ProjectPermissions).filter_by(project_permission_id=permissions_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
@@ -45,7 +43,7 @@ async def read_project_permissions_by_id(permissions_id: str | UUID,
 
 
 async def read_project_permissions_for_project(project_id: str | UUID,
-                                              engine: DatabaseEngineAsync) -> list[ProjectPermissionsModel]:
+                                               engine: DatabaseEngineAsync) -> list[ProjectPermissionsModel]:
     async with engine.session() as session:
         stmt = select(ProjectPermissions).filter_by(project_id=project_id)
         result = await session.execute(stmt)
@@ -54,7 +52,7 @@ async def read_project_permissions_for_project(project_id: str | UUID,
 
 
 async def read_project_permissions_for_user(user_id: str | UUID, project_id: str | UUID,
-                                           engine: DatabaseEngineAsync) -> ProjectPermissionsModel | None:
+                                            engine: DatabaseEngineAsync) -> ProjectPermissionsModel | None:
     async with engine.session() as session:
         stmt = select(ProjectPermissions).filter_by(user_id=user_id, project_id=project_id)
         result = (await session.execute(stmt)).scalars().one_or_none()

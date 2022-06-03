@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, Column
+from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, Column, UniqueConstraint, Identity
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
 from sqlalchemy_json import mutable_json_type
@@ -103,9 +103,12 @@ class Assignment(Base):
     # The AnnotationTask defining the annotation scheme to be used for this assignment
     task_id = Column(UUID(as_uuid=True), ForeignKey(AnnotationTask.annotation_task_id), nullable=False, index=True)
 
-    # The AssignmentScope this Assignment should logically be grouped into. This is optional.
+    # The AssignmentScope this Assignment should logically be grouped into.
     assignment_scope_id = Column(UUID(as_uuid=True), ForeignKey(AssignmentScope.assignment_scope_id),
-                                 nullable=True, index=True)
+                                 nullable=False, index=True)
+
+    # The order of assignments within the assignment scope
+    order = Column(Integer, Identity(always=False))
 
     # TODO figure out how to nicely resolve in-text annotations here
 
@@ -174,6 +177,8 @@ class Annotation(Base):
     # of that Item, the following fields should be set with the respective string offset.
     text_offset_start = Column(Integer, nullable=True)
     text_offset_stop = Column(Integer, nullable=True)
+
+    UniqueConstraint('assignment_id', 'key', 'repeat')
 
     # TODO: Figure out a way to allow automated methods (e.g. classifiers) to utilise this
     #       table to annotate data as well. Creating loads of dummy users and assignments

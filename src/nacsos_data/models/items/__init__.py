@@ -9,7 +9,7 @@ class ItemModel(SBaseModel):
 
     """
     # Unique identifier for this Item.
-    item_id: str | UUID | None
+    item_id: str | UUID | None = None
 
     # The text for this item
     text: str

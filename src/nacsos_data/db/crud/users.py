@@ -1,14 +1,15 @@
 from typing import Optional
 from sqlalchemy import select
+from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import User
 from nacsos_data.models.users import UserInDBModel, UserModel
 
 
-async def read_user_by_id(uid: str, engine: DatabaseEngineAsync) -> Optional[UserInDBModel]:
+async def read_user_by_id(user_id: str, engine: DatabaseEngineAsync) -> Optional[UserInDBModel]:
     async with engine.session() as session:
-        stmt = select(User).filter_by(user_id=uid)
+        stmt = select(User).filter_by(user_id=user_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
             return UserInDBModel(**result.__dict__)
@@ -29,7 +30,7 @@ async def read_all_users(engine: DatabaseEngineAsync) -> list[UserInDBModel]:
         return [UserInDBModel(**res.__dict__) for res in result.scalars().all()]
 
 
-def read_project_users(pid: str) -> list[UserModel]:
+def read_project_users(project_id: str | UUID) -> list[UserModel]:
     # TODO implement function that returns all users with access to a project (pid = project id)
     pass
 

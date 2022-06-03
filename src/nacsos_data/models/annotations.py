@@ -1,31 +1,38 @@
 from typing import Literal, ForwardRef, Optional
 from datetime import datetime
+from uuid import UUID
 
 from . import SBaseModel
-from .users import UserModel
-from .items import ItemModel
 
 AnnotationTaskLabel = ForwardRef('AnnotationTaskLabel')
+AnnotationModel = ForwardRef('AnnotationModel')
 
 
 class AnnotationTaskLabelChoice(SBaseModel):
     name: str
-    hint: str | None
+    hint: str | None = None
     # note, no constraint on value uniqueness; should be checked in frontend
     value: int
-    child: Optional[AnnotationTaskLabel]
+    children: list[AnnotationTaskLabel] | None = None
 
 
 class AnnotationTaskLabel(SBaseModel):
     name: str
     key: str  # note, no check for key uniqueness; should be done in frontend
-    hint: str | None
+    hint: str | None = None
     max_repeat: int = 1
     required: bool = True
+    annotation: Optional[AnnotationModel] = None
 
-    kind: Literal['bool', 'str', 'int', 'float', 'single', 'multi'] = 'single'  # TODO in-text
+    kind: Literal['bool', 'str', 'int', 'float', 'single', 'multi'] = 'single'  # TODO add in-text
     # to be used in single or multi, which are dropdown menus
-    choices: list[AnnotationTaskLabelChoice] | None
+    choices: Optional[list[AnnotationTaskLabelChoice]] = None
+
+    # FIXME: add this in model (after evaluating this makes sense)
+    default_value_bool: bool | None = None
+    default_value_int: int | None = None
+    default_value_float: float | None = None
+    default_value_str: str | None = None
 
 
 AnnotationTaskLabelChoice.update_forward_refs()
@@ -45,10 +52,10 @@ class AnnotationTaskModel(SBaseModel):
     """
 
     # Unique identifier for this task.
-    annotation_task_id: str | None
+    annotation_task_id: str | UUID | None = None
 
     # Reference to the project this AnnotationTask belongs to.
-    project_id: str | None
+    project_id: str | UUID | None = None
 
     # A short descriptive title / name for this AnnotationTask.
     # This may be displayed to the annotators.
@@ -57,7 +64,7 @@ class AnnotationTaskModel(SBaseModel):
     # An (optional) slightly longer description of the AnnotationTask.
     # This may be displayed to the annotators as an instruction or background information.
     # Text should be formatted using Markdown.
-    description: str | None
+    description: str | None = None
 
     # The definition of the annotation scheme for this AnnotationTask is stored here.
     # For more information on how an annotation scheme is defined, check out schemas.annotations.AnnotationTaskLabel
@@ -76,15 +83,15 @@ class AssignmentScopeModel(SBaseModel):
     AnnotationTask -> [AssignmentScope] -> Assignment -> Annotation
     """
     # Unique identifier for this scope
-    assignment_scope_id: str | None
+    assignment_scope_id: str | UUID | None = None
     # The AnnotationTask defining the annotation scheme to be used for this scope
-    task: AnnotationTaskModel | str
+    task_id: str | UUID
     # A short descriptive title / name for this scope.
     # This may be displayed to the annotators.
     name: str
     # An (optional) slightly longer description of the scope.
     # This may be displayed to the annotators as refined instruction or background information.
-    description: str | None
+    description: str | None = None
 
 
 class AssignmentModel(SBaseModel):
@@ -105,15 +112,17 @@ class AssignmentModel(SBaseModel):
       * Creating assignments in small batches or one-by-one in prioritised annotation settings
     """
     # Unique identifier for this assignment
-    assignment_id: str | None
+    assignment_id: str | UUID | None = None
+    # The AssignmentScope this Assignment should logically be grouped into.
+    assignment_scope_id: str | UUID
     # The User (or its ID) this AnnotationTask/Item combination is assigned to
-    user: UserModel | str
+    user_id: str | UUID
     # The Item (or its ID) this assigment refers to.
-    item: ItemModel | str
+    item_id: str | UUID
     # The AnnotationTask (or its ID) defining the annotation scheme to be used for this assignment
-    task: AnnotationTaskModel | str
-
-    # FIXME: replace by actual instances?
+    task_id: str | UUID
+    # The order of assignments within the assignment scope
+    order: int | None = None
 
 
 class AnnotationModel(SBaseModel):
@@ -139,24 +148,24 @@ class AnnotationModel(SBaseModel):
     AnnotationTask or not display an Assignment as complete.
     """
     # Unique identifier for this Annotation
-    annotation_id: str | None
+    annotation_id: str | UUID | None = None
 
     # Date and time when this annotation was created (or last changed)
-    time_created: datetime | None
-    time_updated: datetime | None
+    time_created: datetime | None = None
+    time_updated: datetime | None = None
 
     # The Assignment this Annotation is responding to.
-    assignment_id: str
+    assignment_id: str | UUID
 
     # The User(or its ID) the AnnotationTask/Item combination is assigned to
-    user: UserModel | str
+    user_id: str | UUID
 
     # The Item (or its ID) this assigment refers to (redundant to implicit information from Assignment)
-    item: ItemModel | str
+    item_id: str | UUID
 
     # The AnnotationTask (or its ID) defining the annotation scheme to be used for this assignment
     # (redundant to implicit information from Assignment)
-    task: AnnotationTaskModel | str
+    task_id: str | UUID
 
     # Defines which AnnotationTaskLabel.key this Annotation refers to.
     # Note, that there is no correctness constraint, the frontend should make sure to send correct data!!
@@ -169,12 +178,15 @@ class AnnotationModel(SBaseModel):
 
     # Depending on the AnnotationTaskLabel.kind, one of the following fields should be filled.
     # For single and mixed, the AnnotationTaskLabelChoice.value should be filled in value_int.
-    value_bool: bool | None
-    value_int: int | None
-    value_float: float | None
-    value_str: str | None
+    value_bool: bool | None = None
+    value_int: int | None = None
+    value_float: float | None = None
+    value_str: str | None = None
 
     # When the Annotation does not refer to an entire Item, but a sub-string (in-text annotation)
     # of that Item, the following fields should be set with the respective string offset.
-    text_offset_start: int | None
-    text_offset_stop: int | None
+    text_offset_start: int | None = None
+    text_offset_stop: int | None = None
+
+
+AnnotationTaskLabel.update_forward_refs()

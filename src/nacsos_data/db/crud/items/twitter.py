@@ -1,13 +1,10 @@
 import uuid
-from typing import Optional
-from sqlalchemy import select, delete, insert
+from sqlalchemy import select
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
-from nacsos_data.db.crud.items import create_item
 from nacsos_data.db.schemas.items import Item
 from nacsos_data.db.schemas import TwitterItem, M2MProjectItem
-from nacsos_data.models.items import ItemModel
 from nacsos_data.models.items.twitter import TwitterItemModel
 
 
