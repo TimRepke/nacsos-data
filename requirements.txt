@@ -6,4 +6,4 @@ psycopg2==2.9.3
 #sqlalchemy[asyncio]==1.4.36
 SQLAlchemy @ git+https://github.com/sqlalchemy/sqlalchemy.git@cd628fad7c92f5f54bf1bf6985fd983269b0ec19
 sqlalchemy-json==0.5.0
-alembic==1.7.7
+alembic==1.8.0
