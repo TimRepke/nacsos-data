@@ -1,10 +1,12 @@
-from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, Column, UniqueConstraint, Identity
+from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, Column, \
+    UniqueConstraint, Identity, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
 from sqlalchemy_json import mutable_json_type
 import uuid
 
-from ..base_class import Base
+from ...models.annotations import AssignmentStatus
+from ...db.base_class import Base
 
 from .projects import Project
 from .users import User
@@ -93,7 +95,9 @@ class Assignment(Base):
     # Unique identifier for this assignment
     assignment_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
                            nullable=False, unique=True, index=True)
-
+    # The AssignmentScope this Assignment should logically be grouped into.
+    assignment_scope_id = Column(UUID(as_uuid=True), ForeignKey(AssignmentScope.assignment_scope_id),
+                                 nullable=False, index=True)
     # The User the AnnotationTask/Item combination is assigned to
     user_id = Column(UUID(as_uuid=True), ForeignKey(User.user_id), nullable=False, index=True)
 
@@ -103,9 +107,8 @@ class Assignment(Base):
     # The AnnotationTask defining the annotation scheme to be used for this assignment
     task_id = Column(UUID(as_uuid=True), ForeignKey(AnnotationTask.annotation_task_id), nullable=False, index=True)
 
-    # The AssignmentScope this Assignment should logically be grouped into.
-    assignment_scope_id = Column(UUID(as_uuid=True), ForeignKey(AssignmentScope.assignment_scope_id),
-                                 nullable=False, index=True)
+    # The status of this assignment (to be updated with each annotation related to this assignment)
+    status = Column(SAEnum(AssignmentStatus), nullable=False, server_default='OPEN')
 
     # The order of assignments within the assignment scope
     order = Column(Integer, Identity(always=False))
@@ -144,7 +147,7 @@ class Annotation(Base):
     time_updated = Column(DateTime(timezone=True), onupdate=func.now())
 
     # The Assignment this Annotation is responding to.
-    assignment_id = Column(UUID(as_uuid=True), ForeignKey(AnnotationTask.annotation_task_id),
+    assignment_id = Column(UUID(as_uuid=True), ForeignKey(Assignment.assignment_id),
                            nullable=False, index=True)
 
     # The User the AnnotationTask/Item combination is assigned to (redundant to implicit information from Assignment)
@@ -166,6 +169,10 @@ class Annotation(Base):
     # Default should always be 1.
     repeat = Column(Integer, nullable=False, default=1)
 
+    # Reference to the parent labels' annotation.
+    parent = Column(UUID(as_uuid=True),
+                    ForeignKey('annotation.annotation_id'), nullable=True, index=True)
+
     # Depending on the AnnotationTaskLabel.kind, one of the following fields should be filled.
     # For single and mixed, the AnnotationTaskLabelChoice.value should be filled in value_int.
     value_bool = Column(Boolean, nullable=True)
@@ -178,7 +185,7 @@ class Annotation(Base):
     text_offset_start = Column(Integer, nullable=True)
     text_offset_stop = Column(Integer, nullable=True)
 
-    UniqueConstraint('assignment_id', 'key', 'repeat')
+    UniqueConstraint('assignment_id', 'key', 'parent', 'repeat')
 
     # TODO: Figure out a way to allow automated methods (e.g. classifiers) to utilise this
     #       table to annotate data as well. Creating loads of dummy users and assignments

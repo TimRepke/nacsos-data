@@ -1,11 +1,14 @@
 from typing import Literal, ForwardRef, Optional
 from datetime import datetime
 from uuid import UUID
+from enum import Enum
 
 from . import SBaseModel
 
 AnnotationTaskLabel = ForwardRef('AnnotationTaskLabel')
 AnnotationModel = ForwardRef('AnnotationModel')
+
+AnnotationTaskLabelTypes = Literal['bool', 'str', 'int', 'float', 'single', 'multi', 'intext']
 
 
 class AnnotationTaskLabelChoice(SBaseModel):
@@ -22,20 +25,26 @@ class AnnotationTaskLabel(SBaseModel):
     hint: str | None = None
     max_repeat: int = 1
     required: bool = True
-    annotation: Optional[AnnotationModel] = None
 
-    kind: Literal['bool', 'str', 'int', 'float', 'single', 'multi'] = 'single'  # TODO add in-text
+    kind: AnnotationTaskLabelTypes = 'single'
     # to be used in single or multi, which are dropdown menus
     choices: Optional[list[AnnotationTaskLabelChoice]] = None
 
-    # FIXME: add this in model (after evaluating this makes sense)
-    default_value_bool: bool | None = None
-    default_value_int: int | None = None
-    default_value_float: float | None = None
-    default_value_str: str | None = None
+    # Only filled when transmitting annotations from/to the gui
+    annotation: Optional[AnnotationModel] = None
 
 
 AnnotationTaskLabelChoice.update_forward_refs()
+
+
+class FlattenedAnnotationTaskLabel(SBaseModel):
+    key: str
+    required: bool
+    max_repeat: int
+    implicit_max_repeat: int
+    kind: AnnotationTaskLabelTypes
+    choices: list[int] | None
+    parent_label: str | None
 
 
 class AnnotationTaskModel(SBaseModel):
@@ -94,6 +103,13 @@ class AssignmentScopeModel(SBaseModel):
     description: str | None = None
 
 
+class AssignmentStatus(Enum):
+    FULL = 'FULL'  # This assignment was fully and correctly fulfilled
+    PARTIAL = 'PARTIAL'  # This assignment was partially fulfilled
+    OPEN = 'OPEN'  # This assignment was not attempted
+    INVALID = 'INVALID'  # Something does not comply with the annotation scheme and is thus invalid
+
+
 class AssignmentModel(SBaseModel):
     """
     Corresponds to db.models.annotations.Assignment
@@ -121,6 +137,8 @@ class AssignmentModel(SBaseModel):
     item_id: str | UUID
     # The AnnotationTask (or its ID) defining the annotation scheme to be used for this assignment
     task_id: str | UUID
+    # The status of this assignment (to be updated with each annotation related to this assignment)
+    status: AssignmentStatus
     # The order of assignments within the assignment scope
     order: int | None = None
 
@@ -173,8 +191,11 @@ class AnnotationModel(SBaseModel):
 
     # In the case of AnnotationTaskLabel.repeats > 1, this field can be used
     # to track primary, secondary,... Annotations for that AnnotationTask/key pair.
-    # Default should always be 1.
-    repeat: int
+    # Count starts at 1, resets with each parent repeat.
+    repeat: int = 1
+
+    # Reference to the parent labels' annotation.
+    parent: str | UUID | None = None
 
     # Depending on the AnnotationTaskLabel.kind, one of the following fields should be filled.
     # For single and mixed, the AnnotationTaskLabelChoice.value should be filled in value_int.
