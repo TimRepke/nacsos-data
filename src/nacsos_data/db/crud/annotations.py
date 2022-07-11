@@ -28,6 +28,8 @@ logger = logging.getLogger('nacsos_data.crud.annotations')
 
 class UserProjectAssignmentScope(BaseModel):
     scope: AssignmentScopeModel
+    task_name: str
+    task_description: str
     num_assignments: int
     num_open: int
     num_partial: int
@@ -40,6 +42,8 @@ async def read_assignment_scopes_for_project_for_user(project_id: str | UUID,
     async with engine.session() as session:
         stmt = text("""
         SELECT scope.*,
+               task.name AS task_name,
+               task.description AS task_description,
                COUNT(DISTINCT assi.assignment_id) AS num_assignments,
                SUM(CASE WHEN assi.status = 'OPEN' THEN 1 ELSE 0 END) AS num_open,
                SUM(CASE WHEN assi.status = 'PARTIAL' THEN 1 ELSE 0 END) AS num_partial,
@@ -49,7 +53,7 @@ async def read_assignment_scopes_for_project_for_user(project_id: str | UUID,
                  LEFT OUTER JOIN assignment assi ON scope.assignment_scope_id = assi.assignment_scope_id
         WHERE assi.user_id = :user_id AND 
               task.project_id = :project_id
-        GROUP BY scope.assignment_scope_id;
+        GROUP BY scope.assignment_scope_id, task_name, task_description;
         """)
         result = await session.execute(stmt, {'user_id': user_id, 'project_id': project_id})
         result_list = result.mappings().all()
@@ -61,6 +65,8 @@ async def read_assignment_scopes_for_project_for_user(project_id: str | UUID,
                     name=res['name'],
                     description=res['description']
                 ),
+                task_name=res['task_name'],
+                task_description=res['task_description'],
                 num_assignments=res['num_assignments'],
                 num_open=res['num_open'],
                 num_partial=res['num_partial'],
@@ -216,7 +222,6 @@ async def update_assignment_status(assignment_id: str | UUID, status: Assignment
 async def upsert_annotations(annotations: list[AnnotationModel],
                              assignment_id: str | UUID | None,
                              engine: DatabaseEngineAsync) -> AssignmentStatus | None:
-    print(annotations)
     if assignment_id is not None:
         existing_annotations = await read_annotations_for_assignment(assignment_id=assignment_id, engine=engine)
         existing_ids = set([str(annotation.annotation_id) for annotation in existing_annotations])
@@ -235,8 +240,14 @@ async def upsert_annotations(annotations: list[AnnotationModel],
     logger.debug(f'[upsert_annotations] DELETING existing annotations with ids: {ids_to_remove}')
 
     async with engine.session() as session:
-        for annotation_id in ids_to_remove:
-            await session.execute(delete(Annotation).where(Annotation.annotation_id == annotation_id))
+        # TODO this seems too excessive compared to simply deleting them directly (but has to be done for FK constraint)
+        #      session.execute(delete(Annotation).where(Annotation.annotation_id == annotation_id))
+        annotations_to_delete = [
+            (await session.scalars(select(Annotation).filter_by(annotation_id=annotation_id))).first()
+            for annotation_id in ids_to_remove
+        ]
+        for annotation in annotations_to_delete:
+            await session.delete(annotation)
 
         new_annotations = []
         for annotation in annotations:

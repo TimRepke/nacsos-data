@@ -2,6 +2,7 @@ from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, Co
     UniqueConstraint, Identity, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from sqlalchemy_json import mutable_json_type
 import uuid
 
@@ -186,6 +187,8 @@ class Annotation(Base):
     text_offset_stop = Column(Integer, nullable=True)
 
     UniqueConstraint('assignment_id', 'key', 'parent', 'repeat')
+
+    sub_annotations = relationship('Annotation', cascade='all, delete')
 
     # TODO: Figure out a way to allow automated methods (e.g. classifiers) to utilise this
     #       table to annotate data as well. Creating loads of dummy users and assignments
