@@ -1,18 +1,27 @@
-from sqlalchemy import select, delete, asc
-from sqlalchemy.sql import text
 from uuid import UUID
-from pydantic import BaseModel
-from typing import Type
 import logging
 
-from nacsos_data.db import DatabaseEngineAsync
-from . import update_orm
-from nacsos_data.db.schemas import Annotation, AssignmentScope, Assignment, AnnotationTask
-from nacsos_data.models.annotations import AssignmentScopeModel, AssignmentModel, AnnotationModel, \
-    AnnotationTaskModel, AssignmentStatus
-from nacsos_data.models.projects import ProjectModel, ProjectPermissionsModel
-from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_task_and_annotations
+from sqlalchemy import select, delete, asc
+from sqlalchemy.sql import text
+from pydantic import BaseModel
 
+from nacsos_data.db import DatabaseEngineAsync
+from nacsos_data.db.schemas import \
+    Annotation, \
+    AnnotationTask, \
+    Assignment, \
+    AssignmentScope
+from nacsos_data.models.annotations import \
+    AnnotationModel, \
+    AnnotationTaskModel, \
+    AssignmentModel, \
+    AssignmentScopeModel, \
+    AssignmentStatus
+from nacsos_data.models.projects import \
+    ProjectModel, \
+    ProjectPermissionsModel
+from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_task_and_annotations
+from . import update_orm
 
 logger = logging.getLogger('nacsos_data.crud.annotations')
 

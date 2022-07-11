@@ -1,10 +1,9 @@
-from enum import Enum
 from uuid import UUID, uuid4
 import logging
 from nacsos_data.models.annotations import \
     AnnotationModel, AnnotationTaskModel, \
-    AnnotationTaskLabelTypes, FlattenedAnnotationTaskLabel, \
-    AssignmentStatus, AnnotationTaskLabel, AnnotationTaskLabelChoice
+    FlattenedAnnotationTaskLabel, \
+    AssignmentStatus, AnnotationTaskLabel
 
 logger = logging.getLogger('nacsos_data.annotation.validation')
 
@@ -38,17 +37,7 @@ def flatten_annotation_task(annotation_task: AnnotationTaskModel) -> list[Flatte
     return recurse(annotation_task.labels)
 
 
-def validate_annotated_assignment(annotation_task: AnnotationTaskModel,
-                                  annotations: list[AnnotationModel]) -> AssignmentStatus:
-    status, _ = merge_task_and_annotations(annotation_task, annotations)
-    return status
-
-
-def merge_task_and_annotations(annotation_task: AnnotationTaskModel,
-                               annotations: list[AnnotationModel]) -> tuple[AssignmentStatus, AnnotationTaskModel]:
-    if annotations is None or len(annotations) == 0:
-        return AssignmentStatus.OPEN, annotation_task
-
+def create_annotations_lookup(annotations: list[AnnotationModel]) -> dict[str, list[AnnotationModel]]:
     annotations_map = {}
     for annotation in annotations:
         if annotation.key not in annotations_map:
@@ -58,15 +47,58 @@ def merge_task_and_annotations(annotation_task: AnnotationTaskModel,
     for key in annotations_map.keys():
         annotations_map[key] = sorted(annotations_map[key], key=lambda a: a.repeat)
 
-    def recurse(labels: list[AnnotationTaskLabel], repeat: int = 1, parent: str | UUID = None):
-        ret = []
+    return annotations_map
+
+
+def validate_annotated_assignment(annotation_task: AnnotationTaskModel,
+                                  annotations: list[AnnotationModel]) -> AssignmentStatus:
+    if annotations is None or len(annotations) == 0:
+        return AssignmentStatus.OPEN
+
+    annotations_map = create_annotations_lookup(annotations)
+
+    def recurse(labels: list[AnnotationTaskLabel], repeat: int = 1, parent: str = None) -> AssignmentStatus:
         status = AssignmentStatus.FULL
 
         for label in labels:
             if label.key not in annotations_map:
-                ret.append(label)
                 if label.required:
                     status = AssignmentStatus.PARTIAL
+            else:
+                cnt = 0
+                for annotation in annotations_map[label.key]:
+                    if annotation.parent == parent:
+                        cnt += 1
+                        for ci, choice in enumerate(label.choices or []):
+                            if choice.children is not None and choice.value == annotation.value_int:
+                                child_state = recurse(choice.children,
+                                                      repeat=repeat,
+                                                      parent=annotation.annotation_id)
+                                if child_state != AssignmentStatus.FULL:
+                                    status = child_state
+                if label.required and cnt == 0:
+                    status = AssignmentStatus.PARTIAL
+                if cnt > label.max_repeat:
+                    status = AssignmentStatus.INVALID
+
+        return status
+
+    return recurse(annotation_task.labels)
+
+
+def merge_task_and_annotations(annotation_task: AnnotationTaskModel,
+                               annotations: list[AnnotationModel]) -> AnnotationTaskModel:
+    if annotations is None or len(annotations) == 0:
+        return annotation_task
+
+    annotations_map = create_annotations_lookup(annotations)
+
+    def recurse(labels: list[AnnotationTaskLabel], repeat: int = 1, parent: str = None) -> list[AnnotationTaskLabel]:
+        ret = []
+
+        for label in labels:
+            if label.key not in annotations_map:
+                ret.append(label)
             else:
                 cnt = 0
                 for annotation in annotations_map[label.key]:
@@ -77,23 +109,14 @@ def merge_task_and_annotations(annotation_task: AnnotationTaskModel,
 
                         for ci, choice in enumerate(label_cpy.choices or []):
                             if choice.children is not None:
-                                child_state, children = recurse(choice.children,
-                                                                repeat=repeat + 1,
-                                                                parent=annotation.annotation_id)
-                                choice.children = children
-
-                                if child_state != AssignmentStatus.FULL:
-                                    status = child_state
+                                choice.children = recurse(choice.children,
+                                                          repeat=repeat,
+                                                          parent=annotation.annotation_id)
                         ret.append(label_cpy)
-                if label.required and cnt == 0:
-                    status = AssignmentStatus.PARTIAL
-                if cnt > label.max_repeat:
-                    status = AssignmentStatus.INVALID
+        return ret
 
-        return status, ret
-
-    assignment_status, annotation_task.labels = recurse(annotation_task.labels)
-    return assignment_status, annotation_task
+    annotation_task.labels = recurse(annotation_task.labels)
+    return annotation_task
 
 
 def has_annotation(label: AnnotationTaskLabel) -> bool:
