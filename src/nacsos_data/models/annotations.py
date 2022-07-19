@@ -81,6 +81,27 @@ class AnnotationTaskModel(SBaseModel):
     labels: list[AnnotationTaskLabel]
 
 
+AssignmentScopeBaseConfigTypes = Literal['random']
+
+
+class AssignmentScopeBaseConfig(SBaseModel):
+    config_type: AssignmentScopeBaseConfigTypes
+    # list of user ids in the pool
+    users: list[str] | list[UUID] | None = None
+
+
+class AssignmentScopeRandomConfig(AssignmentScopeBaseConfig):
+    config_type: AssignmentScopeBaseConfigTypes = 'random'
+    num_items: int
+    min_assignments_per_item: int
+    max_assignments_per_item: int
+    num_multi_coded_items: int
+    random_seed: int
+
+
+AssignmentScopeConfig = AssignmentScopeRandomConfig
+
+
 class AssignmentScopeModel(SBaseModel):
     """
     AssignmentScope can be used to logically group a set of Assignments.
@@ -95,12 +116,16 @@ class AssignmentScopeModel(SBaseModel):
     assignment_scope_id: str | UUID | None = None
     # The AnnotationTask defining the annotation scheme to be used for this scope
     task_id: str | UUID
+    # Date and time when this assignment scope was created
+    time_created: datetime | None = None
     # A short descriptive title / name for this scope.
     # This may be displayed to the annotators.
     name: str
     # An (optional) slightly longer description of the scope.
     # This may be displayed to the annotators as refined instruction or background information.
     description: str | None = None
+    # Config for the assignment (for reference, optional)
+    config: AssignmentScopeConfig | None = None
 
 
 class AssignmentStatus(Enum):

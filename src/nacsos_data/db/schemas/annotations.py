@@ -47,6 +47,9 @@ class AnnotationTask(Base):
     # Note, this is always a list of labels!
     labels = Column(mutable_json_type(dbtype=JSONB, nested=True))
 
+    # reference to the associated assignment scopes
+    assignment_scopes = relationship('AssignmentScope', cascade='all, delete')
+
 
 class AssignmentScope(Base):
     """
@@ -67,6 +70,9 @@ class AssignmentScope(Base):
     # The AnnotationTask defining the annotation scheme to be used for this scope
     task_id = Column(UUID(as_uuid=True), ForeignKey(AnnotationTask.annotation_task_id), nullable=False, index=True)
 
+    # Date and time when this assignment scope was created
+    time_created = Column(DateTime(timezone=True), server_default=func.now())
+
     # A short descriptive title / name for this scope.
     # This may be displayed to the annotators.
     name = Column(String, nullable=False)
@@ -74,6 +80,12 @@ class AssignmentScope(Base):
     # An (optional) slightly longer description of the scope.
     # This may be displayed to the annotators as refined instruction or background information.
     description = Column(String, nullable=True)
+
+    # Stores the config parameters used in creating the assignments for future reference
+    config = Column(mutable_json_type(dbtype=JSONB, nested=True), nullable=True)
+
+    # reference to the associated assignments
+    assignments = relationship('Assignment', cascade='all, delete')
 
 
 class Assignment(Base):
