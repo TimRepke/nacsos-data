@@ -239,6 +239,27 @@ async def update_assignment_status(assignment_id: str | UUID, status: Assignment
         await session.commit()
 
 
+async def upsert_annotation_task(annotation_task: AnnotationTaskModel,
+                                 engine: DatabaseEngineAsync) -> str | UUID | None:
+    key = await upsert_orm(upsert_model=annotation_task,
+                           Schema=AnnotationTask,
+                           primary_key=AnnotationTask.annotation_task_id.name,
+                           engine=engine)
+    return key
+
+
+async def delete_annotation_task(annotation_task_id: str | UUID,
+                                 engine: DatabaseEngineAsync) -> None:
+    async with engine.session() as session:
+        stmt = select(AnnotationTask).filter_by(annotation_task_id=annotation_task_id)
+        annotation_task = (await session.scalars(stmt)).one_or_none()
+        if annotation_task is not None:
+            await session.delete(annotation_task)
+            await session.commit()
+        else:
+            raise ValueError(f'AnnotationTask with id="{annotation_task_id}" does not seem to exist.')
+
+
 async def upsert_assignment_scope(assignment_scope: AssignmentScopeModel,
                                   engine: DatabaseEngineAsync) -> str | UUID | None:
     key = await upsert_orm(upsert_model=assignment_scope,
