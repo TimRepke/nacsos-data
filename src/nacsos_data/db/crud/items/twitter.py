@@ -21,6 +21,21 @@ async def read_all_tweets_for_project(project_id: str | UUID, engine: DatabaseEn
         return [TwitterItemModel(**res.__dict__) for res in result_list]
 
 
+async def read_paged_tweets_for_project(project_id: str | UUID,
+                                        page: int, page_size: int,
+                                        engine: DatabaseEngineAsync) -> list[TwitterItemModel]:
+    # page: count starts at 1
+    async with engine.session() as session:
+        stmt = select(TwitterItem) \
+            .join(M2MProjectItem, M2MProjectItem.item_id == TwitterItem.item_id) \
+            .where(M2MProjectItem.project_id == project_id) \
+            .offset((page - 1) * page_size) \
+            .limit(page_size)
+        result = await session.execute(stmt)
+        result_list = result.scalars().all()
+        return [TwitterItemModel(**res.__dict__) for res in result_list]
+
+
 async def read_tweet_by_item_id(item_id: str | UUID, engine: DatabaseEngineAsync) -> TwitterItemModel:
     stmt = select(TwitterItem).filter_by(item_id=item_id)
     async with engine.session() as session:

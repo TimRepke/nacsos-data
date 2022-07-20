@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import select, delete, insert
+from sqlalchemy import select, delete, insert, func
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
@@ -18,6 +18,15 @@ async def read_all_items_for_project(project_id: str | UUID, engine: DatabaseEng
         result = await session.execute(stmt)
         result_list = result.scalars().all()
         return [ItemModel(**res.__dict__) for res in result_list]
+
+
+async def read_item_count_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) -> int:
+    async with engine.session() as session:
+        stmt = select(M2MProjectItem.project_id, func.count(M2MProjectItem.item_id).label('num_items')) \
+            .where(M2MProjectItem.project_id == project_id) \
+            .group_by(M2MProjectItem.project_id)
+        result = (await session.execute(stmt)).mappings().one_or_none()
+        return result['num_items']
 
 
 async def create_item(item: ItemModel, project_id: str | UUID | None, engine: DatabaseEngineAsync):
