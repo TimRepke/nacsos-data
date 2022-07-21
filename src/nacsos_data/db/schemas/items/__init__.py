@@ -1,9 +1,12 @@
-from sqlalchemy import String, Column, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, ForeignKey, Boolean, Column, Enum as SAEnum, DateTime, func, UniqueConstraint
+from sqlalchemy_json import mutable_json_type
+from sqlalchemy.dialects.postgresql import UUID, JSONB
+from enum import Enum
 import uuid
 
 from ...base_class import Base
 from ..projects import Project
+from ..imports import Import
 
 
 class Item(Base):
@@ -23,6 +26,9 @@ class Item(Base):
     #   Paper: abstract
     text = Column(String, nullable=False)
 
+    # any kind of (json-formatted) meta-data
+    meta = Column(mutable_json_type(dbtype=JSONB, nested=True))
+
     # FIXME: fundamental question is how to deal with different use cases.
     #        e.g. for papers, text could be the abstract, title,  full-text, paragraphs of full text
     #             and based on context, the same item (?) would point to different texts
@@ -30,10 +36,36 @@ class Item(Base):
     #             which would lead to lots of repeated data though
 
 
-class M2MProjectItem(Base):
-    __tablename__ = 'm2m_project_item'
+class M2MImportItem(Base):
+    """
+    This describes the many-to-many relation between imports and items.
+    In other words: It keeps track of which items were imported when and in which context.
 
+      - If an item already existed in the database, this entry should still be added
+        to keep track of what this import (e.g. WoS query) covers.
+      - An import job may run for a while. In that case, the `time_created` field
+        will refer to the time this item was (virtually) imported, not when the import job started.
+    """
+    __tablename__ = 'm2m_import_item'
+
+    import_id = Column(UUID(as_uuid=True), ForeignKey(Import.import_id),
+                       nullable=False, index=True, primary_key=True)
     item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id),
                      nullable=False, index=True, primary_key=True)
+
+    # Keeps track of when this import took place.
+    # Refers to the actual time the item was imported, not when the import ob was started!
+    time_created = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class M2MProjectItem(Base):
+    """
+    This describes the many-to-many relation between projects and items.
+    In other words: It keeps track of which items belong to which project.
+    """
+    __tablename__ = 'm2m_project_item'
+
     project_id = Column(UUID(as_uuid=True), ForeignKey(Project.project_id),
                         nullable=False, index=True, primary_key=True)
+    item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id),
+                     nullable=False, index=True, primary_key=True)

@@ -9,6 +9,7 @@ from .users import User
 
 
 class ProjectType(Enum):
+    basic = 'basic'
     twitter = 'twitter'
     academic = 'academic'
     patents = 'patents'
@@ -75,9 +76,9 @@ class ProjectPermissions(Base):
     dataset_edit = Column(Boolean, nullable=False, default=False)
 
     # If true, the user has permission to see the list of queries used in this project
-    queries_read = Column(Boolean, nullable=False, default=False)
+    imports_read = Column(Boolean, nullable=False, default=False)
     # If true, the user has permission to add, edit, and execute queries for this project
-    queries_edit = Column(Boolean, nullable=False, default=False)
+    imports_edit = Column(Boolean, nullable=False, default=False)
 
     # If true, the user has permission to view and export annotations associated with this project
     annotations_read = Column(Boolean, nullable=False, default=False)

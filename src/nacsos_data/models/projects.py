@@ -4,6 +4,8 @@ from uuid import UUID
 from nacsos_data.db.schemas.projects import ProjectType
 from . import SBaseModel
 
+ProjectTypeLiteral = Literal['basic', 'twitter', 'academic', 'patents']
+
 
 class ProjectModel(SBaseModel):
     """
@@ -27,12 +29,12 @@ class ProjectModel(SBaseModel):
 
     # Defines what sort of data this project works with
     # This is used to show item-type specific interface elements and join enriched meta-data
-    type: Literal['twitter', 'academic', 'patents'] | ProjectType
+    type: ProjectTypeLiteral | ProjectType
 
 
 ProjectPermission = Literal['owner',
                             'dataset_read', 'dataset_edit',
-                            'queries_read', 'queries_edit',
+                            'imports_read', 'imports_edit',
                             'annotations_read', 'annotations_edit',
                             'pipelines_read', 'pipelines_edit',
                             'artefacts_read', 'artefacts_edit']
@@ -69,9 +71,9 @@ class ProjectPermissionsModel(SBaseModel):
     dataset_edit: bool = False
 
     # If true, the user has permission to see the list of queries used in this project
-    queries_read: bool = False
+    imports_read: bool = False
     # If true, the user has permission to add, edit, and execute queries for this project
-    queries_edit: bool = False
+    imports_edit: bool = False
 
     # If true, the user has permission to view and export annotations associated with this project
     annotations_read: bool = False
@@ -93,7 +95,7 @@ class ProjectPermissionsModel(SBaseModel):
         return cls(project_permission_id=None, project_id=project_id,
                    user_id=user_id, owner=True,
                    dataset_read=True, dataset_edit=True,
-                   queries_read=True, queries_edit=True,
+                   imports_read=True, imports_edit=True,
                    annotations_read=True, annotations_edit=True,
                    pipelines_read=True, pipelines_edit=True,
                    artefacts_read=True, artefacts_edit=True)
