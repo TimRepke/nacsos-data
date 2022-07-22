@@ -17,10 +17,12 @@ async def read_all_imports_for_project(project_id: UUID | str,
 
 async def read_item_count_for_import(import_id: UUID | str, engine: DatabaseEngineAsync) -> int:
     async with engine.session() as session:
-        stmt = select(M2MImportItem.import_id, func.count(Import.item_id).label('num_items')) \
+        stmt = select(M2MImportItem.import_id, func.count(M2MImportItem.item_id).label('num_items')) \
             .where(M2MImportItem.import_id == import_id) \
             .group_by(M2MImportItem.import_id)
         result = (await session.execute(stmt)).mappings().one_or_none()
+        if result is None:
+            return 0
         return result['num_items']
 
 
@@ -34,6 +36,7 @@ async def read_import(import_id: UUID | str,
 
 async def upsert_import(import_model: ImportModel,
                         engine: DatabaseEngineAsync) -> str | UUID | None:
+    print(import_model.config)
     key = await upsert_orm(upsert_model=import_model,
                            Schema=Import,
                            primary_key=Import.import_id.name,
