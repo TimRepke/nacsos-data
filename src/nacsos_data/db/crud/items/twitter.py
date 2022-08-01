@@ -7,36 +7,21 @@ from nacsos_data.db.schemas.items import Item
 from nacsos_data.db.schemas import TwitterItem, M2MProjectItem
 from nacsos_data.models.items.twitter import TwitterItemModel
 
-
-# TODO paged output with cursor of some sort
-#      ideally make it a decorator so it's reusable everywhere
-#      https://www.postgresql.org/docs/current/sql-declare.html
-async def read_all_tweets_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) -> list[TwitterItemModel]:
-    async with engine.session() as session:
-        stmt = select(TwitterItem) \
-            .join(M2MProjectItem, M2MProjectItem.item_id == TwitterItem.item_id) \
-            .where(M2MProjectItem.project_id == project_id)
-        result = await session.execute(stmt)
-        result_list = result.scalars().all()
-        return [TwitterItemModel(**res.__dict__) for res in result_list]
+from . import _read_all_for_project, _read_paged_for_project
 
 
-async def read_paged_tweets_for_project(project_id: str | UUID,
-                                        page: int, page_size: int,
-                                        engine: DatabaseEngineAsync) -> list[TwitterItemModel]:
-    # page: count starts at 1
-    async with engine.session() as session:
-        stmt = select(TwitterItem) \
-            .join(M2MProjectItem, M2MProjectItem.item_id == TwitterItem.item_id) \
-            .where(M2MProjectItem.project_id == project_id) \
-            .offset((page - 1) * page_size) \
-            .limit(page_size)
-        result = await session.execute(stmt)
-        result_list = result.scalars().all()
-        return [TwitterItemModel(**res.__dict__) for res in result_list]
+async def read_all_twitter_items_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) \
+        -> list[TwitterItemModel]:
+    return await _read_all_for_project(project_id=project_id, Schema=TwitterItem, Model=TwitterItemModel, engine=engine)
 
 
-async def read_tweet_by_item_id(item_id: str | UUID, engine: DatabaseEngineAsync) -> TwitterItemModel:
+async def read_all_twitter_items_for_project_paged(project_id: str | UUID, page: int, page_size: int,
+                                                   engine: DatabaseEngineAsync) -> list[TwitterItemModel]:
+    return await _read_paged_for_project(project_id=project_id, page=page, page_size=page_size,
+                                         Schema=TwitterItem, Model=TwitterItemModel, engine=engine)
+
+
+async def read_twitter_item_by_item_id(item_id: str | UUID, engine: DatabaseEngineAsync) -> TwitterItemModel:
     stmt = select(TwitterItem).filter_by(item_id=item_id)
     async with engine.session() as session:
         result = (await session.execute(stmt)).scalars().one_or_none()
@@ -44,7 +29,7 @@ async def read_tweet_by_item_id(item_id: str | UUID, engine: DatabaseEngineAsync
             return TwitterItemModel(**result.__dict__)
 
 
-async def read_tweet_by_twitter_id(twitter_id: str | UUID, engine: DatabaseEngineAsync) -> TwitterItemModel:
+async def read_twitter_item_by_twitter_id(twitter_id: str | UUID, engine: DatabaseEngineAsync) -> TwitterItemModel:
     stmt = select(TwitterItem).filter_by(twitter_id=twitter_id)
     async with engine.session() as session:
         result = (await session.execute(stmt)).scalars().one_or_none()
@@ -52,7 +37,7 @@ async def read_tweet_by_twitter_id(twitter_id: str | UUID, engine: DatabaseEngin
             return TwitterItemModel(**result.__dict__)
 
 
-async def read_tweets_by_author_id(twitter_author_id: str | UUID, engine: DatabaseEngineAsync) \
+async def read_twitter_items_by_author_id(twitter_author_id: str | UUID, engine: DatabaseEngineAsync) \
         -> list[TwitterItemModel]:
     stmt = select(TwitterItem).filter_by(twitter_author_id=twitter_author_id)
     async with engine.session() as session:
@@ -61,7 +46,7 @@ async def read_tweets_by_author_id(twitter_author_id: str | UUID, engine: Databa
         return [TwitterItemModel(**res.__dict__) for res in result_list]
 
 
-async def create_tweet(tweet: TwitterItemModel, project_id: str | UUID | None, engine: DatabaseEngineAsync) \
+async def create_twitter_item(tweet: TwitterItemModel, project_id: str | UUID | None, engine: DatabaseEngineAsync) \
         -> str | UUID:
     # TODO return item_id
     try:
@@ -87,9 +72,9 @@ async def create_tweet(tweet: TwitterItemModel, project_id: str | UUID | None, e
         print(e)
 
 
-async def create_tweets(tweets: list[TwitterItemModel], project_id: str | UUID | None, engine: DatabaseEngineAsync) \
-        -> list[str | UUID]:
+async def create_twitter_items(tweets: list[TwitterItemModel], project_id: str | UUID | None,
+                               engine: DatabaseEngineAsync) -> list[str | UUID]:
     # TODO return item_ids
     # TODO make this in an actual batched mode
     for tweet in tweets:
-        return [await create_tweet(tweet, project_id=project_id, engine=engine)]
+        return [await create_twitter_item(tweet, project_id=project_id, engine=engine)]

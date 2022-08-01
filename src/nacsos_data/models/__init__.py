@@ -9,3 +9,4 @@ class SBaseModel(BaseModel):
 
     def __setitem__(self, key, value):
         setattr(self, key, value)
+

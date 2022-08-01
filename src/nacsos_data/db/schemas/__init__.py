@@ -5,3 +5,5 @@ from .users import User
 from .imports import Import
 from .items import Item, M2MProjectItem, M2MImportItem
 from .items.twitter import TwitterItem
+
+AnyItemType = Item | TwitterItem

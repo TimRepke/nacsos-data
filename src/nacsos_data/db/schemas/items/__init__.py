@@ -27,6 +27,8 @@ class Item(Base):
     text = Column(String, nullable=False)
 
     # any kind of (json-formatted) meta-data
+    #   For project marked as "basic" this information may be shown to the user.
+    #   Keys with prefix `_` will not be rendered by the frontend though.
     meta = Column(mutable_json_type(dbtype=JSONB, nested=True))
 
     # FIXME: fundamental question is how to deal with different use cases.
