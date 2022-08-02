@@ -4,6 +4,7 @@ from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import M2MProjectItem, AnyItemType, Item, TwitterItem
+from nacsos_data.db.schemas.projects import ProjectType
 from nacsos_data.models.items import AnyItemModel, ItemModel, TwitterItemModel
 from nacsos_data.models.projects import ProjectTypeLiteral
 
@@ -68,10 +69,10 @@ async def _read_paged_for_project(project_id: str | UUID, Schema: AnyItemType, M
         return [Model(**res.__dict__) for res in result]
 
 
-def _get_schema_model_for_type(item_type: ProjectTypeLiteral) -> tuple[AnyItemType, AnyItemModel]:
-    if item_type == 'basic':
+def _get_schema_model_for_type(item_type: ProjectTypeLiteral | ProjectType) -> tuple[AnyItemType, AnyItemModel]:
+    if item_type == 'basic' or item_type == ProjectType.basic:
         return Item, ItemModel
-    if item_type == 'twitter':
+    if item_type == 'twitter' or item_type == ProjectType.twitter:
         return TwitterItem, TwitterItemModel
     raise ValueError(f'Not implemented for {item_type}')
 
