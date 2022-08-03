@@ -41,7 +41,3 @@ class User(Base):
     # Note: Deleting an account might lead to inconsistencies with other parts of the DB,
     #       so setting this to "false" to remove access should be preferred.
     is_active = Column(Boolean, nullable=False, default=True)
-
-
-
-

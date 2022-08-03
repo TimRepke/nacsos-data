@@ -1,4 +1,4 @@
-from sqlalchemy import select, asc, desc
+from sqlalchemy import select, asc
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync

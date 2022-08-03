@@ -1,8 +1,7 @@
-import uuid
 from uuid import UUID
 import logging
 
-from sqlalchemy import select, delete, asc, desc, func, distinct
+from sqlalchemy import select, asc, desc
 from sqlalchemy.sql import text
 from pydantic import BaseModel
 
@@ -11,21 +10,15 @@ from nacsos_data.db.schemas import \
     Annotation, \
     AnnotationTask, \
     Assignment, \
-    AssignmentScope, \
-    Item
+    AssignmentScope
 from nacsos_data.models.annotations import \
     AnnotationModel, \
     AnnotationTaskModel, \
     AssignmentModel, \
     AssignmentScopeModel, \
     AssignmentStatus
-from nacsos_data.models.items import \
-    ItemModel
-from nacsos_data.models.projects import \
-    ProjectModel, \
-    ProjectPermissionsModel
 from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_task_and_annotations
-from . import update_orm, upsert_orm
+from . import upsert_orm
 
 logger = logging.getLogger('nacsos_data.crud.annotations')
 
@@ -55,7 +48,7 @@ async def read_assignment_scopes_for_project_for_user(project_id: str | UUID,
         FROM assignment_scope scope
                  FULL OUTER JOIN annotation_task task ON scope.task_id = task.annotation_task_id
                  LEFT OUTER JOIN assignment assi ON scope.assignment_scope_id = assi.assignment_scope_id
-        WHERE assi.user_id = :user_id AND 
+        WHERE assi.user_id = :user_id AND
               task.project_id = :project_id
         GROUP BY scope.assignment_scope_id, task_name, task_description;
         """)
@@ -355,8 +348,8 @@ async def read_item_ids_with_assignment_count_for_project(project_id: str | UUID
                SUM(CASE WHEN assignment.status = 'OPEN' THEN 1 ELSE 0 END) AS num_open,
                SUM(CASE WHEN assignment.status = 'PARTIAL' THEN 1 ELSE 0 END) AS num_partial,
                SUM(CASE WHEN assignment.status = 'FULL' THEN 1 ELSE 0 END) AS num_full
-        FROM assignment 
-        JOIN annotation_task ON annotation_task.annotation_task_id = assignment.task_id 
+        FROM assignment
+        JOIN annotation_task ON annotation_task.annotation_task_id = assignment.task_id
         WHERE annotation_task.project_id = :project_id
         GROUP BY assignment.item_id;
         """)

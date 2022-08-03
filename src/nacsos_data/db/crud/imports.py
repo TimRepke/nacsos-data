@@ -1,8 +1,8 @@
-from sqlalchemy import select, delete, func
+from sqlalchemy import select, func
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
-from . import update_orm, upsert_orm
+from . import upsert_orm
 from nacsos_data.db.schemas import Import, M2MImportItem
 from nacsos_data.models.imports import ImportModel
 
