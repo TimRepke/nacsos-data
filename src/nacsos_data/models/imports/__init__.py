@@ -1,12 +1,32 @@
 from datetime import datetime
 from typing import Literal
+from enum import Enum
 from uuid import UUID
 
 from .. import SBaseModel
-from ...db.schemas.imports import ImportType
 
 from .import_config_ris import ImportConfigRIS
 from .import_config_twitter import ImportConfigTwitter
+
+
+class ImportType(Enum):
+    # File import
+    ris = 'ris'  # single or bulk import of publications via RIS file(s)
+    csv = 'csv'  # single or bulk import of publications via CSV file(s)
+    jsonl = 'jsonl'  # single or bulk import of publications via JSON.l file(s)
+
+    # Scholarly databases
+    wos = 'wos'  # Import via Web of Science query
+    scopus = 'scopus'  # Import via Scopus query
+    ebsco = 'ebsco'  # Import via EBSCO query
+    jstor = 'jstor'  # Import via JSTOR query
+    ovid = 'ovid'  # Import via OVID query
+    pop = 'pop'  # Import via Publish or Perish query
+
+    # Others
+    twitter = 'twitter'  # Import via Twitter
+    script = 'script'  # Import was done with a script
+
 
 ImportTypeLiteral = Literal['ris', 'csv', 'jsonl',
                             'wos', 'scopus', 'ebsco', 'jstor', 'ovid', 'pop',

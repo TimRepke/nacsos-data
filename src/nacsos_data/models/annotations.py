@@ -1,4 +1,4 @@
-from typing import Literal, ForwardRef, Optional, Type
+from typing import Literal, ForwardRef, Optional
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
@@ -16,7 +16,7 @@ class AnnotationTaskLabelChoice(SBaseModel):
     hint: str | None = None
     # note, no constraint on value uniqueness; should be checked in frontend
     value: int
-    children: list[Type[AnnotationTaskLabel]] | None = None
+    children: list[AnnotationTaskLabel] | None = None
 
 
 class AnnotationTaskLabel(SBaseModel):  # type: ignore

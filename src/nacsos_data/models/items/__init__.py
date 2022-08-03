@@ -4,7 +4,7 @@ from uuid import UUID
 from .. import SBaseModel
 from .twitter import TwitterItemModel, TwitterMetaObject, ReferencedTweet
 
-ItemMetaType = dict[str, str | float | int | 'ItemMetaType']
+ItemMetaType = dict # dict[str, str | float | int | 'ItemMetaType']
 
 
 class ItemModel(SBaseModel):
