@@ -1,4 +1,4 @@
-from typing import Literal, ForwardRef, Optional
+from typing import Literal, ForwardRef, Optional, Type
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
@@ -16,10 +16,10 @@ class AnnotationTaskLabelChoice(SBaseModel):
     hint: str | None = None
     # note, no constraint on value uniqueness; should be checked in frontend
     value: int
-    children: list[AnnotationTaskLabel] | None = None
+    children: list[Type[AnnotationTaskLabel]] | None = None
 
 
-class AnnotationTaskLabel(SBaseModel):
+class AnnotationTaskLabel(SBaseModel):  # type: ignore
     name: str
     key: str  # note, no check for key uniqueness; should be done in frontend
     hint: str | None = None
@@ -168,7 +168,7 @@ class AssignmentModel(SBaseModel):
     order: int | None = None
 
 
-class AnnotationModel(SBaseModel):
+class AnnotationModel(SBaseModel):  # type: ignore
     """
     Corresponds to db.models.annotations.Annotation
 
@@ -235,4 +235,5 @@ class AnnotationModel(SBaseModel):
     text_offset_stop: int | None = None
 
 
-AnnotationTaskLabel.update_forward_refs()
+# AnnotationModel.update_forward_refs()  # type: ignore
+AnnotationTaskLabel.update_forward_refs()  # type: ignore

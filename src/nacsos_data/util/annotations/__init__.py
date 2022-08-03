@@ -1,5 +1,4 @@
-from nacsos_data.models.annotations import AnnotationTaskModel, AnnotationTaskLabelChoice, AnnotationModel, \
-    AnnotationTaskLabel
+from nacsos_data.models.annotations import AnnotationTaskModel, AnnotationTaskLabel
 
 
 def unravel_annotation_task_keys(task: AnnotationTaskModel):

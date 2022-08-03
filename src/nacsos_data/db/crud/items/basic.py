@@ -1,5 +1,6 @@
 from uuid import UUID
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import Item
@@ -18,9 +19,10 @@ async def read_all_basic_items_for_project_paged(project_id: str | UUID, page: i
                                          Schema=Item, Model=ItemModel, engine=engine)
 
 
-async def read_basic_item_by_item_id(item_id: str | UUID, engine: DatabaseEngineAsync) -> ItemModel:
+async def read_basic_item_by_item_id(item_id: str | UUID, engine: DatabaseEngineAsync) -> ItemModel | None:
     stmt = select(Item).filter_by(item_id=item_id)
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
             return ItemModel(**result.__dict__)
+    return None

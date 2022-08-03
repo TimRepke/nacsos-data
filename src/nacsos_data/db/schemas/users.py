@@ -15,7 +15,7 @@ class User(Base):
 
     # Unique identifier for this user.
     user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                     nullable=False, unique=True, index=True)
+                     nullable=False, unique=True, index=True)  # type: Column[uuid.UUID | str]
 
     # Username for that user
     # -> nicer than using email and allows us to have multiple accounts per email

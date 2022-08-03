@@ -1,13 +1,13 @@
 import logging
-from typing import Optional
-from sqlalchemy import select, delete
+from typing import Any, Type
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID, uuid4
 from pydantic import BaseModel
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import Base
 from nacsos_data.models import SBaseModel
-
 
 logger = logging.getLogger('nacsos_data.crud')
 
@@ -22,9 +22,9 @@ class DuplicateKeyWarning(UserWarning):
     pass
 
 
-async def update_orm(updated_model: BaseModel, Model, Schema: Base, filter_by: dict, skip_update: list[str],
-                     engine: DatabaseEngineAsync):
-    async with engine.session() as session:
+async def update_orm(updated_model: BaseModel, Model: Type[BaseModel], Schema: Type[Base],
+                     filter_by: dict[str, Any], skip_update: list[str], engine: DatabaseEngineAsync) -> Base:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(Schema).filter_by(**filter_by)
         orm_model = (await session.execute(stmt)).one_or_none()
         if orm_model is not None:
@@ -38,10 +38,10 @@ async def update_orm(updated_model: BaseModel, Model, Schema: Base, filter_by: d
         return Model(**orm_model.__dict__)
 
 
-async def upsert_orm(upsert_model: SBaseModel, Schema: Base, primary_key: str,
+async def upsert_orm(upsert_model: SBaseModel, Schema: Type[Base], primary_key: str,
                      engine: DatabaseEngineAsync, skip_update: list[str] = None) -> str | UUID | None:
     # returns id of inserted or updated assignment scope
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         logger.debug(f'UPSERT "{Schema}" with keys: {list(upsert_model.dict().keys())}')
 
         if upsert_model[primary_key] is None:
@@ -50,7 +50,7 @@ async def upsert_orm(upsert_model: SBaseModel, Schema: Base, primary_key: str,
             # fetch existing model from the database
             # session.query()
             stmt = select(Schema).filter_by(**{primary_key: upsert_model[primary_key]})
-            orm_model: Schema = (await session.scalars(stmt)).one_or_none()
+            orm_model: Base = (await session.scalars(stmt)).one_or_none()
 
             logger.debug(f'"{Schema}" with {primary_key}={upsert_model[primary_key]} found, '
                          f'attempting to UPDATE!')

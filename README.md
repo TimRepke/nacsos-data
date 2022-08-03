@@ -18,9 +18,7 @@ $ alembic upgrade head
 ## Testing
 
 ```bash
-# To check code style, run:
+# For testing/linting/code style checks, run
 flake8 --config .flake8
-
-# To lint, run:
 mypy --config-file=pyproject.toml src/nacsos_data 
 ```

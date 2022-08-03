@@ -1,9 +1,9 @@
-from sqlalchemy import String, ForeignKey, Boolean, Column, Enum as SAEnum, DateTime, func, UniqueConstraint
+from sqlalchemy import String, ForeignKey, Column, DateTime, func
 from sqlalchemy_json import mutable_json_type
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from enum import Enum
 import uuid
 
+from nacsos_data.models.items import ItemMetaType
 from ...base_class import Base
 from ..projects import Project
 from ..imports import Import
@@ -19,7 +19,7 @@ class Item(Base):
 
     # Unique identifier for this Item.
     item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                     nullable=False, unique=True, index=True)
+                     nullable=False, unique=True, index=True)  # type: Column[uuid.UUID | str]
 
     # The text for this item
     #   Tweet: status_text
@@ -29,7 +29,7 @@ class Item(Base):
     # any kind of (json-formatted) meta-data
     #   For project marked as "basic" this information may be shown to the user.
     #   Keys with prefix `_` will not be rendered by the frontend though.
-    meta = Column(mutable_json_type(dbtype=JSONB, nested=True))
+    meta = Column(mutable_json_type(dbtype=JSONB, nested=True))  # type: ItemMetaType
 
     # FIXME: fundamental question is how to deal with different use cases.
     #        e.g. for papers, text could be the abstract, title,  full-text, paragraphs of full text
@@ -51,9 +51,9 @@ class M2MImportItem(Base):
     __tablename__ = 'm2m_import_item'
 
     import_id = Column(UUID(as_uuid=True), ForeignKey(Import.import_id),
-                       nullable=False, index=True, primary_key=True)
+                       nullable=False, index=True, primary_key=True)  # type: Column[uuid.UUID | str]
     item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id),
-                     nullable=False, index=True, primary_key=True)
+                     nullable=False, index=True, primary_key=True)  # type: Column[uuid.UUID | str]
 
     # Keeps track of when this import took place.
     # Refers to the actual time the item was imported, not when the import ob was started!
@@ -68,6 +68,6 @@ class M2MProjectItem(Base):
     __tablename__ = 'm2m_project_item'
 
     project_id = Column(UUID(as_uuid=True), ForeignKey(Project.project_id),
-                        nullable=False, index=True, primary_key=True)
+                        nullable=False, index=True, primary_key=True)  # type: Column[uuid.UUID | str]
     item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id),
-                     nullable=False, index=True, primary_key=True)
+                     nullable=False, index=True, primary_key=True)  # type: Column[uuid.UUID | str]

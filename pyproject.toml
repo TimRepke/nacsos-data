@@ -9,15 +9,20 @@ testpaths = [
 ]
 
 [tool.mypy]
-mypy_path = "src/nacsos_data"
-check_untyped_defs = true
-disallow_any_generics = true
-ignore_missing_imports = true
-no_implicit_optional = true
-show_error_codes = true
-strict_equality = true
+plugins = ["pydantic.mypy"]
+strict_optional = true
+follow_imports = "silent"
 warn_redundant_casts = true
-warn_return_any = true
-warn_unreachable = true
-warn_unused_configs = true
+warn_unused_ignores = true
+disallow_any_generics = true
+check_untyped_defs = true
 no_implicit_reexport = true
+
+# for strict mypy: (this is the tricky one :-))
+disallow_untyped_defs = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+warn_untyped_fields = true

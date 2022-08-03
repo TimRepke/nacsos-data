@@ -91,7 +91,7 @@ class ProjectPermissionsModel(SBaseModel):
     artefacts_edit: bool = False
 
     @classmethod
-    def get_virtual_admin(cls, project_id: str, user_id: str):
+    def get_virtual_admin(cls, project_id: str, user_id: str) -> 'ProjectPermissionsModel':
         return cls(project_permission_id=None, project_id=project_id,
                    user_id=user_id, owner=True,
                    dataset_read=True, dataset_edit=True,

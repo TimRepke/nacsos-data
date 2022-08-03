@@ -1,5 +1,6 @@
 import uuid
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
@@ -21,36 +22,39 @@ async def read_all_twitter_items_for_project_paged(project_id: str | UUID, page:
                                          Schema=TwitterItem, Model=TwitterItemModel, engine=engine)
 
 
-async def read_twitter_item_by_item_id(item_id: str | UUID, engine: DatabaseEngineAsync) -> TwitterItemModel:
+async def read_twitter_item_by_item_id(item_id: str | UUID, engine: DatabaseEngineAsync) -> TwitterItemModel | None:
     stmt = select(TwitterItem).filter_by(item_id=item_id)
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
             return TwitterItemModel(**result.__dict__)
+    return None
 
 
-async def read_twitter_item_by_twitter_id(twitter_id: str | UUID, engine: DatabaseEngineAsync) -> TwitterItemModel:
+async def read_twitter_item_by_twitter_id(twitter_id: str | UUID,
+                                          engine: DatabaseEngineAsync) -> TwitterItemModel | None:
     stmt = select(TwitterItem).filter_by(twitter_id=twitter_id)
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
             return TwitterItemModel(**result.__dict__)
+    return None
 
 
 async def read_twitter_items_by_author_id(twitter_author_id: str | UUID, engine: DatabaseEngineAsync) \
         -> list[TwitterItemModel]:
     stmt = select(TwitterItem).filter_by(twitter_author_id=twitter_author_id)
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         result = await session.execute(stmt)
         result_list = result.scalars().all()
         return [TwitterItemModel(**res.__dict__) for res in result_list]
 
 
 async def create_twitter_item(tweet: TwitterItemModel, project_id: str | UUID | None, engine: DatabaseEngineAsync) \
-        -> str | UUID:
+        -> str | UUID | None:
     # TODO return item_id
     try:
-        async with engine.session() as session:
+        async with engine.session() as session:  # type: AsyncSession
             # TODO check, that this will break if an already existing tweets is being inserted
             #      and fail gracefully
             orm_tweet = TwitterItem(**tweet.dict())
@@ -70,11 +74,12 @@ async def create_twitter_item(tweet: TwitterItemModel, project_id: str | UUID | 
     except Exception as e:
         # TODO clean exception handling
         print(e)
+    return None
 
 
 async def create_twitter_items(tweets: list[TwitterItemModel], project_id: str | UUID | None,
-                               engine: DatabaseEngineAsync) -> list[str | UUID]:
+                               engine: DatabaseEngineAsync) -> list[str | UUID | None]:
     # TODO return item_ids
     # TODO make this in an actual batched mode
-    for tweet in tweets:
-        return [await create_twitter_item(tweet, project_id=project_id, engine=engine)]
+
+    return [await create_twitter_item(tweet, project_id=project_id, engine=engine) for tweet in tweets]

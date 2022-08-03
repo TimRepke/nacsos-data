@@ -9,10 +9,11 @@ logger = logging.getLogger('nacsos_data.annotation.validation')
 
 
 def flatten_annotation_task(annotation_task: AnnotationTaskModel) -> list[FlattenedAnnotationTaskLabel]:
-    def recurse(labels, parent_label=None, parent_repeat=1):
+    def recurse(labels: list[AnnotationTaskLabel], parent_label: str = None,
+                parent_repeat: int = 1) -> list[FlattenedAnnotationTaskLabel]:
         ret = []
 
-        for label in labels:
+        for label in labels:  # type: AnnotationTaskLabel
             choices = None
 
             if label.choices is not None:
@@ -37,8 +38,11 @@ def flatten_annotation_task(annotation_task: AnnotationTaskModel) -> list[Flatte
     return recurse(annotation_task.labels)
 
 
-def create_annotations_lookup(annotations: list[AnnotationModel]) -> dict[str, list[AnnotationModel]]:
-    annotations_map = {}
+AnnotationModelLookupType = dict[str, list[AnnotationModel]]
+
+
+def create_annotations_lookup(annotations: list[AnnotationModel]) -> AnnotationModelLookupType:
+    annotations_map: AnnotationModelLookupType = {}
     for annotation in annotations:
         if annotation.key not in annotations_map:
             annotations_map[annotation.key] = []
@@ -130,7 +134,7 @@ def has_annotation(label: AnnotationTaskLabel) -> bool:
 def annotated_task_to_annotations(task: AnnotationTaskModel) -> list[AnnotationModel]:
     ret = []
 
-    def recurse(labels: list[AnnotationTaskLabel], parent_id: UUID = None):
+    def recurse(labels: list[AnnotationTaskLabel], parent_id: UUID = None) -> None:
         for label in labels:
             if has_annotation(label):
                 if label.annotation.annotation_id is None:

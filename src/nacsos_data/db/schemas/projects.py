@@ -28,7 +28,7 @@ class Project(Base):
 
     # Unique identifier for this project
     project_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                        nullable=False, unique=True, index=True)
+                        nullable=False, unique=True, index=True)  # type: Column[uuid.UUID | str]
 
     # Unique descriptive name/title for the project
     name = Column(String, unique=True, nullable=False)
@@ -39,7 +39,7 @@ class Project(Base):
 
     # Defines what sort of data this project works with
     # This is used to show item-type specific interface elements and join enriched meta-data
-    type = Column(SAEnum(ProjectType), nullable=False)
+    type = Column(SAEnum(ProjectType), nullable=False)  # type: Column[ProjectType]
 
 
 class ProjectPermissions(Base):
@@ -56,13 +56,15 @@ class ProjectPermissions(Base):
 
     # Unique identifier for this set of permissions
     project_permission_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                   nullable=False, unique=True, index=True)
+                                   nullable=False, unique=True, index=True)  # type: Column[uuid.UUID | str]
 
     # Refers to the project this permission relates to
-    project_id = Column(UUID(as_uuid=True), ForeignKey(Project.project_id), nullable=False)
+    project_id = Column(UUID(as_uuid=True), ForeignKey(Project.project_id),
+                        nullable=False)  # type: Column[uuid.UUID | str]
 
     # Refers to the User this set of permissions for this project refers to
-    user_id = Column(UUID(as_uuid=True), ForeignKey(User.user_id), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey(User.user_id),
+                     nullable=False, index=True)  # type: Column[uuid.UUID | str]
 
     # If true, the user has all permissions for this project
     # Note: All other permission settings below will be ignored if set to "true"

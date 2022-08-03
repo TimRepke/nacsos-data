@@ -2,6 +2,7 @@ import random
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.models.annotations import \
@@ -11,7 +12,7 @@ from nacsos_data.models.annotations import \
 
 
 async def read_random_items(project_id: str | UUID, num_items: int, engine: DatabaseEngineAsync) -> list[str]:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = text("""
             SELECT m2m_project_item.item_id
             FROM m2m_project_item
@@ -59,7 +60,8 @@ async def random_assignments(assignment_scope_id: str | UUID,
 
     for item_id in multi_code_items:
         num_annotations = random.randint(config.min_assignments_per_item, config.max_assignments_per_item)
-        for user_id in random.sample(user_ids, k=num_annotations):
+        random_users = random.sample(user_ids, k=num_annotations)  # type: list[str]
+        for user_id in random_users:
             assignments.append(AssignmentModel(assignment_id=uuid4(),
                                                assignment_scope_id=assignment_scope_id,
                                                user_id=user_id,

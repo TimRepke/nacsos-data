@@ -8,6 +8,7 @@ import uuid
 from .users import User
 from .projects import Project
 from ..base_class import Base
+from ...models.imports import ImportConfig
 
 
 class ImportType(Enum):
@@ -34,15 +35,15 @@ class Import(Base):
 
     # Unique identifier for this import
     import_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                       nullable=False, unique=True, index=True)
+                       nullable=False, unique=True, index=True)  # type: Column[uuid.UUID | str]
 
     # The user who created this import (may be NULL if done via a script)
     user_id = Column(UUID(as_uuid=True), ForeignKey(User.user_id),
-                     nullable=True, index=True, primary_key=False)
+                     nullable=True, index=True, primary_key=False)  # type: Column[uuid.UUID | str]
 
     # The project this import is attached to
     project_id = Column(UUID(as_uuid=True), ForeignKey(Project.project_id),
-                        nullable=False, index=True, primary_key=False)
+                        nullable=False, index=True, primary_key=False)  # type: Column[uuid.UUID | str]
 
     # Unique descriptive name/title for the import
     name = Column(String, nullable=False)
@@ -52,7 +53,7 @@ class Import(Base):
     description = Column(String, nullable=True)
 
     # Defines what sort of import this is
-    type = Column(SAEnum(ImportType), nullable=False)
+    type = Column(SAEnum(ImportType), nullable=False)  # type: Column[ImportType]
 
     # Date and time when this import was created and when the actual import was triggered
     time_created = Column(DateTime(timezone=True), server_default=func.now())
@@ -60,7 +61,7 @@ class Import(Base):
     time_finished = Column(DateTime(timezone=True), nullable=True)
 
     # This stores the configuration of the respective import method
-    config = Column(mutable_json_type(dbtype=JSONB, nested=True))
+    config = Column(mutable_json_type(dbtype=JSONB, nested=True))  # type: Column[ImportConfig]
 
     # reference to the associated m2m rows
     m2m = relationship('M2MImportItem', cascade='all, delete')

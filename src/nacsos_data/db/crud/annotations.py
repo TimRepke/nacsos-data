@@ -3,6 +3,7 @@ import logging
 
 from sqlalchemy import select, asc, desc
 from sqlalchemy.sql import text
+from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 from nacsos_data.db import DatabaseEngineAsync
@@ -36,7 +37,7 @@ class UserProjectAssignmentScope(BaseModel):
 async def read_assignment_scopes_for_project_for_user(project_id: str | UUID,
                                                       user_id: str | UUID,
                                                       engine: DatabaseEngineAsync) -> list[UserProjectAssignmentScope]:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = text("""
         SELECT scope.*,
                task.name AS task_name,
@@ -75,7 +76,7 @@ async def read_assignment_scopes_for_project_for_user(project_id: str | UUID,
 
 async def read_assignment_scopes_for_project(project_id: str | UUID,
                                              engine: DatabaseEngineAsync) -> list[AssignmentScopeModel]:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(AssignmentScope) \
             .join(AnnotationTask, AnnotationTask.annotation_task_id == AssignmentScope.task_id) \
             .where(AnnotationTask.project_id == project_id) \
@@ -86,7 +87,7 @@ async def read_assignment_scopes_for_project(project_id: str | UUID,
 
 async def read_assignments_for_scope_for_user(assignment_scope_id: str | UUID, user_id: str | UUID,
                                               engine: DatabaseEngineAsync) -> list[AssignmentModel]:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(Assignment) \
             .filter_by(assignment_scope_id=assignment_scope_id, user_id=user_id) \
             .order_by(asc(Assignment.order))
@@ -96,7 +97,7 @@ async def read_assignments_for_scope_for_user(assignment_scope_id: str | UUID, u
 
 async def read_assignments_for_scope(assignment_scope_id: str | UUID,
                                      engine: DatabaseEngineAsync) -> list[AssignmentModel]:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(Assignment) \
             .filter_by(assignment_scope_id=assignment_scope_id) \
             .order_by(asc(Assignment.order))
@@ -107,8 +108,8 @@ async def read_assignments_for_scope(assignment_scope_id: str | UUID,
 async def read_next_assignment_for_scope_for_user(current_assignment_id: str | UUID,
                                                   assignment_scope_id: str | UUID,
                                                   user_id: str | UUID,
-                                                  engine: DatabaseEngineAsync) -> AssignmentModel:
-    async with engine.session() as session:
+                                                  engine: DatabaseEngineAsync) -> AssignmentModel | None:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = text("""
         WITH tmp as (SELECT assignment_id,
                         LEAD(assignment_id, 1) over (order by "order") as next_assignment_id
@@ -123,13 +124,15 @@ async def read_next_assignment_for_scope_for_user(current_assignment_id: str | U
                                               'assignment_scope_id': assignment_scope_id,
                                               'assignment_id': current_assignment_id})
         result = result.mappings().one_or_none()
-        return AssignmentModel(**result)
+        if result is not None:
+            return AssignmentModel(**result.__dict__)
+    return None
 
 
 async def read_next_open_assignment_for_scope_for_user(assignment_scope_id: str | UUID,
                                                        user_id: str | UUID,
                                                        engine: DatabaseEngineAsync) -> AssignmentModel:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(Assignment) \
             .where(Assignment.user_id == user_id,
                    Assignment.assignment_scope_id == assignment_scope_id,
@@ -142,7 +145,7 @@ async def read_next_open_assignment_for_scope_for_user(assignment_scope_id: str 
 
 async def read_assignment(assignment_id: str | UUID,
                           engine: DatabaseEngineAsync) -> AssignmentModel:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(Assignment).filter_by(assignment_id=assignment_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         return AssignmentModel(**result.__dict__)
@@ -150,7 +153,7 @@ async def read_assignment(assignment_id: str | UUID,
 
 async def read_annotations_for_scope_for_user(assignment_scope_id: str | UUID, user_id: str | UUID,
                                               engine: DatabaseEngineAsync) -> list[AnnotationModel]:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(Annotation) \
             .join(Assignment, Assignment.assignment_id == Annotation.assignment_id) \
             .where(Assignment.assignment_scope_id == assignment_scope_id,
@@ -161,71 +164,78 @@ async def read_annotations_for_scope_for_user(assignment_scope_id: str | UUID, u
 
 async def read_annotations_for_assignment(assignment_id: str | UUID, engine: DatabaseEngineAsync) \
         -> list[AnnotationModel]:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(Annotation).filter_by(assignment_id=assignment_id)
         result = (await session.execute(stmt)).scalars().all()
         return [AnnotationModel(**res.__dict__) for res in result]
 
 
 async def read_assignment_scope(assignment_scope_id: str | UUID, engine: DatabaseEngineAsync) \
-        -> AssignmentScopeModel:
-    async with engine.session() as session:
+        -> AssignmentScopeModel | None:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(AssignmentScope).filter_by(assignment_scope_id=assignment_scope_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
             return AssignmentScopeModel(**result.__dict__)
+    return None
 
 
 async def read_annotation_task(annotation_task_id: str | UUID, engine: DatabaseEngineAsync) \
-        -> AnnotationTaskModel:
-    async with engine.session() as session:
+        -> AnnotationTaskModel | None:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(AnnotationTask).filter_by(annotation_task_id=annotation_task_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
             return AnnotationTaskModel(**result.__dict__)
+    return None
 
 
 async def read_annotation_task_for_assignment(assignment_id: str | UUID, engine: DatabaseEngineAsync) \
-        -> AnnotationTaskModel:
-    async with engine.session() as session:
+        -> AnnotationTaskModel | None:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(AnnotationTask) \
             .join(Assignment, AnnotationTask.annotation_task_id == Assignment.task_id) \
             .where(Assignment.assignment_id == assignment_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
             return AnnotationTaskModel(**result.__dict__)
+    return None
 
 
 async def read_annotation_task_for_scope(assignment_scope_id: str | UUID, engine: DatabaseEngineAsync) \
-        -> AnnotationTaskModel:
-    async with engine.session() as session:
+        -> AnnotationTaskModel | None:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(AnnotationTask) \
             .join(AssignmentScope, AssignmentScope.task_id == AnnotationTask.annotation_task_id) \
             .where(AssignmentScope.assignment_scope_id == assignment_scope_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
             return AnnotationTaskModel(**result.__dict__)
+    return None
 
 
 async def read_annotation_tasks_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) \
         -> list[AnnotationTaskModel]:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(AnnotationTask).filter_by(project_id=project_id)
         result = (await session.execute(stmt)).scalars().all()
         return [AnnotationTaskModel(**res.__dict__) for res in result]
 
 
 async def read_task_with_annotations(assignment_id: str | UUID,
-                                     engine: DatabaseEngineAsync) -> AnnotationTaskModel:
+                                     engine: DatabaseEngineAsync) -> AnnotationTaskModel | None:
     annotation_task = await read_annotation_task_for_assignment(assignment_id=assignment_id, engine=engine)
     annotations = await read_annotations_for_assignment(assignment_id=assignment_id, engine=engine)
 
-    _, annotated_annotation_task = merge_task_and_annotations(annotation_task, annotations)
-    return annotated_annotation_task
+    if annotation_task is not None and annotations is not None:
+        annotated_annotation_task = merge_task_and_annotations(annotation_task, annotations)
+        return annotated_annotation_task
+    return None
 
 
-async def update_assignment_status(assignment_id: str | UUID, status: AssignmentStatus, engine: DatabaseEngineAsync):
-    async with engine.session() as session:
+async def update_assignment_status(assignment_id: str | UUID, status: AssignmentStatus,
+                                   engine: DatabaseEngineAsync) -> None:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(Assignment).where(Assignment.assignment_id == assignment_id)
         assignment: Assignment = (await session.scalars(stmt)).one()
         assignment.status = status
@@ -243,7 +253,7 @@ async def upsert_annotation_task(annotation_task: AnnotationTaskModel,
 
 async def delete_annotation_task(annotation_task_id: str | UUID,
                                  engine: DatabaseEngineAsync) -> None:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(AnnotationTask).filter_by(annotation_task_id=annotation_task_id)
         annotation_task = (await session.scalars(stmt)).one_or_none()
         if annotation_task is not None:
@@ -264,7 +274,7 @@ async def upsert_assignment_scope(assignment_scope: AssignmentScopeModel,
 
 async def delete_assignment_scope(assignment_scope_id: str | UUID,
                                   engine: DatabaseEngineAsync) -> None:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = select(AssignmentScope).filter_by(assignment_scope_id=assignment_scope_id)
         assignment_scope = (await session.scalars(stmt)).one_or_none()
         if assignment_scope is not None:
@@ -277,10 +287,12 @@ async def delete_assignment_scope(assignment_scope_id: str | UUID,
 async def upsert_annotations(annotations: list[AnnotationModel],
                              assignment_id: str | UUID | None,
                              engine: DatabaseEngineAsync) -> AssignmentStatus | None:
+    if not all([annotation.annotation_id is not None for annotation in annotations]):
+        raise ValueError('One or more annotations have no ID, this in undefined behaviour.')
     if assignment_id is not None:
         existing_annotations = await read_annotations_for_assignment(assignment_id=assignment_id, engine=engine)
         existing_ids = set([str(annotation.annotation_id) for annotation in existing_annotations])
-        submitted_ids = set([annotation.annotation_id for annotation in annotations])
+        submitted_ids = set([str(annotation.annotation_id) for annotation in annotations])
 
         ids_to_remove = existing_ids - submitted_ids
         ids_to_update = existing_ids - ids_to_remove
@@ -288,13 +300,13 @@ async def upsert_annotations(annotations: list[AnnotationModel],
     else:
         ids_to_remove = set()
         ids_to_update = set()
-        ids_to_create = set([annotation.annotation_id for annotation in annotations])
+        ids_to_create = set([str(annotation.annotation_id) for annotation in annotations])
 
     logger.debug(f'[upsert_annotations] CREATING new annotations with ids: {ids_to_create}')
     logger.debug(f'[upsert_annotations] UPDATING existing annotations with ids: {ids_to_update}')
     logger.debug(f'[upsert_annotations] DELETING existing annotations with ids: {ids_to_remove}')
 
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         # TODO this seems too excessive compared to simply deleting them directly (but has to be done for FK constraint)
         #      session.execute(delete(Annotation).where(Annotation.annotation_id == annotation_id))
         annotations_to_delete = [
@@ -326,9 +338,12 @@ async def upsert_annotations(annotations: list[AnnotationModel],
 
     if assignment_id is not None:
         annotation_task = await read_annotation_task_for_assignment(assignment_id=assignment_id, engine=engine)
-        status = validate_annotated_assignment(annotation_task=annotation_task, annotations=annotations)
-        await update_assignment_status(assignment_id=assignment_id, status=status, engine=engine)
-        return status
+        if annotation_task is not None:
+            status = validate_annotated_assignment(annotation_task=annotation_task, annotations=annotations)
+            await update_assignment_status(assignment_id=assignment_id, status=status, engine=engine)
+            return status
+
+    return None
 
 
 class ItemWithCount(BaseModel):
@@ -341,7 +356,7 @@ class ItemWithCount(BaseModel):
 
 async def read_item_ids_with_assignment_count_for_project(project_id: str | UUID,
                                                           engine: DatabaseEngineAsync) -> list[ItemWithCount]:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = text("""
         SELECT assignment.item_id,
                COUNT(DISTINCT assignment.assignment_id) AS num_total,
@@ -366,7 +381,7 @@ class AssignmentCounts(BaseModel):
 
 async def read_assignment_counts_for_scope(assignment_scope_id: str | UUID,
                                            engine: DatabaseEngineAsync) -> AssignmentCounts:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         stmt = text("""
         SELECT COUNT(DISTINCT assignment.assignment_id)                       AS num_total,
                SUM(CASE WHEN assignment.status = 'OPEN' THEN 1 ELSE 0 END)    AS num_open,
@@ -386,7 +401,7 @@ async def read_assignment_counts_for_scope(assignment_scope_id: str | UUID,
 
 async def store_assignments(assignments: list[AssignmentModel],
                             engine: DatabaseEngineAsync) -> None:
-    async with engine.session() as session:
+    async with engine.session() as session:  # type: AsyncSession
         assignments_orm = [Assignment(**assignment.dict()) for assignment in assignments]
         session.add_all(assignments_orm)
         await session.commit()

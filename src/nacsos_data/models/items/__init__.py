@@ -1,7 +1,10 @@
+from typing import TypeVar
 from uuid import UUID
 
 from .. import SBaseModel
 from .twitter import TwitterItemModel, TwitterMetaObject, ReferencedTweet
+
+ItemMetaType = dict[str, str | float | int | 'ItemMetaType']
 
 
 class ItemModel(SBaseModel):
@@ -18,7 +21,10 @@ class ItemModel(SBaseModel):
     # any kind of meta-data
     #   For project marked as "basic" this information may be shown to the user.
     #   Keys with prefix `_` will not be rendered by the frontend though.
-    meta: dict
+    meta: ItemMetaType
 
 
 AnyItemModel = ItemModel | TwitterItemModel
+AnyItemModelType = TypeVar('AnyItemModelType', ItemModel, TwitterItemModel)
+
+__all__ = ['ItemModel', 'TwitterItemModel', 'AnyItemModel', 'ItemMetaType']

@@ -6,7 +6,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy_json import mutable_json_type
 import uuid
 
-from ...models.annotations import AssignmentStatus
+from ...models.annotations import AssignmentStatus, AnnotationTaskLabel, AssignmentScopeConfig
 from ...db.base_class import Base
 
 from .projects import Project
@@ -28,10 +28,11 @@ class AnnotationTask(Base):
 
     # Unique identifier for this task.
     annotation_task_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                nullable=False, unique=True, index=True)
+                                nullable=False, unique=True, index=True)  # type: Column[uuid.UUID | str]
 
     # Reference to the project this AnnotationTask belongs to.
-    project_id = Column(UUID(as_uuid=True), ForeignKey(Project.project_id), nullable=False)
+    project_id = Column(UUID(as_uuid=True), ForeignKey(Project.project_id),
+                        nullable=False)  # type: Column[uuid.UUID | str]
 
     # A short descriptive title / name for this AnnotationTask.
     # This may be displayed to the annotators.
@@ -45,7 +46,7 @@ class AnnotationTask(Base):
     # The definition of the annotation scheme for this AnnotationTask is stored here.
     # For more information on how an annotation scheme is defined, check out schemas.annotations.AnnotationTaskLabel
     # Note, this is always a list of labels!
-    labels = Column(mutable_json_type(dbtype=JSONB, nested=True))
+    labels = Column(mutable_json_type(dbtype=JSONB, nested=True))  # type: AnnotationTaskLabel
 
     # reference to the associated assignment scopes
     assignment_scopes = relationship('AssignmentScope', cascade='all, delete')
@@ -65,10 +66,11 @@ class AssignmentScope(Base):
 
     # Unique identifier for this scope
     assignment_scope_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                 nullable=False, unique=True, index=True)
+                                 nullable=False, unique=True, index=True)  # type: Column[uuid.UUID | str]
 
     # The AnnotationTask defining the annotation scheme to be used for this scope
-    task_id = Column(UUID(as_uuid=True), ForeignKey(AnnotationTask.annotation_task_id), nullable=False, index=True)
+    task_id = Column(UUID(as_uuid=True), ForeignKey(AnnotationTask.annotation_task_id),
+                     nullable=False, index=True)  # type: Column[uuid.UUID | str]
 
     # Date and time when this assignment scope was created
     time_created = Column(DateTime(timezone=True), server_default=func.now())
@@ -82,7 +84,7 @@ class AssignmentScope(Base):
     description = Column(String, nullable=True)
 
     # Stores the config parameters used in creating the assignments for future reference
-    config = Column(mutable_json_type(dbtype=JSONB, nested=True), nullable=True)
+    config = Column(mutable_json_type(dbtype=JSONB, nested=True), nullable=True)  # type: AssignmentScopeConfig | None
 
     # reference to the associated assignments
     assignments = relationship('Assignment', cascade='all, delete')
@@ -107,21 +109,24 @@ class Assignment(Base):
 
     # Unique identifier for this assignment
     assignment_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                           nullable=False, unique=True, index=True)
+                           nullable=False, unique=True, index=True)  # type: Column[uuid.UUID | str]
     # The AssignmentScope this Assignment should logically be grouped into.
     assignment_scope_id = Column(UUID(as_uuid=True), ForeignKey(AssignmentScope.assignment_scope_id),
-                                 nullable=False, index=True)
+                                 nullable=False, index=True)  # type: Column[uuid.UUID | str]
     # The User the AnnotationTask/Item combination is assigned to
-    user_id = Column(UUID(as_uuid=True), ForeignKey(User.user_id), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey(User.user_id),
+                     nullable=False, index=True)  # type: Column[uuid.UUID | str]
 
     # The Item this assigment refers to.
-    item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id), nullable=False, index=True)
+    item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id),
+                     nullable=False, index=True)  # type: Column[uuid.UUID | str]
 
     # The AnnotationTask defining the annotation scheme to be used for this assignment
-    task_id = Column(UUID(as_uuid=True), ForeignKey(AnnotationTask.annotation_task_id), nullable=False, index=True)
+    task_id = Column(UUID(as_uuid=True), ForeignKey(AnnotationTask.annotation_task_id),
+                     nullable=False, index=True)  # type: Column[uuid.UUID | str]
 
     # The status of this assignment (to be updated with each annotation related to this assignment)
-    status = Column(SAEnum(AssignmentStatus), nullable=False, server_default='OPEN')
+    status = Column(SAEnum(AssignmentStatus), nullable=False, server_default='OPEN')  # type: AssignmentStatus
 
     # The order of assignments within the assignment scope
     order = Column(Integer, Identity(always=False))
@@ -153,7 +158,7 @@ class Annotation(Base):
 
     # Unique identifier for this Annotation
     annotation_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                           nullable=False, unique=True, index=True)
+                           nullable=False, unique=True, index=True)  # type: Column[uuid.UUID | str]
 
     # Date and time when this annotation was created (or last changed)
     time_created = Column(DateTime(timezone=True), server_default=func.now())
@@ -161,42 +166,45 @@ class Annotation(Base):
 
     # The Assignment this Annotation is responding to.
     assignment_id = Column(UUID(as_uuid=True), ForeignKey(Assignment.assignment_id),
-                           nullable=False, index=True)
+                           nullable=False, index=True)  # type: Column[uuid.UUID | str]
 
     # The User the AnnotationTask/Item combination is assigned to (redundant to implicit information from Assignment)
-    user_id = Column(UUID(as_uuid=True), ForeignKey(User.user_id), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey(User.user_id),
+                     nullable=False, index=True)  # type: Column[uuid.UUID | str]
 
     # The Item this assigment refers to (redundant to implicit information from Assignment)
-    item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id), nullable=False, index=True)
+    item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id),
+                     nullable=False, index=True)  # type: Column[uuid.UUID | str]
 
     # The AnnotationTask defining the annotation scheme to be used for this assignment
     # (redundant to implicit information from Assignment)
-    task_id = Column(UUID(as_uuid=True), ForeignKey(AnnotationTask.annotation_task_id), nullable=False, index=True)
+    task_id = Column(UUID(as_uuid=True), ForeignKey(AnnotationTask.annotation_task_id),
+                     nullable=False, index=True)  # type: Column[uuid.UUID | str]
 
     # Defines which AnnotationTaskLabel.key this Annotation refers to.
     # Note, that there is no correctness constraint, the frontend should make sure to send correct data!!
-    key = Column(String, nullable=False)
+    key = Column(String, nullable=False)  # type: Column[str]
 
     # In the case of AnnotationTaskLabel.repeats > 1, this field can be used
     # to track primary, secondary,... Annotations for that AnnotationTask/key pair.
     # Default should always be 1.
-    repeat = Column(Integer, nullable=False, default=1)
+    repeat = Column(Integer, nullable=False, default=1)  # type: Column[int]
 
     # Reference to the parent labels' annotation.
-    parent = Column(UUID(as_uuid=True),
-                    ForeignKey('annotation.annotation_id'), nullable=True, index=True)
+    parent = Column(UUID(as_uuid=True), ForeignKey('annotation.annotation_id'),
+                    nullable=True, index=True)  # type: Column[UUID|str]
 
     # Depending on the AnnotationTaskLabel.kind, one of the following fields should be filled.
     # For single and mixed, the AnnotationTaskLabelChoice.value should be filled in value_int.
-    value_bool = Column(Boolean, nullable=True)
-    value_int = Column(Integer, nullable=True)
-    value_float = Column(Float, nullable=True)
-    value_str = Column(String, nullable=True)
+    value_bool = Column(Boolean, nullable=True)  # type: Column[bool]
+    value_int = Column(Integer, nullable=True)  # type: Column[int]
+    value_float = Column(Float, nullable=True)  # type: Column[float]
+    value_str = Column(String, nullable=True)  # type: Column[str]
 
     # When the Annotation does not refer to an entire Item, but a sub-string (in-text annotation)
     # of that Item, the following fields should be set with the respective string offset.
-    text_offset_start = Column(Integer, nullable=True)
-    text_offset_stop = Column(Integer, nullable=True)
+    text_offset_start = Column(Integer, nullable=True)  # type: Column[int]
+    text_offset_stop = Column(Integer, nullable=True)  # type: Column[int]
 
     UniqueConstraint('assignment_id', 'key', 'parent', 'repeat')
 

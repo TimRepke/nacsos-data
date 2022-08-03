@@ -1,3 +1,5 @@
+from typing import AsyncIterator, Iterator
+
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine
@@ -35,8 +37,8 @@ class DatabaseEngineAsync:
         pass
 
     @asynccontextmanager
-    async def session(self) -> AsyncSession:
-        session = self._session()
+    async def session(self) -> AsyncIterator[AsyncSession]:
+        session: AsyncSession = self._session()
         try:
             yield session
             await session.commit()  # FIXME should there even be a commit always?
@@ -75,7 +77,7 @@ class DatabaseEngine:
         pass
 
     @contextmanager
-    def session(self) -> Session:
+    def session(self) -> Iterator[Session]:
         # https://rednafi.github.io/digressions/python/2020/03/26/python-contextmanager.html
         session = self._session()
         try:
