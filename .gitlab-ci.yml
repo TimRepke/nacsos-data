@@ -36,14 +36,16 @@ build-job:
         - pip install -r requirements_dev.txt
 
 test-job1:
-    stage: test
-    script:
-        - flake8 --config .flake8ś
+  stage: test
+  script:
+    - source venv/bin/activate
+    - flake8
 
 test-job2:
-    stage: test
-    script:
-        - mypy --config-file=pyproject.toml src/nacsos_data 
+  stage: test
+  script:
+    - source venv/bin/activate
+    - mypy --config-file=pyproject.toml server
 
 
 #pages:
