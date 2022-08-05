@@ -13,10 +13,10 @@ def flatten_annotation_task(annotation_task: AnnotationTaskModel) -> list[Flatte
                 parent_repeat: int = 1) -> list[FlattenedAnnotationTaskLabel]:
         ret = []
 
-        for label in labels:  # type: AnnotationTaskLabel
-            choices = None
-
-            if label.choices is not None:
+        for label in labels:
+            if label.choices is None:
+                choices = None
+            else:
                 choices = []
                 for choice in label.choices:
                     choices.append(choice.value)
