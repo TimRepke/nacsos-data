@@ -71,6 +71,43 @@ class ContextAnnotation(SBaseModel):
     entity_name: str
 
 
+class TwitterUserModel(SBaseModel):
+    """
+    Flattened and reduced representation of a Twitter User Object
+    https://developer.twitter.com/en/docs/twitter-api/data-dictionary/object-model/user
+
+    NOTE:
+        - In the context of a `TwitterItemModel`, the `id` is not set as it can be inferred from `twitter_author_id`
+        - `name` is None if `name` == `username` to save space
+    """
+    # The unique identifier of this user.
+    id: int | None = None
+    # The UTC datetime that the user account was created on Twitter.
+    created_at: datetime
+    # The name of the user, as they’ve defined it on their profile.
+    # Not necessarily a person’s name. Typically capped at 50 characters, but subject to change.
+    name: str | None = None
+    # The Twitter screen name, handle, or alias that this user identifies themselves with.
+    # Usernames are unique but subject to change. Typically a maximum of 15 characters long,
+    # but some historical accounts may exist with longer names.
+    username: str
+    # Indicates whether or not this Twitter user has a verified account.
+    # A verified account lets people know that an account of public interest is authentic.
+    verified: bool
+    # The text of this user's profile description (also known as bio), if the user provided one.
+    description: str | None = None
+    # The location specified in the user's profile, if the user provided one.
+    # As this is a freeform value, it may not indicate a valid location, but it may be
+    # fuzzily evaluated when performing searches with location queries.
+    location: str | None = None
+
+    # Attributes from `public_metrics` (Contains details about activity for this user)
+    followers_count: int | None = None
+    following_count: int | None = None
+    tweet_count: int | None = None
+    listed_count: int | None = None
+
+
 class TwitterItemModel(SBaseModel):
     """
     Corresponds to db.models.items.TwitterItem
@@ -128,6 +165,8 @@ class TwitterItemModel(SBaseModel):
     reply_count: int
     like_count: int
     quote_count: int
+
+    user: TwitterUserModel | None = None
 
 
 class TwitterMetaObject(SBaseModel):

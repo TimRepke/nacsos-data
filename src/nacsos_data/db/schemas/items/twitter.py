@@ -66,3 +66,6 @@ class TwitterItem(Base):
     reply_count = Column(Integer, nullable=False)
     like_count = Column(Integer, nullable=False)
     quote_count = Column(Integer, nullable=False)
+
+    # Additional information about the user (retrieved via expansions=author_id)
+    user = Column(JSONB, nullable=True)
