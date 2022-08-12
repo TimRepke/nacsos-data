@@ -1,12 +1,22 @@
-from typing import AsyncIterator, Iterator
-
+import json
+from typing import AsyncIterator, Iterator, Any
+from json import JSONDecoder, JSONEncoder
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine
 from contextlib import contextmanager, asynccontextmanager
+from datetime import datetime
 
 # unused import required so the engine sees the models!
 from . import schemas  # noqa F401
+
+
+class DictLikeEncoder(JSONEncoder):
+    def default(self, o: Any) -> Any:
+        if type(o) == datetime:
+            return o.strftime('%Y-%m-%dT%H:%M:%S')
+
+        return json.JSONEncoder.default(self, o)
 
 
 class DatabaseEngineAsync:
@@ -26,7 +36,8 @@ class DatabaseEngineAsync:
         # TODO expire_on_commit (check if this should be turned off)
         self._connection_str = f'postgresql+psycopg://{self._user}:{self._password}@' \
                                f'{self._host}:{self._port}/{self._database}'
-        self.engine = create_async_engine(self._connection_str, echo=True, future=True)
+        self.engine = create_async_engine(self._connection_str, echo=True, future=True,
+                                          json_serializer=DictLikeEncoder().encode)
         self._session = async_sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
 
     def startup(self) -> None:
@@ -66,7 +77,8 @@ class DatabaseEngine:
         # TODO expire_on_commit (check if this should be turned off)
         self._connection_str = f'postgresql+psycopg2://{self._user}:{self._password}@' \
                                f'{self._host}:{self._port}/{self._database}'
-        self.engine = create_engine(self._connection_str, echo=True, future=True)
+        self.engine = create_engine(self._connection_str, echo=True, future=True,
+                                    json_serializer=DictLikeEncoder().encode)
         self._session = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
 
     def startup(self) -> None:
