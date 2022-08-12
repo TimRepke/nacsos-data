@@ -53,6 +53,24 @@ class URL(SBaseModel):
     # TODO: check how url_unwound differs ("The full destination URL.")
 
 
+class ContextAnnotation(SBaseModel):
+    """
+    Flattened and reduced version of the context_annotation object
+    https://developer.twitter.com/en/docs/twitter-api/annotations/overview
+
+    NOTE: Under the assumption that we could always recover the `description`
+          of the domain and entity, this information is not stored to save space.
+    """
+    # ID of the top level context (aka domain)
+    domain_id: int
+    # Name of the top level context
+    domain_name: str
+    # ID of the second-level context (e.g. topic, named entity, ...)
+    entity_id: int
+    # Name of the second-level context
+    entity_name: str
+
+
 class TwitterItemModel(SBaseModel):
     """
     Corresponds to db.models.items.TwitterItem
@@ -100,6 +118,9 @@ class TwitterItemModel(SBaseModel):
     # from entities.cashtag (Contains details about text recognized as a Cashtag.)
     # [Cashtags are stock price symbols]
     cashtags: list[Cashtag] | None = None
+    # from context_annotations (Contains context annotations for the Tweet.)
+    # Entity recognition/extraction, topical analysis
+    annotations: list[ContextAnnotation] | None = None
 
     # Public engagement metrics for the Tweet at the time of the request.
     # taken from public_metrics.???

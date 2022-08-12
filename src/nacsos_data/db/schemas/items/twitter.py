@@ -19,7 +19,7 @@ class TwitterItem(Base):
     item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id), default=uuid.uuid4,
                      nullable=False, index=True, primary_key=True, unique=True)  # type: Column[uuid.UUID | str]
     # Unique identifier on Twitter
-    twitter_id = Column(BigInteger, nullable=False, unique=True, index=True)
+    twitter_id = Column(BigInteger, nullable=False, unique=False, index=True)
     # Unique user identifier on Twitter
     twitter_author_id = Column(BigInteger, nullable=True, index=True)
 
@@ -56,6 +56,9 @@ class TwitterItem(Base):
     # from entities.cashtag (Contains details about text recognized as a Cashtag.)
     # [Cashtags are stock price symbols]
     cashtags = Column(JSONB, nullable=True)
+    # from context_annotations (Contains context annotations for the Tweet.)
+    # Entity recognition/extraction, topical analysis
+    annotations = Column(JSONB, nullable=True)
 
     # Public engagement metrics for the Tweet at the time of the request.
     # taken from public_metrics.???
