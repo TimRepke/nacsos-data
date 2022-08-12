@@ -19,7 +19,7 @@ class TwitterItem(Base):
     item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id), default=uuid.uuid4,
                      nullable=False, index=True, primary_key=True, unique=True)  # type: Column[uuid.UUID | str]
     # Unique identifier on Twitter
-    twitter_id = Column(BigInteger, nullable=False, unique=False, index=True)
+    twitter_id = Column(BigInteger, nullable=False, unique=True, index=True)
     # Unique user identifier on Twitter
     twitter_author_id = Column(BigInteger, nullable=True, index=True)
 

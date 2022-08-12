@@ -1,5 +1,6 @@
 import uuid
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
@@ -54,40 +55,48 @@ async def create_twitter_item(tweet: TwitterItemModel,
                               project_id: str | UUID | None = None, import_id: str | UUID | None = None,
                               engine: DatabaseEngineAsync = None) \
         -> str | UUID | None:
-    # TODO return item_id
-    try:
-        async with engine.session() as session:  # type: AsyncSession
-            # TODO check, that this will break if an already existing tweets is being inserted
-            #      and fail gracefully
-            orm_tweet = TwitterItem(**tweet.dict())
-            orm_tweet.item_id = uuid.uuid4()
-            orm_item = Item(item_id=orm_tweet.item_id, text=tweet.status)
+    """
+    Insert a Tweet into the database.
 
+    :param tweet: The Tweet (Should contain all fields for which Twitter API gave us data)
+    :param project_id: Project this Tweet is inserted to (or None if no project is linked -> AVOID this!)
+    :param import_id: Import context (or None if not linked to specific import job -> AVOID this!)
+    :param engine:
+    :return:
+    """
+
+    async with engine.session() as session:  # type: AsyncSession
+        orm_tweet = TwitterItem(**tweet.dict())
+        if orm_tweet.item_id is None:
+            orm_tweet.item_id = uuid.uuid4()
+        item_id = orm_tweet.item_id
+        orm_item = Item(item_id=orm_tweet.item_id, text=tweet.status)
+
+        try:
             session.add(orm_tweet)
             session.add(orm_item)
-
-            if project_id is not None:
-                orm_m2m_p2i = M2MProjectItem(item_id=orm_item.item_id, project_id=project_id)
-                session.add(orm_m2m_p2i)
-
-            if import_id is not None:
-                orm_m2m_i2i = M2MImportItem(item_id=orm_item.item_id, import_id=import_id)
-                session.add(orm_m2m_i2i)
-
             await session.commit()
+        except IntegrityError:
+            item_id = (
+                await session.execute(select(TwitterItem.item_id)
+                                      .where(TwitterItem.twitter_id == orm_item.twitter_id))
+            ).one()[0]
 
-            return orm_tweet.item_id
-    except Exception as e:
-        # TODO clean exception handling
-        print(e)
-    return None
+        if project_id is not None:
+            orm_m2m_p2i = M2MProjectItem(item_id=item_id, project_id=project_id)
+            session.add(orm_m2m_p2i)
+
+        if import_id is not None:
+            orm_m2m_i2i = M2MImportItem(item_id=item_id, import_id=import_id)
+            session.add(orm_m2m_i2i)
+
+        await session.commit()
+
+        return item_id
 
 
 async def create_twitter_items(tweets: list[TwitterItemModel],
                                project_id: str | UUID | None = None, import_id: str | UUID | None = None,
                                engine: DatabaseEngineAsync = None) -> list[str | UUID | None]:
-    # TODO return item_ids
-    # TODO make this in an actual batched mode
-
     return [await create_twitter_item(tweet, project_id=project_id, import_id=import_id, engine=engine)
             for tweet in tweets]
