@@ -1,16 +1,16 @@
 from uuid import UUID, uuid4
 import logging
 from nacsos_data.models.annotations import \
-    AnnotationModel, AnnotationTaskModel, \
-    FlattenedAnnotationTaskLabel, \
-    AssignmentStatus, AnnotationTaskLabel
+    AnnotationModel, AnnotationSchemeModel, \
+    FlattenedAnnotationSchemeLabel, \
+    AssignmentStatus, AnnotationSchemeLabel
 
 logger = logging.getLogger('nacsos_data.annotation.validation')
 
 
-def flatten_annotation_task(annotation_task: AnnotationTaskModel) -> list[FlattenedAnnotationTaskLabel]:
-    def recurse(labels: list[AnnotationTaskLabel], parent_label: str = None,
-                parent_repeat: int = 1) -> list[FlattenedAnnotationTaskLabel]:
+def flatten_annotation_scheme(annotation_scheme: AnnotationSchemeModel) -> list[FlattenedAnnotationSchemeLabel]:
+    def recurse(labels: list[AnnotationSchemeLabel], parent_label: str = None,
+                parent_repeat: int = 1) -> list[FlattenedAnnotationSchemeLabel]:
         ret = []
 
         for label in labels:
@@ -25,17 +25,17 @@ def flatten_annotation_task(annotation_task: AnnotationTaskModel) -> list[Flatte
                                        parent_label=label.key,
                                        parent_repeat=label.max_repeat)
 
-            ret.append(FlattenedAnnotationTaskLabel(key=label.key,
-                                                    required=label.required,
-                                                    max_repeat=label.max_repeat,
-                                                    implicit_max_repeat=label.max_repeat * parent_repeat,
-                                                    kind=label.kind,
-                                                    choices=choices,
-                                                    parent_label=parent_label))
+            ret.append(FlattenedAnnotationSchemeLabel(key=label.key,
+                                                      required=label.required,
+                                                      max_repeat=label.max_repeat,
+                                                      implicit_max_repeat=label.max_repeat * parent_repeat,
+                                                      kind=label.kind,
+                                                      choices=choices,
+                                                      parent_label=parent_label))
 
         return ret
 
-    return recurse(annotation_task.labels)
+    return recurse(annotation_scheme.labels)
 
 
 AnnotationModelLookupType = dict[str, list[AnnotationModel]]
@@ -54,14 +54,14 @@ def create_annotations_lookup(annotations: list[AnnotationModel]) -> AnnotationM
     return annotations_map
 
 
-def validate_annotated_assignment(annotation_task: AnnotationTaskModel,
+def validate_annotated_assignment(annotation_scheme: AnnotationSchemeModel,
                                   annotations: list[AnnotationModel]) -> AssignmentStatus:
     if annotations is None or len(annotations) == 0:
         return AssignmentStatus.OPEN
 
     annotations_map = create_annotations_lookup(annotations)
 
-    def recurse(labels: list[AnnotationTaskLabel], repeat: int = 1, parent: str = None) -> AssignmentStatus:
+    def recurse(labels: list[AnnotationSchemeLabel], repeat: int = 1, parent: str = None) -> AssignmentStatus:
         status = AssignmentStatus.FULL
 
         for label in labels:
@@ -87,17 +87,18 @@ def validate_annotated_assignment(annotation_task: AnnotationTaskModel,
 
         return status
 
-    return recurse(annotation_task.labels)
+    return recurse(annotation_scheme.labels)
 
 
-def merge_task_and_annotations(annotation_task: AnnotationTaskModel,
-                               annotations: list[AnnotationModel]) -> AnnotationTaskModel:
+def merge_scheme_and_annotations(annotation_scheme: AnnotationSchemeModel,
+                                 annotations: list[AnnotationModel]) -> AnnotationSchemeModel:
     if annotations is None or len(annotations) == 0:
-        return annotation_task
+        return annotation_scheme
 
     annotations_map = create_annotations_lookup(annotations)
 
-    def recurse(labels: list[AnnotationTaskLabel], repeat: int = 1, parent: str = None) -> list[AnnotationTaskLabel]:
+    def recurse(labels: list[AnnotationSchemeLabel], repeat: int = 1, parent: str = None) \
+            -> list[AnnotationSchemeLabel]:
         ret = []
 
         for label in labels:
@@ -119,11 +120,11 @@ def merge_task_and_annotations(annotation_task: AnnotationTaskModel,
                         ret.append(label_cpy)
         return ret
 
-    annotation_task.labels = recurse(annotation_task.labels)
-    return annotation_task
+    annotation_scheme.labels = recurse(annotation_scheme.labels)
+    return annotation_scheme
 
 
-def has_annotation(label: AnnotationTaskLabel) -> bool:
+def has_annotation(label: AnnotationSchemeLabel) -> bool:
     return label.annotation \
            and (label.annotation.value_int is not None
                 or label.annotation.value_str is not None
@@ -131,10 +132,10 @@ def has_annotation(label: AnnotationTaskLabel) -> bool:
                 or label.annotation.value_float is not None)
 
 
-def annotated_task_to_annotations(task: AnnotationTaskModel) -> list[AnnotationModel]:
+def annotated_scheme_to_annotations(scheme: AnnotationSchemeModel) -> list[AnnotationModel]:
     ret = []
 
-    def recurse(labels: list[AnnotationTaskLabel], parent_id: UUID = None) -> None:
+    def recurse(labels: list[AnnotationSchemeLabel], parent_id: UUID = None) -> None:
         for label in labels:
             if has_annotation(label):
                 if label.annotation.annotation_id is None:
@@ -147,6 +148,6 @@ def annotated_task_to_annotations(task: AnnotationTaskModel) -> list[AnnotationM
                         if choice.children:
                             recurse(choice.children, parent_id=label.annotation.annotation_id)
 
-    recurse(task.labels)
+    recurse(scheme.labels)
 
     return ret

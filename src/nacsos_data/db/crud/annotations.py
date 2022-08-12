@@ -9,16 +9,16 @@ from pydantic import BaseModel
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import \
     Annotation, \
-    AnnotationTask, \
+    AnnotationScheme, \
     Assignment, \
     AssignmentScope
 from nacsos_data.models.annotations import \
     AnnotationModel, \
-    AnnotationTaskModel, \
+    AnnotationSchemeModel, \
     AssignmentModel, \
     AssignmentScopeModel, \
     AssignmentStatus
-from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_task_and_annotations
+from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_scheme_and_annotations
 from . import upsert_orm
 
 logger = logging.getLogger('nacsos_data.crud.annotations')
@@ -26,8 +26,8 @@ logger = logging.getLogger('nacsos_data.crud.annotations')
 
 class UserProjectAssignmentScope(BaseModel):
     scope: AssignmentScopeModel
-    task_name: str
-    task_description: str
+    scheme_name: str
+    scheme_description: str
     num_assignments: int
     num_open: int
     num_partial: int
@@ -40,18 +40,18 @@ async def read_assignment_scopes_for_project_for_user(project_id: str | UUID,
     async with engine.session() as session:  # type: AsyncSession
         stmt = text("""
         SELECT scope.*,
-               task.name AS task_name,
-               task.description AS task_description,
+               scheme.name AS scheme_name,
+               scheme.description AS scheme_description,
                COUNT(DISTINCT assi.assignment_id) AS num_assignments,
                SUM(CASE WHEN assi.status = 'OPEN' THEN 1 ELSE 0 END) AS num_open,
                SUM(CASE WHEN assi.status = 'PARTIAL' THEN 1 ELSE 0 END) AS num_partial,
                SUM(CASE WHEN assi.status = 'FULL' THEN 1 ELSE 0 END) AS num_completed
         FROM assignment_scope scope
-                 FULL OUTER JOIN annotation_task task ON scope.task_id = task.annotation_task_id
+                 FULL OUTER JOIN annotation_scheme scheme ON scope.annotation_scheme_id = scheme.annotation_scheme_id
                  LEFT OUTER JOIN assignment assi ON scope.assignment_scope_id = assi.assignment_scope_id
         WHERE assi.user_id = :user_id AND
-              task.project_id = :project_id
-        GROUP BY scope.assignment_scope_id, task_name, task_description;
+              scheme.project_id = :project_id
+        GROUP BY scope.assignment_scope_id, scheme_name, scheme_description;
         """)
         result = await session.execute(stmt, {'user_id': user_id, 'project_id': project_id})
         result_list = result.mappings().all()
@@ -59,12 +59,12 @@ async def read_assignment_scopes_for_project_for_user(project_id: str | UUID,
             UserProjectAssignmentScope(
                 scope=AssignmentScopeModel(
                     assignment_scope_id=res['assignment_scope_id'],
-                    task_id=res['task_id'],
+                    annotation_scheme_id=res['annotation_scheme_id'],
                     name=res['name'],
                     description=res['description']
                 ),
-                task_name=res['task_name'],
-                task_description=res['task_description'],
+                scheme_name=res['scheme_name'],
+                scheme_description=res['scheme_description'],
                 num_assignments=res['num_assignments'],
                 num_open=res['num_open'],
                 num_partial=res['num_partial'],
@@ -78,8 +78,8 @@ async def read_assignment_scopes_for_project(project_id: str | UUID,
                                              engine: DatabaseEngineAsync) -> list[AssignmentScopeModel]:
     async with engine.session() as session:  # type: AsyncSession
         stmt = select(AssignmentScope) \
-            .join(AnnotationTask, AnnotationTask.annotation_task_id == AssignmentScope.task_id) \
-            .where(AnnotationTask.project_id == project_id) \
+            .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == AssignmentScope.scheme_id) \
+            .where(AnnotationScheme.project_id == project_id) \
             .order_by(desc(AssignmentScope.time_created))
         result = (await session.execute(stmt)).scalars().all()
         return [AssignmentScopeModel(**res.__dict__) for res in result]
@@ -180,56 +180,56 @@ async def read_assignment_scope(assignment_scope_id: str | UUID, engine: Databas
     return None
 
 
-async def read_annotation_task(annotation_task_id: str | UUID, engine: DatabaseEngineAsync) \
-        -> AnnotationTaskModel | None:
+async def read_annotation_scheme(annotation_scheme_id: str | UUID, engine: DatabaseEngineAsync) \
+        -> AnnotationSchemeModel | None:
     async with engine.session() as session:  # type: AsyncSession
-        stmt = select(AnnotationTask).filter_by(annotation_task_id=annotation_task_id)
+        stmt = select(AnnotationScheme).filter_by(annotation_scheme_id=annotation_scheme_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
-            return AnnotationTaskModel(**result.__dict__)
+            return AnnotationSchemeModel(**result.__dict__)
     return None
 
 
-async def read_annotation_task_for_assignment(assignment_id: str | UUID, engine: DatabaseEngineAsync) \
-        -> AnnotationTaskModel | None:
+async def read_annotation_scheme_for_assignment(assignment_id: str | UUID, engine: DatabaseEngineAsync) \
+        -> AnnotationSchemeModel | None:
     async with engine.session() as session:  # type: AsyncSession
-        stmt = select(AnnotationTask) \
-            .join(Assignment, AnnotationTask.annotation_task_id == Assignment.task_id) \
+        stmt = select(AnnotationScheme) \
+            .join(Assignment, AnnotationScheme.annotation_scheme_id == Assignment.annotation_scheme_id) \
             .where(Assignment.assignment_id == assignment_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
-            return AnnotationTaskModel(**result.__dict__)
+            return AnnotationSchemeModel(**result.__dict__)
     return None
 
 
-async def read_annotation_task_for_scope(assignment_scope_id: str | UUID, engine: DatabaseEngineAsync) \
-        -> AnnotationTaskModel | None:
+async def read_annotation_scheme_for_scope(assignment_scope_id: str | UUID, engine: DatabaseEngineAsync) \
+        -> AnnotationSchemeModel | None:
     async with engine.session() as session:  # type: AsyncSession
-        stmt = select(AnnotationTask) \
-            .join(AssignmentScope, AssignmentScope.task_id == AnnotationTask.annotation_task_id) \
+        stmt = select(AnnotationScheme) \
+            .join(AssignmentScope, AssignmentScope.annotation_scheme_id == AnnotationScheme.annotation_scheme_id) \
             .where(AssignmentScope.assignment_scope_id == assignment_scope_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
-            return AnnotationTaskModel(**result.__dict__)
+            return AnnotationSchemeModel(**result.__dict__)
     return None
 
 
-async def read_annotation_tasks_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) \
-        -> list[AnnotationTaskModel]:
+async def read_annotation_schemes_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) \
+        -> list[AnnotationSchemeModel]:
     async with engine.session() as session:  # type: AsyncSession
-        stmt = select(AnnotationTask).filter_by(project_id=project_id)
+        stmt = select(AnnotationScheme).filter_by(project_id=project_id)
         result = (await session.execute(stmt)).scalars().all()
-        return [AnnotationTaskModel(**res.__dict__) for res in result]
+        return [AnnotationSchemeModel(**res.__dict__) for res in result]
 
 
-async def read_task_with_annotations(assignment_id: str | UUID,
-                                     engine: DatabaseEngineAsync) -> AnnotationTaskModel | None:
-    annotation_task = await read_annotation_task_for_assignment(assignment_id=assignment_id, engine=engine)
+async def read_scheme_with_annotations(assignment_id: str | UUID,
+                                       engine: DatabaseEngineAsync) -> AnnotationSchemeModel | None:
+    annotation_scheme = await read_annotation_scheme_for_assignment(assignment_id=assignment_id, engine=engine)
     annotations = await read_annotations_for_assignment(assignment_id=assignment_id, engine=engine)
 
-    if annotation_task is not None and annotations is not None:
-        annotated_annotation_task = merge_task_and_annotations(annotation_task, annotations)
-        return annotated_annotation_task
+    if annotation_scheme is not None and annotations is not None:
+        annotated_annotation_scheme = merge_scheme_and_annotations(annotation_scheme, annotations)
+        return annotated_annotation_scheme
     return None
 
 
@@ -242,25 +242,25 @@ async def update_assignment_status(assignment_id: str | UUID, status: Assignment
         await session.commit()
 
 
-async def upsert_annotation_task(annotation_task: AnnotationTaskModel,
-                                 engine: DatabaseEngineAsync) -> str | UUID | None:
-    key = await upsert_orm(upsert_model=annotation_task,
-                           Schema=AnnotationTask,
-                           primary_key=AnnotationTask.annotation_task_id.name,
+async def upsert_annotation_scheme(annotation_scheme: AnnotationSchemeModel,
+                                   engine: DatabaseEngineAsync) -> str | UUID | None:
+    key = await upsert_orm(upsert_model=annotation_scheme,
+                           Schema=AnnotationScheme,
+                           primary_key=AnnotationScheme.annotation_scheme_id.name,
                            engine=engine)
     return key
 
 
-async def delete_annotation_task(annotation_task_id: str | UUID,
-                                 engine: DatabaseEngineAsync) -> None:
+async def delete_annotation_scheme(annotation_scheme_id: str | UUID,
+                                   engine: DatabaseEngineAsync) -> None:
     async with engine.session() as session:  # type: AsyncSession
-        stmt = select(AnnotationTask).filter_by(annotation_task_id=annotation_task_id)
-        annotation_task = (await session.scalars(stmt)).one_or_none()
-        if annotation_task is not None:
-            await session.delete(annotation_task)
+        stmt = select(AnnotationScheme).filter_by(annotation_scheme_id=annotation_scheme_id)
+        annotation_scheme = (await session.scalars(stmt)).one_or_none()
+        if annotation_scheme is not None:
+            await session.delete(annotation_scheme)
             await session.commit()
         else:
-            raise ValueError(f'AnnotationTask with id="{annotation_task_id}" does not seem to exist.')
+            raise ValueError(f'AnnotationScheme with id="{annotation_scheme_id}" does not seem to exist.')
 
 
 async def upsert_assignment_scope(assignment_scope: AssignmentScopeModel,
@@ -337,9 +337,9 @@ async def upsert_annotations(annotations: list[AnnotationModel],
                 await session.commit()
 
     if assignment_id is not None:
-        annotation_task = await read_annotation_task_for_assignment(assignment_id=assignment_id, engine=engine)
-        if annotation_task is not None:
-            status = validate_annotated_assignment(annotation_task=annotation_task, annotations=annotations)
+        annotation_scheme = await read_annotation_scheme_for_assignment(assignment_id=assignment_id, engine=engine)
+        if annotation_scheme is not None:
+            status = validate_annotated_assignment(annotation_scheme=annotation_scheme, annotations=annotations)
             await update_assignment_status(assignment_id=assignment_id, status=status, engine=engine)
             return status
 
@@ -364,8 +364,8 @@ async def read_item_ids_with_assignment_count_for_project(project_id: str | UUID
                SUM(CASE WHEN assignment.status = 'PARTIAL' THEN 1 ELSE 0 END) AS num_partial,
                SUM(CASE WHEN assignment.status = 'FULL' THEN 1 ELSE 0 END) AS num_full
         FROM assignment
-        JOIN annotation_task ON annotation_task.annotation_task_id = assignment.task_id
-        WHERE annotation_task.project_id = :project_id
+        JOIN annotation_scheme ON annotation_scheme.annotation_scheme_id = assignment.scheme_id
+        WHERE annotation_scheme.project_id = :project_id
         GROUP BY assignment.item_id;
         """)
         result = (await session.execute(stmt, {'project_id': project_id})).mappings().all()

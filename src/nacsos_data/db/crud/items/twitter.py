@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
-from nacsos_data.db.schemas.items import Item
+from nacsos_data.db.schemas.items import Item, M2MImportItem
 from nacsos_data.db.schemas import TwitterItem, M2MProjectItem
 from nacsos_data.models.items.twitter import TwitterItemModel
 
@@ -50,7 +50,9 @@ async def read_twitter_items_by_author_id(twitter_author_id: str | UUID, engine:
         return [TwitterItemModel(**res.__dict__) for res in result_list]
 
 
-async def create_twitter_item(tweet: TwitterItemModel, project_id: str | UUID | None, engine: DatabaseEngineAsync) \
+async def create_twitter_item(tweet: TwitterItemModel,
+                              project_id: str | UUID | None = None, import_id: str | UUID | None = None,
+                              engine: DatabaseEngineAsync = None) \
         -> str | UUID | None:
     # TODO return item_id
     try:
@@ -65,8 +67,12 @@ async def create_twitter_item(tweet: TwitterItemModel, project_id: str | UUID | 
             session.add(orm_item)
 
             if project_id is not None:
-                orm_m2m = M2MProjectItem(item_id=orm_item.item_id, project_id=project_id)
-                session.add(orm_m2m)
+                orm_m2m_p2i = M2MProjectItem(item_id=orm_item.item_id, project_id=project_id)
+                session.add(orm_m2m_p2i)
+
+            if import_id is not None:
+                orm_m2m_i2i = M2MImportItem(item_id=orm_item.item_id, import_id=import_id)
+                session.add(orm_m2m_i2i)
 
             await session.commit()
 
@@ -77,9 +83,11 @@ async def create_twitter_item(tweet: TwitterItemModel, project_id: str | UUID | 
     return None
 
 
-async def create_twitter_items(tweets: list[TwitterItemModel], project_id: str | UUID | None,
-                               engine: DatabaseEngineAsync) -> list[str | UUID | None]:
+async def create_twitter_items(tweets: list[TwitterItemModel],
+                               project_id: str | UUID | None = None, import_id: str | UUID | None = None,
+                               engine: DatabaseEngineAsync = None) -> list[str | UUID | None]:
     # TODO return item_ids
     # TODO make this in an actual batched mode
 
-    return [await create_twitter_item(tweet, project_id=project_id, engine=engine) for tweet in tweets]
+    return [await create_twitter_item(tweet, project_id=project_id, import_id=import_id, engine=engine)
+            for tweet in tweets]

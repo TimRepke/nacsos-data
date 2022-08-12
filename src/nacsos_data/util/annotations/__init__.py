@@ -1,8 +1,8 @@
-from nacsos_data.models.annotations import AnnotationTaskModel, AnnotationTaskLabel
+from nacsos_data.models.annotations import AnnotationSchemeModel, AnnotationSchemeLabel
 
 
-def unravel_annotation_task_keys(task: AnnotationTaskModel):
-    def recurse_label(label: AnnotationTaskLabel, accu: list[str]):
+def unravel_annotation_scheme_keys(scheme: AnnotationSchemeModel):
+    def recurse_label(label: AnnotationSchemeLabel, accu: list[str]):
         if label is None:
             return accu
         accu += [label.key]
@@ -11,5 +11,5 @@ def unravel_annotation_task_keys(task: AnnotationTaskModel):
 
         return [recurse_label(choice.child, accu) for choice in label.choices]
 
-    keys = [recurse_label(label, []) for label in task.labels]
+    keys = [recurse_label(label, []) for label in scheme.labels]
     return keys

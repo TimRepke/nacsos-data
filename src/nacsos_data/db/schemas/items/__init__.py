@@ -3,7 +3,7 @@ from sqlalchemy_json import mutable_json_type
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 
-from nacsos_data.models.items import ItemMetaType
+from ....models.items import ItemMetaType
 from ...base_class import Base
 from ..projects import Project
 from ..imports import Import

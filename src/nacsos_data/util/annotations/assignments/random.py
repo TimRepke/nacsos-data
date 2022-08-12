@@ -25,7 +25,7 @@ async def read_random_items(project_id: str | UUID, num_items: int, engine: Data
 
 
 async def random_assignments(assignment_scope_id: str | UUID,
-                             annotation_task_id: str | UUID,
+                             annotation_scheme_id: str | UUID,
                              project_id: str | UUID,
                              config: AssignmentScopeRandomConfig,
                              engine: DatabaseEngineAsync) -> list[AssignmentModel]:
@@ -66,7 +66,7 @@ async def random_assignments(assignment_scope_id: str | UUID,
                                                assignment_scope_id=assignment_scope_id,
                                                user_id=user_id,
                                                item_id=item_id,
-                                               task_id=annotation_task_id,
+                                               annotation_scheme_id=annotation_scheme_id,
                                                status=AssignmentStatus.OPEN))
 
     for it, item_id in enumerate(set(item_ids) - set(multi_code_items)):
@@ -75,6 +75,6 @@ async def random_assignments(assignment_scope_id: str | UUID,
                                            assignment_scope_id=assignment_scope_id,
                                            user_id=user_id,
                                            item_id=item_id,
-                                           task_id=annotation_task_id,
+                                           annotation_scheme_id=annotation_scheme_id,
                                            status=AssignmentStatus.OPEN))
     return assignments
