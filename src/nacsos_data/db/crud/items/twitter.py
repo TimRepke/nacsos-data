@@ -1,4 +1,5 @@
 import uuid
+import logging
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,8 @@ from nacsos_data.db.schemas import TwitterItem, M2MProjectItem
 from nacsos_data.models.items.twitter import TwitterItemModel
 
 from . import _read_all_for_project, _read_paged_for_project
+
+logger = logging.getLogger('nacsos-data.crud.twitter')
 
 
 async def read_all_twitter_items_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) \
@@ -81,6 +84,7 @@ async def create_twitter_item(tweet: TwitterItemModel,
                 await session.execute(select(TwitterItem.item_id)
                                       .where(TwitterItem.twitter_id == orm_item.twitter_id))
             ).one()[0]
+            logger.debug(f'Did not create new item tweet_id: {orm_tweet.twitter_id} -> exists in item_id: {item_id}.')
 
         if project_id is not None:
             orm_m2m_p2i = M2MProjectItem(item_id=item_id, project_id=project_id)
