@@ -1,6 +1,6 @@
 import json
 from typing import AsyncIterator, Iterator, Any
-from json import JSONDecoder, JSONEncoder
+from json import JSONEncoder
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine

@@ -5,7 +5,7 @@ from uuid import UUID
 import httpx
 
 from ...db import DatabaseEngineAsync
-from ...db.crud.imports import read_import, upsert_import
+from ...db.crud.imports import read_import
 from ...models.imports import ImportConfigJSONL, LineEncoding, ImportModel
 
 
