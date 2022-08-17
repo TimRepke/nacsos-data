@@ -25,6 +25,9 @@ class Import(Base):
     project_id = Column(UUID(as_uuid=True), ForeignKey(Project.project_id),
                         nullable=False, index=True, primary_key=False)  # type: Column[uuid.UUID | str]
 
+    # The task_id assigned by nacsos-pipes service (if this import is handled by a pipeline)
+    pipeline_task_id = Column(String, nullable=True, index=True, primary_key=False)
+
     # Unique descriptive name/title for the import
     name = Column(String, nullable=False)
 

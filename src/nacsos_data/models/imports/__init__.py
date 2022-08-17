@@ -7,6 +7,7 @@ from .. import SBaseModel
 
 from .import_config_ris import ImportConfigRIS
 from .import_config_twitter import ImportConfigTwitter
+from .import_config_jsonl import ImportConfigJSONL, LineEncoding
 
 
 class ImportType(Enum):
@@ -32,7 +33,7 @@ ImportTypeLiteral = Literal['ris', 'csv', 'jsonl',
                             'wos', 'scopus', 'ebsco', 'jstor', 'ovid', 'pop',
                             'twitter', 'script']
 
-ImportConfig = ImportConfigRIS | ImportConfigTwitter
+ImportConfig = ImportConfigRIS | ImportConfigTwitter | ImportConfigJSONL
 
 
 class ImportModel(SBaseModel):
@@ -42,6 +43,8 @@ class ImportModel(SBaseModel):
     user_id: UUID | str | None = None
     # The project this import is attached to
     project_id: UUID | str
+    # The task_id assigned by nacsos-pipes service (if this import is handled by a pipeline)
+    pipeline_task_id: str | None = None
 
     # Unique descriptive name/title for the import
     name: str

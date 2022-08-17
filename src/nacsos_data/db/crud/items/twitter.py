@@ -80,21 +80,31 @@ async def create_twitter_item(tweet: TwitterItemModel,
             session.add(orm_item)
             await session.commit()
         except IntegrityError:
+            logger.debug(f'Did not create new item tweet_id: {orm_tweet.twitter_id} -> exists in item_id: {item_id}.')
+            # First, rollback all previously attempted actions (bring transaction to initial state)
+            await session.rollback()
             item_id = (
                 await session.execute(select(TwitterItem.item_id)
-                                      .where(TwitterItem.twitter_id == orm_item.twitter_id))
+                                      .where(TwitterItem.twitter_id == orm_tweet.twitter_id))
             ).one()[0]
-            logger.debug(f'Did not create new item tweet_id: {orm_tweet.twitter_id} -> exists in item_id: {item_id}.')
 
         if project_id is not None:
             orm_m2m_p2i = M2MProjectItem(item_id=item_id, project_id=project_id)
-            session.add(orm_m2m_p2i)
+            try:
+                session.add(orm_m2m_p2i)
+                await session.commit()
+            except IntegrityError:
+                logger.debug(f'M2M_p2i already exists, ignoring {project_id} <-> {item_id}')
+                await session.rollback()
 
         if import_id is not None:
             orm_m2m_i2i = M2MImportItem(item_id=item_id, import_id=import_id)
-            session.add(orm_m2m_i2i)
-
-        await session.commit()
+            try:
+                session.add(orm_m2m_i2i)
+                await session.commit()
+            except IntegrityError:
+                logger.debug(f'M2M_i2i already exists, ignoring {import_id} <-> {item_id}')
+                await session.rollback()
 
         return item_id
 
