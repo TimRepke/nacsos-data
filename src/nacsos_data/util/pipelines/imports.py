@@ -50,7 +50,7 @@ async def submit_jsonl_import_task(import_id: UUID | str,
                                    base_url: str,
                                    engine: DatabaseEngineAsync) -> str:
     import_details = await read_import(import_id=import_id, engine=engine)
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient() as client, engine.session() as session:
         config: ImportConfigJSONL = import_details.config
 
         if config.line_type not in function_map:
@@ -73,10 +73,10 @@ async def submit_jsonl_import_task(import_id: UUID | str,
             error = response.json()
             raise FailedJobSubmission('Failed to submit job', payload, error)
 
-        task_id = response.text
+        task_id = response.json()
 
-    # remember that we submitted this import job (and its reference)
-    import_details.pipeline_task_id = task_id
-    await upsert_import(import_model=import_details, engine=engine)
+        # remember that we submitted this import job (and its reference)
+        import_details.pipeline_task_id = task_id
+        await session.commit()
 
     return task_id

@@ -61,7 +61,7 @@ async def upsert_orm(upsert_model: SBaseModel, Schema: Type[Base], primary_key: 
                 for key, value in upsert_model.dict().items():
                     if (skip_update is not None and key in skip_update) or key == primary_key:
                         continue
-                    logger.debug(f'{key}:"{value}"')
+                    # logger.debug(f'{key}: "{value}"')
                     setattr(orm_model, key, value)
 
                 await session.commit()
