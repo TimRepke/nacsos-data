@@ -35,7 +35,7 @@ async def read_twitter_item_by_item_id(item_id: str | UUID, engine: DatabaseEngi
     return None
 
 
-async def read_twitter_item_by_twitter_id(twitter_id: str | UUID,
+async def read_twitter_item_by_twitter_id(twitter_id: str,
                                           engine: DatabaseEngineAsync) -> TwitterItemModel | None:
     stmt = select(TwitterItem).filter_by(twitter_id=twitter_id)
     async with engine.session() as session:  # type: AsyncSession
@@ -45,7 +45,7 @@ async def read_twitter_item_by_twitter_id(twitter_id: str | UUID,
     return None
 
 
-async def read_twitter_items_by_author_id(twitter_author_id: str | UUID, engine: DatabaseEngineAsync) \
+async def read_twitter_items_by_author_id(twitter_author_id: str, engine: DatabaseEngineAsync) \
         -> list[TwitterItemModel]:
     stmt = select(TwitterItem).filter_by(twitter_author_id=twitter_author_id)
     async with engine.session() as session:  # type: AsyncSession

@@ -6,7 +6,7 @@ from .. import SBaseModel
 
 
 class ReferencedTweet(SBaseModel):
-    id: int
+    id: str
     type: Literal['retweeted', 'quoted', 'replied_to']
 
 
@@ -36,7 +36,7 @@ class Mention(SBaseModel):
     # The part of text recognized as a user mention.
     username: str
     # The twitter id for that user
-    user_id: int
+    user_id: str
 
 
 class URL(SBaseModel):
@@ -62,11 +62,11 @@ class ContextAnnotation(SBaseModel):
           of the domain and entity, this information is not stored to save space.
     """
     # ID of the top level context (aka domain)
-    domain_id: int
+    domain_id: str
     # Name of the top level context
     domain_name: str
     # ID of the second-level context (e.g. topic, named entity, ...)
-    entity_id: int
+    entity_id: str
     # Name of the second-level context
     entity_name: str
 
@@ -81,7 +81,7 @@ class TwitterUserModel(SBaseModel):
         - `name` is None if `name` == `username` to save space
     """
     # The unique identifier of this user.
-    id: int | None = None
+    id: str | None = None
     # The UTC datetime that the user account was created on Twitter.
     created_at: datetime
     # The name of the user, as they’ve defined it on their profile.
@@ -118,9 +118,9 @@ class TwitterItemModel(SBaseModel):
     # Unique identifier for this TwitterItem, corresponds to Item
     item_id: str | UUID | None = None
     # Unique identifier on Twitter
-    twitter_id: int | None = None
+    twitter_id: str | None = None
     # Unique user identifier on Twitter
-    twitter_author_id: int | None = None
+    twitter_author_id: str | None = None
 
     # text of the tweet (in Twitter lingo, it's the "status")
     status: str
@@ -132,7 +132,7 @@ class TwitterItemModel(SBaseModel):
     language: str | None = None
 
     # The Tweet ID of the original Tweet of the conversation (which includes direct replies, replies of replies).
-    conversation_id: int | None = None
+    conversation_id: str | None = None
     # A list of Tweets this Tweet refers to. For example, if the parent Tweet is a Retweet, a Retweet with comment
     # (also known as Quoted Tweet) or a Reply, it will include the related Tweet referenced to by its parent.
     referenced_tweets: list[ReferencedTweet] | None = None
@@ -176,8 +176,8 @@ class TwitterMetaObject(SBaseModel):
     # The number of Tweet results returned in the response.
     count: int
     # The Tweet ID of the most recent Tweet returned in the response.
-    newest_id: int
+    newest_id: str
     # The Tweet ID of the oldest Tweet returned in the response.
-    oldest_id: int
+    oldest_id: str
     # A value that encodes the next 'page' of results that can be requested, via the next_token request parameter.
     next_token: str

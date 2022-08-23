@@ -19,9 +19,9 @@ class TwitterItem(Base):
     item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id), default=uuid.uuid4,
                      nullable=False, index=True, primary_key=True, unique=True)  # type: Column[uuid.UUID | str]
     # Unique identifier on Twitter
-    twitter_id = Column(BigInteger, nullable=False, unique=True, index=True)
+    twitter_id = Column(String, nullable=False, unique=True, index=True)
     # Unique user identifier on Twitter
-    twitter_author_id = Column(BigInteger, nullable=True, index=True)
+    twitter_author_id = Column(String, nullable=True, index=True)
 
     # text of the tweet (in Twitter lingo, it's the "status")
     status = Column(String, nullable=False)
@@ -33,7 +33,7 @@ class TwitterItem(Base):
     language = Column(String, nullable=True)
 
     # The Tweet ID of the original Tweet of the conversation (which includes direct replies, replies of replies).
-    conversation_id = Column(BigInteger, nullable=True, index=True)
+    conversation_id = Column(String, nullable=True, index=True)
     # A list of Tweets this Tweet refers to. For example, if the parent Tweet is a Retweet, a Retweet with comment
     # (also known as Quoted Tweet) or a Reply, it will include the related Tweet referenced to by its parent.
     referenced_tweets = Column(JSONB, nullable=True)
