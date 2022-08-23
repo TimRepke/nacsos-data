@@ -2,8 +2,7 @@ from typing import Literal, ForwardRef, Optional
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
-
-from . import SBaseModel
+from pydantic import BaseModel
 
 AnnotationSchemeLabel = ForwardRef('AnnotationSchemeLabel')
 AnnotationModel = ForwardRef('AnnotationModel')
@@ -11,7 +10,7 @@ AnnotationModel = ForwardRef('AnnotationModel')
 AnnotationSchemeLabelTypes = Literal['bool', 'str', 'int', 'float', 'single', 'multi', 'intext']
 
 
-class AnnotationSchemeLabelChoice(SBaseModel):
+class AnnotationSchemeLabelChoice(BaseModel):
     name: str
     hint: str | None = None
     # note, no constraint on value uniqueness; should be checked in frontend
@@ -19,7 +18,7 @@ class AnnotationSchemeLabelChoice(SBaseModel):
     children: list[AnnotationSchemeLabel] | None = None
 
 
-class AnnotationSchemeLabel(SBaseModel):  # type: ignore
+class AnnotationSchemeLabel(BaseModel):  # type: ignore
     name: str
     key: str  # note, no check for key uniqueness; should be done in frontend
     hint: str | None = None
@@ -37,7 +36,7 @@ class AnnotationSchemeLabel(SBaseModel):  # type: ignore
 AnnotationSchemeLabelChoice.update_forward_refs()
 
 
-class FlattenedAnnotationSchemeLabel(SBaseModel):
+class FlattenedAnnotationSchemeLabel(BaseModel):
     key: str
     required: bool
     max_repeat: int
@@ -47,7 +46,7 @@ class FlattenedAnnotationSchemeLabel(SBaseModel):
     parent_label: str | None
 
 
-class AnnotationSchemeModel(SBaseModel):
+class AnnotationSchemeModel(BaseModel):
     """
     Corresponds to db.models.annotations.AnnotationScheme
 
@@ -84,7 +83,7 @@ class AnnotationSchemeModel(SBaseModel):
 AssignmentScopeBaseConfigTypes = Literal['random']
 
 
-class AssignmentScopeBaseConfig(SBaseModel):
+class AssignmentScopeBaseConfig(BaseModel):
     config_type: AssignmentScopeBaseConfigTypes
     # list of user ids in the pool
     users: list[str] | list[UUID] | None = None
@@ -102,7 +101,7 @@ class AssignmentScopeRandomConfig(AssignmentScopeBaseConfig):
 AssignmentScopeConfig = AssignmentScopeRandomConfig
 
 
-class AssignmentScopeModel(SBaseModel):
+class AssignmentScopeModel(BaseModel):
     """
     AssignmentScope can be used to logically group a set of Assignments.
     For example, one may wish to re-use the same AnnotationScheme several times within a project
@@ -135,7 +134,7 @@ class AssignmentStatus(Enum):
     INVALID = 'INVALID'  # Something does not comply with the annotation scheme and is thus invalid
 
 
-class AssignmentModel(SBaseModel):
+class AssignmentModel(BaseModel):
     """
     Corresponds to db.models.annotations.Assignment
 
@@ -168,7 +167,7 @@ class AssignmentModel(SBaseModel):
     order: int | None = None
 
 
-class AnnotationModel(SBaseModel):  # type: ignore
+class AnnotationModel(BaseModel):  # type: ignore
     """
     Corresponds to db.models.annotations.Annotation
 

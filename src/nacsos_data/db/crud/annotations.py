@@ -216,7 +216,7 @@ async def read_annotation_scheme_for_scope(assignment_scope_id: str | UUID, engi
 
 async def read_annotation_schemes_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) \
         -> list[AnnotationSchemeModel]:
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
         stmt = select(AnnotationScheme).filter_by(project_id=project_id)
         result = (await session.execute(stmt)).scalars().all()
         return [AnnotationSchemeModel(**res.__dict__) for res in result]

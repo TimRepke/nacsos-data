@@ -79,7 +79,7 @@ def _get_schema_model_for_type(item_type: ProjectTypeLiteral | ProjectType) \
     raise ValueError(f'Not implemented for {item_type}')
 
 
-async def read_any_item_by_item_id(item_id: str | UUID, item_type: ProjectTypeLiteral,
+async def read_any_item_by_item_id(item_id: str | UUID, item_type: ProjectTypeLiteral | ProjectType,
                                    engine: DatabaseEngineAsync) -> AnyItemModel | None:
     Schema, Model = _get_schema_model_for_type(item_type=item_type)
     async with engine.session() as session:  # type: AsyncSession

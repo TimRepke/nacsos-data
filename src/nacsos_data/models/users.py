@@ -1,11 +1,10 @@
 from pydantic import EmailStr
 from uuid import UUID
-
-from . import SBaseModel
+from pydantic import BaseModel
 
 
 # Shared properties
-class UserBaseModel(SBaseModel):
+class UserBaseModel(BaseModel):
     """
     User represents a person.
     Most entries in the database will be (indirectly) linked to user accounts, so this is

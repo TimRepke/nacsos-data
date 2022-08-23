@@ -1,13 +1,13 @@
 from typing import Literal
 from uuid import UUID
+from pydantic import BaseModel
 
 from nacsos_data.db.schemas.projects import ProjectType
-from . import SBaseModel
 
 ProjectTypeLiteral = Literal['basic', 'twitter', 'academic', 'patents']
 
 
-class ProjectModel(SBaseModel):
+class ProjectModel(BaseModel):
     """
     Project is the basic structural and conceptual place around which all functionality evolves.
     It is essentially a container for a logically connected set of analyses, e.g. all work for a paper.
@@ -40,7 +40,7 @@ ProjectPermission = Literal['owner',
                             'artefacts_read', 'artefacts_edit']
 
 
-class ProjectPermissionsModel(SBaseModel):
+class ProjectPermissionsModel(BaseModel):
     """
     ProjectPermissions allows to define fine-grained project-level permission management.
     Once such an entry exists, the user is assumed to have very basic access to the respective project.

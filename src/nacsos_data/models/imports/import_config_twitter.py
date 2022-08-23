@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Literal
-from .. import SBaseModel
+from pydantic import BaseModel
 
 
-class ImportConfigTwitter(SBaseModel):
+class ImportConfigTwitter(BaseModel):
     # One query for matching Tweets. You can learn how to build this query by reading our build a query guide.
     # You can use all available operators and can make queries up to 1,024 characters long.
     # https://developer.twitter.com/en/docs/twitter-api/tweets/counts/integrate/build-a-query

@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import Base
-from nacsos_data.models import SBaseModel
 
 logger = logging.getLogger('nacsos_data.crud')
 
@@ -38,21 +37,24 @@ async def update_orm(updated_model: BaseModel, Model: Type[BaseModel], Schema: T
         return Model(**orm_model.__dict__)
 
 
-async def upsert_orm(upsert_model: SBaseModel, Schema: Type[Base], primary_key: str,
+async def upsert_orm(upsert_model: BaseModel, Schema: Type[Base], primary_key: str,
                      engine: DatabaseEngineAsync, skip_update: list[str] = None) -> str | UUID | None:
     # returns id of inserted or updated assignment scope
     async with engine.session() as session:  # type: AsyncSession
         logger.debug(f'UPSERT "{Schema}" with keys: {list(upsert_model.dict().keys())}')
 
-        if upsert_model[primary_key] is None:
-            upsert_model[primary_key] = uuid4()
+        p_key = getattr(upsert_model, primary_key, None)
+
+        if p_key is None:
+            p_key = uuid4()
+            setattr(upsert_model, primary_key, p_key)
         else:
             # fetch existing model from the database
             # session.query()
-            stmt = select(Schema).filter_by(**{primary_key: upsert_model[primary_key]})
+            stmt = select(Schema).filter_by(**{primary_key: p_key})
             orm_model: Base = (await session.scalars(stmt)).one_or_none()
 
-            logger.debug(f'"{Schema}" with {primary_key}={upsert_model[primary_key]} found, '
+            logger.debug(f'"{Schema}" with {primary_key}={p_key} found, '
                          f'attempting to UPDATE!')
 
             # check if it actually already exists in the database
@@ -66,14 +68,14 @@ async def upsert_orm(upsert_model: SBaseModel, Schema: Type[Base], primary_key: 
 
                 await session.commit()
 
-                return upsert_model[primary_key]
+                return p_key
             # else: does not exist, create item
             # TODO: would it be a better behaviour to raise an error if key does not exist?
 
-        logger.debug(f'"{Schema}" with {primary_key}={upsert_model[primary_key]} does not exist yet, '
+        logger.debug(f'"{Schema}" with {primary_key}={p_key} does not exist yet, '
                      f'attempting to INSERT!')
         orm_model = Schema(**upsert_model.dict())
         session.add(orm_model)
         await session.commit()
 
-        return upsert_model[primary_key]
+        return p_key

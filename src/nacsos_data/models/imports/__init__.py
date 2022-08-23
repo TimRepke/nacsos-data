@@ -2,8 +2,7 @@ from datetime import datetime
 from typing import Literal
 from enum import Enum
 from uuid import UUID
-
-from .. import SBaseModel
+from pydantic import BaseModel
 
 from .import_config_ris import ImportConfigRIS
 from .import_config_twitter import ImportConfigTwitter
@@ -36,7 +35,7 @@ ImportTypeLiteral = Literal['ris', 'csv', 'jsonl',
 ImportConfig = ImportConfigRIS | ImportConfigTwitter | ImportConfigJSONL
 
 
-class ImportModel(SBaseModel):
+class ImportModel(BaseModel):
     # Unique identifier for this import
     import_id: UUID | str | None = None
     # The user who created this import (may be NULL if done via a script)
