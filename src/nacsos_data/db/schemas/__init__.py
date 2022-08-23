@@ -13,4 +13,4 @@ AnyItemSchema = TypeVar('AnyItemSchema', Item, TwitterItem)
 
 __all__ = ['Base', 'Annotation', 'AnnotationScheme', 'Assignment', 'AssignmentScope',
            'Project', 'ProjectPermissions', 'User', 'Item', 'Import',
-           'M2MImportItem', 'M2MProjectItem', 'TwitterItem', 'AnyItemSchema']
+           'M2MImportItem', 'M2MProjectItem', 'TwitterItem', 'AnyItemSchema', 'AnyItemType']

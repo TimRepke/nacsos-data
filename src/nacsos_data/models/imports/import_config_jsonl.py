@@ -1,5 +1,5 @@
 from typing import Literal
-from .. import SBaseModel
+from pydantic import BaseModel
 
 LineEncoding = Literal[
     # twitter-related line encodings
@@ -13,6 +13,6 @@ LineEncoding = Literal[
 ]
 
 
-class ImportConfigJSONL(SBaseModel):
+class ImportConfigJSONL(BaseModel):
     filenames: list[str]
     line_type: LineEncoding
