@@ -1,16 +1,15 @@
 from typing import Literal
 from datetime import datetime
 from uuid import UUID
+from pydantic import BaseModel
 
-from .. import SBaseModel
 
-
-class ReferencedTweet(SBaseModel):
+class ReferencedTweet(BaseModel):
     id: int
     type: Literal['retweeted', 'quoted', 'replied_to']
 
 
-class Cashtag(SBaseModel):
+class Cashtag(BaseModel):
     # The start position (zero-based) of the recognized Cashtag within the Tweet. All start indices are inclusive.
     start: int
     # The end position (zero-based) of the recognized Cashtag within the Tweet. This end index is exclusive.
@@ -19,7 +18,7 @@ class Cashtag(SBaseModel):
     tag: str
 
 
-class Hashtag(SBaseModel):
+class Hashtag(BaseModel):
     # The start position (zero-based) of the recognized Hashtag within the Tweet. All start indices are inclusive.
     start: int
     # The end position (zero-based) of the recognized Hashtag within the Tweet. This end index is exclusive.
@@ -28,7 +27,7 @@ class Hashtag(SBaseModel):
     tag: str
 
 
-class Mention(SBaseModel):
+class Mention(BaseModel):
     # The start position (zero-based) of the recognized user mention within the Tweet. All start indices are inclusive.
     start: int
     # The end position (zero-based) of the recognized user mention within the Tweet. This end index is exclusive.
@@ -39,7 +38,7 @@ class Mention(SBaseModel):
     user_id: int
 
 
-class URL(SBaseModel):
+class URL(BaseModel):
     # The start position (zero-based) of the recognized URL within the Tweet. All start indices are inclusive.
     start: int
     # The end position (zero-based) of the recognized URL within the Tweet. This end index is exclusive.
@@ -53,7 +52,7 @@ class URL(SBaseModel):
     # TODO: check how url_unwound differs ("The full destination URL.")
 
 
-class ContextAnnotation(SBaseModel):
+class ContextAnnotation(BaseModel):
     """
     Flattened and reduced version of the context_annotation object
     https://developer.twitter.com/en/docs/twitter-api/annotations/overview
@@ -71,7 +70,7 @@ class ContextAnnotation(SBaseModel):
     entity_name: str
 
 
-class TwitterUserModel(SBaseModel):
+class TwitterUserModel(BaseModel):
     """
     Flattened and reduced representation of a Twitter User Object
     https://developer.twitter.com/en/docs/twitter-api/data-dictionary/object-model/user
@@ -108,7 +107,7 @@ class TwitterUserModel(SBaseModel):
     listed_count: int | None = None
 
 
-class TwitterItemModel(SBaseModel):
+class TwitterItemModel(BaseModel):
     """
     Corresponds to db.models.items.TwitterItem
 
@@ -169,7 +168,7 @@ class TwitterItemModel(SBaseModel):
     user: TwitterUserModel | None = None
 
 
-class TwitterMetaObject(SBaseModel):
+class TwitterMetaObject(BaseModel):
     """
     This object contains information about the number of users returned in the current request and pagination details.
     """

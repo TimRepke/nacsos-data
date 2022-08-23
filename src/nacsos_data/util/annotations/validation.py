@@ -1,9 +1,11 @@
 from uuid import UUID, uuid4
 import logging
 from nacsos_data.models.annotations import \
-    AnnotationModel, AnnotationSchemeModel, \
+    AnnotationModel, \
+    AnnotationSchemeModel, \
     FlattenedAnnotationSchemeLabel, \
-    AssignmentStatus, AnnotationSchemeLabel
+    AssignmentStatus, \
+    AnnotationSchemeLabel
 
 logger = logging.getLogger('nacsos_data.annotation.validation')
 

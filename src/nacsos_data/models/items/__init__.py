@@ -1,13 +1,12 @@
 from typing import TypeVar
 from uuid import UUID
-
-from .. import SBaseModel
+from pydantic import BaseModel
 from .twitter import TwitterItemModel, TwitterMetaObject, ReferencedTweet
 
-ItemMetaType = dict # dict[str, str | float | int | 'ItemMetaType']
+ItemMetaType = dict  # dict[str, str | float | int | 'ItemMetaType']
 
 
-class ItemModel(SBaseModel):
+class ItemModel(BaseModel):
     """
     Corresponds to db.models.items.Item
 
@@ -27,4 +26,4 @@ class ItemModel(SBaseModel):
 AnyItemModel = ItemModel | TwitterItemModel
 AnyItemModelType = TypeVar('AnyItemModelType', ItemModel, TwitterItemModel)
 
-__all__ = ['ItemModel', 'TwitterItemModel', 'AnyItemModel', 'ItemMetaType']
+__all__ = ['ItemModel', 'TwitterItemModel', 'AnyItemModel', 'ItemMetaType', 'AnyItemModelType']

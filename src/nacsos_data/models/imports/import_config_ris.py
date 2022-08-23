@@ -1,5 +1,5 @@
-from .. import SBaseModel
+from pydantic import BaseModel
 
 
-class ImportConfigRIS(SBaseModel):
+class ImportConfigRIS(BaseModel):
     tmp: int
