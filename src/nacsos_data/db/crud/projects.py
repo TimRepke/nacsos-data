@@ -83,7 +83,7 @@ async def update_project(project: ProjectModel, engine: DatabaseEngineAsync) -> 
 
 async def create_project_permissions(permissions: ProjectPermissionsModel,
                                      engine: DatabaseEngineAsync) -> ProjectPermissionsModel:
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
         new_permissions = ProjectPermissions(**permissions.dict())
         session.add(new_permissions)
         await session.commit()

@@ -1,9 +1,9 @@
-from typing import TypeVar
+from typing import TypeVar, Any
 from uuid import UUID
 from pydantic import BaseModel
 from .twitter import TwitterItemModel, TwitterMetaObject, ReferencedTweet
 
-ItemMetaType = dict  # dict[str, str | float | int | 'ItemMetaType']
+ItemMetaType = dict[str, Any]  # dict[str, str | float | int | 'ItemMetaType']
 
 
 class ItemModel(BaseModel):

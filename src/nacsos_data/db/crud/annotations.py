@@ -78,7 +78,7 @@ async def read_assignment_scopes_for_project(project_id: str | UUID,
                                              engine: DatabaseEngineAsync) -> list[AssignmentScopeModel]:
     async with engine.session() as session:  # type: AsyncSession
         stmt = select(AssignmentScope) \
-            .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == AssignmentScope.scheme_id) \
+            .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id) \
             .where(AnnotationScheme.project_id == project_id) \
             .order_by(desc(AssignmentScope.time_created))
         result = (await session.execute(stmt)).scalars().all()
@@ -120,10 +120,9 @@ async def read_next_assignment_for_scope_for_user(current_assignment_id: str | U
             JOIN tmp  ON  tmp.next_assignment_id=assignment.assignment_id
         WHERE tmp.assignment_id=:assignment_id;
         """)
-        result = await session.execute(stmt, {'user_id': user_id,
-                                              'assignment_scope_id': assignment_scope_id,
-                                              'assignment_id': current_assignment_id})
-        result = result.mappings().one_or_none()
+        result = (await session.execute(stmt, {'user_id': user_id,
+                                               'assignment_scope_id': assignment_scope_id,
+                                               'assignment_id': current_assignment_id})).mappings().one_or_none()
         if result is not None:
             return AssignmentModel(**result.__dict__)
     return None
@@ -287,8 +286,9 @@ async def delete_assignment_scope(assignment_scope_id: str | UUID,
 async def upsert_annotations(annotations: list[AnnotationModel],
                              assignment_id: str | UUID | None,
                              engine: DatabaseEngineAsync) -> AssignmentStatus | None:
-    if not all([annotation.annotation_id is not None for annotation in annotations]):
+    if not all([annotation is not None and annotation.annotation_id is not None for annotation in annotations]):
         raise ValueError('One or more annotations have no ID, this in undefined behaviour.')
+
     if assignment_id is not None:
         existing_annotations = await read_annotations_for_assignment(assignment_id=assignment_id, engine=engine)
         existing_ids = set([str(annotation.annotation_id) for annotation in existing_annotations])
@@ -306,7 +306,8 @@ async def upsert_annotations(annotations: list[AnnotationModel],
     logger.debug(f'[upsert_annotations] UPDATING existing annotations with ids: {ids_to_update}')
     logger.debug(f'[upsert_annotations] DELETING existing annotations with ids: {ids_to_remove}')
 
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
+        annotation: AnnotationModel | Annotation | None
         # TODO this seems too excessive compared to simply deleting them directly (but has to be done for FK constraint)
         #      session.execute(delete(Annotation).where(Annotation.annotation_id == annotation_id))
         annotations_to_delete = [
@@ -325,15 +326,18 @@ async def upsert_annotations(annotations: list[AnnotationModel],
 
         for annotation in annotations:
             if annotation.annotation_id in ids_to_update:
-                stmt = select(Annotation).where(Annotation.annotation_id == annotation.annotation_id)
-                annotation_db: Annotation = (await session.scalars(stmt)).one()
+                stmt = select(Annotation).filter_by(annotation_id=annotation.annotation_id)
+                annotation_db = (await session.scalars(stmt)).one_or_none()
+                if annotation_db is None:
+                    raise RuntimeError('During processing, one tof the annotations disappeared.'
+                                       f'This should never happen! ID for reference: {annotation.annotation_id}')
                 annotation_db.key = annotation.key
                 annotation_db.repeat = annotation.repeat
                 annotation_db.parent = annotation.parent
                 annotation_db.value_int = annotation.value_int
                 annotation_db.value_bool = annotation.value_bool
                 annotation_db.value_str = annotation.value_str
-                annotation_db.value_float = annotation.value_float
+                annotation_db.value_float = annotation.value_float  # type: ignore[assignment] # FIXME
                 await session.commit()
 
     if assignment_id is not None:
@@ -356,7 +360,7 @@ class ItemWithCount(BaseModel):
 
 async def read_item_ids_with_assignment_count_for_project(project_id: str | UUID,
                                                           engine: DatabaseEngineAsync) -> list[ItemWithCount]:
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
         stmt = text("""
         SELECT assignment.item_id,
                COUNT(DISTINCT assignment.assignment_id) AS num_total,
@@ -381,7 +385,7 @@ class AssignmentCounts(BaseModel):
 
 async def read_assignment_counts_for_scope(assignment_scope_id: str | UUID,
                                            engine: DatabaseEngineAsync) -> AssignmentCounts:
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
         stmt = text("""
         SELECT COUNT(DISTINCT assignment.assignment_id)                       AS num_total,
                SUM(CASE WHEN assignment.status = 'OPEN' THEN 1 ELSE 0 END)    AS num_open,
@@ -401,7 +405,7 @@ async def read_assignment_counts_for_scope(assignment_scope_id: str | UUID,
 
 async def store_assignments(assignments: list[AssignmentModel],
                             engine: DatabaseEngineAsync) -> None:
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
         assignments_orm = [Assignment(**assignment.dict()) for assignment in assignments]
         session.add_all(assignments_orm)
         await session.commit()

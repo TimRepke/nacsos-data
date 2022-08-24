@@ -22,17 +22,19 @@ async def read_item_count_for_import(import_id: UUID | str, engine: DatabaseEngi
             .where(M2MImportItem.import_id == import_id) \
             .group_by(M2MImportItem.import_id)
         result = (await session.execute(stmt)).mappings().one_or_none()
-        if result is None:
+        if result is None or type(result['num_items']) != int:
             return 0
         return result['num_items']
 
 
 async def read_import(import_id: UUID | str,
-                      engine: DatabaseEngineAsync) -> ImportModel:
+                      engine: DatabaseEngineAsync) -> ImportModel | None:
     async with engine.session() as session:  # type: AsyncSession
         stmt = select(Import).where(Import.import_id == import_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
-        return ImportModel.parse_obj(result.__dict__)
+        if result is not None:
+            return ImportModel.parse_obj(result.__dict__)
+        return None
 
 
 async def upsert_import(import_model: ImportModel,

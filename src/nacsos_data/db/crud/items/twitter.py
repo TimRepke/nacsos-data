@@ -54,9 +54,8 @@ async def read_twitter_items_by_author_id(twitter_author_id: str, engine: Databa
         return [TwitterItemModel(**res.__dict__) for res in result_list]
 
 
-async def create_twitter_item(tweet: TwitterItemModel,
-                              project_id: str | UUID | None = None, import_id: str | UUID | None = None,
-                              engine: DatabaseEngineAsync = None) \
+async def create_twitter_item(tweet: TwitterItemModel, engine: DatabaseEngineAsync,
+                              project_id: str | UUID | None = None, import_id: str | UUID | None = None) \
         -> str | UUID | None:
     """
     Insert a Tweet into the database.
@@ -68,11 +67,11 @@ async def create_twitter_item(tweet: TwitterItemModel,
     :return:
     """
 
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
         orm_tweet = TwitterItem(**tweet.dict())
         if orm_tweet.item_id is None:
-            orm_tweet.item_id = uuid.uuid4()
-        item_id = orm_tweet.item_id
+            orm_tweet.item_id = uuid.uuid4()  # type: ignore[unreachable]
+        item_id = str(orm_tweet.item_id)
         orm_item = Item(item_id=orm_tweet.item_id, text=tweet.status)
 
         try:
@@ -109,8 +108,8 @@ async def create_twitter_item(tweet: TwitterItemModel,
         return item_id
 
 
-async def create_twitter_items(tweets: list[TwitterItemModel],
-                               project_id: str | UUID | None = None, import_id: str | UUID | None = None,
-                               engine: DatabaseEngineAsync = None) -> list[str | UUID | None]:
+async def create_twitter_items(tweets: list[TwitterItemModel], engine: DatabaseEngineAsync,
+                               project_id: str | UUID | None = None, import_id: str | UUID | None = None) \
+        -> list[str | UUID | None]:
     return [await create_twitter_item(tweet, project_id=project_id, import_id=import_id, engine=engine)
             for tweet in tweets]

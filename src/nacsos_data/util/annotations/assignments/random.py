@@ -60,7 +60,8 @@ async def random_assignments(assignment_scope_id: str | UUID,
 
     for item_id in multi_code_items:
         num_annotations = random.randint(config.min_assignments_per_item, config.max_assignments_per_item)
-        random_users = random.sample(user_ids, k=num_annotations)  # type: list[str]
+        random_users: list[str | UUID] = random.sample(user_ids, k=num_annotations)
+        user_id: str | UUID
         for user_id in random_users:
             assignments.append(AssignmentModel(assignment_id=uuid4(),
                                                assignment_scope_id=assignment_scope_id,

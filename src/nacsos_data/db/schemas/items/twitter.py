@@ -1,4 +1,4 @@
-from sqlalchemy import String, Column, Integer, DateTime, Float, ForeignKey, BigInteger
+from sqlalchemy import String, Column, Integer, DateTime, Float, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 
@@ -16,8 +16,9 @@ class TwitterItem(Base):
     __tablename__ = 'twitter_item'
 
     # Unique identifier for this TwitterItem, corresponds to Item
-    item_id = Column(UUID(as_uuid=True), ForeignKey(Item.item_id), default=uuid.uuid4,
-                     nullable=False, index=True, primary_key=True, unique=True)  # type: Column[uuid.UUID | str]
+    item_id = Column(UUID(as_uuid=True),
+                     ForeignKey(Item.item_id),  # type: ignore[arg-type] # FIXME
+                     default=uuid.uuid4, nullable=False, index=True, primary_key=True, unique=True)
     # Unique identifier on Twitter
     twitter_id = Column(String, nullable=False, unique=True, index=True)
     # Unique user identifier on Twitter

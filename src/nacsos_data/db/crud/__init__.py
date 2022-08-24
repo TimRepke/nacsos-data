@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Type
+from typing import Any, Type, TypeVar
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID, uuid4
@@ -21,9 +21,27 @@ class DuplicateKeyWarning(UserWarning):
     pass
 
 
-async def update_orm(updated_model: BaseModel, Model: Type[BaseModel], Schema: Type[Base],
-                     filter_by: dict[str, Any], skip_update: list[str], engine: DatabaseEngineAsync) -> Base:
-    async with engine.session() as session:  # type: AsyncSession
+class UpdateFailedWarning(Warning):
+    """
+    Raised when an update has failed.
+    """
+    pass
+
+
+class UpsertFailedWarning(Warning):
+    """
+    Raised when an upsert (insert on_conflict update) has failed.
+    """
+    pass
+
+
+S = TypeVar('S', bound=Base)
+M = TypeVar('M', bound=BaseModel)
+
+
+async def update_orm(updated_model: BaseModel, Model: Type[M], Schema: Type[Base],
+                     filter_by: dict[str, Any], skip_update: list[str], engine: DatabaseEngineAsync) -> M:
+    async with engine.session() as session:
         stmt = select(Schema).filter_by(**filter_by)
         orm_model = (await session.execute(stmt)).one_or_none()
         if orm_model is not None:
@@ -37,13 +55,13 @@ async def update_orm(updated_model: BaseModel, Model: Type[BaseModel], Schema: T
         return Model(**orm_model.__dict__)
 
 
-async def upsert_orm(upsert_model: BaseModel, Schema: Type[Base], primary_key: str,
-                     engine: DatabaseEngineAsync, skip_update: list[str] = None) -> str | UUID | None:
+async def upsert_orm(upsert_model: BaseModel, Schema: Type[S], primary_key: str,
+                     engine: DatabaseEngineAsync, skip_update: list[str] | None = None) -> str | UUID | None:
     # returns id of inserted or updated assignment scope
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
         logger.debug(f'UPSERT "{Schema}" with keys: {list(upsert_model.dict().keys())}')
 
-        p_key = getattr(upsert_model, primary_key, None)
+        p_key: str | UUID | None = getattr(upsert_model, primary_key, None)
 
         if p_key is None:
             p_key = uuid4()
@@ -52,7 +70,7 @@ async def upsert_orm(upsert_model: BaseModel, Schema: Type[Base], primary_key: s
             # fetch existing model from the database
             # session.query()
             stmt = select(Schema).filter_by(**{primary_key: p_key})
-            orm_model: Base = (await session.scalars(stmt)).one_or_none()
+            orm_model: S | None = (await session.scalars(stmt)).one_or_none()
 
             logger.debug(f'"{Schema}" with {primary_key}={p_key} found, '
                          f'attempting to UPDATE!')

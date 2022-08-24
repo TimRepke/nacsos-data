@@ -11,7 +11,7 @@ logger = logging.getLogger('nacsos_data.annotation.validation')
 
 
 def flatten_annotation_scheme(annotation_scheme: AnnotationSchemeModel) -> list[FlattenedAnnotationSchemeLabel]:
-    def recurse(labels: list[AnnotationSchemeLabel], parent_label: str = None,
+    def recurse(labels: list[AnnotationSchemeLabel], parent_label: str | None = None,
                 parent_repeat: int = 1) -> list[FlattenedAnnotationSchemeLabel]:
         ret = []
 
@@ -63,7 +63,8 @@ def validate_annotated_assignment(annotation_scheme: AnnotationSchemeModel,
 
     annotations_map = create_annotations_lookup(annotations)
 
-    def recurse(labels: list[AnnotationSchemeLabel], repeat: int = 1, parent: str = None) -> AssignmentStatus:
+    def recurse(labels: list[AnnotationSchemeLabel], repeat: int = 1, parent: str | UUID | None = None) \
+            -> AssignmentStatus:
         status = AssignmentStatus.FULL
 
         for label in labels:
@@ -99,7 +100,7 @@ def merge_scheme_and_annotations(annotation_scheme: AnnotationSchemeModel,
 
     annotations_map = create_annotations_lookup(annotations)
 
-    def recurse(labels: list[AnnotationSchemeLabel], repeat: int = 1, parent: str = None) \
+    def recurse(labels: list[AnnotationSchemeLabel], repeat: int = 1, parent: str | UUID | None = None) \
             -> list[AnnotationSchemeLabel]:
         ret = []
 
@@ -127,7 +128,7 @@ def merge_scheme_and_annotations(annotation_scheme: AnnotationSchemeModel,
 
 
 def has_annotation(label: AnnotationSchemeLabel) -> bool:
-    return label.annotation \
+    return label.annotation is not None \
            and (label.annotation.value_int is not None
                 or label.annotation.value_str is not None
                 or label.annotation.value_bool is not None
@@ -137,9 +138,10 @@ def has_annotation(label: AnnotationSchemeLabel) -> bool:
 def annotated_scheme_to_annotations(scheme: AnnotationSchemeModel) -> list[AnnotationModel]:
     ret = []
 
-    def recurse(labels: list[AnnotationSchemeLabel], parent_id: UUID = None) -> None:
+    def recurse(labels: list[AnnotationSchemeLabel], parent_id: str | UUID | None = None) -> None:
         for label in labels:
             if has_annotation(label):
+                assert label.annotation is not None
                 if label.annotation.annotation_id is None:
                     label.annotation.annotation_id = uuid4()
                 label.annotation.parent = parent_id

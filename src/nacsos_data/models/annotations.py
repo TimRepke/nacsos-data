@@ -1,11 +1,10 @@
-from typing import Literal, ForwardRef, Optional
+from __future__ import annotations
+from typing import Literal, Optional
+
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel
-
-AnnotationSchemeLabel = ForwardRef('AnnotationSchemeLabel')
-AnnotationModel = ForwardRef('AnnotationModel')
 
 AnnotationSchemeLabelTypes = Literal['bool', 'str', 'int', 'float', 'single', 'multi', 'intext']
 
@@ -31,9 +30,6 @@ class AnnotationSchemeLabel(BaseModel):  # type: ignore
 
     # Only filled when transmitting annotations from/to the gui
     annotation: Optional[AnnotationModel] = None
-
-
-AnnotationSchemeLabelChoice.update_forward_refs()
 
 
 class FlattenedAnnotationSchemeLabel(BaseModel):
@@ -127,7 +123,7 @@ class AssignmentScopeModel(BaseModel):
     config: AssignmentScopeConfig | None = None
 
 
-class AssignmentStatus(Enum):
+class AssignmentStatus(str, Enum):
     FULL = 'FULL'  # This assignment was fully and correctly fulfilled
     PARTIAL = 'PARTIAL'  # This assignment was partially fulfilled
     OPEN = 'OPEN'  # This assignment was not attempted
@@ -167,7 +163,7 @@ class AssignmentModel(BaseModel):
     order: int | None = None
 
 
-class AnnotationModel(BaseModel):  # type: ignore
+class AnnotationModel(BaseModel):
     """
     Corresponds to db.models.annotations.Annotation
 
@@ -232,7 +228,3 @@ class AnnotationModel(BaseModel):  # type: ignore
     # of that Item, the following fields should be set with the respective string offset.
     text_offset_start: int | None = None
     text_offset_stop: int | None = None
-
-
-# AnnotationModel.update_forward_refs()  # type: ignore
-AnnotationSchemeLabel.update_forward_refs()  # type: ignore

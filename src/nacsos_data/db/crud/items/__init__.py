@@ -1,6 +1,5 @@
 from typing import Type
 from sqlalchemy import select, insert, func
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
@@ -9,32 +8,36 @@ from nacsos_data.db.schemas.projects import ProjectType
 from nacsos_data.models.items import AnyItemModel, ItemModel, TwitterItemModel, AnyItemModelType
 from nacsos_data.models.projects import ProjectTypeLiteral
 
+import logging
+
+logger = logging.getLogger('nacsos-data.crud.items')
+
 
 async def read_item_count_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) -> int:
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
         stmt = select(M2MProjectItem.project_id, func.count(M2MProjectItem.item_id).label('num_items')) \
             .where(M2MProjectItem.project_id == project_id) \
             .group_by(M2MProjectItem.project_id)
         result = (await session.execute(stmt)).mappings().one_or_none()
-        if result is None or 'num_items' not in result:
+        if result is None or 'num_items' not in result or type(result['num_items']) != int:
             return 0
         return result['num_items']
 
 
 async def create_item(item: ItemModel, project_id: str | UUID | None, engine: DatabaseEngineAsync) -> None:
     try:
-        async with engine.session() as session:  # type: AsyncSession
+        async with engine.session() as session:
             orm_item = Item(**item.dict())
             session.add(orm_item)
 
             await session.commit()
 
             if project_id is not None:
-                stmt = insert(M2MProjectItem(item_id=orm_item.item_id, project_id=project_id))
-                await session.execute(stmt)
+                session.add(M2MProjectItem(item_id=orm_item.item_id, project_id=project_id))
+                await session.commit()
 
     except Exception as e:
-        print(e)
+        logger.exception(e)
 
 
 async def create_items(items: list[ItemModel], project_id: str | UUID | None, engine: DatabaseEngineAsync) -> None:
@@ -45,7 +48,7 @@ async def create_items(items: list[ItemModel], project_id: str | UUID | None, en
 
 async def _read_all_for_project(project_id: str | UUID, Schema: Type[AnyItemSchema], Model: Type[AnyItemModelType],
                                 engine: DatabaseEngineAsync) -> list[AnyItemModelType]:
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
         # FIXME We should probably set a LIMIT by default
         stmt = select(Schema) \
             .join(M2MProjectItem, M2MProjectItem.item_id == Schema.item_id) \
@@ -57,7 +60,7 @@ async def _read_all_for_project(project_id: str | UUID, Schema: Type[AnyItemSche
 async def _read_paged_for_project(project_id: str | UUID, Schema: Type[AnyItemSchema], Model: Type[AnyItemModelType],
                                   page: int, page_size: int, engine: DatabaseEngineAsync) -> list[AnyItemModelType]:
     # page: count starts at 1
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
         offset = (page - 1) * page_size
         if offset < 0:
             offset = 0
@@ -82,7 +85,7 @@ def _get_schema_model_for_type(item_type: ProjectTypeLiteral | ProjectType) \
 async def read_any_item_by_item_id(item_id: str | UUID, item_type: ProjectTypeLiteral | ProjectType,
                                    engine: DatabaseEngineAsync) -> AnyItemModel | None:
     Schema, Model = _get_schema_model_for_type(item_type=item_type)
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
         stmt = select(Schema).filter_by(item_id=item_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
