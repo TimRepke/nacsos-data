@@ -17,7 +17,7 @@ class AnnotationSchemeLabelChoice(BaseModel):
     children: list[AnnotationSchemeLabel] | None = None
 
 
-class AnnotationSchemeLabel(BaseModel):  # type: ignore
+class AnnotationSchemeLabel(BaseModel):
     name: str
     key: str  # note, no check for key uniqueness; should be done in frontend
     hint: str | None = None
@@ -228,3 +228,7 @@ class AnnotationModel(BaseModel):
     # of that Item, the following fields should be set with the respective string offset.
     text_offset_start: int | None = None
     text_offset_stop: int | None = None
+
+
+AnnotationSchemeLabelChoice.update_forward_refs()
+AnnotationSchemeLabel.update_forward_refs()

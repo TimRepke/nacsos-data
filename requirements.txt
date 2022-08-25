@@ -1,9 +1,9 @@
-pydantic==1.9.1
-setuptools==63.4.2
+pydantic==1.9.2
+setuptools==65.3.0
 psycopg==3.0.16
 psycopg2==2.9.3
 #sqlalchemy2-stubs==0.0.2a22
 #sqlalchemy[asyncio]==1.4.36
-SQLAlchemy @ git+https://github.com/sqlalchemy/sqlalchemy.git@cd628fad7c92f5f54bf1bf6985fd983269b0ec19
+SQLAlchemy @ git+https://github.com/sqlalchemy/sqlalchemy.git@1ea3c783b6ceaf488e34f15c3ce97eabbc3ab4d3
 sqlalchemy-json==0.5.0
 httpx[http2]==0.23.0
