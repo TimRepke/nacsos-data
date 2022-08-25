@@ -17,7 +17,7 @@ class TwitterItem(Base):
 
     # Unique identifier for this TwitterItem, corresponds to Item
     item_id = Column(UUID(as_uuid=True),
-                     ForeignKey(Item.item_id),  # type: ignore[arg-type] # FIXME
+                     ForeignKey(Item.item_id),  # type: ignore[misc] # FIXME
                      default=uuid.uuid4, nullable=False, index=True, primary_key=True, unique=True)
     # Unique identifier on Twitter
     twitter_id = Column(String, nullable=False, unique=True, index=True)

@@ -50,10 +50,10 @@ class M2MImportItem(Base):
     __tablename__ = 'm2m_import_item'
 
     import_id = Column(UUID(as_uuid=True),
-                       ForeignKey(Import.import_id),  # type: ignore[arg-type] # FIXME
+                       ForeignKey(Import.import_id),  # type: ignore[arg-type, misc] # FIXME
                        nullable=False, index=True, primary_key=True)
     item_id = Column(UUID(as_uuid=True),
-                     ForeignKey(Item.item_id),  # type: ignore[arg-type] # FIXME
+                     ForeignKey(Item.item_id),  # type: ignore[arg-type, misc] # FIXME
                      nullable=False, index=True, primary_key=True)
 
     # Keeps track of when this import took place.
@@ -69,8 +69,8 @@ class M2MProjectItem(Base):
     __tablename__ = 'm2m_project_item'
 
     project_id = Column(UUID(as_uuid=True),
-                        ForeignKey(Project.project_id),  # type: ignore[arg-type] # FIXME
+                        ForeignKey(Project.project_id),  # type: ignore[misc] # FIXME
                         nullable=False, index=True, primary_key=True)
     item_id = Column(UUID(as_uuid=True),
-                     ForeignKey(Item.item_id),  # type: ignore[arg-type] # FIXME
+                     ForeignKey(Item.item_id),  # type: ignore[misc] # FIXME
                      nullable=False, index=True, primary_key=True)

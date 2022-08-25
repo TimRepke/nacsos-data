@@ -17,7 +17,7 @@ async def read_user_by_id(user_id: str, engine: DatabaseEngineAsync) -> UserInDB
 
 async def read_users_by_ids(user_ids: list[str], engine: DatabaseEngineAsync) -> list[UserInDBModel] | None:
     async with engine.session() as session:
-        stmt = select(User).filter(User.user_id.in_(user_ids))
+        stmt = select(User).filter(User.user_id.in_(user_ids))  # type: ignore[misc] # FIXME
         result = (await session.execute(stmt)).scalars().all()
         if result is not None:
             return [UserInDBModel(**res.__dict__) for res in result]
@@ -41,10 +41,10 @@ async def read_all_users(engine: DatabaseEngineAsync) -> list[UserInDBModel]:
 
 async def read_project_users(project_id: str | UUID, engine: DatabaseEngineAsync) -> list[UserInDBModel] | None:
     async with engine.session() as session:
-        stmt = select(User) \
-            .join(ProjectPermissions, ProjectPermissions.user_id == User.user_id) \
-            .where(ProjectPermissions.project_id == project_id) \
-            .order_by(asc(User.username))
+        stmt = (select(User)
+                .join(ProjectPermissions, ProjectPermissions.user_id == User.user_id)  # type: ignore[misc] # FIXME
+                .where(ProjectPermissions.project_id == project_id)  # type: ignore[misc] # FIXME
+                .order_by(asc(User.username)))
         result = (await session.execute(stmt)).scalars().all()
         if result is not None:
             return [UserInDBModel(**res.__dict__) for res in result]

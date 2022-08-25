@@ -1,5 +1,4 @@
 from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
@@ -10,17 +9,18 @@ from nacsos_data.models.imports import ImportModel
 
 async def read_all_imports_for_project(project_id: UUID | str,
                                        engine: DatabaseEngineAsync) -> list[ImportModel]:
-    async with engine.session() as session:  # type: AsyncSession
-        stmt = select(Import).where(Import.project_id == project_id)
+    async with engine.session() as session:
+        stmt = select(Import).where(Import.project_id == project_id)  # type: ignore[misc] # FIXME
         result = (await session.execute(stmt)).scalars().all()
         return [ImportModel.parse_obj(res.__dict__) for res in result]
 
 
 async def read_item_count_for_import(import_id: UUID | str, engine: DatabaseEngineAsync) -> int:
-    async with engine.session() as session:  # type: AsyncSession
-        stmt = select(M2MImportItem.import_id, func.count(M2MImportItem.item_id).label('num_items')) \
-            .where(M2MImportItem.import_id == import_id) \
-            .group_by(M2MImportItem.import_id)
+    async with engine.session() as session:  # type: ignore[misc] # FIXME
+        stmt = (select(M2MImportItem.import_id,  # type: ignore[misc] # FIXME
+                       func.count(M2MImportItem.item_id).label('num_items'))  # type: ignore[misc] # FIXME
+                .where(M2MImportItem.import_id == import_id)  # type: ignore[misc] # FIXME
+                .group_by(M2MImportItem.import_id))  # type: ignore[misc] # FIXME
         result = (await session.execute(stmt)).mappings().one_or_none()
         if result is None or type(result['num_items']) != int:
             return 0
@@ -29,8 +29,8 @@ async def read_item_count_for_import(import_id: UUID | str, engine: DatabaseEngi
 
 async def read_import(import_id: UUID | str,
                       engine: DatabaseEngineAsync) -> ImportModel | None:
-    async with engine.session() as session:  # type: AsyncSession
-        stmt = select(Import).where(Import.import_id == import_id)
+    async with engine.session() as session:
+        stmt = select(Import).where(Import.import_id == import_id)  # type: ignore[misc] # FIXME
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
             return ImportModel.parse_obj(result.__dict__)
@@ -42,6 +42,6 @@ async def upsert_import(import_model: ImportModel,
     print(import_model.config)
     key = await upsert_orm(upsert_model=import_model,
                            Schema=Import,
-                           primary_key=Import.import_id.name,
+                           primary_key=Import.import_id.name,  # type: ignore[misc] # FIXME
                            engine=engine)
     return key

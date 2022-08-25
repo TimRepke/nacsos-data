@@ -70,7 +70,7 @@ async def create_twitter_item(tweet: TwitterItemModel, engine: DatabaseEngineAsy
     async with engine.session() as session:
         orm_tweet = TwitterItem(**tweet.dict())
         if orm_tweet.item_id is None:
-            orm_tweet.item_id = uuid.uuid4()  # type: ignore[unreachable]
+            orm_tweet.item_id = uuid.uuid4()  # type: ignore[unreachable,assignment]
         item_id = str(orm_tweet.item_id)
         orm_item = Item(item_id=orm_tweet.item_id, text=tweet.status)
 
@@ -83,12 +83,12 @@ async def create_twitter_item(tweet: TwitterItemModel, engine: DatabaseEngineAsy
             # First, rollback all previously attempted actions (bring transaction to initial state)
             await session.rollback()
             item_id = (
-                await session.execute(select(TwitterItem.item_id)
+                await session.execute(select(TwitterItem.item_id)  # type: ignore[misc] # FIXME
                                       .where(TwitterItem.twitter_id == orm_tweet.twitter_id))
             ).one()[0]
 
         if project_id is not None:
-            orm_m2m_p2i = M2MProjectItem(item_id=item_id, project_id=project_id)
+            orm_m2m_p2i = M2MProjectItem(item_id=item_id, project_id=project_id)  # type: ignore[arg-type] # FIXME
             try:
                 session.add(orm_m2m_p2i)
                 await session.commit()
@@ -97,7 +97,7 @@ async def create_twitter_item(tweet: TwitterItemModel, engine: DatabaseEngineAsy
                 await session.rollback()
 
         if import_id is not None:
-            orm_m2m_i2i = M2MImportItem(item_id=item_id, import_id=import_id)
+            orm_m2m_i2i = M2MImportItem(item_id=item_id, import_id=import_id)  # type: ignore[arg-type] # FIXME
             try:
                 session.add(orm_m2m_i2i)
                 await session.commit()

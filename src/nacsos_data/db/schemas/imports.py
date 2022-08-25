@@ -19,12 +19,12 @@ class Import(Base):
 
     # The user who created this import (may be NULL if done via a script)
     user_id = Column(PG_UUID(as_uuid=True),
-                     ForeignKey(User.user_id),  # type: ignore[arg-type] # FIXME
+                     ForeignKey(User.user_id),  # type: ignore[arg-type, misc] # FIXME
                      nullable=True, index=True, primary_key=False)
 
     # The project this import is attached to
     project_id = Column(PG_UUID(as_uuid=True),
-                        ForeignKey(Project.project_id),  # type: ignore[arg-type] # FIXME
+                        ForeignKey(Project.project_id),  # type: ignore[arg-type, misc] # FIXME
                         nullable=False, index=True, primary_key=False)
 
     # The task_id assigned by nacsos-pipes service (if this import is handled by a pipeline)
