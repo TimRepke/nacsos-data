@@ -69,8 +69,8 @@ class M2MProjectItem(Base):
     __tablename__ = 'm2m_project_item'
 
     project_id = Column(UUID(as_uuid=True),
-                        ForeignKey(Project.project_id),  # type: ignore[misc] # FIXME
+                        ForeignKey(Project.project_id),  # type: ignore[arg-type,misc] # FIXME
                         nullable=False, index=True, primary_key=True)
     item_id = Column(UUID(as_uuid=True),
-                     ForeignKey(Item.item_id),  # type: ignore[misc] # FIXME
+                     ForeignKey(Item.item_id),  # type: ignore[arg-type,misc] # FIXME
                      nullable=False, index=True, primary_key=True)

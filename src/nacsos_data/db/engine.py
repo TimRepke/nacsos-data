@@ -38,8 +38,8 @@ class DatabaseEngineAsync:
                                f'{self._host}:{self._port}/{self._database}'
         self.engine = create_async_engine(self._connection_str, echo=True, future=True,
                                           json_serializer=DictLikeEncoder().encode)
-        self._session: async_sessionmaker[AsyncSession] = async_sessionmaker(bind=self.engine, autoflush=False,
-                                                                             autocommit=False)
+        self._session: async_sessionmaker[AsyncSession] = async_sessionmaker(  # type: ignore[type-arg] # FIXME
+            bind=self.engine, autoflush=False, autocommit=False)
 
     def startup(self) -> None:
         """
@@ -80,7 +80,8 @@ class DatabaseEngine:
                                f'{self._host}:{self._port}/{self._database}'
         self.engine = create_engine(self._connection_str, echo=True, future=True,
                                     json_serializer=DictLikeEncoder().encode)
-        self._session: sessionmaker[Session] = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
+        self._session: sessionmaker[Session] = sessionmaker(  # type: ignore[type-arg] # FIXME
+            bind=self.engine, autoflush=False, autocommit=False)
 
     def startup(self) -> None:
         """

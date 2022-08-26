@@ -32,7 +32,7 @@ class AnnotationScheme(Base):
 
     # Reference to the project this AnnotationScheme belongs to.
     project_id = Column(UUID(as_uuid=True),
-                        ForeignKey(Project.project_id),  # type: ignore[misc] # FIXME
+                        ForeignKey(Project.project_id),  # type: ignore[arg-type,misc] # FIXME
                         nullable=False)
 
     # A short descriptive title / name for this AnnotationScheme.
@@ -71,7 +71,7 @@ class AssignmentScope(Base):
 
     # The AnnotationScheme defining the annotation scheme to be used for this scope
     annotation_scheme_id = Column(UUID(as_uuid=True),
-                                  ForeignKey(AnnotationScheme.annotation_scheme_id),  # type: ignore[misc] # FIXME
+                                  ForeignKey(AnnotationScheme.annotation_scheme_id),  # type: ignore[arg-type,misc] # FIXME
                                   nullable=False, index=True)
 
     # Date and time when this assignment scope was created
@@ -114,21 +114,21 @@ class Assignment(Base):
                            nullable=False, unique=True, index=True)
     # The AssignmentScope this Assignment should logically be grouped into.
     assignment_scope_id = Column(UUID(as_uuid=True),
-                                 ForeignKey(AssignmentScope.assignment_scope_id),  # type: ignore[misc] # FIXME
+                                 ForeignKey(AssignmentScope.assignment_scope_id),  # type: ignore[arg-type,misc] # FIXME
                                  nullable=False, index=True)
     # The User the AnnotationScheme/Item combination is assigned to
     user_id = Column(UUID(as_uuid=True),
-                     ForeignKey(User.user_id),  # type: ignore[misc] # FIXME
+                     ForeignKey(User.user_id),  # type: ignore[arg-type,misc] # FIXME
                      nullable=False, index=True)
 
     # The Item this assigment refers to.
     item_id = Column(UUID(as_uuid=True),
-                     ForeignKey(Item.item_id),  # type: ignore[misc] # FIXME
+                     ForeignKey(Item.item_id),  # type: ignore[arg-type,misc] # FIXME
                      nullable=False, index=True)
 
     # The AnnotationScheme defining the annotation scheme to be used for this assignment
     annotation_scheme_id = Column(UUID(as_uuid=True),
-                                  ForeignKey(AnnotationScheme.annotation_scheme_id),  # type: ignore[misc] # FIXME
+                                  ForeignKey(AnnotationScheme.annotation_scheme_id),  # type: ignore[arg-type,misc] # FIXME
                                   nullable=False, index=True)
 
     # The status of this assignment (to be updated with each annotation related to this assignment)
@@ -175,23 +175,23 @@ class Annotation(Base):
 
     # The Assignment this Annotation is responding to.
     assignment_id = Column(UUID(as_uuid=True),
-                           ForeignKey(Assignment.assignment_id),  # type: ignore[misc] # FIXME
+                           ForeignKey(Assignment.assignment_id),  # type: ignore[arg-type,misc] # FIXME
                            nullable=False, index=True)
 
     # The User the AnnotationScheme/Item combination is assigned to (redundant to implicit information from Assignment)
     user_id = Column(UUID(as_uuid=True),
-                     ForeignKey(User.user_id),  # type: ignore[misc] # FIXME
+                     ForeignKey(User.user_id),  # type: ignore[arg-type,misc] # FIXME
                      nullable=False, index=True)
 
     # The Item this assigment refers to (redundant to implicit information from Assignment)
     item_id = Column(UUID(as_uuid=True),
-                     ForeignKey(Item.item_id),  # type: ignore[misc] #FIXME
+                     ForeignKey(Item.item_id),  # type: ignore[arg-type,misc] #FIXME
                      nullable=False, index=True)
 
     # The AnnotationScheme defining the annotation scheme to be used for this assignment
     # (redundant to implicit information from Assignment)
     annotation_scheme_id = Column(UUID(as_uuid=True),
-                                  ForeignKey(AnnotationScheme.annotation_scheme_id),  # type: ignore[misc] # FIXME
+                                  ForeignKey(AnnotationScheme.annotation_scheme_id),  # type: ignore[arg-type,misc] # FIXME
                                   nullable=False, index=True)
 
     # Defines which AnnotationSchemeLabel.key this Annotation refers to.
