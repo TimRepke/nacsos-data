@@ -28,6 +28,7 @@ class DatabaseConfig(BaseSettings):
         )
 
     class Config:
+        # Add this prefix to be compatible with nacsos-core config
         env_prefix = 'NACSOS_DB__'
 
 
