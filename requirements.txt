@@ -1,4 +1,4 @@
-pydantic==1.9.2
+pydantic[dotenv]==1.9.2
 setuptools==65.3.0
 psycopg==3.0.16
 psycopg2==2.9.3
