@@ -1,8 +1,6 @@
-from typing import Type
-
-from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, Column, \
+from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, \
     UniqueConstraint, Enum as SAEnum
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PUUID
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 from sqlalchemy.sql.sqltypes import UUID
@@ -10,7 +8,7 @@ from sqlalchemy_json import mutable_json_type
 import uuid
 
 from . import AnnotationScheme, AssignmentScope
-from ...models.bot_annotations import BotKind
+from ...models.bot_annotations import BotKind, BotMeta
 from ...db.base_class import Base
 
 from .projects import Project
@@ -46,8 +44,8 @@ class BotAnnotationMetaData(Base):
                                          ForeignKey(AnnotationScheme.annotation_scheme_id),
                                          nullable=True, index=True)
     # Additional information for this Bot for future reference
-    meta: Mapped[dict[str, str | int | float | bool]] = mapped_column(mutable_json_type(dbtype=JSONB, nested=True),
-                                                                      nullable=True)
+    meta: Mapped[BotMeta] = mapped_column(mutable_json_type(dbtype=JSONB, nested=True),
+                                          nullable=True)
 
 
 class BotAnnotation(Base):

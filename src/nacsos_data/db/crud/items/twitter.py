@@ -48,7 +48,7 @@ async def read_twitter_item_by_twitter_id(twitter_id: str,
 async def read_twitter_items_by_author_id(twitter_author_id: str, engine: DatabaseEngineAsync) \
         -> list[TwitterItemModel]:
     stmt = select(TwitterItem).filter_by(twitter_author_id=twitter_author_id)
-    async with engine.session() as session:  # type: AsyncSession
+    async with engine.session() as session:
         result = await session.execute(stmt)
         result_list = result.scalars().all()
         return [TwitterItemModel(**res.__dict__) for res in result_list]

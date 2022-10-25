@@ -19,8 +19,8 @@ async def read_all_projects_for_user(user_id: str | UUID, engine: DatabaseEngine
     async with engine.session() as session:
         stmt = (select(Project)
                 .join(ProjectPermissions,
-                      Project.project_id == ProjectPermissions.project_id)  # type: ignore[misc] # FIXME
-                .where(ProjectPermissions.user_id == user_id))  # type: ignore[misc] # FIXME
+                      Project.project_id == ProjectPermissions.project_id)
+                .where(ProjectPermissions.user_id == user_id))
         result = await session.execute(stmt)
         result_list = result.scalars().all()
         return [ProjectModel(**res.__dict__) for res in result_list]
@@ -104,5 +104,5 @@ async def delete_project_permissions(project_permission_id: UUID | str,
                                      engine: DatabaseEngineAsync) -> None:
     async with engine.session() as session:
         stmt = (delete(ProjectPermissions)
-                .where(ProjectPermissions.project_permission_id == project_permission_id))  # type: ignore[misc] # FIXME
+                .where(ProjectPermissions.project_permission_id == project_permission_id))
         await session.execute(stmt)

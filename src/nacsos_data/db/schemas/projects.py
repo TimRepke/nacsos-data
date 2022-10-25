@@ -62,12 +62,12 @@ class ProjectPermissions(Base):
 
     # Refers to the project this permission relates to
     project_id = Column(UUID(as_uuid=True),
-                        ForeignKey(Project.project_id),  # type: ignore[arg-type, misc] # FIXME
+                        ForeignKey(Project.project_id),
                         nullable=False)
 
     # Refers to the User this set of permissions for this project refers to
     user_id = Column(UUID(as_uuid=True),
-                     ForeignKey(User.user_id),  # type: ignore[arg-type, misc] # FIXME
+                     ForeignKey(User.user_id),
                      nullable=False, index=True)
 
     # If true, the user has all permissions for this project
