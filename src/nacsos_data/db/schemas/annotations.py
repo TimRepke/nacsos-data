@@ -1,8 +1,9 @@
-from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, Column, \
+from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, \
     UniqueConstraint, Identity, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, mapped_column, Relationship
 from sqlalchemy_json import mutable_json_type
 import uuid
 
@@ -27,30 +28,30 @@ class AnnotationScheme(Base):
     __tablename__ = 'annotation_scheme'
 
     # Unique identifier for this scheme.
-    annotation_scheme_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                  nullable=False, unique=True, index=True)
+    annotation_scheme_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+                                         nullable=False, unique=True, index=True)
 
     # Reference to the project this AnnotationScheme belongs to.
-    project_id = Column(UUID(as_uuid=True),
-                        ForeignKey(Project.project_id),  # type: ignore[arg-type,misc] # FIXME
-                        nullable=False)
+    project_id = mapped_column(UUID(as_uuid=True),
+                               ForeignKey(Project.project_id),
+                               nullable=False)
 
     # A short descriptive title / name for this AnnotationScheme.
     # This may be displayed to the annotators.
-    name = Column(String, nullable=False)
+    name = mapped_column(String, nullable=False)
 
     # An (optional) slightly longer description of the AnnotationScheme.
     # This may be displayed to the annotators as an instruction or background information.
     # Text should be formatted using Markdown.
-    description = Column(String, nullable=True)
+    description = mapped_column(String, nullable=True)
 
     # The definition of the annotation scheme for this AnnotationScheme is stored here.
     # For more information on how an annotation scheme is defined, check out schemas.annotations.AnnotationSchemeLabel
     # Note, this is always a list of labels!
-    labels = Column(mutable_json_type(dbtype=JSONB, nested=True))  # type: ignore[misc] # FIXME
+    labels = mapped_column(mutable_json_type(dbtype=JSONB, nested=True))
 
     # reference to the associated assignment scopes
-    assignment_scopes = relationship('AssignmentScope', cascade='all, delete')  # type: ignore[misc] # FIXME
+    assignment_scopes: Relationship['AssignmentScope'] = relationship('AssignmentScope', cascade='all, delete')
 
 
 class AssignmentScope(Base):
@@ -66,30 +67,30 @@ class AssignmentScope(Base):
     __tablename__ = 'assignment_scope'
 
     # Unique identifier for this scope
-    assignment_scope_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                 nullable=False, unique=True, index=True)
+    assignment_scope_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+                                        nullable=False, unique=True, index=True)
 
     # The AnnotationScheme defining the annotation scheme to be used for this scope
-    annotation_scheme_id = Column(UUID(as_uuid=True),
-                                  ForeignKey(AnnotationScheme.annotation_scheme_id),  # type: ignore[arg-type,misc] # FIXME
-                                  nullable=False, index=True)
+    annotation_scheme_id = mapped_column(UUID(as_uuid=True),
+                                         ForeignKey(AnnotationScheme.annotation_scheme_id),
+                                         nullable=False, index=True)
 
     # Date and time when this assignment scope was created
-    time_created = Column(DateTime(timezone=True), server_default=func.now())
+    time_created = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # A short descriptive title / name for this scope.
     # This may be displayed to the annotators.
-    name = Column(String, nullable=False)
+    name = mapped_column(String, nullable=False)
 
     # An (optional) slightly longer description of the scope.
     # This may be displayed to the annotators as refined instruction or background information.
-    description = Column(String, nullable=True)
+    description = mapped_column(String, nullable=True)
 
     # Stores the config parameters used in creating the assignments for future reference
-    config = Column(mutable_json_type(dbtype=JSONB, nested=True), nullable=True)  # type: ignore[misc] # FIXME
+    config = mapped_column(mutable_json_type(dbtype=JSONB, nested=True), nullable=True)
 
     # reference to the associated assignments
-    assignments = relationship('Assignment', cascade='all, delete')  # type: ignore[misc] # FIXME
+    assignments: Relationship['Assignment'] = relationship('Assignment', cascade='all, delete')
 
 
 class Assignment(Base):
@@ -110,32 +111,32 @@ class Assignment(Base):
     __tablename__ = 'assignment'
 
     # Unique identifier for this assignment
-    assignment_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                           nullable=False, unique=True, index=True)
+    assignment_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+                                  nullable=False, unique=True, index=True)
     # The AssignmentScope this Assignment should logically be grouped into.
-    assignment_scope_id = Column(UUID(as_uuid=True),
-                                 ForeignKey(AssignmentScope.assignment_scope_id),  # type: ignore[arg-type,misc] # FIXME
-                                 nullable=False, index=True)
+    assignment_scope_id = mapped_column(UUID(as_uuid=True),
+                                        ForeignKey(AssignmentScope.assignment_scope_id),
+                                        nullable=False, index=True)
     # The User the AnnotationScheme/Item combination is assigned to
-    user_id = Column(UUID(as_uuid=True),
-                     ForeignKey(User.user_id),  # type: ignore[arg-type,misc] # FIXME
-                     nullable=False, index=True)
+    user_id = mapped_column(UUID(as_uuid=True),
+                            ForeignKey(User.user_id),
+                            nullable=False, index=True)
 
     # The Item this assigment refers to.
-    item_id = Column(UUID(as_uuid=True),
-                     ForeignKey(Item.item_id),  # type: ignore[arg-type,misc] # FIXME
-                     nullable=False, index=True)
+    item_id = mapped_column(UUID(as_uuid=True),
+                            ForeignKey(Item.item_id),
+                            nullable=False, index=True)
 
     # The AnnotationScheme defining the annotation scheme to be used for this assignment
-    annotation_scheme_id = Column(UUID(as_uuid=True),
-                                  ForeignKey(AnnotationScheme.annotation_scheme_id),  # type: ignore[arg-type,misc] # FIXME
-                                  nullable=False, index=True)
+    annotation_scheme_id = mapped_column(UUID(as_uuid=True),
+                                         ForeignKey(AnnotationScheme.annotation_scheme_id),
+                                         nullable=False, index=True)
 
     # The status of this assignment (to be updated with each annotation related to this assignment)
-    status = Column(SAEnum(AssignmentStatus), nullable=False, server_default='OPEN')
+    status = mapped_column(SAEnum(AssignmentStatus), nullable=False, server_default='OPEN')
 
     # The order of assignments within the assignment scope
-    order = Column(Integer, Identity(always=False))
+    order = mapped_column(Integer, Identity(always=False))
 
     # TODO figure out how to nicely resolve in-text annotations here
 
@@ -166,61 +167,61 @@ class Annotation(Base):
     )
 
     # Unique identifier for this Annotation
-    annotation_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                           nullable=False, unique=True, index=True)
+    annotation_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+                                  nullable=False, unique=True, index=True)
 
     # Date and time when this annotation was created (or last changed)
-    time_created = Column(DateTime(timezone=True), server_default=func.now())
-    time_updated = Column(DateTime(timezone=True), onupdate=func.now())
+    time_created = mapped_column(DateTime(timezone=True), server_default=func.now())
+    time_updated = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     # The Assignment this Annotation is responding to.
-    assignment_id = Column(UUID(as_uuid=True),
-                           ForeignKey(Assignment.assignment_id),  # type: ignore[arg-type,misc] # FIXME
-                           nullable=False, index=True)
+    assignment_id = mapped_column(UUID(as_uuid=True),
+                                  ForeignKey(Assignment.assignment_id),
+                                  nullable=False, index=True)
 
     # The User the AnnotationScheme/Item combination is assigned to (redundant to implicit information from Assignment)
-    user_id = Column(UUID(as_uuid=True),
-                     ForeignKey(User.user_id),  # type: ignore[arg-type,misc] # FIXME
-                     nullable=False, index=True)
+    user_id = mapped_column(UUID(as_uuid=True),
+                            ForeignKey(User.user_id),
+                            nullable=False, index=True)
 
     # The Item this assigment refers to (redundant to implicit information from Assignment)
-    item_id = Column(UUID(as_uuid=True),
-                     ForeignKey(Item.item_id),  # type: ignore[arg-type,misc] #FIXME
-                     nullable=False, index=True)
+    item_id = mapped_column(UUID(as_uuid=True),
+                            ForeignKey(Item.item_id),
+                            nullable=False, index=True)
 
     # The AnnotationScheme defining the annotation scheme to be used for this assignment
     # (redundant to implicit information from Assignment)
-    annotation_scheme_id = Column(UUID(as_uuid=True),
-                                  ForeignKey(AnnotationScheme.annotation_scheme_id),  # type: ignore[arg-type,misc] # FIXME
-                                  nullable=False, index=True)
+    annotation_scheme_id = mapped_column(UUID(as_uuid=True),
+                                         ForeignKey(AnnotationScheme.annotation_scheme_id),
+                                         nullable=False, index=True)
 
     # Defines which AnnotationSchemeLabel.key this Annotation refers to.
     # Note, that there is no correctness constraint, the frontend should make sure to send correct data!!
-    key = Column(String, nullable=False)
+    key = mapped_column(String, nullable=False)
 
     # In the case of AnnotationSchemeLabel.repeats > 1, this field can be used
     # to track primary, secondary,... Annotations for that AnnotationScheme/key pair.
     # Default should always be 1.
-    repeat = Column(Integer, nullable=False, default=1)
+    repeat = mapped_column(Integer, nullable=False, default=1)
 
     # Reference to the parent labels' annotation.
-    parent = Column(UUID(as_uuid=True),
-                    ForeignKey('annotation.annotation_id'),  # type: ignore[arg-type] # FIXME
-                    nullable=True, index=True)
+    parent = mapped_column(UUID(as_uuid=True),
+                           ForeignKey('annotation.annotation_id'),
+                           nullable=True, index=True)
 
     # Depending on the AnnotationSchemeLabel.kind, one of the following fields should be filled.
     # For single and mixed, the AnnotationSchemeLabelChoice.value should be filled in value_int.
-    value_bool = Column(Boolean, nullable=True)
-    value_int = Column(Integer, nullable=True)
-    value_float = Column(Float, nullable=True)
-    value_str = Column(String, nullable=True)
+    value_bool = mapped_column(Boolean, nullable=True)
+    value_int = mapped_column(Integer, nullable=True)
+    value_float = mapped_column(Float, nullable=True)
+    value_str = mapped_column(String, nullable=True)
 
     # When the Annotation does not refer to an entire Item, but a sub-string (in-text annotation)
     # of that Item, the following fields should be set with the respective string offset.
-    text_offset_start = Column(Integer, nullable=True)
-    text_offset_stop = Column(Integer, nullable=True)
+    text_offset_start = mapped_column(Integer, nullable=True)
+    text_offset_stop = mapped_column(Integer, nullable=True)
 
-    sub_annotations = relationship('Annotation', cascade='all, delete')  # type: ignore[misc] # FIXME
+    sub_annotations: Relationship['Annotation'] = relationship('Annotation', cascade='all, delete')
 
     # TODO: Figure out a way to allow automated methods (e.g. classifiers) to utilise this
     #       table to annotate data as well. Creating loads of dummy users and assignments

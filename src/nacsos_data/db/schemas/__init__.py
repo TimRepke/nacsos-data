@@ -2,6 +2,7 @@ from typing import TypeVar
 
 from ..base_class import Base
 from .annotations import AnnotationScheme, Annotation, Assignment, AssignmentScope
+from .bot_annotations import BotAnnotationMetaData, BotAnnotation
 from .projects import Project, ProjectPermissions
 from .users import User
 from .imports import Import
@@ -12,5 +13,6 @@ AnyItemType = Item | TwitterItem
 AnyItemSchema = TypeVar('AnyItemSchema', Item, TwitterItem)
 
 __all__ = ['Base', 'Annotation', 'AnnotationScheme', 'Assignment', 'AssignmentScope',
+           'BotAnnotationMetaData', 'BotAnnotation',
            'Project', 'ProjectPermissions', 'User', 'Item', 'Import',
            'M2MImportItem', 'M2MProjectItem', 'TwitterItem', 'AnyItemSchema', 'AnyItemType']

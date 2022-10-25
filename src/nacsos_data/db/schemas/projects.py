@@ -3,6 +3,8 @@ from sqlalchemy.dialects.postgresql import UUID
 from enum import Enum
 import uuid
 
+from sqlalchemy.orm import mapped_column
+
 from ..base_class import Base
 
 from .users import User
@@ -27,19 +29,19 @@ class Project(Base):
     __tablename__ = 'project'
 
     # Unique identifier for this project
-    project_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                        nullable=False, unique=True, index=True)
+    project_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+                               nullable=False, unique=True, index=True)
 
     # Unique descriptive name/title for the project
-    name = Column(String, unique=True, nullable=False)
+    name = mapped_column(String, unique=True, nullable=False)
 
     # A brief description of that project.
     # Optional, but should be used and can be Markdown formatted
-    description = Column(String, nullable=True)
+    description = mapped_column(String, nullable=True)
 
     # Defines what sort of data this project works with
     # This is used to show item-type specific interface elements and join enriched meta-data
-    type = Column(SAEnum(ProjectType), nullable=False)
+    type = mapped_column(SAEnum(ProjectType), nullable=False)
 
 
 class ProjectPermissions(Base):
