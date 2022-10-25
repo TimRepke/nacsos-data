@@ -90,6 +90,9 @@ class DatabaseEngine:
         # SQLModel.metadata.create_all(self.engine)
         pass
 
+    def __call__(self, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> Session:
+        return self._session()
+
     @contextmanager
     def session(self) -> Iterator[Session]:
         # https://rednafi.github.io/digressions/python/2020/03/26/python-contextmanager.html
