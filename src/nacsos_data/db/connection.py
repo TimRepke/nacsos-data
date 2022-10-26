@@ -40,7 +40,7 @@ def _get_settings(conf_file: str | None = None) -> DatabaseConfig:
     return DatabaseConfig(_env_file=conf_file, _env_file_encoding='utf-8')  # type: ignore[call-arg]
 
 
-def get_engine(conf_file: str | None = None) -> DatabaseEngine:
+def get_engine(conf_file: str | None = None, settings: DatabaseConfig | None = None) -> DatabaseEngine:
     """
     Returns a database connection (aka DatabaseEngine).
 
@@ -72,7 +72,9 @@ def get_engine(conf_file: str | None = None) -> DatabaseEngine:
     ```
     Fore more details on how to query data with sqlalchemy, see https://docs.sqlalchemy.org/en/20/orm/quickstart.html#simple-select
     """
-    settings = _get_settings(conf_file)
+    if settings is None:
+        settings = _get_settings(conf_file)
+
     return DatabaseEngine(host=settings.HOST, port=settings.PORT, user=settings.USER, password=settings.PASSWORD,
                           database=settings.DATABASE)
 
