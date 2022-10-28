@@ -138,6 +138,8 @@ class Assignment(Base):
     # The order of assignments within the assignment scope
     order = mapped_column(Integer, Identity(always=False))
 
+    annotations: Relationship['Annotation'] = relationship('Annotation', cascade='all, delete')
+
     # TODO figure out how to nicely resolve in-text annotations here
 
 

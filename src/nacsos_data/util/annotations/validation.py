@@ -5,12 +5,13 @@ from nacsos_data.models.annotations import \
     AnnotationSchemeModel, \
     FlattenedAnnotationSchemeLabel, \
     AssignmentStatus, \
-    AnnotationSchemeLabel
+    AnnotationSchemeLabel, \
+    AnnotationSchemeModelFlat
 
 logger = logging.getLogger('nacsos_data.annotation.validation')
 
 
-def flatten_annotation_scheme(annotation_scheme: AnnotationSchemeModel) -> list[FlattenedAnnotationSchemeLabel]:
+def flatten_annotation_scheme(annotation_scheme: AnnotationSchemeModel) -> AnnotationSchemeModelFlat:
     def recurse(labels: list[AnnotationSchemeLabel], parent_label: str | None = None,
                 parent_repeat: int = 1) -> list[FlattenedAnnotationSchemeLabel]:
         ret = []
@@ -37,7 +38,11 @@ def flatten_annotation_scheme(annotation_scheme: AnnotationSchemeModel) -> list[
 
         return ret
 
-    return recurse(annotation_scheme.labels)
+    return AnnotationSchemeModelFlat(annotation_scheme_id=annotation_scheme.annotation_scheme_id,
+                                     project_id=annotation_scheme.project_id,
+                                     name=annotation_scheme.name,
+                                     description=annotation_scheme.description,
+                                     labels=recurse(annotation_scheme.labels))
 
 
 AnnotationModelLookupType = dict[str, list[AnnotationModel]]

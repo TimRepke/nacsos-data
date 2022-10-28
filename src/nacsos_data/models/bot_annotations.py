@@ -35,7 +35,7 @@ class BotKind(str, Enum):
     # the labels are the result of a topic model and represent the dominant topic
     TOPICS = 'TOPICS'
     # represents the consolidated labels, may be auto-generated and/or adjusted by hand
-    CONSOLIDATE = 'CONSOLIDATE'
+    RESOLVE = 'RESOLVE'
     # label ("manually") assigned by an external script / notebook
     SCRIPT = 'SCRIPT'
 

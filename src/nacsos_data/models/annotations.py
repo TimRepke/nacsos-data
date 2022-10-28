@@ -42,19 +42,7 @@ class FlattenedAnnotationSchemeLabel(BaseModel):
     parent_label: str | None
 
 
-class AnnotationSchemeModel(BaseModel):
-    """
-    Corresponds to db.models.annotations.AnnotationScheme
-
-    AnnotationScheme defines the annotation scheme for a particular project.
-    Each project may have multiple AnnotationSchemes,
-    but projects cannot share the same scheme. In case they are technically the same,
-    the user would have to create a new copy of that scheme for a different project.
-
-    The actual annotation scheme is defined as a list of labels (see schemas.annotations.AnnotationSchemeLabel).
-    The other fields pose as meta-data.
-    """
-
+class _AnnotationSchemeModel(BaseModel):
     # Unique identifier for this scheme.
     annotation_scheme_id: str | UUID | None = None
 
@@ -70,10 +58,31 @@ class AnnotationSchemeModel(BaseModel):
     # Text should be formatted using Markdown.
     description: str | None = None
 
+
+class AnnotationSchemeModel(_AnnotationSchemeModel):
+    """
+    Corresponds to db.models.annotations.AnnotationScheme
+
+    AnnotationScheme defines the annotation scheme for a particular project.
+    Each project may have multiple AnnotationSchemes,
+    but projects cannot share the same scheme. In case they are technically the same,
+    the user would have to create a new copy of that scheme for a different project.
+
+    The actual annotation scheme is defined as a list of labels (see schemas.annotations.AnnotationSchemeLabel).
+    The other fields pose as meta-data.
+    """
+
     # The definition of the annotation scheme for this AnnotationScheme is stored here.
     # For more information on how an annotation scheme is defined, check out schemas.annotations.AnnotationSchemeLabel
     # Note, this is always a list of labels!
     labels: list[AnnotationSchemeLabel]
+
+
+class AnnotationSchemeModelFlat(_AnnotationSchemeModel):
+    """
+    Same as AnnotationSchemeModel but with flattened structure.
+    """
+    labels: list[FlattenedAnnotationSchemeLabel]
 
 
 AssignmentScopeBaseConfigTypes = Literal['random']
