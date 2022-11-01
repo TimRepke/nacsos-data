@@ -40,8 +40,8 @@ M = TypeVar('M', bound=BaseModel)
 
 
 async def update_orm(updated_model: BaseModel, Model: Type[M], Schema: Type[Base],
-                     filter_by: dict[str, Any], skip_update: list[str], engine: DatabaseEngineAsync) -> M:
-    async with engine.session() as session:
+                     filter_by: dict[str, Any], skip_update: list[str], db_engine: DatabaseEngineAsync) -> M:
+    async with db_engine.session() as session:
         stmt = select(Schema).filter_by(**filter_by)
         orm_model = (await session.execute(stmt)).one_or_none()
         if orm_model is not None:
@@ -56,9 +56,9 @@ async def update_orm(updated_model: BaseModel, Model: Type[M], Schema: Type[Base
 
 
 async def upsert_orm(upsert_model: BaseModel, Schema: Type[S], primary_key: str,
-                     engine: DatabaseEngineAsync, skip_update: list[str] | None = None) -> str | UUID | None:
+                     db_engine: DatabaseEngineAsync, skip_update: list[str] | None = None) -> str | UUID | None:
     # returns id of inserted or updated assignment scope
-    async with engine.session() as session:
+    async with db_engine.session() as session:
         logger.debug(f'UPSERT "{Schema}" with keys: {list(upsert_model.dict().keys())}')
 
         p_key: str | UUID | None = getattr(upsert_model, primary_key, None)

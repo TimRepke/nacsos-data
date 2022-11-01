@@ -5,26 +5,59 @@ from datetime import datetime
 from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel
+from .annotations import AnnotationValue, Label
 
-ConsolidationMethod = Literal['majority', 'first', 'last', 'trust']
+AnnotationFiltersType = dict[str, str | tuple[str] | int | tuple[int] | None]
 
 
-class BotMetaConsolidate(BaseModel):
+class AnnotationFilters(BaseModel):
+    """
+    Filter rules for fetching all annotations that match these conditions
+    It is up to the user of this function to make sure to provide sensible filters!
+    All filters are conjunctive (connected with "AND"); if None, they are not included
+
+    There are no "exclude" filters by design. If needed, they should be simulated in the interface.
+
+    :param scheme_id: if not None: annotation has to be part of this annotation scheme
+    :param scope_id: if not None: annotation has to be part of this assignment scope
+    :param user_id: if not None: annotation has to be by this user
+    :param key: if not None: annotation has to be for this AnnotationSchemeLabel.key (or list/tuple of keys)
+    :param repeat: if not None: annotation has to be primary/secondary/...
+    """
+    scheme_id: str | list[str] | None = None
+    scope_id: str | list[str] | None = None
+    user_id: str | list[str] | None = None
+    key: str | list[str] | None = None
+    repeat: int | list[int] | None = None
+
+
+# key: item_id
+AnnotationMatrixList = dict[str, list[list[AnnotationValue | None] | None]]
+ResolvedAnnotations = dict[str, list[AnnotationValue | None]]
+
+
+class AnnotationMatrix(BaseModel):
+    scheme_id: str
+    labels: list[tuple[Label, ...]]
+    users: list[str]
+    matrix: AnnotationMatrixList
+
+
+ResolutionMethod = Literal['majority', 'first', 'last', 'trust']
+
+
+class BotMetaResolve(BaseModel):
     # the algorithm used to (auto-)resolve conflicting annotations
-    algorithm: ConsolidationMethod
-    # (optional) which annotation scheme this is based on
-    scheme: str | None
-    # (optional) label in the scheme this consolidates
-    label: str | None
-    # (optional) list of assignment scopes labels were taken from for consolidation
-    source_scopes: list[str] | None
-    # (optional) list of users, who's annotations are excluded
-    excluded_users: list[str] | None
+    algorithm: ResolutionMethod
+    # defines the "scope" of labels to include for the resolver
+    filters: AnnotationFilters
+    # snapshot of the annotations used to resolve this
+    matrix: AnnotationMatrix
     # (optional) dictionary of user UUID -> float weights (i.e. trust in the user for weighted majority votes)
-    trust: dict[str, float] | None
+    trust: dict[str, float] | None = None
 
 
-BotMeta = BotMetaConsolidate
+BotMeta = BotMetaResolve
 
 
 class BotKind(str, Enum):
@@ -40,7 +73,7 @@ class BotKind(str, Enum):
     SCRIPT = 'SCRIPT'
 
 
-class BotAnnotationMetaData(BaseModel):
+class BotAnnotationMetaDataModel(BaseModel):
     bot_annotation_metadata_id: str | UUID | None = None
     # A short descriptive title / name for this bot
     name: str
@@ -53,15 +86,15 @@ class BotAnnotationMetaData(BaseModel):
     # (Optional) reference to an annotation scheme used here
     annotation_scheme_id: str | UUID | None = None
     # Additional information for this Bot for future reference
-    meta: dict[str, str | int | float | bool] | None = None
+    meta: BotMeta | None = None
 
 
-class BotAnnotation(BaseModel):
+class BotAnnotationModel(BaseModel):
     # Unique identifier for this BotAnnotation
-    annotation_id: str | UUID | None = None
+    bot_annotation_id: str | UUID | None = None
     # The AnnotationScheme (or its ID) defining the annotation scheme to be used for this assignment
     # (redundant to implicit information from Assignment)
-    bot_annotation_metadata_id: str | UUID
+    bot_annotation_metadata_id: str | UUID | None = None
     # Date and time when this annotation was created (or last changed)
     time_created: datetime | None = None
     time_updated: datetime | None = None

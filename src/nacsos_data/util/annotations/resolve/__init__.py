@@ -1,11 +1,16 @@
-from typing import NamedTuple
-
-from pydantic import BaseModel
 from sqlalchemy import text
 from nacsos_data.db.connection import DatabaseEngineAsync
-from nacsos_data.models.annotations import AnnotationModel
-from uuid import UUID
-
+from nacsos_data.db.crud.annotations import read_annotation_scheme
+from nacsos_data.models.annotations import AnnotationModel, AnnotationValue, Label
+from nacsos_data.models.bot_annotations import \
+    AnnotationFilters, \
+    AnnotationFiltersType, \
+    AnnotationMatrix, \
+    AnnotationMatrixList, \
+    ResolutionMethod, \
+    ResolvedAnnotations
+from nacsos_data.util.annotations.resolve.majority_vote import naive_majority_vote
+from nacsos_data.util.annotations.validation import flatten_annotation_scheme
 
 # ideas for resolving algorithms:
 #   - naive majority vote (per key,repeat)
@@ -13,73 +18,65 @@ from uuid import UUID
 #   - weighted vote (with manually assigned "trust" weights per annotator)
 #   - weighted vote (compute annotator trust/reliability)
 #   - ...
+ItemId = str
+UserId = str
+AnnotationMatrixDict = dict[ItemId, dict[tuple[Label, ...], dict[UserId, AnnotationValue]]]
+
 
 class InvalidFilterError(AssertionError):
     pass
 
 
-class AnnotationFilters(BaseModel):
+class AnnotationFilterObject(AnnotationFilters):
+    def get_subquery(self) -> tuple[str, AnnotationFiltersType]:
+        where = []
+        filters = self.get_filters()
+        for db_col, (comp_s, comp_l), key in [('ass.assignment_scope_id', ('=', 'IN'), 'scope_id'),
+                                              ('a.annotation_scheme_id', ('=', 'IN'), 'scheme_id'),
+                                              ('a.user_id', ('=', 'IN'), 'user_id'),
+                                              ('a.key', ('=', 'IN'), 'key'),
+                                              ('a.repeat', ('=', 'IN'), 'repeat')]:
+            if filters.get(key) is not None:
+                where.append(f'{db_col} {comp_l if type(filters[key]) == tuple else comp_s} :{key}')
+
+        if len(where) == 0:
+            raise InvalidFilterError('You did not specify any valid filter.')
+
+        subquery = f' WHERE {" AND ".join(where)} '
+        if filters.get('scope_id') is not None:
+            subquery = f' JOIN assignment ass on ass.assignment_id = a.assignment_id {subquery} '
+
+        return subquery, filters
+
+    def get_filters(self) -> AnnotationFiltersType:
+        ret = {}
+        for key, value in self.dict().items():
+            if value is not None:
+                if type(value) == list:
+                    if len(value) == 1:
+                        ret[key] = value[0]
+                    else:
+                        ret[key] = tuple(value)
+                else:
+                    ret[key] = value
+        return ret
+
+
+async def read_item_annotations(filters: AnnotationFilterObject, db_engine: DatabaseEngineAsync) \
+        -> dict[str, list[AnnotationModel]]:
     """
-    Filter rules for fetching all annotations that match these conditions
-    It is up to the user of this function to make sure to provide sensible filters!
-    All filters are conjunctive (connected with "AND"); if None, they are not included
-    :param scheme_id: if not None: annotation has to be part of this annotation scheme
-    :param scope_id: if not None: annotation has to be part of this assignment scope
-    :param user_id: if not None: annotation has to be by this user
-    :param key: if not None: annotation has to be for this AnnotationSchemeLabel.key (or list/tuple of keys)
-    :param exclude_key: if not None: annotation must not be for this AnnotationSchemeLabel.key
-    :param repeat: if not None: annotation has to be primary/secondary/...
-    """
-    scheme_id: UUID | str | None = None
-    scope_id: UUID | str | None = None
-    user_id: UUID | str | None = None
-    key: str | tuple[str] | None = None
-    repeat: int | None = None
-    exclude_key: str | tuple[str] | None = None
-
-
-def _get_filter_subquery(filters: AnnotationFilters):
-    join = ''
-    where = []
-    if filters.scope_id is not None:
-        join += 'JOIN assignment ass on ass.assignment_id = a.assignment_id '
-        where.append('ass.assignment_scope_id = :scope_id ')
-    if filters.scheme_id is not None:
-        where.append('a.annotation_scheme_id = :scheme_id')
-    if filters.user_id is not None:
-        where.append('a.user_id = :user_id')
-    if filters.key is not None:
-        if type(filters.key) == tuple:
-            where.append('a.key IN :key')
-        else:
-            where.append('a.key = :key')
-    if filters.exclude_key is not None:
-        if type(filters.exclude_key) == tuple:
-            where.append('a.key IN :exclude_key')
-        else:
-            where.append('a.key = :exclude_key')
-    if filters.repeat is not None:
-        where.append('a.repeat = :repeat')
-    if len(where) == 0:
-        raise InvalidFilterError('You did not specify any valid filter.')
-
-    return f'{join} WHERE {" AND ".join(where)}'
-
-
-async def get_item_annotations(engine: DatabaseEngineAsync, filters: AnnotationFilters) -> dict[
-    str, list[AnnotationModel]]:
-    """
-    :param engine: Connection to the database
+    :param db_engine: Connection to the database
     :param filters:
     :return: dictionary (keys are item_ids) of all annotations per item that match the filters.
     """
-    async with engine.session() as session:
+    async with db_engine.session() as session:
+        subquery, query_filters = filters.get_subquery()
         annotations = (await session.execute(text(
             "SELECT a.item_id, json_agg(a.*) as annotations "
             "FROM annotation a "
-            f" {_get_filter_subquery(filters)} "
+            f" {subquery} "
             "GROUP BY a.item_id;"
-        ), filters.dict())).mappings().all()
+        ), query_filters)).mappings().all()
 
         return {
             row['item_id']: [AnnotationModel.parse_obj(anno) for anno in row['annotations']]
@@ -87,80 +84,63 @@ async def get_item_annotations(engine: DatabaseEngineAsync, filters: AnnotationF
         }
 
 
-async def get_annotator_ids(engine: DatabaseEngineAsync, filters: AnnotationFilters) -> list[str]:
+async def read_annotator_ids(filters: AnnotationFilterObject, db_engine: DatabaseEngineAsync) -> list[str]:
     # list of all (unique) user_ids that have at least one annotation in the set
-    async with engine.session() as session:
-        return (await session.execute(text(
-            "SELECT a.user_id "
+    async with db_engine.session() as session:
+        subquery, query_filters = filters.get_subquery()
+        return [str(uid) for uid in (await session.execute(text(
+            "SELECT DISTINCT a.user_id "
             "FROM annotation a "
-            f" {_get_filter_subquery(filters)} "
-            "GROUP BY a.user_id;"
-        ), filters.dict())).scalars().all()
+            f"{subquery};"
+        ), query_filters)).scalars()]
 
 
-async def get_key_repeats(engine: DatabaseEngineAsync, filters: AnnotationFilters) -> dict[str, list[int]]:
+async def read_key_repeats(filters: AnnotationFilterObject, db_engine: DatabaseEngineAsync) -> dict[str, list[int]]:
     # dictionary of (key=) keys (AnnotationSchemeLabel.key) in the set and (values=) the list of available repeats
-    async with engine.session() as session:
+    async with db_engine.session() as session:
+        subquery, query_filters = filters.get_subquery()
         keys = (await session.execute(text(
             "SELECT a.key, array_agg(distinct a.repeat) as repeats "
             "FROM annotation a "
-            f" {_get_filter_subquery(filters)} "
+            f" {subquery} "
             "GROUP BY a.key;"
-        ), filters.dict())).mappings().all()
+        ), query_filters)).mappings().all()
         return {
             row['key']: row['repeats']
             for row in keys
         }
 
 
-class Key(NamedTuple):
-    key: str
-    repeat: int
-
-
-AnnotationValue = int | float | bool | str
-ItemId = str
-UserId = str
-AnnotationMatrixDict = dict[ItemId, dict[tuple[Key, ...], dict[UserId, AnnotationValue]]]
-
-
-class AnnotationMatrix(BaseModel):
-    scheme_id: str
-    keys: list[tuple[Key, ...]]
-    users: list[UserId]
-    matrix: dict[ItemId, list[list[AnnotationValue | None] | None]]
-
-
-def _unpack_nested_keys(annotations: dict[str, AnnotationModel], annotation: AnnotationModel) -> list[Key]:
+def _unpack_nested_keys(annotations: dict[str, AnnotationModel], annotation: AnnotationModel | None) -> list[Label]:
     if annotation is None:
         return []
-    return _unpack_nested_keys(annotations, annotations.get(annotation.parent)) + \
-           [Key(annotation.key, annotation.repeat)]
+    return _unpack_nested_keys(annotations,
+                               annotations.get(str(annotation.parent))
+                               if annotation.parent is not None else None) + [Label(annotation.key, annotation.repeat)]
 
 
 def _get_value(annotation: AnnotationModel) -> AnnotationValue | None:
-    if annotation.value_int is not None:
-        return annotation.value_int
-    if annotation.value_bool is not None:
-        return annotation.value_bool
-    if annotation.value_str is not None:
-        return annotation.value_str
-    if annotation.value_float is not None:
-        return annotation.value_float
-    return None
+    if annotation.value_int is None and \
+            annotation.value_bool is None and \
+            annotation.value_float is None and \
+            annotation.value_str is None:
+        return None
+
+    return AnnotationValue(annotation.value_int, annotation.value_float, annotation.value_bool, annotation.value_str)
 
 
-async def get_item_annotation_matrix_dict(engine: DatabaseEngineAsync,
-                                          filters: AnnotationFilters) -> AnnotationMatrixDict:
-    async with engine.session() as session:
+async def read_item_annotation_matrix_dict(filters: AnnotationFilterObject,
+                                           db_engine: DatabaseEngineAsync) -> AnnotationMatrixDict:
+    async with db_engine.session() as session:
+        subquery, query_filters = filters.get_subquery()
         result = (await session.execute(text(
             "SELECT a.item_id, json_agg(a.*) as annotations "
             "FROM annotation a "
-            f" {_get_filter_subquery(filters)} "
+            f" {subquery} "
             "GROUP BY a.item_id;"
-        ), filters.dict())).mappings().all()
+        ), query_filters)).mappings().all()
 
-        annotation_matrix = {}
+        annotation_matrix: AnnotationMatrixDict = {}
 
         for row in result:
             item_id = str(row['item_id'])
@@ -182,29 +162,45 @@ async def get_item_annotation_matrix_dict(engine: DatabaseEngineAsync,
         return annotation_matrix
 
 
-async def get_item_annotation_matrix(engine: DatabaseEngineAsync, filters: AnnotationFilters) -> AnnotationMatrix:
-    matrix_dict = await get_item_annotation_matrix_dict(engine, filters)
-    users = []
-    keys = []
+async def read_item_annotation_matrix(filters: AnnotationFilterObject,
+                                      db_engine: DatabaseEngineAsync) -> AnnotationMatrix:
+    matrix_dict = await read_item_annotation_matrix_dict(filters, db_engine=db_engine)
+    _users = []
+    _keys = []
     for item in matrix_dict.values():
         for key, annotations in item.items():
-            keys.append(key)
-            users += list(annotations.keys())
-    users = {uid: i for i, uid in enumerate(set(users))}
-    keys = {lid: i for i, lid in enumerate(set(keys))}
+            _keys.append(key)
+            _users += list(annotations.keys())
+    users: dict[str, int] = {uid: i for i, uid in enumerate(set(_users))}
+    keys: dict[tuple[Label, ...], int] = {lid: i for i, lid in enumerate(set(_keys))}
 
-    matrix = {}
+    matrix: AnnotationMatrixList = {}
     for item_id, item in matrix_dict.items():
         matrix[item_id] = [None] * len(keys)
         for key, annotations in item.items():
             matrix[item_id][keys[key]] = [None] * len(users)
             for user_id, value in annotations.items():
                 matrix[item_id][keys[key]][users[user_id]] = value
-    async with engine.session() as session:
+
+    async with db_engine.session() as session:
+        subquery, query_filters = filters.get_subquery()
         scheme_id = (await session.execute(text(
             "SELECT a.annotation_scheme_id "
             "FROM annotation a "
-            f" {_get_filter_subquery(filters)} "
+            f" {subquery} "
             "GROUP BY a.annotation_scheme_id;"
-        ), filters.dict())).scalars().first()
-    return AnnotationMatrix(users=list(users.keys()), keys=list(keys.keys()), matrix=matrix, scheme_id=str(scheme_id))
+        ), query_filters)).scalars().first()
+
+    return AnnotationMatrix(users=list(users.keys()), labels=list(keys.keys()), matrix=matrix, scheme_id=str(scheme_id))
+
+
+async def get_resolved_item_annotations(strategy: ResolutionMethod, filters: AnnotationFilterObject,
+                                        db_engine: DatabaseEngineAsync) -> tuple[AnnotationMatrix, ResolvedAnnotations]:
+    matrix = await read_item_annotation_matrix(db_engine=db_engine, filters=filters)
+    scheme = await read_annotation_scheme(annotation_scheme_id=matrix.scheme_id, db_engine=db_engine)
+    flat_scheme = flatten_annotation_scheme(scheme)
+
+    if strategy == 'majority':
+        return matrix, naive_majority_vote(matrix=matrix, scheme=flat_scheme.labels)
+
+    raise NotImplementedError(f'Resolution strategy "{strategy}" not implemented (yet)!')

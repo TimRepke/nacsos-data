@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Literal, Optional
+from typing import Literal, Optional, NamedTuple
 
 from datetime import datetime
 from uuid import UUID
@@ -9,11 +9,14 @@ from pydantic import BaseModel
 AnnotationSchemeLabelTypes = Literal['bool', 'str', 'int', 'float', 'single', 'multi', 'intext']
 
 
-class AnnotationSchemeLabelChoice(BaseModel):
+class AnnotationSchemeLabelChoiceFlat(BaseModel):
     name: str
     hint: str | None = None
     # note, no constraint on value uniqueness; should be checked in frontend
     value: int
+
+
+class AnnotationSchemeLabelChoice(AnnotationSchemeLabelChoiceFlat):
     children: list[AnnotationSchemeLabel] | None = None
 
 
@@ -33,13 +36,16 @@ class AnnotationSchemeLabel(BaseModel):
 
 
 class FlattenedAnnotationSchemeLabel(BaseModel):
+    name: str
+    hint: str | None
     key: str
     required: bool
     max_repeat: int
     implicit_max_repeat: int
     kind: AnnotationSchemeLabelTypes
-    choices: list[int] | None
+    choices: list[AnnotationSchemeLabelChoiceFlat] | None
     parent_label: str | None
+    parent_choice: int | None
 
 
 class _AnnotationSchemeModel(BaseModel):
@@ -170,6 +176,19 @@ class AssignmentModel(BaseModel):
     status: AssignmentStatus
     # The order of assignments within the assignment scope
     order: int | None = None
+
+
+class Label(NamedTuple):
+    key: str
+    repeat: int
+
+
+class AnnotationValue(NamedTuple):
+    # Helper to transmit/handle Annotations at smaller footprint
+    v_int: int | None = None
+    v_float: float | None = None
+    v_bool: bool | None = None
+    v_str: str | None = None
 
 
 class AnnotationModel(BaseModel):
