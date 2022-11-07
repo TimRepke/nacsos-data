@@ -11,6 +11,7 @@ from nacsos_data.models.bot_annotations import \
     ResolvedAnnotations
 from nacsos_data.util.annotations.resolve.majority_vote import naive_majority_vote
 from nacsos_data.util.annotations.validation import flatten_annotation_scheme
+from nacsos_data.util.errors import NotFoundError
 
 # ideas for resolving algorithms:
 #   - naive majority vote (per key,repeat)
@@ -178,9 +179,10 @@ async def read_item_annotation_matrix(filters: AnnotationFilterObject,
     for item_id, item in matrix_dict.items():
         matrix[item_id] = [None] * len(keys)
         for key, annotations in item.items():
-            matrix[item_id][keys[key]] = [None] * len(users)
+            resolved_key = keys[key]
+            matrix[item_id][resolved_key] = [None] * len(users)  # type: ignore[index] # FIXME
             for user_id, value in annotations.items():
-                matrix[item_id][keys[key]][users[user_id]] = value
+                matrix[item_id][resolved_key][users[user_id]] = value  # type: ignore[index] # FIXME
 
     async with db_engine.session() as session:
         subquery, query_filters = filters.get_subquery()
@@ -198,6 +200,10 @@ async def get_resolved_item_annotations(strategy: ResolutionMethod, filters: Ann
                                         db_engine: DatabaseEngineAsync) -> tuple[AnnotationMatrix, ResolvedAnnotations]:
     matrix = await read_item_annotation_matrix(db_engine=db_engine, filters=filters)
     scheme = await read_annotation_scheme(annotation_scheme_id=matrix.scheme_id, db_engine=db_engine)
+
+    if not matrix or not scheme:
+        raise NotFoundError(f'Matrix empty or no annotation scheme for {matrix.scheme_id}')
+
     flat_scheme = flatten_annotation_scheme(scheme)
 
     if strategy == 'majority':

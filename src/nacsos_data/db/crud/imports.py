@@ -43,5 +43,5 @@ async def upsert_import(import_model: ImportModel,
     key = await upsert_orm(upsert_model=import_model,
                            Schema=Import,
                            primary_key=Import.import_id.name,
-                           engine=engine)
+                           db_engine=engine)
     return key

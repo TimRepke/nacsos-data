@@ -32,7 +32,7 @@ def naive_majority_vote(matrix: AnnotationMatrix,
                                                        ).most_common()[0][0]
                         ret[item_id][label_i] = AnnotationValue(v_bool=majority_label)
                     case 'int' | 'single':
-                        majority_label: int = Counter([la.v_int
+                        majority_label: int = Counter([la.v_int  # type: ignore[no-redef]
                                                        for la in label_annotations
                                                        if la is not None and la.v_int is not None]
                                                       ).most_common()[0][0]
