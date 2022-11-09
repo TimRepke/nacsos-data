@@ -2,7 +2,7 @@ from typing import Literal
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel
-
+from .base import ItemModel
 
 class ReferencedTweet(BaseModel):
     id: str
@@ -107,7 +107,7 @@ class TwitterUserModel(BaseModel):
     listed_count: int | None = None
 
 
-class TwitterItemModel(BaseModel):
+class TwitterItemModel(ItemModel):
     """
     Corresponds to db.models.items.TwitterItem
 
@@ -122,7 +122,8 @@ class TwitterItemModel(BaseModel):
     twitter_author_id: str | None = None
 
     # text of the tweet (in Twitter lingo, it's the "status")
-    status: str
+    # status: str (in Twitter Schema)
+    # inherited as `Item.text`
 
     # date and time this tweet was posted Format: ISO 8601 (e.g. "2019-06-04T23:12:08.000Z")
     created_at: datetime

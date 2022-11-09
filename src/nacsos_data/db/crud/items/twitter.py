@@ -69,14 +69,9 @@ async def create_twitter_item(tweet: TwitterItemModel, engine: DatabaseEngineAsy
 
     async with engine.session() as session:
         orm_tweet = TwitterItem(**tweet.dict())
-        if orm_tweet.item_id is None:
-            orm_tweet.item_id = uuid.uuid4()
-        item_id = str(orm_tweet.item_id)
-        orm_item = Item(item_id=orm_tweet.item_id, text=tweet.status)
 
         try:
             session.add(orm_tweet)
-            session.add(orm_item)
             await session.commit()
         except IntegrityError:
             logger.debug(f'Did not create new item tweet_id: {orm_tweet.twitter_id} -> exists in item_id: {item_id}.')

@@ -5,7 +5,7 @@ from datetime import datetime
 from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel
-from .annotations import AnnotationValue, Label
+from .annotations import Label, AnnotationValue
 
 AnnotationFiltersType = dict[str, str | tuple[str] | int | tuple[int] | None]
 
@@ -100,6 +100,8 @@ class BotAnnotationModel(BaseModel):
     time_updated: datetime | None = None
     # The Item (or its ID) this assigment refers to
     item_id: str | UUID
+    # parent BotAnnotation
+    parent: str | UUID | None = None
     # (Optional) Defines which AnnotationSchemeLabel.key this Annotation refers to.
     key: str | None = None
     # Indicates primary/secondary label, but can also be used to store multiple predictions (e.g. the top five topics)
@@ -111,5 +113,6 @@ class BotAnnotationModel(BaseModel):
     value_int: int | None = None
     value_float: float | None = None
     value_str: str | None = None
+    multi_int: list[int] | None = None
     # (Optional) Confidence scores / probabilities provided by the underlying model
     confidence: float | None = None

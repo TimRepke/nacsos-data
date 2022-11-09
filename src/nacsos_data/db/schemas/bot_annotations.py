@@ -1,18 +1,24 @@
-from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, \
-    UniqueConstraint, Enum as SAEnum
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql import func
-from sqlalchemy.sql.sqltypes import UUID
-from sqlalchemy_json import mutable_json_type
 import uuid
+from sqlalchemy import \
+    Integer, \
+    Float, \
+    String, \
+    Boolean, \
+    DateTime, \
+    Enum as SAEnum, \
+    ForeignKey, \
+    UniqueConstraint, \
+    CheckConstraint
+from sqlalchemy.sql import func
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy_json import mutable_json_type
 
-from . import AnnotationScheme, AssignmentScope
 from ...models.bot_annotations import BotKind, BotMeta
 from ...db.base_class import Base
-
 from .projects import Project
-from .items import Item
+from .items.base import Item
+from . import AnnotationScheme, AssignmentScope
 
 
 class BotAnnotationMetaData(Base):
@@ -55,6 +61,8 @@ class BotAnnotation(Base):
     __tablename__ = 'bot_annotation'
     __table_args__ = (
         UniqueConstraint('bot_annotation_metadata_id', 'item_id', 'key', 'repeat'),
+        CheckConstraint('num_nonnulls(value_bool, value_int, value_float, value_str, multi_int) = 1',
+                        name='bot_annotation_has_value'),
     )
 
     # Unique identifier for this BotAnnotation
@@ -72,6 +80,11 @@ class BotAnnotation(Base):
     item_id = mapped_column(UUID(as_uuid=True),
                             ForeignKey(Item.item_id),
                             nullable=False, index=True)
+
+    # Reference to the parent labels' annotation.
+    parent = mapped_column(UUID(as_uuid=True),
+                           ForeignKey('bot_annotation.bot_annotation_id'),
+                           nullable=True, index=True)
 
     # (Optional) Defines which AnnotationSchemeLabel.key this Annotation refers to.
     key = mapped_column(String, nullable=True)

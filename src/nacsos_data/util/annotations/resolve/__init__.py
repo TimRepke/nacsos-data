@@ -120,18 +120,16 @@ def _unpack_nested_keys(annotations: dict[str, AnnotationModel], annotation: Ann
                                if annotation.parent is not None else None) + [Label(annotation.key, annotation.repeat)]
 
 
-def _get_value(annotation: AnnotationModel) -> AnnotationValue | None:
-    if annotation.value_int is None and \
-            annotation.value_bool is None and \
-            annotation.value_float is None and \
-            annotation.value_str is None:
-        return None
-
-    return AnnotationValue(annotation.value_int, annotation.value_float, annotation.value_bool, annotation.value_str)
+def _get_value(annotation: AnnotationModel) -> AnnotationValue:
+    return AnnotationValue(value_int=annotation.value_int, value_float=annotation.value_float,
+                           value_bool=annotation.value_bool, value_str=annotation.value_str,
+                           multi_int=annotation.multi_int)
 
 
 async def read_item_annotation_matrix_dict(filters: AnnotationFilterObject,
-                                           db_engine: DatabaseEngineAsync) -> AnnotationMatrixDict:
+                                           db_engine: DatabaseEngineAsync,
+                                           ignore_order: bool = False,
+                                           ignore_hierarchy: bool = False) -> AnnotationMatrixDict:
     async with db_engine.session() as session:
         subquery, query_filters = filters.get_subquery()
         result = (await session.execute(text(
@@ -149,10 +147,13 @@ async def read_item_annotation_matrix_dict(filters: AnnotationFilterObject,
 
             for annotation in annotations.values():
                 key = tuple(_unpack_nested_keys(annotations, annotation))
-                value = _get_value(annotation)
 
-                if value is None:
-                    continue
+                if ignore_order:
+                    key = tuple([Label(label.key, 1) for label in key])
+                if ignore_hierarchy:
+                    key = (key[-1],)
+
+                value = _get_value(annotation)
 
                 if item_id not in annotation_matrix:
                     annotation_matrix[item_id] = {}
@@ -164,8 +165,11 @@ async def read_item_annotation_matrix_dict(filters: AnnotationFilterObject,
 
 
 async def read_item_annotation_matrix(filters: AnnotationFilterObject,
-                                      db_engine: DatabaseEngineAsync) -> AnnotationMatrix:
-    matrix_dict = await read_item_annotation_matrix_dict(filters, db_engine=db_engine)
+                                      db_engine: DatabaseEngineAsync,
+                                      ignore_order: bool = False,
+                                      ignore_hierarchy: bool = False) -> AnnotationMatrix:
+    matrix_dict = await read_item_annotation_matrix_dict(filters, db_engine=db_engine,
+                                                         ignore_hierarchy=ignore_hierarchy, ignore_order=ignore_order)
     _users = []
     _keys = []
     for item in matrix_dict.values():
@@ -197,8 +201,11 @@ async def read_item_annotation_matrix(filters: AnnotationFilterObject,
 
 
 async def get_resolved_item_annotations(strategy: ResolutionMethod, filters: AnnotationFilterObject,
-                                        db_engine: DatabaseEngineAsync) -> tuple[AnnotationMatrix, ResolvedAnnotations]:
-    matrix = await read_item_annotation_matrix(db_engine=db_engine, filters=filters)
+                                        db_engine: DatabaseEngineAsync,
+                                        ignore_order: bool = False,
+                                        ignore_hierarchy: bool = False) -> tuple[AnnotationMatrix, ResolvedAnnotations]:
+    matrix = await read_item_annotation_matrix(db_engine=db_engine, filters=filters,
+                                               ignore_hierarchy=ignore_hierarchy, ignore_order=ignore_order)
     scheme = await read_annotation_scheme(annotation_scheme_id=matrix.scheme_id, db_engine=db_engine)
 
     if not matrix or not scheme:

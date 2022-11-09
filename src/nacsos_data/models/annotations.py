@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Literal, Optional, NamedTuple
+from typing import Literal, Optional, NamedTuple, Union
 
 from datetime import datetime
 from uuid import UUID
@@ -183,12 +183,17 @@ class Label(NamedTuple):
     repeat: int
 
 
-class AnnotationValue(NamedTuple):
-    # Helper to transmit/handle Annotations at smaller footprint
-    v_int: int | None = None
-    v_float: float | None = None
-    v_bool: bool | None = None
-    v_str: str | None = None
+AnnotationScalarValueField = Literal['value_bool', 'value_int', 'value_float', 'value_str']
+AnnotationListValueField = Literal['multi_int']
+AnnotationValueField = Union[AnnotationScalarValueField, AnnotationListValueField]
+
+
+class AnnotationValue(BaseModel):
+    value_bool: bool | None = None
+    value_int: int | None = None
+    value_float: float | None = None
+    value_str: str | None = None
+    multi_int: list[int] | None = None
 
 
 class AnnotationModel(BaseModel):
@@ -251,6 +256,7 @@ class AnnotationModel(BaseModel):
     value_int: int | None = None
     value_float: float | None = None
     value_str: str | None = None
+    multi_int: list[int] | None = None
 
     # When the Annotation does not refer to an entire Item, but a sub-string (in-text annotation)
     # of that Item, the following fields should be set with the respective string offset.

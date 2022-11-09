@@ -1,6 +1,6 @@
 from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, \
-    UniqueConstraint, Identity, Enum as SAEnum
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+    UniqueConstraint, Identity, Enum as SAEnum, CheckConstraint
+from sqlalchemy.dialects.postgresql import JSONB, UUID, ARRAY
 
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship, mapped_column, Relationship
@@ -12,7 +12,7 @@ from ...db.base_class import Base
 
 from .projects import Project
 from .users import User
-from .items import Item
+from .items.base import Item
 
 
 class AnnotationScheme(Base):
@@ -166,6 +166,8 @@ class Annotation(Base):
     __tablename__ = 'annotation'
     __table_args__ = (
         UniqueConstraint('assignment_id', 'key', 'parent', 'repeat'),
+        CheckConstraint('num_nonnulls(value_bool, value_int, value_float, value_str, multi_int) = 1',
+                        name='annotation_has_value'),
     )
 
     # Unique identifier for this Annotation
@@ -217,6 +219,7 @@ class Annotation(Base):
     value_int = mapped_column(Integer, nullable=True)
     value_float = mapped_column(Float, nullable=True)
     value_str = mapped_column(String, nullable=True)
+    multi_int = mapped_column(ARRAY(Integer), nullable=True)
 
     # When the Annotation does not refer to an entire Item, but a sub-string (in-text annotation)
     # of that Item, the following fields should be set with the respective string offset.

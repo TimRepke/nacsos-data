@@ -4,3 +4,5 @@ scratch/
 __pycache__
 .mypy_cache/
 dist/
+scripts/testing/
+scripts/scratch/

@@ -72,7 +72,7 @@ async def _read_paged_for_project(project_id: str | UUID, Schema: Type[AnyItemSc
 
 def _get_schema_model_for_type(item_type: ProjectTypeLiteral | ProjectType) \
         -> tuple[Type[AnyItemType], Type[AnyItemModel]]:
-    if item_type == 'basic' or item_type == ProjectType.basic:
+    if item_type == 'generic' or item_type == ProjectType.generic:
         return Item, ItemModel
     if item_type == 'twitter' or item_type == ProjectType.twitter:
         return TwitterItem, TwitterItemModel

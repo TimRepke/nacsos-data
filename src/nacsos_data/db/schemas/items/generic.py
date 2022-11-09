@@ -1,5 +1,5 @@
 from sqlalchemy import ForeignKey
-from sqlalchemy.orm import mapped_column, Mapped
+from sqlalchemy.orm import mapped_column
 from sqlalchemy_json import mutable_json_type
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
@@ -7,19 +7,9 @@ from .base import Item
 from . import ItemType
 
 
-# TODO define schema
-# TODO mirror in model
-# TODO add to schemas.__all__
-
-
-class AcademicItem(Item):
-    __tablename__ = 'academic_item'
+class GenericItem(Item):
+    __tablename__ = 'generic_item'
     item_id = mapped_column(UUID(as_uuid=True), ForeignKey(Item.item_id), primary_key=True)
-
-    # (Primary) title of the paper
-    title: Mapped[str]
-
-    # abstract inherited from `Item` as `Item.text`
 
     # any kind of (json-formatted) meta-data
     #   For project marked as "basic" this information may be shown to the user.
@@ -27,5 +17,5 @@ class AcademicItem(Item):
     meta = mapped_column(mutable_json_type(dbtype=JSONB, nested=True))
 
     __mapper_args__ = {
-        'polymorphic_identity': ItemType.academic,
+        'polymorphic_identity': ItemType.generic,
     }

@@ -1,20 +1,15 @@
-from sqlalchemy import String, ForeignKey, Boolean, Column, Enum as SAEnum
-from sqlalchemy.dialects.postgresql import UUID
-from enum import Enum
 import uuid
-
-from sqlalchemy.orm import mapped_column
+from typing import TYPE_CHECKING
+from sqlalchemy import String, ForeignKey, Boolean, Column, Enum as SAEnum, UniqueConstraint
+from sqlalchemy.orm import mapped_column, WriteOnlyMapped, relationship, Relationship
+from sqlalchemy.dialects.postgresql import UUID
 
 from ..base_class import Base
-
 from .users import User
+from .items import ItemType
 
-
-class ProjectType(str, Enum):
-    basic = 'basic'
-    twitter = 'twitter'
-    academic = 'academic'
-    patents = 'patents'
+if TYPE_CHECKING:
+    from .items.base import Item
 
 
 class Project(Base):
@@ -41,7 +36,16 @@ class Project(Base):
 
     # Defines what sort of data this project works with
     # This is used to show item-type specific interface elements and join enriched meta-data
-    type = mapped_column(SAEnum(ProjectType), nullable=False)
+    type = mapped_column(SAEnum(ItemType), nullable=False)
+
+    # ORM reference to all items in the project
+    # Note, that they will not be loaded into memory automatically!
+    # https://docs.sqlalchemy.org/en/20/orm/large_collections.html
+    items: WriteOnlyMapped[list['Item']] = relationship(back_populates='project',
+                                                        cascade="all, delete-orphan",
+                                                        passive_deletes=True)
+
+    permissions: Relationship['ProjectPermissions'] = relationship('ProjectPermissions', cascade='all, delete')
 
 
 class ProjectPermissions(Base):
@@ -55,6 +59,9 @@ class ProjectPermissions(Base):
     by giving them permission to view annotations, they can also see other users' annotations.
     """
     __tablename__ = 'project_permissions'
+    __table_args__ = (
+        UniqueConstraint('project_id', 'user_id'),
+    )
 
     # Unique identifier for this set of permissions
     project_permission_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
@@ -63,12 +70,12 @@ class ProjectPermissions(Base):
     # Refers to the project this permission relates to
     project_id = Column(UUID(as_uuid=True),
                         ForeignKey(Project.project_id),
-                        nullable=False)
+                        nullable=False, index=True, unique=False)
 
     # Refers to the User this set of permissions for this project refers to
     user_id = Column(UUID(as_uuid=True),
                      ForeignKey(User.user_id),
-                     nullable=False, index=True)
+                     nullable=False, index=True, unique=False)
 
     # If true, the user has all permissions for this project
     # Note: All other permission settings below will be ignored if set to "true"
