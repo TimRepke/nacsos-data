@@ -106,12 +106,12 @@ async def read_item_annotations(filters: AnnotationFilterObject,
                 "SELECT item_id, array_to_json(path) as label, json_agg(ctename.*) as annotations "
                 "FROM ctename "
                 "WHERE parent is NULL "
-                "GROUP BY item_id, label;"
+                "GROUP BY item_id, path;"
             ), filter_data)).mappings().all()
 
         return {
-            row['item_id']: ([Label.parse_obj(label) for label in row['label']],
-                             [AnnotationModel.parse_obj(anno) for anno in row['annotations']])
+            str(row['item_id']): ([Label.parse_obj(label) for label in row['label']],
+                                  [AnnotationModel.parse_obj(anno) for anno in row['annotations']])
             for row in annotations
         }
 
@@ -126,7 +126,7 @@ async def read_annotators(filters: AnnotationFilterObject, db_engine: DatabaseEn
             f"   {filter_join} "
             "    JOIN \"user\" u on u.user_id = a.user_id "
             f"WHERE {filter_where};"
-        ), filter_data)).scalars()]
+        ), filter_data)).mappings().all()]
 
 
 async def read_labels(filters: AnnotationFilterObject,
