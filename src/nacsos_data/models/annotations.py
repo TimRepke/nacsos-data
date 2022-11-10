@@ -1,12 +1,21 @@
 from __future__ import annotations
-from typing import Literal, Optional, NamedTuple, Union
+from typing import Literal, Optional, Union
 
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel
 
-AnnotationSchemeLabelTypes = Literal['bool', 'str', 'int', 'float', 'single', 'multi', 'intext']
+
+# Types of Labels:
+#   - bool: stored in `Annotation.value_bool`, used for binary labels (no children)
+#   - int: stored in `Annotation.value_int`, used for extracted numbers (no children)
+#   - float: stored in `Annotation.value_float`, used for extracted numbers (no children)
+#   - single: stored in `Annotation.value_int`, single-choice annotations from list of choices (stores value)
+#   - multi: stored in `Annotation.multi_int`, multi-choice annotations from list of choices (stores list of value)
+#   - intext: tbd
+#   - str: tbd
+AnnotationSchemeLabelTypes = Literal['bool', 'str', 'float', 'int', 'single', 'multi', 'intext']
 
 
 class AnnotationSchemeLabelChoiceFlat(BaseModel):
@@ -176,11 +185,6 @@ class AssignmentModel(BaseModel):
     status: AssignmentStatus
     # The order of assignments within the assignment scope
     order: int | None = None
-
-
-class Label(NamedTuple):
-    key: str
-    repeat: int
 
 
 AnnotationScalarValueField = Literal['value_bool', 'value_int', 'value_float', 'value_str']

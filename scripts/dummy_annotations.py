@@ -1,7 +1,6 @@
-from sqlalchemy import text, select, insert
+from sqlalchemy import text, insert
 from nacsos_data.db.connection import get_engine
-from nacsos_data.db.schemas import Assignment, AssignmentScope, AnnotationScheme, Annotation, Project, User, \
-    M2MProjectItem
+from nacsos_data.db.schemas import Assignment, AssignmentScope, Annotation
 
 PROJECT_ID = '59577b91-5d6d-4460-9074-4cf2e4bd748c'
 SCHEME_ID = '98545fb3-3ed3-48b2-9748-a24015244be0'
@@ -50,7 +49,7 @@ def annotate(sess, uid, iid, rel: bool | None = None,
 
 with engine.session() as session:
     r = session.execute(text("SELECT item_id "
-                             "FROM m2m_project_item "
+                             "FROM item "
                              "WHERE project_id = :project_id "
                              "LIMIT 10"),
                         {'project_id': PROJECT_ID})

@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel
 from .base import ItemModel
 
+
 class ReferencedTweet(BaseModel):
     id: str
     type: Literal['retweeted', 'quoted', 'replied_to']

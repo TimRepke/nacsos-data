@@ -41,8 +41,7 @@ class Project(Base):
     # ORM reference to all items in the project
     # Note, that they will not be loaded into memory automatically!
     # https://docs.sqlalchemy.org/en/20/orm/large_collections.html
-    items: WriteOnlyMapped[list['Item']] = relationship(back_populates='project',
-                                                        cascade="all, delete-orphan",
+    items: WriteOnlyMapped[list['Item']] = relationship(cascade="all, delete-orphan",
                                                         passive_deletes=True)
 
     permissions: Relationship['ProjectPermissions'] = relationship('ProjectPermissions', cascade='all, delete')

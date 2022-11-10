@@ -5,7 +5,8 @@ from datetime import datetime
 from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel
-from .annotations import Label, AnnotationValue
+from .annotations import AnnotationModel
+from .users import UserModel
 
 AnnotationFiltersType = dict[str, str | tuple[str] | int | tuple[int] | None]
 
@@ -24,23 +25,37 @@ class AnnotationFilters(BaseModel):
     :param key: if not None: annotation has to be for this AnnotationSchemeLabel.key (or list/tuple of keys)
     :param repeat: if not None: annotation has to be primary/secondary/...
     """
-    scheme_id: str | list[str] | None = None
+    scheme_id: str
     scope_id: str | list[str] | None = None
     user_id: str | list[str] | None = None
     key: str | list[str] | None = None
     repeat: int | list[int] | None = None
 
 
-# key: item_id
-AnnotationMatrixList = dict[str, list[list[AnnotationValue | None] | None]]
-ResolvedAnnotations = dict[str, list[AnnotationValue | None]]
+class Label(BaseModel):
+    """
+    Convenience type (corresponding to internal type in db annotation_label).
+    For Annotation or BotAnnotation, this is the combination of their respective key, repeat value.
+
+    Mainly used during resolving annotations.
+    """
+    key: str
+    repeat: int
 
 
-class AnnotationMatrix(BaseModel):
+class _AnnotationCollection(BaseModel):
     scheme_id: str
-    labels: list[tuple[Label, ...]]
-    users: list[str]
-    matrix: AnnotationMatrixList
+    labels: list[list[Label]]
+    # key: item_id
+    annotations: dict[str, tuple[list[Label], list[AnnotationModel]]]
+
+
+class AnnotationCollectionDB(_AnnotationCollection):
+    annotators: list[str]
+
+
+class AnnotationCollection(_AnnotationCollection):
+    annotators: list[UserModel]
 
 
 ResolutionMethod = Literal['majority', 'first', 'last', 'trust']
@@ -51,10 +66,12 @@ class BotMetaResolve(BaseModel):
     algorithm: ResolutionMethod
     # defines the "scope" of labels to include for the resolver
     filters: AnnotationFilters
-    # snapshot of the annotations used to resolve this
-    matrix: AnnotationMatrix
+    ignore_hierarchy: bool
+    ignore_repeat: bool
     # (optional) dictionary of user UUID -> float weights (i.e. trust in the user for weighted majority votes)
     trust: dict[str, float] | None = None
+    # snapshot of the annotations used to resolve this
+    collection: AnnotationCollectionDB
 
 
 BotMeta = BotMetaResolve

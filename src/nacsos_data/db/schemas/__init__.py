@@ -7,15 +7,15 @@ from .projects import Project, ProjectPermissions
 from .users import User
 from .imports import Import, M2MImportItem
 
-from .items import ItemType
+from .items import ItemType, ItemTypeLiteral
 from .items.base import Item
 from .items.generic import GenericItem
 from .items.twitter import TwitterItem
 
 # from .items.academic import AcademicItem # FIXME uncomment
 
-AnyItemType = Item | TwitterItem
-AnyItemSchema = TypeVar('AnyItemSchema', Item, TwitterItem)
+AnyItemType = GenericItem | TwitterItem  # | AcademicItem # FIXME uncomment
+AnyItemSchema = TypeVar('AnyItemSchema', GenericItem, TwitterItem)  # , AcademicItem) # FIXME uncomment
 
 __all__ = ['Base',
            # Schemas for annotations
@@ -23,8 +23,8 @@ __all__ = ['Base',
            # Schemas for "automated" annotations
            'BotAnnotationMetaData', 'BotAnnotation',
            # Schemas for items (i.e. documents) and util types
-           'Item', 'GenericItem', 'TwitterItem',  # 'AcademicItem',
-           'AnyItemSchema', 'AnyItemType',
+           'Item', 'GenericItem', 'TwitterItem',  # 'AcademicItem', # FIXME uncomment
+           'ItemType', 'ItemTypeLiteral', 'AnyItemSchema', 'AnyItemType',
            # Schemas for organising data
            'Import', 'M2MImportItem',
            # Schemas for project management

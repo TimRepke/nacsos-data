@@ -2,9 +2,7 @@ from typing import Literal
 from uuid import UUID
 from pydantic import BaseModel
 
-from nacsos_data.db.schemas.projects import ProjectType
-
-ProjectTypeLiteral = Literal['basic', 'twitter', 'academic', 'patents']
+from nacsos_data.db.schemas.items import ItemType, ItemTypeLiteral
 
 
 class ProjectModel(BaseModel):
@@ -29,7 +27,7 @@ class ProjectModel(BaseModel):
 
     # Defines what sort of data this project works with
     # This is used to show item-type specific interface elements and join enriched meta-data
-    type: ProjectTypeLiteral | ProjectType
+    type: ItemTypeLiteral | ItemType
 
 
 ProjectPermission = Literal['owner',

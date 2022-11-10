@@ -2,7 +2,7 @@ from sqlalchemy import String, Integer, DateTime, Float, ForeignKey, UniqueConst
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 
-from sqlalchemy.orm import mapped_column, column_property
+from sqlalchemy.orm import mapped_column, column_property, Mapped
 
 from ..projects import Project
 from .base import Item
@@ -28,9 +28,9 @@ class TwitterItem(Item):
 
     # mirror of `Item.project_id` so we can introduce the UniqueConstraint
     # https://docs.sqlalchemy.org/en/20/faq/ormconfiguration.html#i-m-getting-a-warning-or-error-about-implicitly-combining-column-x-under-attribute-y
-    project_id = column_property(Column(UUID(as_uuid=True),
-                                        ForeignKey(Project.project_id, ondelete='cascade'),
-                                        index=True, nullable=False), Item.project_id)
+    project_id: Mapped[uuid.UUID] = column_property(Column(UUID(as_uuid=True),  # type: ignore[assignment]
+                                                           ForeignKey(Project.project_id, ondelete='cascade'),
+                                                           index=True, nullable=False), Item.project_id)
 
     # Unique identifier on Twitter
     twitter_id = mapped_column(String, nullable=False, unique=False, index=True)
