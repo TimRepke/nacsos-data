@@ -1,13 +1,11 @@
 from typing import Type
-from sqlalchemy import select, func, insert
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import Item, TwitterItem, AnyItemSchema, AnyItemType, ItemType, ItemTypeLiteral, GenericItem
 from nacsos_data.models.items import AnyItemModel, TwitterItemModel, AnyItemModelType, GenericItemModel
-from nacsos_data.models.items.base import ItemModel
-from nacsos_data.models.projects import ProjectModel
 
 import logging
 
@@ -21,8 +19,8 @@ async def read_item_count_for_project(project_id: str | UUID, engine: DatabaseEn
         return result
 
 
-async def _read_all_for_project(project_id: str | UUID, Schema: Type[AnyItemSchema], Model: Type[AnyItemModelType],
-                                engine: DatabaseEngineAsync) -> list[AnyItemModelType]:
+async def read_all_for_project(project_id: str | UUID, Schema: Type[AnyItemSchema], Model: Type[AnyItemModelType],
+                               engine: DatabaseEngineAsync) -> list[AnyItemModelType]:
     async with engine.session() as session:
         # FIXME We should probably set a LIMIT by default
         stmt = (select(Schema)
@@ -31,8 +29,8 @@ async def _read_all_for_project(project_id: str | UUID, Schema: Type[AnyItemSche
         return [Model.parse_obj(res.__dict__) for res in result]
 
 
-async def _read_paged_for_project(project_id: str | UUID, Schema: Type[AnyItemSchema], Model: Type[AnyItemModelType],
-                                  page: int, page_size: int, engine: DatabaseEngineAsync) -> list[AnyItemModelType]:
+async def read_paged_for_project(project_id: str | UUID, Schema: Type[AnyItemSchema], Model: Type[AnyItemModelType],
+                                 page: int, page_size: int, engine: DatabaseEngineAsync) -> list[AnyItemModelType]:
     # page: count starts at 1
     async with engine.session() as session:
         offset = (page - 1) * page_size

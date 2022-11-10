@@ -8,7 +8,7 @@ from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import TwitterItem, M2MImportItem
 from nacsos_data.models.items.twitter import TwitterItemModel
 
-from . import _read_all_for_project, _read_paged_for_project
+from . import read_all_for_project, read_paged_for_project
 
 logger = logging.getLogger('nacsos-data.crud.twitter')
 
@@ -76,13 +76,13 @@ async def import_tweets(tweets: list[TwitterItemModel], engine: DatabaseEngineAs
 
 async def read_all_twitter_items_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) \
         -> list[TwitterItemModel]:
-    return await _read_all_for_project(project_id=project_id, Schema=TwitterItem, Model=TwitterItemModel, engine=engine)
+    return await read_all_for_project(project_id=project_id, Schema=TwitterItem, Model=TwitterItemModel, engine=engine)
 
 
 async def read_all_twitter_items_for_project_paged(project_id: str | UUID, page: int, page_size: int,
                                                    engine: DatabaseEngineAsync) -> list[TwitterItemModel]:
-    return await _read_paged_for_project(project_id=project_id, page=page, page_size=page_size,
-                                         Schema=TwitterItem, Model=TwitterItemModel, engine=engine)
+    return await read_paged_for_project(project_id=project_id, page=page, page_size=page_size,
+                                        Schema=TwitterItem, Model=TwitterItemModel, engine=engine)
 
 
 async def read_twitter_item_by_item_id(item_id: str | UUID, engine: DatabaseEngineAsync) -> TwitterItemModel | None:
