@@ -147,7 +147,8 @@ def has_annotation(label: AnnotationSchemeLabel) -> bool:
            and (label.annotation.value_int is not None
                 or label.annotation.value_str is not None
                 or label.annotation.value_bool is not None
-                or label.annotation.value_float is not None)
+                or label.annotation.value_float is not None
+                or label.annotation.multi_int is not None)
 
 
 def annotated_scheme_to_annotations(scheme: AnnotationSchemeModel) -> list[AnnotationModel]:

@@ -1,7 +1,8 @@
 from sqlalchemy import text
 from nacsos_data.db.connection import DatabaseEngineAsync
 from nacsos_data.db.crud.annotations import read_annotation_scheme
-from nacsos_data.models.annotations import AnnotationModel, AnnotationValue
+from nacsos_data.models.annotations import AnnotationModel, AnnotationValue, AnnotationSchemeModel, \
+    FlattenedAnnotationSchemeLabel
 from nacsos_data.models.bot_annotations import \
     Label, \
     AnnotationFilters, \
@@ -179,7 +180,8 @@ async def get_resolved_item_annotations(strategy: ResolutionMethod, filters: Ann
                                         db_engine: DatabaseEngineAsync,
                                         ignore_hierarchy: bool = False,
                                         ignore_order: bool = False) \
-        -> tuple[AnnotationCollection, list[BotAnnotationModel]]:
+        -> tuple[AnnotationSchemeModel, list[FlattenedAnnotationSchemeLabel],
+                 AnnotationCollection, list[BotAnnotationModel]]:
     annotations = await read_item_annotations(db_engine=db_engine, filters=filters,
                                               ignore_hierarchy=ignore_hierarchy, ignore_order=ignore_order)
     labels = await read_labels(db_engine=db_engine, filters=filters,
@@ -196,6 +198,7 @@ async def get_resolved_item_annotations(strategy: ResolutionMethod, filters: Ann
     flat_scheme = flatten_annotation_scheme(scheme)
 
     if strategy == 'majority':
-        return collection, naive_majority_vote(collection=collection, scheme=flat_scheme.labels)
+        return scheme, flat_scheme.labels, \
+               collection, naive_majority_vote(collection=collection, scheme=flat_scheme.labels)
 
     raise NotImplementedError(f'Resolution strategy "{strategy}" not implemented (yet)!')
