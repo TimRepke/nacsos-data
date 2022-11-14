@@ -1,17 +1,24 @@
+from datetime import datetime
 from sqlalchemy import text
 from nacsos_data.db.connection import DatabaseEngineAsync
 from nacsos_data.db.crud.annotations import read_annotation_scheme
-from nacsos_data.models.annotations import AnnotationModel, AnnotationValue, AnnotationSchemeModel, \
+from nacsos_data.models.annotations import \
+    AnnotationModel, \
+    AnnotationSchemeModel, \
     FlattenedAnnotationSchemeLabel
 from nacsos_data.models.bot_annotations import \
     Label, \
     AnnotationFilters, \
     AnnotationFiltersType, \
-    ResolutionMethod, AnnotationCollection, BotAnnotationModel
+    ResolutionMethod, \
+    AnnotationCollection, \
+    GroupedAnnotations, \
+    GroupedBotAnnotation
 from nacsos_data.models.users import UserModel
 from nacsos_data.util.annotations.resolve.majority_vote import naive_majority_vote
 from nacsos_data.util.annotations.validation import flatten_annotation_scheme
 from nacsos_data.util.errors import NotFoundError
+
 
 # ideas for resolving algorithms:
 #   - naive majority vote (per key,repeat)
@@ -19,9 +26,6 @@ from nacsos_data.util.errors import NotFoundError
 #   - weighted vote (with manually assigned "trust" weights per annotator)
 #   - weighted vote (compute annotator trust/reliability)
 #   - ...
-ItemId = str
-UserId = str
-AnnotationMatrixDict = dict[ItemId, dict[tuple[Label, ...], dict[UserId, AnnotationValue]]]
 
 
 class InvalidFilterError(AssertionError):
@@ -63,12 +67,62 @@ class AnnotationFilterObject(AnnotationFilters):
         return ret
 
 
+async def read_num_annotation_changes_after(timestamp: str | datetime,
+                                            filters: AnnotationFilterObject,
+                                            db_engine: DatabaseEngineAsync) -> int:
+    """
+    Looks for `Annotation`s that were added or edited after `timestamp` and returns the count.
+    This is assumed to be used in the context of `Annotation` resolution, so the same filter logic is used, so
+    it can be re-applied later to see if there have been changes that should be included in the resolution.
+    NOTICE: This does *not* recognise deletions (but `Annotation`s should never be deleted anyway).
+    If you are looking for the actually changed `Annotation`s, use `read_changed_annotations_after`.
+    :param timestamp:
+    :param filters:
+    :param db_engine:
+    :return:
+    """
+    async with db_engine.session() as session:
+        filter_join, filter_where, filter_data = filters.get_subquery()
+        filter_data['timestamp'] = timestamp
+        num_changes = (await session.execute(text(
+            "SELECT count(1) "
+            "FROM annotation AS a "
+            f" {filter_join} "
+            f"WHERE {filter_where} "
+            f"      AND (a.time_created > :timestamp OR a.time_updated > :timestamp);"
+        ), filter_data)).scalar()
+        return num_changes
+
+
+async def read_changed_annotations_after(timestamp: str | datetime,
+                                         filters: AnnotationFilterObject,
+                                         db_engine: DatabaseEngineAsync) -> list[AnnotationModel]:
+    """
+    See `read_num_annotation_changes_after`
+    :param timestamp:
+    :param filters:
+    :param db_engine:
+    :return:
+    """
+    async with db_engine.session() as session:
+        filter_join, filter_where, filter_data = filters.get_subquery()
+        filter_data['timestamp'] = timestamp
+        annotations = (await session.execute(text(
+            "SELECT a.* "
+            "FROM annotation AS a "
+            f" {filter_join} "
+            f"WHERE {filter_where} "
+            f"      AND (a.time_created > :timestamp OR a.time_updated > :timestamp);"
+        ), filter_data)).mappings().all()
+        return [AnnotationModel.parse_obj(anno) for anno in annotations]
+
+
 async def read_item_annotations(filters: AnnotationFilterObject,
                                 db_engine: DatabaseEngineAsync,
                                 ignore_hierarchy: bool = False,
-                                ignore_order: bool = False) \
-        -> dict[str, tuple[list[Label], list[AnnotationModel]]]:
+                                ignore_order: bool = False) -> dict[str, list[GroupedAnnotations]]:
     """
+    asd
     :param db_engine: Connection to the database
     :param filters:
     :param ignore_hierarchy: if False, looking at keys linearly (ignoring parents)
@@ -110,11 +164,17 @@ async def read_item_annotations(filters: AnnotationFilterObject,
                 "GROUP BY item_id, path;"
             ), filter_data)).mappings().all()
 
-        return {
-            str(row['item_id']): ([Label.parse_obj(label) for label in row['label']],
-                                  [AnnotationModel.parse_obj(anno) for anno in row['annotations']])
-            for row in annotations
-        }
+        ret = {}
+        for row in annotations:
+            item_uuid = str(row['item_id'])
+            if item_uuid not in ret:
+                ret[item_uuid] = []
+            ret[item_uuid].append(GroupedAnnotations(path=[Label.parse_obj(label)
+                                                           for label in row['label']],
+                                                     annotations=[AnnotationModel.parse_obj(anno)
+                                                                  for anno in row['annotations']]))
+
+        return ret
 
 
 async def read_annotators(filters: AnnotationFilterObject, db_engine: DatabaseEngineAsync) -> list[UserModel]:
@@ -181,7 +241,7 @@ async def get_resolved_item_annotations(strategy: ResolutionMethod, filters: Ann
                                         ignore_hierarchy: bool = False,
                                         ignore_order: bool = False) \
         -> tuple[AnnotationSchemeModel, list[FlattenedAnnotationSchemeLabel],
-                 AnnotationCollection, list[BotAnnotationModel]]:
+                 AnnotationCollection, dict[str, list[GroupedBotAnnotation]]]:
     annotations = await read_item_annotations(db_engine=db_engine, filters=filters,
                                               ignore_hierarchy=ignore_hierarchy, ignore_order=ignore_order)
     labels = await read_labels(db_engine=db_engine, filters=filters,

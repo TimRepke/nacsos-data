@@ -5,7 +5,7 @@ LineEncoding = Literal[
     # twitter-related line encodings
     'db-twitter-item', 'twitter-api-page',
     # basic (generic) items per line
-    'db-basic-item',
+    'db-generic-item',
     # academic-related line encodings
     'db-academic-item',
     # patent-related line encodings

@@ -41,6 +41,11 @@ class BotAnnotationMetaData(Base):
     project_id = mapped_column(UUID(as_uuid=True),
                                ForeignKey(Project.project_id),
                                nullable=False, index=True)
+
+    # Date and time when this meta entry was created (or last changed)
+    time_created = mapped_column(DateTime(timezone=True), server_default=func.now())
+    time_updated = mapped_column(DateTime(timezone=True), onupdate=func.now())
+
     # (Optional) reference to an annotation scope
     annotation_scope_id = mapped_column(UUID(as_uuid=True),
                                         ForeignKey(AssignmentScope.assignment_scope_id),

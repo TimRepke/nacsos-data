@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Literal
+from typing import Literal, NamedTuple
 
 from datetime import datetime
 from uuid import UUID
@@ -43,11 +43,21 @@ class Label(BaseModel):
     repeat: int
 
 
+class GroupedAnnotations(NamedTuple):
+    path: list[Label]
+    annotations: list[AnnotationModel]
+
+
+class GroupedBotAnnotation(NamedTuple):
+    path: list[Label]
+    annotation: BotAnnotationModel
+
+
 class _AnnotationCollection(BaseModel):
     scheme_id: str
     labels: list[list[Label]]
-    # key: item_id
-    annotations: dict[str, tuple[list[Label], list[AnnotationModel]]]
+
+    annotations: dict[str, list[GroupedAnnotations]]  # key: item_id
 
 
 class AnnotationCollectionDB(_AnnotationCollection):
@@ -98,6 +108,9 @@ class BotAnnotationMetaDataModel(BaseModel):
     kind: BotKind
     # Reference to a project
     project_id: str | UUID
+    # Date and time when this meta entry was created (or last changed)
+    time_created: datetime | None = None
+    time_updated: datetime | None = None
     # (Optional) reference to an annotation scope
     annotation_scope_id: str | UUID | None = None
     # (Optional) reference to an annotation scheme used here

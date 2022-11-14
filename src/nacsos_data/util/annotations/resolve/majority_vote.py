@@ -7,7 +7,7 @@ from nacsos_data.models.annotations import \
     AnnotationScalarValueField, \
     AnnotationListValueField, \
     AnnotationModel, AnnotationSchemeLabelTypes
-from nacsos_data.models.bot_annotations import AnnotationCollection, BotAnnotationModel, Label
+from nacsos_data.models.bot_annotations import AnnotationCollection, BotAnnotationModel, Label, GroupedBotAnnotation
 
 
 def _majority_vote_list(label_annotations: list[AnnotationModel],
@@ -50,41 +50,45 @@ def _label_to_str(label: list[Label]) -> str:
 
 
 def naive_majority_vote(collection: AnnotationCollection,
-                        scheme: list[FlattenedAnnotationSchemeLabel]) -> list[BotAnnotationModel]:
+                        scheme: list[FlattenedAnnotationSchemeLabel]) -> dict[str, list[GroupedBotAnnotation]]:
     scheme_lookup: dict[str, FlattenedAnnotationSchemeLabel] = {label.key: label for label in scheme}
 
-    parent_lookup: dict[str, str] = {}
-    ret = []
-    for item_id, (label, annotations) in collection.annotations.items():
-        kind: AnnotationSchemeLabelTypes = scheme_lookup[label[0].key].kind
-        if kind == 'bool':
-            value = _majority_vote_scalar(annotations, field='value_bool')
-        elif kind == 'single':
-            value = _majority_vote_scalar(annotations, field='value_int')
-        elif kind == 'multi':
-            value = _majority_vote_list(annotations, field='multi_int')
-        # elif column_schemes[label_i].kind == 'int':
-        #     pass
-        # elif column_schemes[label_i].kind == 'float':
-        #     pass
-        # elif column_schemes[label_i].kind == 'str':
-        #     pass
-        # elif column_schemes[label_i].kind == 'intext':
-        #     pass
-        else:
-            raise NotImplementedError(f'Majority vote for {kind} not implemented')
+    ret: dict[str, list[GroupedBotAnnotation]] = {}
+    for item_id, grouped_annotations in collection.annotations.items():
+        ret[item_id] = []
+        parent_lookup: dict[str, str] = {}
+        for label, annotations in grouped_annotations:
+            kind: AnnotationSchemeLabelTypes = scheme_lookup[label[0].key].kind
+            if kind == 'bool':
+                value = _majority_vote_scalar(annotations, field='value_bool')
+            elif kind == 'single':
+                value = _majority_vote_scalar(annotations, field='value_int')
+            elif kind == 'multi':
+                value = _majority_vote_list(annotations, field='multi_int')
+            # elif column_schemes[label_i].kind == 'int':
+            #     pass
+            # elif column_schemes[label_i].kind == 'float':
+            #     pass
+            # elif column_schemes[label_i].kind == 'str':
+            #     pass
+            # elif column_schemes[label_i].kind == 'intext':
+            #     pass
+            else:
+                raise NotImplementedError(f'Majority vote for {kind} not implemented')
 
-        ba_uuid = uuid.uuid4()
-        parent_lookup[f'{item_id}|{_label_to_str(label)}'] = str(ba_uuid)
-        ret.append(BotAnnotationModel(bot_annotation_id=ba_uuid, item_id=item_id,
-                                      key=label[0].key, repeat=label[0].repeat,
-                                      **value.dict()))
+            ba_uuid = uuid.uuid4()
+            parent_lookup[_label_to_str(label)] = str(ba_uuid)
+            ret[item_id].append(GroupedBotAnnotation(
+                path=label,
+                annotation=BotAnnotationModel(bot_annotation_id=ba_uuid, item_id=item_id,
+                                              key=label[0].key, repeat=label[0].repeat,
+                                              **value.dict())))
 
-    # Second loop to back-fill parents
-    # NOTICE: This does *not* check for validity!
-    #         (e.g. the parent might have been resolved to a choice where the current sub-label is not a child)
-    for i, (item_id, (label, _)) in enumerate(collection.annotations.items()):
-        if len(label) > 1:
-            ret[i].parent = parent_lookup[f'{item_id}|{_label_to_str(label)}']
+        # Second loop to back-fill parents
+        # NOTICE: This does *not* check for validity!
+        #         (e.g. the parent might have been resolved to a choice where the current sub-label is not a child)
+        for i, (label, annotations) in enumerate(grouped_annotations):
+            if len(label) > 1:
+                ret[item_id][i].annotation.parent = parent_lookup[_label_to_str(label)]
 
     return ret
