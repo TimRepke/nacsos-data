@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey
+from sqlalchemy import String, Integer, DateTime, Float, ForeignKey, UniqueConstraint, Column
 from sqlalchemy.orm import mapped_column, Mapped
 from sqlalchemy_json import mutable_json_type
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -16,8 +16,26 @@ class AcademicItem(Item):
     __tablename__ = 'academic_item'
     item_id = mapped_column(UUID(as_uuid=True), ForeignKey(Item.item_id), primary_key=True)
 
+    doi = mapped_column(String, nullable=True, unique=False, index=True)
+
+    wos_id = mapped_column(String, nullable=True, unique=False, index=True)
+    scopus_id = mapped_column(String, nullable=True, unique=False, index=True)
+    openalex_id = mapped_column(String, nullable=True, unique=False, index=True)
+    s2_id = mapped_column(String, nullable=True, unique=False, index=True)
+
     # (Primary) title of the paper
-    title: Mapped[str]
+    title = mapped_column(String, nullable=True, unique=False, index=True)
+    title_slug = mapped_column(String, nullable=True, unique=False, index=True)
+
+    publication_year = mapped_column(Integer, nullable=True, unique=False, index=True)
+
+    # Journal
+    source = mapped_column(String, nullable=True, unique=False, index=True)
+
+    keywords = mapped_column(JSONB, nullable=True, index=True)
+
+    # JSON representation of authors: see models/academic.py
+    authors = mapped_column(mutable_json_type(dbtype=JSONB, nested=True))
 
     # abstract inherited from `Item` as `Item.text`
 
