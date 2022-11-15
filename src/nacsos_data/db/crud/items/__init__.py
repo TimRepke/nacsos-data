@@ -14,7 +14,7 @@ logger = logging.getLogger('nacsos-data.crud.items')
 
 async def read_item_count_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) -> int:
     async with engine.session() as session:  # type: AsyncSession
-        result: int = (await session.execute(
+        result: int = (await session.execute(  # type: ignore[assignment] # FIXME: mypy
             select(func.count(Item.item_id)).where(Item.project_id == project_id)
         )).scalar()
         return result

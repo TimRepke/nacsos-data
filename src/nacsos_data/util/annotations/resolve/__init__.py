@@ -36,20 +36,23 @@ class AnnotationFilterObject(AnnotationFilters):
     def get_subquery(self) -> tuple[str, str, AnnotationFiltersType]:
         where = []
         filters = self.get_filters()
-        for db_col, (comp_s, comp_l), key in [('ass.assignment_scope_id', ('=', 'IN'), 'scope_id'),
-                                              ('a.annotation_scheme_id', ('=', 'IN'), 'scheme_id'),
-                                              ('a.user_id', ('=', 'IN'), 'user_id'),
-                                              ('a.key', ('=', 'IN'), 'key'),
-                                              ('a.repeat', ('=', 'IN'), 'repeat')]:
+        for db_col, key in [('ass.assignment_scope_id', 'scope_id'),
+                            ('a.annotation_scheme_id', 'scheme_id'),
+                            ('a.user_id', 'user_id'),
+                            ('a.key', 'key'),
+                            ('a.repeat', 'repeat')]:
             if filters.get(key) is not None:
-                where.append(f'{db_col} {comp_l if type(filters[key]) == tuple else comp_s} :{key}')
+                if type(filters[key]) == list:
+                    where.append(f' {db_col} = ANY(:{key}) ')
+                else:
+                    where.append(f' {db_col} = :{key} ')
 
         if len(where) == 0:
             raise InvalidFilterError('You did not specify any valid filter.')
 
         join = f''
         if filters.get('scope_id') is not None:
-            join = f'JOIN assignment ass on ass.assignment_id = a.assignment_id'
+            join = f' JOIN assignment ass on ass.assignment_id = a.assignment_id '
 
         return join, ' AND '.join(where), filters
 
@@ -61,7 +64,7 @@ class AnnotationFilterObject(AnnotationFilters):
                     if len(value) == 1:
                         ret[key] = value[0]
                     else:
-                        ret[key] = tuple(value)
+                        ret[key] = list(value)
                 else:
                     ret[key] = value
         return ret
@@ -83,8 +86,8 @@ async def read_num_annotation_changes_after(timestamp: str | datetime,
     """
     async with db_engine.session() as session:
         filter_join, filter_where, filter_data = filters.get_subquery()
-        filter_data['timestamp'] = timestamp
-        num_changes = (await session.execute(text(
+        filter_data['timestamp'] = str(timestamp)
+        num_changes: int = (await session.execute(text(  # type: ignore[assignment] # FIXME mypy
             "SELECT count(1) "
             "FROM annotation AS a "
             f" {filter_join} "
@@ -106,7 +109,7 @@ async def read_changed_annotations_after(timestamp: str | datetime,
     """
     async with db_engine.session() as session:
         filter_join, filter_where, filter_data = filters.get_subquery()
-        filter_data['timestamp'] = timestamp
+        filter_data['timestamp'] = str(timestamp)
         annotations = (await session.execute(text(
             "SELECT a.* "
             "FROM annotation AS a "
@@ -148,23 +151,23 @@ async def read_item_annotations(filters: AnnotationFilterObject,
             ), filter_data)).mappings().all()
         else:
             annotations = (await session.execute(text(
-                "WITH RECURSIVE ctename AS ( "
-                f"      SELECT a.*, ARRAY[(a.key, {repeat})::annotation_label] as path "
-                "      FROM annotation AS a "
-                f"         {filter_join} "
-                f"      WHERE {filter_where} "
-                "   UNION ALL "
-                f"      SELECT a.*, array_append(ctename.path, ((a.key, {repeat})::annotation_label)) "
-                "      FROM annotation a "
-                "         JOIN ctename ON a.annotation_id = ctename.parent "
-                ") "
-                "SELECT item_id, array_to_json(path) as label, json_agg(ctename.*) as annotations "
-                "FROM ctename "
-                "WHERE parent is NULL "
+                "WITH RECURSIVE ctename AS ( \n"
+                f"      SELECT a.*, ARRAY[(a.key, {repeat})::annotation_label] as path \n"
+                "      FROM annotation AS a \n"
+                f"         {filter_join} \n"
+                f"      WHERE {filter_where} \n"
+                "   UNION ALL \n"
+                f"      SELECT a.*, array_append(ctename.path, ((a.key, {repeat})::annotation_label)) \n"
+                "      FROM annotation a \n"
+                "         JOIN ctename ON a.annotation_id = ctename.parent \n"
+                ") \n"
+                "SELECT item_id, array_to_json(path) as label, json_agg(ctename.*) as annotations \n"
+                "FROM ctename \n"
+                "WHERE parent is NULL \n"
                 "GROUP BY item_id, path;"
             ), filter_data)).mappings().all()
 
-        ret = {}
+        ret: dict[str, list[GroupedAnnotations]] = {}
         for row in annotations:
             item_uuid = str(row['item_id'])
             if item_uuid not in ret:
@@ -200,7 +203,6 @@ async def read_labels(filters: AnnotationFilterObject,
         repeat = 'a.repeat'
         if ignore_order:  # if repeat is ignored, always forcing it to 1
             repeat = '1'
-
         filter_join, filter_where, filter_data = filters.get_subquery()
         if ignore_hierarchy:
             return [[Label.parse_obj(sub_label) for sub_label in label]
@@ -250,7 +252,8 @@ async def get_resolved_item_annotations(strategy: ResolutionMethod, filters: Ann
     scheme = await read_annotation_scheme(annotation_scheme_id=filters.scheme_id, db_engine=db_engine)
 
     if not annotations or not scheme:
-        raise NotFoundError(f'No annotations or no annotation scheme for {filters.scheme_id}')
+        raise NotFoundError(
+            f'No annotations ({bool(annotations)}) or no annotation scheme ({bool(scheme)}) for {filters.scheme_id}')
 
     collection = AnnotationCollection(scheme_id=filters.scheme_id,
                                       labels=labels, annotators=annotators, annotations=annotations)

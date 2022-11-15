@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from .annotations import AnnotationModel
 from .users import UserModel
 
-AnnotationFiltersType = dict[str, str | tuple[str] | int | tuple[int] | None]
+AnnotationFiltersType = dict[str, str | list[str] | int | list[int] | None]
 
 
 class AnnotationFilters(BaseModel):
