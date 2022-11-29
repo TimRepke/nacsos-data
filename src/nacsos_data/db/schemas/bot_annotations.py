@@ -11,7 +11,7 @@ from sqlalchemy import \
     CheckConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID, ARRAY
 from sqlalchemy_json import mutable_json_type
 
 from ...models.bot_annotations import BotKind, BotMeta
@@ -46,8 +46,8 @@ class BotAnnotationMetaData(Base):
     time_created = mapped_column(DateTime(timezone=True), server_default=func.now())
     time_updated = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
-    # (Optional) reference to an annotation scope
-    annotation_scope_id = mapped_column(UUID(as_uuid=True),
+    # (Optional) reference to an assignment scope
+    annotation_scope_id = mapped_column(UUID(as_uuid=True),  # FIXME: fix name to assignment_scope_id
                                         ForeignKey(AssignmentScope.assignment_scope_id),
                                         nullable=True, index=True)
     # (Optional) reference to an annotation scheme used here
@@ -65,7 +65,7 @@ class BotAnnotation(Base):
     """
     __tablename__ = 'bot_annotation'
     __table_args__ = (
-        UniqueConstraint('bot_annotation_metadata_id', 'item_id', 'key', 'repeat'),
+        UniqueConstraint('bot_annotation_metadata_id', 'item_id', 'parent', 'key', 'repeat'),
         CheckConstraint('num_nonnulls(value_bool, value_int, value_float, value_str, multi_int) = 1',
                         name='bot_annotation_has_value'),
     )
@@ -104,6 +104,7 @@ class BotAnnotation(Base):
     value_int = mapped_column(Integer, nullable=True)
     value_float = mapped_column(Float, nullable=True)
     value_str = mapped_column(String, nullable=True)
+    multi_int = mapped_column(ARRAY(Integer), nullable=True)
 
     # (Optional) Confidence scores / probabilities provided by the underlying model
     confidence = mapped_column(Float, nullable=True)

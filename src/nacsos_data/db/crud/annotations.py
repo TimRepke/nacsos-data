@@ -1,7 +1,8 @@
+import uuid
 from uuid import UUID
 import logging
 
-from sqlalchemy import select, asc, desc
+from sqlalchemy import select, delete, asc, desc
 from sqlalchemy.sql import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
@@ -11,7 +12,7 @@ from nacsos_data.db.schemas import \
     Annotation, \
     AnnotationScheme, \
     Assignment, \
-    AssignmentScope
+    AssignmentScope, BotAnnotationMetaData, BotAnnotation
 from nacsos_data.models.annotations import \
     AnnotationModel, \
     AnnotationSchemeModel, \
@@ -19,7 +20,9 @@ from nacsos_data.models.annotations import \
     AssignmentScopeModel, \
     AssignmentStatus
 from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_scheme_and_annotations
-from . import upsert_orm
+from . import upsert_orm, MissingIdError
+from ...models.bot_annotations import AnnotationFilters, BotMetaResolve, ResolutionMethod, AnnotationCollectionDB, \
+    BotKind, BotAnnotationModel
 
 logger = logging.getLogger('nacsos_data.crud.annotations')
 
@@ -291,7 +294,7 @@ async def upsert_annotations(annotations: list[AnnotationModel],
                              assignment_id: str | UUID | None,
                              db_engine: DatabaseEngineAsync) -> AssignmentStatus | None:
     if not all([annotation is not None and annotation.annotation_id is not None for annotation in annotations]):
-        raise ValueError('One or more annotations have no ID, this in undefined behaviour.')
+        raise ValueError('One or more annotations have no ID, this an undefined behaviour.')
 
     if assignment_id is not None:
         existing_annotations = await read_annotations_for_assignment(assignment_id=assignment_id, db_engine=db_engine)
@@ -333,7 +336,7 @@ async def upsert_annotations(annotations: list[AnnotationModel],
                 stmt = select(Annotation).filter_by(annotation_id=annotation.annotation_id)
                 annotation_db = (await session.scalars(stmt)).one_or_none()
                 if annotation_db is None:
-                    raise RuntimeError('During processing, one tof the annotations disappeared.'
+                    raise RuntimeError('During processing, one of the annotations disappeared.'
                                        f'This should never happen! ID for reference: {annotation.annotation_id}')
                 annotation_db.key = annotation.key
                 annotation_db.repeat = annotation.repeat
@@ -413,4 +416,86 @@ async def store_assignments(assignments: list[AssignmentModel],
     async with db_engine.session() as session:  # type: AsyncSession
         assignments_orm = [Assignment(**assignment.dict()) for assignment in assignments]
         session.add_all(assignments_orm)
+        await session.commit()
+
+
+async def store_resolved_bot_annotations(project_id: str, name: str,
+                                         algorithm: ResolutionMethod, filters: AnnotationFilters,
+                                         ignore_hierarchy: bool, ignore_repeat: bool,
+                                         collection: AnnotationCollectionDB, bot_annotations: list[BotAnnotationModel],
+                                         db_engine: DatabaseEngineAsync) -> str:
+    async with db_engine.session() as session:  # type: AsyncSession
+        meta = BotMetaResolve(algorithm=algorithm, filters=filters,
+                              ignore_hierarchy=ignore_hierarchy, ignore_repeat=ignore_repeat,
+                              collection=collection)
+        meta_uuid = uuid.uuid4()
+        # TODO: should we also store assignment_scope_id? might be more than one...
+        metadata = BotAnnotationMetaData(bot_annotation_metadata_id=meta_uuid,
+                                         name=name, kind=BotKind.RESOLVE, project_id=project_id,
+                                         annotation_scheme_id=filters.scheme_id, meta=meta.dict())
+        session.add(metadata)
+        await session.commit()
+
+        bot_annotations_orm = [BotAnnotation(**{**anno.dict(), 'bot_annotation_metadata_id': meta_uuid})
+                               for anno in bot_annotations]
+        session.add_all(bot_annotations_orm)
+        await session.commit()
+
+        return str(meta_uuid)
+
+
+async def update_resolved_bot_annotations(bot_annotation_metadata_id: str,
+                                          name: str,
+                                          bot_annotations: list[BotAnnotationModel],
+                                          db_engine: DatabaseEngineAsync) -> None:
+    async with db_engine.session() as session:  # type: AsyncSession
+        metadata: BotAnnotationMetaData | None = (await session.execute(
+            select(BotAnnotationMetaData)
+            .where(BotAnnotationMetaData.bot_annotation_metadata_id == bot_annotation_metadata_id))) \
+            .scalars().one_or_none()
+        if metadata is None:
+            raise MissingIdError(f'No `BotAnnotationMetaData` object for {bot_annotation_metadata_id}')
+
+        # update the name
+        metadata.name = name
+        await session.commit()
+
+        bot_annotations_orm: list[BotAnnotation] = list(
+            (await session.execute(
+                select(BotAnnotation)
+                .where(BotAnnotation.bot_annotation_metadata_id == bot_annotation_metadata_id)))
+            .scalars().all())
+
+        existing_ids = set([str(ba.bot_annotation_id) for ba in bot_annotations_orm])
+        submitted_ids = set([str(ba.bot_annotation_id) for ba in bot_annotations])
+
+        ids_to_remove = existing_ids - submitted_ids
+        ids_to_update = existing_ids - ids_to_remove
+        ids_to_create = submitted_ids - ids_to_update
+
+        logger.debug(f'[upsert_bot_annotations] CREATING new annotations with ids: {ids_to_create}')
+        logger.debug(f'[upsert_bot_annotations] UPDATING existing annotations with ids: {ids_to_update}')
+        logger.debug(f'[upsert_bot_annotations] DELETING existing annotations with ids: {ids_to_remove}')
+
+        if len(ids_to_remove) > 0:
+            stmt = delete(BotAnnotation).where(BotAnnotation.bot_annotation_id.in_(list(ids_to_remove)))
+            await session.execute(stmt)
+
+        bot_annotations_to_be_created = []
+        for annotation in bot_annotations:
+            if annotation.bot_annotation_id in ids_to_update:
+                ba_orm: BotAnnotation = (await session.execute(
+                    select(BotAnnotation)
+                    .where(BotAnnotation.bot_annotation_id == annotation.bot_annotation_id))).scalars().one()
+                ba_orm.repeat = annotation.repeat
+                ba_orm.parent = annotation.parent
+                ba_orm.value_bool = annotation.value_bool
+                ba_orm.value_str = annotation.value_str
+                ba_orm.value_int = annotation.value_int
+                ba_orm.value_float = annotation.value_float
+                ba_orm.multi_int = annotation.multi_int
+                await session.commit()
+            elif annotation.bot_annotation_id in ids_to_create:
+                bot_annotations_to_be_created.append(BotAnnotation(**annotation.dict()))
+        session.add_all(bot_annotations_to_be_created)
         await session.commit()

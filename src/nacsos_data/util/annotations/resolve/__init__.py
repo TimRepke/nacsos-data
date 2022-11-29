@@ -1,5 +1,8 @@
 from datetime import datetime
+from collections import defaultdict
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from nacsos_data.db.connection import DatabaseEngineAsync
 from nacsos_data.db.crud.annotations import read_annotation_scheme
 from nacsos_data.models.annotations import \
@@ -13,7 +16,7 @@ from nacsos_data.models.bot_annotations import \
     ResolutionMethod, \
     AnnotationCollection, \
     GroupedAnnotations, \
-    GroupedBotAnnotation
+    GroupedBotAnnotation, BotAnnotationModel
 from nacsos_data.models.users import UserModel
 from nacsos_data.util.annotations.resolve.majority_vote import naive_majority_vote
 from nacsos_data.util.annotations.validation import flatten_annotation_scheme
@@ -198,7 +201,7 @@ async def read_labels(filters: AnnotationFilterObject,
                       ignore_hierarchy: bool = True,
                       ignore_order: bool = True) -> list[list[Label]]:
     # list of all (unique) labels in this selection
-    async with db_engine.session() as session:
+    async with db_engine.session() as session:  # type: AsyncSession
 
         repeat = 'a.repeat'
         if ignore_order:  # if repeat is ignored, always forcing it to 1
@@ -236,6 +239,32 @@ async def read_labels(filters: AnnotationFilterObject,
                         "FROM ctename "
                         "WHERE parent is NULL) labels;"
                     ), filter_data)).scalars()]
+
+
+async def read_bot_annotations(bot_annotation_metadata_id: str,
+                               db_engine: DatabaseEngineAsync) -> dict[str, list[GroupedBotAnnotation]]:
+    async with db_engine.session() as session:  # type: AsyncSession
+        bot_annotations = (await session.execute(text(
+            "WITH RECURSIVE ctename AS ( "
+            "    SELECT a.*, ARRAY [(a.key, a.repeat)::annotation_label] as path "
+            "    FROM bot_annotation AS a "
+            "    WHERE a.bot_annotation_metadata_id = :bot_annotation_metadata_id "
+            "    UNION ALL "
+            "    SELECT a.*, array_append(ctename.path, ((a.key, a.repeat)::annotation_label)) "
+            "    FROM bot_annotation a "
+            "            JOIN ctename ON a.bot_annotation_id = ctename.parent) "
+            "SELECT item_id, array_to_json(path) as label, json_agg(ctename.*)::jsonb->0 as bot_annotation "
+            "FROM ctename "
+            "WHERE parent is NULL "
+            "GROUP BY item_id, path;"),
+            {'bot_annotation_metadata_id': bot_annotation_metadata_id})).mappings().all()
+
+        grouped_annotations = defaultdict(list)
+        for ba in bot_annotations:
+            grouped_annotations[str(ba['item_id'])].append(
+                GroupedBotAnnotation(path=ba['label'],
+                                     annotation=BotAnnotationModel.parse_obj(ba['bot_annotation'])))
+        return grouped_annotations
 
 
 async def get_resolved_item_annotations(strategy: ResolutionMethod, filters: AnnotationFilterObject,

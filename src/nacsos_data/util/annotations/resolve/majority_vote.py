@@ -89,6 +89,6 @@ def naive_majority_vote(collection: AnnotationCollection,
         #         (e.g. the parent might have been resolved to a choice where the current sub-label is not a child)
         for i, (label, annotations) in enumerate(grouped_annotations):
             if len(label) > 1:
-                ret[item_id][i].annotation.parent = parent_lookup[_label_to_str(label)]
+                ret[item_id][i].annotation.parent = parent_lookup.get(_label_to_str(label[1:]), None)
 
     return ret

@@ -100,7 +100,7 @@ class BotKind(str, Enum):
     SCRIPT = 'SCRIPT'
 
 
-class BotAnnotationMetaDataModel(BaseModel):
+class BotAnnotationMetaDataBaseModel(BaseModel):
     bot_annotation_metadata_id: str | UUID | None = None
     # A short descriptive title / name for this bot
     name: str
@@ -115,6 +115,9 @@ class BotAnnotationMetaDataModel(BaseModel):
     annotation_scope_id: str | UUID | None = None
     # (Optional) reference to an annotation scheme used here
     annotation_scheme_id: str | UUID | None = None
+
+
+class BotAnnotationMetaDataModel(BotAnnotationMetaDataBaseModel):
     # Additional information for this Bot for future reference
     meta: BotMeta | None = None
 
