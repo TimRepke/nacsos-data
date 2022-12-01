@@ -47,12 +47,12 @@ async def update_orm(updated_model: BaseModel, Model: Type[M], Schema: Type[Base
                      filter_by: dict[str, Any], skip_update: list[str], db_engine: DatabaseEngineAsync) -> M:
     async with db_engine.session() as session:
         stmt = select(Schema).filter_by(**filter_by)
-        orm_model = (await session.execute(stmt)).one_or_none()
+        orm_model = (await session.execute(stmt)).scalars().one_or_none()
         if orm_model is not None:
             for key, value in updated_model.dict().items():
                 if key in skip_update:
                     continue
-                orm_model[key] = value
+                setattr(orm_model, key, value)
         await session.commit()
 
         # return the updated project for completeness

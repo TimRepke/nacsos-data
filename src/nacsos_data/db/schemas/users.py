@@ -1,10 +1,14 @@
+from typing import TYPE_CHECKING
 from sqlalchemy import String, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
-from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import mapped_column, Relationship, relationship
 
 from ..base_class import Base
+
+if TYPE_CHECKING:
+    from .projects import ProjectPermissions
 
 
 class User(Base):
@@ -43,3 +47,5 @@ class User(Base):
     # Note: Deleting an account might lead to inconsistencies with other parts of the DB,
     #       so setting this to "false" to remove access should be preferred.
     is_active = mapped_column(Boolean, nullable=False, default=True)
+
+    project_permissions: Relationship['ProjectPermissions'] = relationship('ProjectPermissions', cascade='all, delete')

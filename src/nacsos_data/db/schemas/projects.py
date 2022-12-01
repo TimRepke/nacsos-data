@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING
-from sqlalchemy import String, ForeignKey, Boolean, Column, Enum as SAEnum, UniqueConstraint
-from sqlalchemy.orm import mapped_column, WriteOnlyMapped, relationship, Relationship
+from sqlalchemy import String, ForeignKey, Boolean, Enum as SAEnum, UniqueConstraint
+from sqlalchemy.orm import mapped_column, WriteOnlyMapped, relationship, Relationship, Mapped
 from sqlalchemy.dialects.postgresql import UUID
 
 from ..base_class import Base
@@ -63,46 +63,48 @@ class ProjectPermissions(Base):
     )
 
     # Unique identifier for this set of permissions
-    project_permission_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                   nullable=False, unique=True, index=True)
+    project_permission_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+                                          nullable=False, unique=True, index=True)
 
     # Refers to the project this permission relates to
-    project_id = Column(UUID(as_uuid=True),
-                        ForeignKey(Project.project_id),
-                        nullable=False, index=True, unique=False)
+    project_id = mapped_column(UUID(as_uuid=True),
+                               ForeignKey(Project.project_id),
+                               nullable=False, index=True, unique=False)
 
     # Refers to the User this set of permissions for this project refers to
-    user_id = Column(UUID(as_uuid=True),
-                     ForeignKey(User.user_id),
-                     nullable=False, index=True, unique=False)
+    user_id = mapped_column(UUID(as_uuid=True),
+                            ForeignKey(User.user_id),
+                            nullable=False, index=True, unique=False)
 
     # If true, the user has all permissions for this project
     # Note: All other permission settings below will be ignored if set to "true"
-    owner = Column(Boolean, nullable=False, default=False)
+    owner = mapped_column(Boolean, nullable=False, default=False)
 
     # If true, the user has permission to view and export Items associated with this project
     # This does not include annotations, artefacts or other additional data – only raw Items (and respective extension)
-    dataset_read = Column(Boolean, nullable=False, default=False)
+    dataset_read = mapped_column(Boolean, nullable=False, default=False)
     # If true, the user has permission to add or remove individual items to this project.
     # Note: This does not refer to the ability to run queries.
-    dataset_edit = Column(Boolean, nullable=False, default=False)
+    dataset_edit = mapped_column(Boolean, nullable=False, default=False)
 
     # If true, the user has permission to see the list of queries used in this project
-    imports_read = Column(Boolean, nullable=False, default=False)
+    imports_read = mapped_column(Boolean, nullable=False, default=False)
     # If true, the user has permission to add, edit, and execute queries for this project
-    imports_edit = Column(Boolean, nullable=False, default=False)
+    imports_edit = mapped_column(Boolean, nullable=False, default=False)
 
     # If true, the user has permission to view and export annotations associated with this project
-    annotations_read = Column(Boolean, nullable=False, default=False)
+    annotations_read = mapped_column(Boolean, nullable=False, default=False)
     # If true, the user has permission to annotate items in this project (assuming a respective assignment exists)
-    annotations_edit = Column(Boolean, nullable=False, default=False)
+    annotations_edit = mapped_column(Boolean, nullable=False, default=False)
 
     # If true, the user has permission to see available pipelines (and their configuration) for this project
-    pipelines_read = Column(Boolean, nullable=False, default=False)
+    pipelines_read = mapped_column(Boolean, nullable=False, default=False)
     # If true, the user has permission to configure and execute pipelines for this project
-    pipelines_edit = Column(Boolean, nullable=False, default=False)
+    pipelines_edit = mapped_column(Boolean, nullable=False, default=False)
 
     # If true, the user has permission to see and export pipeline outputs (aka artefacts)
-    artefacts_read = Column(Boolean, nullable=False, default=False)
+    artefacts_read = mapped_column(Boolean, nullable=False, default=False)
     # If true, the user has permission to edit and delete pipeline outputs (aka artefacts)
-    artefacts_edit = Column(Boolean, nullable=False, default=False)
+    artefacts_edit = mapped_column(Boolean, nullable=False, default=False)
+
+    user: Mapped['User'] = relationship(back_populates='project_permissions')
