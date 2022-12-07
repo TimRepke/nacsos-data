@@ -30,7 +30,7 @@ class Item(Base):
                                nullable=False, index=True, primary_key=False)
 
     # The text for this item
-    text = mapped_column(String, nullable=False)
+    text = mapped_column(String, nullable=True)
 
     # Discriminator for figuring out which subclass to load for this item for more details
     # Note, that all items within a project must have the same type (thus `Item.type` == `Project.type`)

@@ -18,7 +18,8 @@ depends_on = None
 
 def upgrade():
     op.add_column('item', sa.Column('type', sa.Enum('generic', 'twitter', 'academic', 'patents', name='projecttype'),
-                                    nullable=False))
+                                    nullable=False, server_default='twitter'))
+    op.alter_column('item', 'type', server_default=None)
     op.drop_column('item', 'meta')
     op.drop_column('twitter_item', 'status')
     op.execute("ALTER TYPE projecttype RENAME VALUE 'basic' TO 'generic';")

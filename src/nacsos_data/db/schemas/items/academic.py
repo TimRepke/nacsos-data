@@ -18,6 +18,9 @@ class AcademicItem(Item):
 
     doi = mapped_column(String, nullable=True, unique=False, index=True)
 
+    ## Summarise design decisions in the documentation
+
+    # Set unique constraints on proprietary IDs and project
     wos_id = mapped_column(String, nullable=True, unique=False, index=True)
     scopus_id = mapped_column(String, nullable=True, unique=False, index=True)
     openalex_id = mapped_column(String, nullable=True, unique=False, index=True)
@@ -25,6 +28,7 @@ class AcademicItem(Item):
 
     # (Primary) title of the paper
     title = mapped_column(String, nullable=True, unique=False, index=True)
+    # lower case string of title
     title_slug = mapped_column(String, nullable=True, unique=False, index=True)
 
     publication_year = mapped_column(Integer, nullable=True, unique=False, index=True)
@@ -32,7 +36,7 @@ class AcademicItem(Item):
     # Journal
     source = mapped_column(String, nullable=True, unique=False, index=True)
 
-    keywords = mapped_column(JSONB, nullable=True, index=True)
+    keywords = mapped_column(mutable_json_type(dbtype=JSONB, nested=True), nullable=True, index=True)
 
     # JSON representation of authors: see models/academic.py
     authors = mapped_column(mutable_json_type(dbtype=JSONB, nested=True))

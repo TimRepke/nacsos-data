@@ -3,18 +3,18 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
-class Affiliation(BaseModel):
+class AffiliationModel(BaseModel):
     name: str
     country: str | None = None
     openalex_id: str | None = None
     s2_id: str | None = None
 
 
-class AcademicAuthor(BaseModel):
+class AcademicAuthorModel(BaseModel):
     name: str
     surname_initials: str | None = None
     orcid: str | None = None
-    affiliations: list[Affiliation] | None = None
+    affiliations: list[AffiliationModel] | None = None
 
 class AcademicItemModel(ItemModel):
     """
@@ -39,5 +39,5 @@ class AcademicItemModel(ItemModel):
 
     keywords: list[str] | None = None
 
-    authors: list[AcademicAuthor] | None = None
+    authors: list[AcademicAuthorModel] | None = None
     pass

@@ -49,7 +49,7 @@ class ImportModel(BaseModel):
     name: str
 
     # A brief description of that import.
-    # Optional, but should be used and can be Markdown formatted
+    # Can be blank and can be Markdown formatted
     description: str
 
     # Defines what sort of import this is

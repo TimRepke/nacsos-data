@@ -36,8 +36,8 @@ class Import(Base):
     name = mapped_column(String, nullable=False)
 
     # A brief description of that import.
-    # Optional, but should be used and can be Markdown formatted
-    description = mapped_column(String, nullable=True)
+    # Not optional, but can be blank and can be Markdown formatted
+    description = mapped_column(String, nullable=False)
 
     # Defines what sort of import this is
     type = mapped_column(SAEnum(ImportType), nullable=False)
