@@ -41,4 +41,3 @@ class AcademicItemModel(ItemModel):
     keywords: list[str] | None = None
 
     authors: list[AcademicAuthorModel] | None = None
-

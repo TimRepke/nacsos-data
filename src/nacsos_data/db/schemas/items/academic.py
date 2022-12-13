@@ -1,5 +1,5 @@
-from sqlalchemy import String, Integer, DateTime, Float, ForeignKey, UniqueConstraint, Column
-from sqlalchemy.orm import mapped_column, Mapped
+from sqlalchemy import String, Integer, ForeignKey
+from sqlalchemy.orm import mapped_column
 from sqlalchemy_json import mutable_json_type
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
@@ -18,7 +18,7 @@ class AcademicItem(Item):
 
     doi = mapped_column(String, nullable=True, unique=False, index=True)
 
-    ## Summarise design decisions in the documentation
+    # TODO: Summarise design decisions in the documentation
 
     # Set unique constraints on proprietary IDs and project
     wos_id = mapped_column(String, nullable=True, unique=False, index=True)

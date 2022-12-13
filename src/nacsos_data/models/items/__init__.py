@@ -7,4 +7,4 @@ from .academic import AcademicItemModel
 AnyItemModel = GenericItemModel | TwitterItemModel | AcademicItemModel
 AnyItemModelType = TypeVar('AnyItemModelType', GenericItemModel, TwitterItemModel, AcademicItemModel)
 
-__all__ = ['GenericItemModel', 'TwitterItemModel', 'AnyItemModel', 'AnyItemModelType']
+__all__ = ['GenericItemModel', 'TwitterItemModel', 'AnyItemModel', 'AnyItemModelType', 'AcademicItemModel']

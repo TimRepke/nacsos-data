@@ -4,10 +4,11 @@ from abc import ABC, abstractmethod
 from uuid import UUID
 
 import httpx
+from httpx import HTTPError
 
 from ...db import DatabaseEngineAsync
 from ...db.crud.imports import read_import
-from ...models.imports import ImportConfigJSONL, ImportConfigWoS, LineEncoding, ImportModel
+from ...models.imports import ImportConfigJSONL, LineEncoding, ImportModel
 
 logger = logging.getLogger('nacsos_data.util.pipelines')
 
@@ -87,6 +88,7 @@ class FailedJobSubmission(Exception):
 class ImportDetailsNotFound(Exception):
     pass
 
+
 async def submit_wos_import_task(import_id: UUID | str,
                                  base_url: str,
                                  engine: DatabaseEngineAsync) -> str:
@@ -95,19 +97,18 @@ async def submit_wos_import_task(import_id: UUID | str,
         raise ImportDetailsNotFound(f"No import found in db for id {import_id}")
 
     async with httpx.AsyncClient() as client, engine.session() as session:
-
-        params = {
-            "project_id": str(import_details.project_id),
-            "import_id": str(import_details.import_id),
-            "records": import_details.config.filenames
-        }
-
-        print(import_details.config)
-
         payload = {
             'task_id': None,
             'function_name': 'nacsos_lib.academic.import.import_wos_file',
-            'params': params,
+            'params': {
+                'project_id': str(import_details.project_id),
+                'import_id': str(import_details.import_id),
+                'records': {
+                    'user_serializer': 'WebOfScienceSerializer',
+                    'user_dtype': 'AcademicItemModel',
+                    'filenames': import_details.config.filenames  # type: ignore[union-attr]
+                }
+            },
             'user_id': str(import_details.user_id),
             'project_id': str(import_details.project_id),
             'comment': f'Import for "{import_details.name}" ({import_id})',
@@ -115,7 +116,11 @@ async def submit_wos_import_task(import_id: UUID | str,
             'force_run': True,
             'forced_dependencies': None,
         }
-        response = await client.put(f'{base_url}/queue/submit/task', json=payload)
+        logger.debug(payload)
+        try:
+            response = await client.put(f'{base_url}/queue/submit/task', json=payload)
+        except HTTPError as e:
+            logger.exception(e)
 
         if response.status_code != 200:
             error = response.json()
@@ -126,6 +131,8 @@ async def submit_wos_import_task(import_id: UUID | str,
         # remember that we submitted this import job (and its reference)
         import_details.pipeline_task_id = task_id
         await session.commit()
+
+    return task_id
 
 
 async def submit_jsonl_import_task(import_id: UUID | str,
@@ -154,7 +161,11 @@ async def submit_jsonl_import_task(import_id: UUID | str,
             'force_run': True,
             'forced_dependencies': None,
         }
-        response = await client.put(f'{base_url}/queue/submit/task', json=payload)
+
+        try:
+            response = await client.put(f'{base_url}/queue/submit/task', json=payload)
+        except HTTPError as e:
+            logger.exception(e)
 
         if response.status_code != 200:
             error = response.json()
