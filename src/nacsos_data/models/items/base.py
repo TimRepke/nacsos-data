@@ -17,4 +17,4 @@ class ItemModel(BaseModel):
     type: ItemType | None = None
 
     # The text for this item
-    text: str
+    text: str | None = None
