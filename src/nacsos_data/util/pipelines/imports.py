@@ -7,7 +7,7 @@ import httpx
 
 from ...db import DatabaseEngineAsync
 from ...db.crud.imports import read_import
-from ...models.imports import ImportConfigJSONL, LineEncoding, ImportModel
+from ...models.imports import ImportConfigJSONL, ImportConfigWoS, LineEncoding, ImportModel
 
 logger = logging.getLogger('nacsos_data.util.pipelines')
 
@@ -86,6 +86,46 @@ class FailedJobSubmission(Exception):
 
 class ImportDetailsNotFound(Exception):
     pass
+
+async def submit_wos_import_task(import_id: UUID | str,
+                                 base_url: str,
+                                 engine: DatabaseEngineAsync) -> str:
+    import_details = await read_import(import_id=import_id, engine=engine)
+    if import_details is None:
+        raise ImportDetailsNotFound(f"No import found in db for id {import_id}")
+
+    async with httpx.AsyncClient() as client, engine.session() as session:
+
+        params = {
+            "project_id": str(import_details.project_id),
+            "import_id": str(import_details.import_id),
+            "records": import_details.config.filenames
+        }
+
+        print(import_details.config)
+
+        payload = {
+            'task_id': None,
+            'function_name': 'nacsos_lib.academic.import.import_wos_file',
+            'params': params,
+            'user_id': str(import_details.user_id),
+            'project_id': str(import_details.project_id),
+            'comment': f'Import for "{import_details.name}" ({import_id})',
+            'location': 'LOCAL',
+            'force_run': True,
+            'forced_dependencies': None,
+        }
+        response = await client.put(f'{base_url}/queue/submit/task', json=payload)
+
+        if response.status_code != 200:
+            error = response.json()
+            raise FailedJobSubmission('Failed to submit job', payload, error)
+
+        task_id: str = response.json()
+
+        # remember that we submitted this import job (and its reference)
+        import_details.pipeline_task_id = task_id
+        await session.commit()
 
 
 async def submit_jsonl_import_task(import_id: UUID | str,
