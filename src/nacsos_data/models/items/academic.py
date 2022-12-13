@@ -16,6 +16,7 @@ class AcademicAuthorModel(BaseModel):
     orcid: str | None = None
     affiliations: list[AffiliationModel] | None = None
 
+
 class AcademicItemModel(ItemModel):
     """
     Corresponds to db.schema.items.academic.AcademicItem
@@ -40,4 +41,4 @@ class AcademicItemModel(ItemModel):
     keywords: list[str] | None = None
 
     authors: list[AcademicAuthorModel] | None = None
-    pass
+
