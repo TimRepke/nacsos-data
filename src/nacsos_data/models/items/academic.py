@@ -11,7 +11,12 @@ class AffiliationModel(BaseModel):
 
 
 class AcademicAuthorModel(BaseModel):
+    # Name is given by AF in web of science, and is in the format
+    # First name, other names. These are sometimes shortened to
+    # initials, depending on the information provided to the publisher
     name: str
+    # Surname initials is given in the format Surname, AB - where
+    # AB are the initials of the first names
     surname_initials: str | None = None
     orcid: str | None = None
     affiliations: list[AffiliationModel] | None = None
@@ -28,6 +33,7 @@ class AcademicItemModel(ItemModel):
     scopus_id: str | None = None
     openalex_id: str | None = None
     s2_id: str | None = None
+    pubmed_id: str | None = None
 
     # (Primary) title of the paper
     title: str | None = None
@@ -41,4 +47,3 @@ class AcademicItemModel(ItemModel):
     keywords: list[str] | None = None
 
     authors: list[AcademicAuthorModel] | None = None
-
