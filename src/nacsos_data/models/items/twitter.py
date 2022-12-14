@@ -3,6 +3,7 @@ from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel
 from .base import ItemModel
+from ...db.schemas import ItemType
 
 
 class ReferencedTweet(BaseModel):
@@ -115,6 +116,7 @@ class TwitterItemModel(ItemModel):
     For more in-depth documentation, please refer to:
     https://developer.twitter.com/en/docs/twitter-api/data-dictionary/object-model/tweet
     """
+    type = ItemType.twitter
     # Unique identifier for this TwitterItem, corresponds to Item
     item_id: str | UUID | None = None
     # Unique identifier on Twitter

@@ -1,6 +1,10 @@
+from typing import Any
+
 from .base import ItemModel
 from uuid import UUID
 from pydantic import BaseModel
+
+from nacsos_data.db.schemas import ItemType
 
 
 class AffiliationModel(BaseModel):
@@ -23,6 +27,7 @@ class AcademicItemModel(ItemModel):
     """
     item_id: str | UUID | None = None
     doi: str | None = None
+    type = ItemType.academic
 
     wos_id: str | None = None
     scopus_id: str | None = None
@@ -41,3 +46,5 @@ class AcademicItemModel(ItemModel):
     keywords: list[str] | None = None
 
     authors: list[AcademicAuthorModel] | None = None
+
+    meta: dict[str, Any] | None = None
