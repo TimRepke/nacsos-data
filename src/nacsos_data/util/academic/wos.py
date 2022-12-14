@@ -11,25 +11,29 @@ def read_wos_file(filepath: str) -> Generator[AcademicItemModel, None, None]:
     for record in records_from([filepath]):
         item = AcademicItemModel()
 
-        if record.get('TI') and len(record.get('TI')) > 0:
-            item.title = record.get('TI')  # type: ignore[assignment]
+        title = record.get('TI')
+        if title and len(title) > 0:
+            item.title = title  # type: ignore[assignment]
             # title_slug will be added on insert
 
-        if record.get('DI') and len(record.get('DI')) > 0:
-            item.doi = record.get('DI')  # type: ignore[assignment]
-
-        if record.get('UT') and len(record.get('UT')) > 0:
-            item.wos_id = record.get('UT')  # type: ignore[assignment]
+        doi = record.get('DI')
+        if doi and len(doi) > 0:
+            item.doi = doi  # type: ignore[assignment]
+        wos_id = record.get('UT')
+        if wos_id and len(wos_id) > 0:
+            item.wos_id = wos_id  # type: ignore[assignment]
 
         # FIXME: add following lines once pubmed is part of model
         # if record.get('PM') and len(record.get('PM')) > 0:
         #    item.pubmed_id = record.get('PM')  # type: ignore[assignment]
 
-        if record.get('PY') and len(record.get('PY')) > 0:
-            item.publication_year = int(record.get('PY'))  # type: ignore[assignment]
+        pub_year = record.get('PY')
+        if pub_year and type(pub_year) == str and len(pub_year) > 0:
+            item.publication_year = int(pub_year)  # type: ignore[assignment]
 
-        if record.get('AB') and len(record.get('AB')) > 0:
-            item.text = record.get('AB')  # type: ignore[assignment]
+        abstract = record.get('AB')
+        if abstract and len(abstract) > 0:
+            item.text = abstract  # type: ignore[assignment]
 
         # There are several fields that could qualify as the "source".
         # Check them all and pick the first one that is valid (non-empty)
@@ -55,7 +59,7 @@ def read_wos_file(filepath: str) -> Generator[AcademicItemModel, None, None]:
                 name, orcid = orcid_entry.split('/')
                 if name in authors:
                     authors[name].orcid = orcid
-            except (ValueError, AttributeError) as e:
+            except (ValueError, AttributeError):
                 pass
         for affiliation_entry in record.get('C1', []):
             try:
@@ -63,13 +67,14 @@ def read_wos_file(filepath: str) -> Generator[AcademicItemModel, None, None]:
                 authors_lst = authors_str.split('; ')
                 for name in authors_lst:
                     if name in authors:
-                        if authors[name].affiliations is None:
-                            authors[name].affiliations = []
-                        authors[name].affiliations.append(AffiliationModel(
+                        author = authors[name]
+                        if author.affiliations is None:
+                            author.affiliations = []
+                        author.affiliations.append(AffiliationModel(
                             name=institute,
                             country=country
                         ))
-            except (ValueError, AttributeError) as e:
+            except (ValueError, AttributeError):
                 pass
         item.authors = list(authors.values())
 

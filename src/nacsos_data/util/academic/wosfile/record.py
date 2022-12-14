@@ -15,7 +15,7 @@ def split_by(string: str, delimiter: str) -> List[str]:
 
 class Record(dict[str, str | list[str]]):
     def __init__(
-            self, wos_data: dict[str, str] = None, skip_empty: bool = True
+            self, wos_data: dict[str, str] | None = None, skip_empty: bool = True
     ) -> None:
         """Create a record based on *wos_data*
 

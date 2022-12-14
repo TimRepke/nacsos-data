@@ -1,6 +1,6 @@
 import re
-
-from sqlalchemy import select, func, UUID
+from uuid import UUID
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db import DatabaseEngineAsync
@@ -55,12 +55,13 @@ async def find_duplicates(item: AcademicItemModel,
     if check_wos_id and item.wos_id is not None:
         stmt = stmt.where(AcademicItem.wos_id == item.wos_id)
 
-    if session is None:
+    if db_engine is not None:
         async with db_engine.session() as session:
-            item_ids: list[UUID] = (await session.execute(stmt)).scalars().all()
-
+            item_ids: list[UUID] = (await session.execute(stmt)).scalars().all()  # type: ignore[assignment]
+    elif session is not None:
+        item_ids = (await session.execute(stmt)).scalars().all()  # type: ignore[assignment]
     else:
-        item_ids: list[UUID] = (await session.execute(stmt)).scalars().all()
+        raise ConnectionError('No connection to database.')
 
     if len(item_ids) > 0:
         return [str(iid) for iid in item_ids]

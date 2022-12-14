@@ -27,7 +27,7 @@ class AcademicItemModel(ItemModel):
     """
     item_id: str | UUID | None = None
     doi: str | None = None
-    type = ItemType.academic
+    type: ItemType = ItemType.academic
 
     wos_id: str | None = None
     scopus_id: str | None = None

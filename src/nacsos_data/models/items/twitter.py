@@ -116,7 +116,7 @@ class TwitterItemModel(ItemModel):
     For more in-depth documentation, please refer to:
     https://developer.twitter.com/en/docs/twitter-api/data-dictionary/object-model/tweet
     """
-    type = ItemType.twitter
+    type: ItemType = ItemType.twitter
     # Unique identifier for this TwitterItem, corresponds to Item
     item_id: str | UUID | None = None
     # Unique identifier on Twitter

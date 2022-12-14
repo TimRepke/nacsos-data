@@ -87,7 +87,7 @@ def get_reader(fh: TextIO) -> Type[Reader]:
 def read(
         fname: Union[FileName, Iterable[FileName]],
         using: Optional[Type[Reader]] = None,
-        encoding: str = None,
+        encoding: str | None = None,
         **kwargs: Any
 ) -> Iterator[Dict[str, str]]:
     """Read WoS export file ('tab-delimited' or 'plain text')
