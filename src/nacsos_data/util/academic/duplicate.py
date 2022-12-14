@@ -1,6 +1,6 @@
 import re
 from uuid import UUID
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db import DatabaseEngineAsync
@@ -45,7 +45,7 @@ async def find_duplicates(item: AcademicItemModel,
     if not item.title_slug:
         item.title_slug = get_title_slug(item)
 
-    stmt = select(func.count(AcademicItem.item_id))
+    stmt = select(AcademicItem.item_id)
     stmt = stmt.where(AcademicItem.title_slug == item.title_slug)
 
     if project_id is not None:
