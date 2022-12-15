@@ -1,11 +1,11 @@
 pydantic[dotenv]==1.10.2
 setuptools==65.6.3
-psycopg==3.1.4
+psycopg==3.1.5
 psycopg2==2.9.5
 #sqlalchemy2-stubs==0.0.2a22
 #sqlalchemy[asyncio]==1.4.36
-SQLAlchemy==2.0.0b2
+SQLAlchemy==2.0.0b4
 sqlalchemy-json==0.5.0
-httpx[http2]==0.23.0
+httpx[http2]==0.23.1
 passlib==1.7.4
 alembic==1.8.1
