@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from .import_config_ris import ImportConfigRIS
 from .import_config_twitter import ImportConfigTwitter
 from .import_config_jsonl import ImportConfigJSONL, LineEncoding
-
+from .import_config_wos import ImportConfigWoS
 
 class ImportType(Enum):
     # File import
@@ -32,7 +32,7 @@ ImportTypeLiteral = Literal['ris', 'csv', 'jsonl',
                             'wos', 'scopus', 'ebsco', 'jstor', 'ovid', 'pop',
                             'twitter', 'script']
 
-ImportConfig = ImportConfigRIS | ImportConfigTwitter | ImportConfigJSONL
+ImportConfig = ImportConfigRIS | ImportConfigTwitter | ImportConfigJSONL | ImportConfigWoS
 
 
 class ImportModel(BaseModel):
