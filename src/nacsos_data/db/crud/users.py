@@ -118,8 +118,8 @@ async def create_or_update_user(user: UserModel | UserInDBModel, engine: Databas
 
         if user_db is None:  # seems to be a new user
             if user.user_id is None:
-                user.user_id = str(uuid4())
-                user_id = str(user.user_id)
+                user_id = str(uuid4())
+                user.user_id = user_id
             session.add(User(**user.dict()))
         else:
             # user_id -> not editable
