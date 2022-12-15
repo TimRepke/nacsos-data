@@ -1,5 +1,5 @@
 pydantic[dotenv]==1.10.2
-setuptools==65.5.0
+setuptools==65.6.3
 psycopg==3.1.4
 psycopg2==2.9.5
 #sqlalchemy2-stubs==0.0.2a22
