@@ -130,7 +130,7 @@ async def read_next_assignment_for_scope_for_user(current_assignment_id: str | U
                                                'assignment_scope_id': assignment_scope_id,
                                                'assignment_id': current_assignment_id})).mappings().one_or_none()
         if result is not None:
-            return AssignmentModel(**result.__dict__)
+            return AssignmentModel(**result)
     return None
 
 
