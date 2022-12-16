@@ -327,8 +327,9 @@ async def upsert_annotations(annotations: list[AnnotationModel],
 
         new_annotations = []
         for annotation in annotations:
-            if annotation.annotation_id in ids_to_create:
+            if str(annotation.annotation_id) in ids_to_create:
                 new_annotations.append(Annotation(**annotation.dict()))
+
         session.add_all(new_annotations)
         await session.commit()
 
