@@ -55,7 +55,8 @@ async def read_assignment_scopes_for_project_for_user(project_id: str | UUID,
                  LEFT OUTER JOIN assignment assi ON scope.assignment_scope_id = assi.assignment_scope_id
         WHERE assi.user_id = :user_id AND
               scheme.project_id = :project_id
-        GROUP BY scope.assignment_scope_id, scheme_name, scheme_description;
+        GROUP BY scope.assignment_scope_id, scheme_name, scheme_description, scope.time_created
+        ORDER BY scope.time_created;
         """)
         result = await session.execute(stmt, {'user_id': user_id, 'project_id': project_id})
         result_list = result.mappings().all()
