@@ -14,9 +14,9 @@ from nacsos_data.models.annotations import \
 async def read_random_items(project_id: str | UUID, num_items: int, engine: DatabaseEngineAsync) -> list[str]:
     async with engine.session() as session:  # type: AsyncSession
         stmt = text("""
-            SELECT m2m_project_item.item_id
-            FROM m2m_project_item
-            WHERE m2m_project_item.project_id = :project_id
+            SELECT item.item_id
+            FROM item
+            WHERE item.project_id = :project_id
             ORDER BY random()
             LIMIT :num_items;
             """)
