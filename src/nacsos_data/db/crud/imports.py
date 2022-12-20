@@ -39,7 +39,6 @@ async def read_import(import_id: UUID | str,
 
 async def upsert_import(import_model: ImportModel,
                         engine: DatabaseEngineAsync) -> str | UUID | None:
-    print(import_model.config)
     key = await upsert_orm(upsert_model=import_model,
                            Schema=Import,
                            primary_key=Import.import_id.name,

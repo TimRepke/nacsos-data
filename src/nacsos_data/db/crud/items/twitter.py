@@ -6,6 +6,7 @@ from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import TwitterItem, M2MImportItem
+from nacsos_data.models.imports import M2MImportItemType
 from nacsos_data.models.items.twitter import TwitterItemModel
 
 from . import read_all_for_project, read_paged_for_project
@@ -14,7 +15,8 @@ logger = logging.getLogger('nacsos-data.crud.twitter')
 
 
 async def import_tweet(tweet: TwitterItemModel, engine: DatabaseEngineAsync,
-                       project_id: str | UUID | None = None, import_id: UUID | str | None = None) \
+                       project_id: str | UUID | None = None, import_id: UUID | str | None = None,
+                       import_type: M2MImportItemType | None = None) \
         -> TwitterItemModel:
     """
     Get or create Tweet (and optionally keep track of how it ended up in the database)
@@ -54,7 +56,7 @@ async def import_tweet(tweet: TwitterItemModel, engine: DatabaseEngineAsync,
             raise RuntimeError('Failed in unclear state, undetermined tweet!')
 
         if import_id is not None:
-            orm_m2m_i2i = M2MImportItem(item_id=orm_tweet.item_id, import_id=import_id)
+            orm_m2m_i2i = M2MImportItem(item_id=orm_tweet.item_id, import_id=import_id, type=import_type)
             try:
                 session.add(orm_m2m_i2i)
                 await session.commit()
