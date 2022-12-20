@@ -9,7 +9,7 @@ from .users import User
 from .projects import Project
 from .items.base import Item
 from ..base_class import Base
-from ...models.imports import ImportType
+from ...models.imports import ImportType, M2MImportItemType
 
 
 class Import(Base):
@@ -76,3 +76,13 @@ class M2MImportItem(Base):
     # Keeps track of when this import took place.
     # Refers to the actual time the item was imported, not when the import operation was started!
     time_created = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # This is a type to specify an entry in the many-to-many relation for items to imports.
+    #
+    #       - An `explicit` m2m relation is used for cases where the import "explicitly" matched this item.
+    #         For example: A tweet or paper matched a keyword specified in the query
+    #       - An `implicit` m2m relation is used for cases where the import only "implicitly" includes this item.
+    #         For example: A tweet is part of the conversation that contained a specified keyword or an
+    #                      article that is referenced by an article that is included "explicitly" in the query.
+    type = mapped_column(SAEnum(M2MImportItemType), nullable=False,
+                         default=M2MImportItemType.explicit, server_default=M2MImportItemType.explicit)
