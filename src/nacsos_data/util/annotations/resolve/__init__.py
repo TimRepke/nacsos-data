@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from collections import defaultdict
 from sqlalchemy import text
@@ -20,8 +21,7 @@ from nacsos_data.models.bot_annotations import \
 from nacsos_data.models.users import UserModel
 from nacsos_data.util.annotations.resolve.majority_vote import naive_majority_vote
 from nacsos_data.util.annotations.validation import flatten_annotation_scheme
-from nacsos_data.util.errors import NotFoundError
-
+from nacsos_data.util.errors import NotFoundError, InvalidFilterError
 
 # ideas for resolving algorithms:
 #   - naive majority vote (per key,repeat)
@@ -30,9 +30,7 @@ from nacsos_data.util.errors import NotFoundError
 #   - weighted vote (compute annotator trust/reliability)
 #   - ...
 
-
-class InvalidFilterError(AssertionError):
-    pass
+logger = logging.getLogger('nacsos_data.util.annotations.resolve')
 
 
 class AnnotationFilterObject(AnnotationFilters):
@@ -155,18 +153,27 @@ async def read_item_annotations(filters: AnnotationFilterObject,
         else:
             annotations = (await session.execute(text(
                 "WITH RECURSIVE ctename AS ( \n"
-                f"      SELECT a.*, ARRAY[(a.key, {repeat})::annotation_label] as path \n"
+                "      SELECT a.annotation_id, a.time_created, a.time_updated, a.assignment_id, a.user_id, a.item_id, "
+                "             a.annotation_scheme_id, a.key, a.repeat,  a.value_bool, a.value_int,a.value_float, "
+                "             a.value_str, a.text_offset_start, a.text_offset_stop, a.multi_int, "
+                "             a.parent, a.parent as recurse_join, "
+                f"            ARRAY[(a.key, {repeat})::annotation_label] as path \n"
                 "      FROM annotation AS a \n"
                 f"         {filter_join} \n"
                 f"      WHERE {filter_where} \n"
                 "   UNION ALL \n"
-                f"      SELECT a.*, array_append(ctename.path, ((a.key, {repeat})::annotation_label)) \n"
+                "      SELECT ctename.annotation_id, ctename.time_created, ctename.time_updated,ctename.assignment_id,"
+                "             ctename.user_id, ctename.item_id, ctename.annotation_scheme_id, ctename.key, "
+                "             ctename.repeat, ctename.value_bool, ctename.value_int,ctename.value_float, "
+                "             ctename.value_str, ctename.text_offset_start, ctename.text_offset_stop, "
+                "             ctename.multi_int, ctename.parent, a.parent as recurse_join, "
+                f"            array_append(ctename.path, ((a.key, {repeat})::annotation_label)) \n"
                 "      FROM annotation a \n"
-                "         JOIN ctename ON a.annotation_id = ctename.parent \n"
+                "         JOIN ctename ON a.annotation_id = ctename.recurse_join \n"
                 ") \n"
                 "SELECT item_id, array_to_json(path) as label, json_agg(ctename.*) as annotations \n"
                 "FROM ctename \n"
-                "WHERE parent is NULL \n"
+                "WHERE recurse_join is NULL \n"
                 "GROUP BY item_id, path;"
             ), filter_data)).mappings().all()
 
@@ -246,16 +253,23 @@ async def read_bot_annotations(bot_annotation_metadata_id: str,
     async with db_engine.session() as session:  # type: AsyncSession
         bot_annotations = (await session.execute(text(
             "WITH RECURSIVE ctename AS ( "
-            "    SELECT a.*, ARRAY [(a.key, a.repeat)::annotation_label] as path "
-            "    FROM bot_annotation AS a "
-            "    WHERE a.bot_annotation_metadata_id = :bot_annotation_metadata_id "
+            "    SELECT a.bot_annotation_id, a.bot_annotation_metadata_id, a.time_created, a.time_updated, a.item_id, "
+            "           a.key, a.repeat,  a.value_bool, a.value_int,a.value_float, "
+            "           a.value_str, a.multi_int, a.confidence, a.parent, a.parent as recurse_join, "
+            "           ARRAY [(a.key, a.repeat)::annotation_label] as path "
+            "       FROM bot_annotation AS a "
+            "       WHERE a.bot_annotation_metadata_id = :bot_annotation_metadata_id "
             "    UNION ALL "
-            "    SELECT a.*, array_append(ctename.path, ((a.key, a.repeat)::annotation_label)) "
-            "    FROM bot_annotation a "
-            "            JOIN ctename ON a.bot_annotation_id = ctename.parent) "
+            "      SELECT ctename.bot_annotation_id, ctename.bot_annotation_metadata_id, ctename.time_created, "
+            "             ctename.time_updated, ctename.item_id, ctename.key, ctename.repeat,  ctename.value_bool, "
+            "             ctename.value_int,ctename.value_float, ctename.value_str, ctename.multi_int, "
+            "             ctename.confidence, ctename.parent, a.parent as recurse_join, "
+            "             array_append(ctename.path, ((a.key, a.repeat)::annotation_label)) "
+            "       FROM bot_annotation a "
+            "            JOIN ctename ON a.bot_annotation_id = ctename.recurse_join) "
             "SELECT item_id, array_to_json(path) as label, json_agg(ctename.*)::jsonb->0 as bot_annotation "
             "FROM ctename "
-            "WHERE parent is NULL "
+            "WHERE recurse_join is NULL "
             "GROUP BY item_id, path;"),
             {'bot_annotation_metadata_id': bot_annotation_metadata_id})).mappings().all()
 
@@ -273,6 +287,9 @@ async def get_resolved_item_annotations(strategy: ResolutionMethod, filters: Ann
                                         ignore_order: bool = False) \
         -> tuple[AnnotationSchemeModel, list[FlattenedAnnotationSchemeLabel],
                  AnnotationCollection, dict[str, list[GroupedBotAnnotation]]]:
+    logger.debug(f'Fetching all annotations matching filters: {filters} '
+                 f'with ignore_hierarchy={ignore_hierarchy} and ignore_order={ignore_order}.')
+
     annotations = await read_item_annotations(db_engine=db_engine, filters=filters,
                                               ignore_hierarchy=ignore_hierarchy, ignore_order=ignore_order)
     labels = await read_labels(db_engine=db_engine, filters=filters,
@@ -281,8 +298,8 @@ async def get_resolved_item_annotations(strategy: ResolutionMethod, filters: Ann
     scheme = await read_annotation_scheme(annotation_scheme_id=filters.scheme_id, db_engine=db_engine)
 
     if not annotations or not scheme:
-        raise NotFoundError(
-            f'No annotations ({bool(annotations)}) or no annotation scheme ({bool(scheme)}) for {filters.scheme_id}')
+        raise NotFoundError(f'No annotations ({bool(annotations)}) or no annotation scheme'
+                            f'({bool(scheme)}) for {filters.scheme_id}')
 
     collection = AnnotationCollection(scheme_id=filters.scheme_id,
                                       labels=labels, annotators=annotators, annotations=annotations)

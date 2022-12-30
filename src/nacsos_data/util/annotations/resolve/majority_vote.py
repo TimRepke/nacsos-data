@@ -1,6 +1,8 @@
+import logging
 import uuid
 from collections import Counter
 
+from nacsos_data.util.errors import EmptyAnnotationsError
 from nacsos_data.models.annotations import \
     AnnotationValue, \
     FlattenedAnnotationSchemeLabel, \
@@ -9,17 +11,24 @@ from nacsos_data.models.annotations import \
     AnnotationModel, AnnotationSchemeLabelTypes
 from nacsos_data.models.bot_annotations import AnnotationCollection, BotAnnotationModel, Label, GroupedBotAnnotation
 
+logger = logging.getLogger('nacsos_data.util.annotations.resolve')
+
 
 def _majority_vote_list(label_annotations: list[AnnotationModel],
-                        field: AnnotationListValueField) -> AnnotationValue:
+                        field: AnnotationListValueField,
+                        label: list[Label]) -> AnnotationValue:
     # form a union of all available sets of multi-labels (ignoring null values)
     flat_values = [li
                    for la in label_annotations
                    if la is not None and la.__dict__[field] is not None
                    for li in la.__dict__[field]
                    if li is not None]
+
+    logger.debug(f'Found {len(flat_values)} annotations for "{_label_to_str(label)}" of type "{field}".')
+
     if len(flat_values) == 0:
-        raise ValueError('Implausible input data (empty list of labels after union)')
+        raise EmptyAnnotationsError(f'No entries for "{_label_to_str(label)}" of type "{field}" '
+                                    f'(empty list of labels after union).')
 
     # FIXME: mypy error: Keywords must be strings  [misc]
     # FIXME: mypy error: Argument 1 to "AnnotationValue" has incompatible type
@@ -34,12 +43,16 @@ def _majority_vote_list(label_annotations: list[AnnotationModel],
 
 
 def _majority_vote_scalar(label_annotations: list[AnnotationModel],
-                          field: AnnotationScalarValueField) -> AnnotationValue:
+                          field: AnnotationScalarValueField,
+                          label: list[Label]) -> AnnotationValue:
     flat_values = [la.__dict__[field]
                    for la in label_annotations
                    if la is not None and la.__dict__[field] is not None]
+
+    logger.debug(f'Found {len(flat_values)} annotations for "{_label_to_str(label)}" of type "{field}".')
+
     if len(flat_values) == 0:
-        raise ValueError('Implausible input data (empty list of labels after plucking)')
+        raise EmptyAnnotationsError(f'No entries for "{_label_to_str(label)}" of type "{field}".')
 
     # FIXME: mypy error: Keywords must be strings  [misc]
     return AnnotationValue(**{field: Counter(flat_values).most_common()[0][0]})  # type: ignore[misc]
@@ -59,12 +72,13 @@ def naive_majority_vote(collection: AnnotationCollection,
         parent_lookup: dict[str, str] = {}
         for label, annotations in grouped_annotations:
             kind: AnnotationSchemeLabelTypes = scheme_lookup[label[0].key].kind
+
             if kind == 'bool':
-                value = _majority_vote_scalar(annotations, field='value_bool')
+                value = _majority_vote_scalar(annotations, field='value_bool', label=label)
             elif kind == 'single':
-                value = _majority_vote_scalar(annotations, field='value_int')
+                value = _majority_vote_scalar(annotations, field='value_int', label=label)
             elif kind == 'multi':
-                value = _majority_vote_list(annotations, field='multi_int')
+                value = _majority_vote_list(annotations, field='multi_int', label=label)
             # elif column_schemes[label_i].kind == 'int':
             #     pass
             # elif column_schemes[label_i].kind == 'float':
@@ -74,7 +88,7 @@ def naive_majority_vote(collection: AnnotationCollection,
             # elif column_schemes[label_i].kind == 'intext':
             #     pass
             else:
-                raise NotImplementedError(f'Majority vote for {kind} not implemented')
+                raise NotImplementedError(f'Majority vote for {kind} not implemented ({label})')
 
             ba_uuid = uuid.uuid4()
             parent_lookup[_label_to_str(label)] = str(ba_uuid)
