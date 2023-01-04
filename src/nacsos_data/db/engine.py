@@ -44,6 +44,7 @@ class DatabaseEngineAsync:
             username=self._user,
             password=self._password,
             host=self._host,
+            port=self._port,
             database=self._database,
         )
         self.engine = create_async_engine(self._connection_str, echo=True, future=True,
@@ -98,6 +99,7 @@ class DatabaseEngine:
             username=self._user,
             password=self._password,
             host=self._host,
+            port=self._port,
             database=self._database,
         )
         self.engine = create_engine(self._connection_str, echo=True, future=True,
