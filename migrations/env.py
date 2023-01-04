@@ -30,20 +30,24 @@ target_metadata = Base.metadata
 
 
 def get_url(fallback=True):
-    env = [os.getenv('NACSOS_DB_USER'),
-           os.getenv('NACSOS_DB_PASSWORD'),
-           os.getenv('NACSOS_DB_HOST'),
-           os.getenv('NACSOS_DB_PORT'),
-           os.getenv('NACSOS_DB_DATABASE')]
+    env = [os.getenv('NACSOS_DB__USER'),
+           os.getenv('NACSOS_DB__PASSWORD'),
+           os.getenv('NACSOS_DB__HOST'),
+           os.getenv('NACSOS_DB__PORT'),
+           os.getenv('NACSOS_DB__DATABASE')]
+
     if all(env):
-        return URL.create(drivername='postgresql+psycopg',
+        url = URL.create(drivername='postgresql+psycopg',
                           username=env[0],
                           password=env[1],
                           host=env[2],
                           port=env[3],
                           database=env[4])
+        print(f'Using URL from env vars: {url}')
     if fallback:
-        return config.get_main_option("sqlalchemy.url")
+        url = config.get_main_option("sqlalchemy.url")
+        print(f'Using URL from config: {url}')
+    print('Returning without fallback for URL.')
 
 
 def run_migrations_offline():
