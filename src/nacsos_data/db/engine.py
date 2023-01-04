@@ -61,7 +61,7 @@ class DatabaseEngineAsync:
             logger.info(f'AsyncEngine connecting to {self._user}:****@{self._host}:{self._port}/{self._database}')
             session: AsyncSession = self._session()
             await session.execute(text('SELECT 1;'))
-            logger.error('Connection seems to be ready.')
+            logger.info('Connection seems to be ready.')
         except OperationalError as e:
             logger.error('Connection failed!')
             logger.exception(e)
