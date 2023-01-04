@@ -10,4 +10,4 @@ SQLAlchemy==2.0.0b4
 sqlalchemy-json==0.5.0
 httpx[http2]==0.23.1
 passlib==1.7.4
-alembic==1.8.1
+alembic==1.9.1
