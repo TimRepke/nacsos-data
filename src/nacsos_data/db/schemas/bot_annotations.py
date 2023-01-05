@@ -10,7 +10,7 @@ from sqlalchemy import \
     UniqueConstraint, \
     CheckConstraint
 from sqlalchemy.sql import func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship, Relationship
 from sqlalchemy.dialects.postgresql import JSONB, UUID, ARRAY
 from sqlalchemy_json import mutable_json_type
 
@@ -57,6 +57,9 @@ class BotAnnotationMetaData(Base):
     # Additional information for this Bot for future reference
     meta: Mapped[BotMeta] = mapped_column(mutable_json_type(dbtype=JSONB, nested=True),
                                           nullable=True)
+
+    # reference to the associated bot_annotations
+    bot_annotations: Relationship['BotAnnotation'] = relationship('BotAnnotation', cascade='all, delete')
 
 
 class BotAnnotation(Base):
