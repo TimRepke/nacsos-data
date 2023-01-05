@@ -44,9 +44,11 @@ def get_url(fallback=True):
                           port=env[3],
                           database=env[4])
         print(f'Using URL from env vars: {url}')
+        return url
     if fallback:
         url = config.get_main_option("sqlalchemy.url")
         print(f'Using URL from config: {url}')
+        return url
     print('Returning without fallback for URL.')
 
 
@@ -62,7 +64,10 @@ def run_migrations_offline():
     script output.
 
     """
+    print('Running offline migrations.')
+
     url = get_url()
+
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -81,6 +86,7 @@ def run_migrations_online():
     and associate a connection with the context.
 
     """
+    print('Running online migrations.')
     conf_section = config.get_section(config.config_ini_section)
 
     url = get_url(fallback=False)
