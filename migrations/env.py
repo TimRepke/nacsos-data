@@ -93,8 +93,10 @@ def run_migrations_online():
     if url is not None:
         conf_section['sqlalchemy.url'] = url
 
+    print(conf_section)
+
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
+        conf_section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool
     )
