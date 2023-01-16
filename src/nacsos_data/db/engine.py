@@ -31,7 +31,7 @@ class DatabaseEngineAsync:
     """
 
     def __init__(self, host: str, port: int, user: str, password: str,
-                 database: str = 'nacsos_core'):
+                 database: str = 'nacsos_core', debug: bool = False):
         self._host = host
         self._port = port
         self._user = user
@@ -47,7 +47,7 @@ class DatabaseEngineAsync:
             port=self._port,
             database=self._database,
         )
-        self.engine = create_async_engine(self._connection_str, echo=True, future=True,
+        self.engine = create_async_engine(self._connection_str, echo=debug, future=True,
                                           json_serializer=DictLikeEncoder().encode)
         self._session: async_sessionmaker[AsyncSession] = async_sessionmaker(  # type: ignore[type-arg] # FIXME
             bind=self.engine, autoflush=False, autocommit=False)
@@ -86,7 +86,7 @@ class DatabaseEngine:
     """
 
     def __init__(self, host: str, port: int, user: str, password: str,
-                 database: str = 'nacsos_core'):
+                 database: str = 'nacsos_core', debug: bool = False):
         self._host = host
         self._port = port
         self._user = user
@@ -102,7 +102,7 @@ class DatabaseEngine:
             port=self._port,
             database=self._database,
         )
-        self.engine = create_engine(self._connection_str, echo=True, future=True,
+        self.engine = create_engine(self._connection_str, echo=debug, future=True,
                                     json_serializer=DictLikeEncoder().encode)
         self._session: sessionmaker[Session] = sessionmaker(  # type: ignore[type-arg] # FIXME
             bind=self.engine, autoflush=False, autocommit=False)
