@@ -3,7 +3,7 @@ from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, \
 from sqlalchemy.dialects.postgresql import JSONB, UUID, ARRAY
 
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship, mapped_column, Relationship
+from sqlalchemy.orm import relationship, mapped_column, Relationship, Mapped
 from sqlalchemy_json import mutable_json_type
 import uuid
 
@@ -124,7 +124,7 @@ class Assignment(Base):
 
     # The Item this assigment refers to.
     item_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(Item.item_id),
+                            ForeignKey(Item.item_id, ondelete='CASCADE'),
                             nullable=False, index=True)
 
     # The AnnotationScheme defining the annotation scheme to be used for this assignment
@@ -190,8 +190,10 @@ class Annotation(Base):
 
     # The Item this assigment refers to (redundant to implicit information from Assignment)
     item_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(Item.item_id),
+                            ForeignKey(Item.item_id, ondelete='CASCADE'),
                             nullable=False, index=True)
+
+    item: Mapped['Item'] = relationship(back_populates='annotations')
 
     # The AnnotationScheme defining the annotation scheme to be used for this assignment
     # (redundant to implicit information from Assignment)

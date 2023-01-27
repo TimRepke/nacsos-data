@@ -5,7 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
-from nacsos_data.db.schemas import TwitterItem, M2MImportItem
+from nacsos_data.db.schemas import TwitterItem
+from nacsos_data.db.schemas.imports import Import
 from nacsos_data.models.imports import M2MImportItemType
 from nacsos_data.models.items.twitter import TwitterItemModel
 
@@ -56,14 +57,10 @@ async def import_tweet(tweet: TwitterItemModel, engine: DatabaseEngineAsync,
             raise RuntimeError('Failed in unclear state, undetermined tweet!')
 
         if import_id is not None:
-            orm_m2m_i2i = M2MImportItem(item_id=orm_tweet.item_id, import_id=import_id, type=import_type)
-            try:
-                session.add(orm_m2m_i2i)
-                await session.commit()
-            except IntegrityError:
-                logger.debug(f'M2M_i2i already exists, ignoring {import_id} <-> {orm_tweet.item_id}')
-                await session.rollback()
-
+            stmt = select(Import).where(Import.import_id == import_id)
+            import_orm = (await session.execute(stmt)).scalars().one_or_none()
+            import_orm.items.append(orm_tweet)
+            await (session.commit())
         return TwitterItemModel.parse_obj(orm_tweet.__dict__)
 
 

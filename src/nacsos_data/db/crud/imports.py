@@ -1,9 +1,10 @@
-from sqlalchemy import select, func
+from sqlalchemy import select, delete
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.crud import upsert_orm
-from nacsos_data.db.schemas import Import, M2MImportItem
+from nacsos_data.db.schemas import Import, m2m_import_item_table
+from nacsos_data.db.schemas.items.base import Item
 from nacsos_data.models.imports import ImportModel
 
 
@@ -17,14 +18,9 @@ async def read_all_imports_for_project(project_id: UUID | str,
 
 async def read_item_count_for_import(import_id: UUID | str, engine: DatabaseEngineAsync) -> int:
     async with engine.session() as session:
-        stmt = (select(M2MImportItem.import_id,
-                       func.count(M2MImportItem.item_id).label('num_items'))  #
-                .where(M2MImportItem.import_id == import_id)
-                .group_by(M2MImportItem.import_id))
-        result = (await session.execute(stmt)).mappings().one_or_none()
-        if result is None or type(result['num_items']) != int:
-            return 0
-        return result['num_items']
+        stmt = select(m2m_import_item_table).where(import_id == import_id)
+        result = len((await session.execute(stmt)).all())
+        return result
 
 
 async def read_import(import_id: UUID | str,
@@ -44,3 +40,20 @@ async def upsert_import(import_model: ImportModel,
                            primary_key=Import.import_id.name,
                            db_engine=engine)
     return key
+
+
+async def delete_import(import_id: UUID | str,
+                        engine: DatabaseEngineAsync) -> None:
+    """
+    When an import is deleted, we want to also delete all items that belonged to that import
+    and that import only.
+    """
+    async with engine.session() as session:
+        # Delete import
+        stmt = delete(Import).where(Import.import_id == import_id)
+        await session.execute(stmt)
+
+        # Delete items that no longer belong to any imports (this will cascade to delete their
+        # assignments and annotations, so be careful!
+        stmt = delete(Item).where(Item.imports is None)
+        await session.execute(stmt)
