@@ -57,10 +57,11 @@ async def import_tweet(tweet: TwitterItemModel, engine: DatabaseEngineAsync,
             raise RuntimeError('Failed in unclear state, undetermined tweet!')
 
         if import_id is not None:
-            stmt = select(Import).where(Import.import_id == import_id)
-            import_orm = (await session.execute(stmt)).scalars().one_or_none()
-            import_orm.items.append(orm_tweet)
-            await (session.commit())
+            stmt_import = select(Import).where(Import.import_id == import_id)
+            import_orm = (await session.execute(stmt_import)).scalars().one_or_none()
+            if import_orm is not None:
+                import_orm.items.append(orm_tweet)
+                await (session.commit())
         return TwitterItemModel.parse_obj(orm_tweet.__dict__)
 
 

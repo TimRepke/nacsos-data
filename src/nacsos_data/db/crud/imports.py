@@ -18,7 +18,7 @@ async def read_all_imports_for_project(project_id: UUID | str,
 
 async def read_item_count_for_import(import_id: UUID | str, engine: DatabaseEngineAsync) -> int:
     async with engine.session() as session:
-        stmt = select(m2m_import_item_table).where(import_id == import_id)
+        stmt = select(m2m_import_item_table).where(m2m_import_item_table.c.import_id == import_id)
         result = len((await session.execute(stmt)).all())
         return result
 
@@ -55,5 +55,5 @@ async def delete_import(import_id: UUID | str,
 
         # Delete items that no longer belong to any imports (this will cascade to delete their
         # assignments and annotations, so be careful!
-        stmt = delete(Item).where(Item.imports is None)
+        stmt = delete(Item).where(~Item.imports.any())
         await session.execute(stmt)
