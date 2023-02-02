@@ -1,22 +1,22 @@
 import logging
-from sqlalchemy import select
+from sqlalchemy import select, insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import TwitterItem
-from nacsos_data.db.schemas.imports import Import
+from nacsos_data.db.schemas.imports import Import, m2m_import_item_table
+from nacsos_data.db.crud.items import read_all_for_project, read_paged_for_project
 from nacsos_data.models.imports import M2MImportItemType
 from nacsos_data.models.items.twitter import TwitterItemModel
-
-from . import read_all_for_project, read_paged_for_project
 
 logger = logging.getLogger('nacsos-data.crud.twitter')
 
 
-async def import_tweet(tweet: TwitterItemModel, engine: DatabaseEngineAsync,
-                       project_id: str | UUID | None = None, import_id: UUID | str | None = None,
+async def import_tweet(tweet: TwitterItemModel,
+                       engine: DatabaseEngineAsync,
+                       project_id: str | UUID | None = None,
+                       import_id: UUID | str | None = None,
                        import_type: M2MImportItemType | None = None) \
         -> TwitterItemModel:
     """
@@ -57,11 +57,15 @@ async def import_tweet(tweet: TwitterItemModel, engine: DatabaseEngineAsync,
             raise RuntimeError('Failed in unclear state, undetermined tweet!')
 
         if import_id is not None:
-            stmt_import = select(Import).where(Import.import_id == import_id)
-            import_orm = (await session.execute(stmt_import)).scalars().one_or_none()
-            if import_orm is not None:
-                import_orm.items.append(orm_tweet)
-                await (session.commit())
+            stmt = insert(m2m_import_item_table) \
+                .values(item_id=orm_tweet.item_id, import_id=import_id, type=import_type)
+            try:
+                session.execute(stmt)
+                await session.commit()
+            except IntegrityError:
+                logger.debug(f'M2M_i2i already exists, ignoring {import_id} <-> {orm_tweet.item_id}')
+                await session.rollback()
+
         return TwitterItemModel.parse_obj(orm_tweet.__dict__)
 
 
