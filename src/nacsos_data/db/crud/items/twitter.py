@@ -5,7 +5,7 @@ from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import TwitterItem
-from nacsos_data.db.schemas.imports import Import, m2m_import_item_table
+from nacsos_data.db.schemas.imports import m2m_import_item_table
 from nacsos_data.db.crud.items import read_all_for_project, read_paged_for_project
 from nacsos_data.models.imports import M2MImportItemType
 from nacsos_data.models.items.twitter import TwitterItemModel
@@ -30,6 +30,7 @@ async def import_tweet(tweet: TwitterItemModel,
     :param tweet: The Tweet (Should contain all fields for which Twitter API gave us data)
     :param project_id: Project this Tweet is inserted to (or None if no project is linked -> AVOID this!)
     :param import_id: Import context (or None if not linked to specific import job -> AVOID this!)
+    :param import_type: Type of relation to import (explicit or implicit, see schema for more information)
     :param engine:
     :return: TwitterItem(Model) that was affected by this operation
     """
