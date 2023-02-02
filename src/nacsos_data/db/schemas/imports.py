@@ -1,10 +1,10 @@
 from __future__ import annotations
+from uuid import uuid4
 from typing import TYPE_CHECKING
 from sqlalchemy import String, ForeignKey, Enum as SAEnum, DateTime, func, Column, Table
 from sqlalchemy.orm import relationship, mapped_column, Mapped
 from sqlalchemy_json import mutable_json_type
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from uuid import uuid4
 
 from .users import User
 from .projects import Project
@@ -14,15 +14,14 @@ from ...models.imports import ImportType, M2MImportItemType
 if TYPE_CHECKING:
     from .items.base import Item
 
-
 m2m_import_item_table = Table(
     'm2m_import_item',
     Base.metadata,
     Column('import_id', ForeignKey('import.import_id'), nullable=False, primary_key=True, index=True),
     Column('item_id', ForeignKey('item.item_id'), nullable=False, primary_key=True, index=True),
     Column('time_created', DateTime(timezone=True), server_default=func.now()),
+
     # This is a type to specify an entry in the many-to-many relation for items to imports.
-    #
     #       - An `explicit` m2m relation is used for cases where the import "explicitly" matched this item.
     #         For example: A tweet or paper matched a keyword specified in the query
     #       - An `implicit` m2m relation is used for cases where the import only "implicitly" includes this item.

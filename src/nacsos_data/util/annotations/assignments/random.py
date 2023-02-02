@@ -1,14 +1,17 @@
 import random
 from uuid import UUID, uuid4
+from typing import TYPE_CHECKING
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.models.annotations import \
     AssignmentModel, \
     AssignmentStatus, \
     AssignmentScopeRandomConfig
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 
 
 async def read_random_items(project_id: str | UUID, num_items: int, engine: DatabaseEngineAsync) -> list[str]:
