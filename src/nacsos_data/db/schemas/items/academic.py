@@ -14,7 +14,9 @@ from . import ItemType
 
 class AcademicItem(Item):
     __tablename__ = 'academic_item'
-    item_id = mapped_column(UUID(as_uuid=True), ForeignKey(Item.item_id), primary_key=True)
+    item_id = mapped_column(UUID(as_uuid=True),
+                            ForeignKey(Item.item_id, ondelete='CASCADE'),
+                            primary_key=True)
 
     # Article DOI (normalised format, e.g. '00.000/0000.0000-00' rather than 'https://dx.doi.org/00.000/0000.0000-00')
     doi = mapped_column(String, nullable=True, unique=False, index=True)

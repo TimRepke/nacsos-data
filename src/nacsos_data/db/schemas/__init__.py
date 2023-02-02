@@ -5,7 +5,7 @@ from .annotations import AnnotationScheme, Annotation, Assignment, AssignmentSco
 from .bot_annotations import BotAnnotationMetaData, BotAnnotation
 from .projects import Project, ProjectPermissions
 from .users import User
-from .imports import Import, M2MImportItem
+from .imports import Import, m2m_import_item_table
 
 from .items import ItemType, ItemTypeLiteral
 from .items.base import Item
@@ -25,6 +25,6 @@ __all__ = ['Base',
            'Item', 'GenericItem', 'TwitterItem', 'AcademicItem',
            'ItemType', 'ItemTypeLiteral', 'AnyItemSchema', 'AnyItemType',
            # Schemas for organising data
-           'Import', 'M2MImportItem',
+           'Import', 'm2m_import_item_table',
            # Schemas for project management
            'Project', 'ProjectPermissions', 'User']

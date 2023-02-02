@@ -14,11 +14,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, Relationship
 from sqlalchemy.dialects.postgresql import JSONB, UUID, ARRAY
 from sqlalchemy_json import mutable_json_type
 
-from ...models.bot_annotations import BotKind, BotMeta
-from ...db.base_class import Base
-from .projects import Project
-from .items.base import Item
-from . import AnnotationScheme, AssignmentScope
+from nacsos_data.db.base_class import Base
+from nacsos_data.db.schemas.projects import Project
+from nacsos_data.db.schemas.items.base import Item
+from nacsos_data.db.schemas.annotations import AnnotationScheme, AssignmentScope
+from nacsos_data.models.bot_annotations import BotKind, BotMeta
 
 
 class BotAnnotationMetaData(Base):
@@ -77,7 +77,8 @@ class BotAnnotation(Base):
     bot_annotation_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
                                       nullable=False, unique=True, index=True)
     bot_annotation_metadata_id = mapped_column(UUID(as_uuid=True),
-                                               ForeignKey(BotAnnotationMetaData.bot_annotation_metadata_id),
+                                               ForeignKey(BotAnnotationMetaData.bot_annotation_metadata_id,
+                                                          ondelete='CASCADE'),
                                                nullable=False, index=True)
 
     # Date and time when this annotation was created (or last changed)
@@ -86,7 +87,7 @@ class BotAnnotation(Base):
 
     # The Item this assigment refers to
     item_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(Item.item_id),
+                            ForeignKey(Item.item_id, ondelete='CASCADE'),
                             nullable=False, index=True)
 
     # Reference to the parent labels' annotation.
@@ -104,7 +105,7 @@ class BotAnnotation(Base):
     # Exactly one of the following fields should be filled.
     # Contains the value for this annotation (e.g. numbered class from annotation_scheme)
     value_bool = mapped_column(Boolean, nullable=True)
-    value_int = mapped_column(Integer, nullable=True)
+    value_int = mapped_column(Integer, nullable=True, index=True)
     value_float = mapped_column(Float, nullable=True)
     value_str = mapped_column(String, nullable=True)
     multi_int = mapped_column(ARRAY(Integer), nullable=True)

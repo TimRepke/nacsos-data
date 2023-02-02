@@ -1,11 +1,17 @@
 import uuid
+from typing import TYPE_CHECKING
+
 from sqlalchemy import String, ForeignKey, Enum as SAEnum
-from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import relationship, mapped_column, Mapped
 from sqlalchemy.dialects.postgresql import UUID
 
 from ...base_class import Base
 from ..projects import Project
+from ..imports import m2m_import_item_table, Import
 from . import ItemType
+
+if TYPE_CHECKING:
+    from ..annotations import Annotation, Assignment
 
 
 class Item(Base):
@@ -35,6 +41,13 @@ class Item(Base):
     # Discriminator for figuring out which subclass to load for this item for more details
     # Note, that all items within a project must have the same type (thus `Item.type` == `Project.type`)
     type = mapped_column(SAEnum(ItemType), nullable=False)
+
+    imports: Mapped[list[Import]] = relationship(
+        secondary=m2m_import_item_table, back_populates='items'
+    )
+
+    annotations: Mapped[list['Annotation']] = relationship('Annotation')
+    assignments: Mapped[list['Assignment']] = relationship('Assignment')
 
     __mapper_args__ = {
         'polymorphic_identity': 'item',

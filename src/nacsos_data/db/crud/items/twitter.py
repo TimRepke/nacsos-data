@@ -1,21 +1,27 @@
 import logging
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+from typing import TYPE_CHECKING
+
+from sqlalchemy import select, insert
+from sqlalchemy.exc import IntegrityError
 
 from nacsos_data.db import DatabaseEngineAsync
-from nacsos_data.db.schemas import TwitterItem, M2MImportItem
+from nacsos_data.db.schemas import TwitterItem
+from nacsos_data.db.schemas.imports import m2m_import_item_table
+from nacsos_data.db.crud.items import read_all_for_project, read_paged_for_project
 from nacsos_data.models.imports import M2MImportItemType
 from nacsos_data.models.items.twitter import TwitterItemModel
 
-from . import read_all_for_project, read_paged_for_project
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 
 logger = logging.getLogger('nacsos-data.crud.twitter')
 
 
-async def import_tweet(tweet: TwitterItemModel, engine: DatabaseEngineAsync,
-                       project_id: str | UUID | None = None, import_id: UUID | str | None = None,
+async def import_tweet(tweet: TwitterItemModel,
+                       engine: DatabaseEngineAsync,
+                       project_id: str | UUID | None = None,
+                       import_id: UUID | str | None = None,
                        import_type: M2MImportItemType | None = None) \
         -> TwitterItemModel:
     """
@@ -29,6 +35,7 @@ async def import_tweet(tweet: TwitterItemModel, engine: DatabaseEngineAsync,
     :param tweet: The Tweet (Should contain all fields for which Twitter API gave us data)
     :param project_id: Project this Tweet is inserted to (or None if no project is linked -> AVOID this!)
     :param import_id: Import context (or None if not linked to specific import job -> AVOID this!)
+    :param import_type: Type of relation to import (explicit or implicit, see schema for more information)
     :param engine:
     :return: TwitterItem(Model) that was affected by this operation
     """
@@ -56,10 +63,10 @@ async def import_tweet(tweet: TwitterItemModel, engine: DatabaseEngineAsync,
             raise RuntimeError('Failed in unclear state, undetermined tweet!')
 
         if import_id is not None:
-            orm_m2m_i2i = M2MImportItem(item_id=orm_tweet.item_id, import_id=import_id, type=import_type)
+            stmt_m2m = insert(m2m_import_item_table) \
+                .values(item_id=orm_tweet.item_id, import_id=import_id, type=import_type)
             try:
-                session.add(orm_m2m_i2i)
-                await session.commit()
+                await session.execute(stmt_m2m)
             except IntegrityError:
                 logger.debug(f'M2M_i2i already exists, ignoring {import_id} <-> {orm_tweet.item_id}')
                 await session.rollback()

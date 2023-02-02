@@ -9,7 +9,7 @@ from nacsos_data.db.schemas import User, ProjectPermissions
 from nacsos_data.models.users import UserInDBModel, UserModel
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 

@@ -1,11 +1,21 @@
-from sqlalchemy import Integer, String, ForeignKey, Boolean, Float, DateTime, \
-    UniqueConstraint, Identity, Enum as SAEnum, CheckConstraint
+import uuid
+
+from sqlalchemy import \
+    Integer, \
+    String, \
+    Boolean, \
+    Float, \
+    DateTime, \
+    Enum as SAEnum, \
+    Identity, \
+    ForeignKey, \
+    UniqueConstraint, \
+    CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID, ARRAY
 
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship, mapped_column, Relationship
+from sqlalchemy.orm import relationship, mapped_column, Relationship, Mapped
 from sqlalchemy_json import mutable_json_type
-import uuid
 
 from ...models.annotations import AssignmentStatus
 from ...db.base_class import Base
@@ -72,7 +82,7 @@ class AssignmentScope(Base):
 
     # The AnnotationScheme defining the annotation scheme to be used for this scope
     annotation_scheme_id = mapped_column(UUID(as_uuid=True),
-                                         ForeignKey(AnnotationScheme.annotation_scheme_id),
+                                         ForeignKey(AnnotationScheme.annotation_scheme_id, ondelete='CASCADE'),
                                          nullable=False, index=True)
 
     # Date and time when this assignment scope was created
@@ -115,7 +125,7 @@ class Assignment(Base):
                                   nullable=False, unique=True, index=True)
     # The AssignmentScope this Assignment should logically be grouped into.
     assignment_scope_id = mapped_column(UUID(as_uuid=True),
-                                        ForeignKey(AssignmentScope.assignment_scope_id),
+                                        ForeignKey(AssignmentScope.assignment_scope_id, ondelete='CASCADE'),
                                         nullable=False, index=True)
     # The User the AnnotationScheme/Item combination is assigned to
     user_id = mapped_column(UUID(as_uuid=True),
@@ -124,7 +134,7 @@ class Assignment(Base):
 
     # The Item this assigment refers to.
     item_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(Item.item_id),
+                            ForeignKey(Item.item_id, ondelete='CASCADE'),
                             nullable=False, index=True)
 
     # The AnnotationScheme defining the annotation scheme to be used for this assignment
@@ -190,7 +200,7 @@ class Annotation(Base):
 
     # The Item this assigment refers to (redundant to implicit information from Assignment)
     item_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(Item.item_id),
+                            ForeignKey(Item.item_id, ondelete='CASCADE'),
                             nullable=False, index=True)
 
     # The AnnotationScheme defining the annotation scheme to be used for this assignment
@@ -216,7 +226,7 @@ class Annotation(Base):
     # Depending on the AnnotationSchemeLabel.kind, one of the following fields should be filled.
     # For single and mixed, the AnnotationSchemeLabelChoice.value should be filled in value_int.
     value_bool = mapped_column(Boolean, nullable=True)
-    value_int = mapped_column(Integer, nullable=True)
+    value_int = mapped_column(Integer, nullable=True, index=True)
     value_float = mapped_column(Float, nullable=True)
     value_str = mapped_column(String, nullable=True)
     multi_int = mapped_column(ARRAY(Integer), nullable=True)
@@ -227,7 +237,4 @@ class Annotation(Base):
     text_offset_stop = mapped_column(Integer, nullable=True)
 
     sub_annotations: Relationship['Annotation'] = relationship('Annotation', cascade='all, delete')
-
-    # TODO: Figure out a way to allow automated methods (e.g. classifiers) to utilise this
-    #       table to annotate data as well. Creating loads of dummy users and assignments
-    #       would be infeasible, esp. considering there might be loads of different (parametrised) models.
+    item: Mapped['Item'] = relationship(back_populates='annotations')
