@@ -14,11 +14,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, Relationship
 from sqlalchemy.dialects.postgresql import JSONB, UUID, ARRAY
 from sqlalchemy_json import mutable_json_type
 
-from nacsos_data.db.base_class import Base
-from nacsos_data.db.schemas.projects import Project
-from nacsos_data.db.schemas.items.base import Item
-from nacsos_data.db.schemas.annotations import AnnotationScheme, AssignmentScope
-from nacsos_data.models.bot_annotations import BotKind, BotMeta
+from ...models.bot_annotations import BotKind, BotMeta
+from ...db.base_class import Base
+from .projects import Project
+from .items.base import Item
+from . import AnnotationScheme, AssignmentScope
 
 
 class BotAnnotationMetaData(Base):
