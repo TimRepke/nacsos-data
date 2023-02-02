@@ -1,13 +1,15 @@
 import uuid
-from sqlalchemy import String, ForeignKey, Enum as SAEnum
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship, mapped_column, Mapped
 from typing import TYPE_CHECKING
+
+from sqlalchemy import String, ForeignKey, Enum as SAEnum
+from sqlalchemy.orm import relationship, mapped_column, Mapped
+from sqlalchemy.dialects.postgresql import UUID
 
 from ...base_class import Base
 from ..projects import Project
-from . import ItemType
 from ..imports import m2m_import_item_table, Import
+from . import ItemType
+
 if TYPE_CHECKING:
     from ..annotations import Annotation, Assignment
 

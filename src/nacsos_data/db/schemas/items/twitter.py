@@ -1,8 +1,8 @@
-from sqlalchemy import String, Integer, DateTime, Float, ForeignKey, UniqueConstraint, Column
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 
-from sqlalchemy.orm import mapped_column, column_property, Mapped, relationship
+from sqlalchemy import String, Integer, DateTime, Float, ForeignKey, UniqueConstraint, Column
+from sqlalchemy.orm import mapped_column, column_property, Mapped
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from ..projects import Project
 from .base import Item
@@ -25,8 +25,6 @@ class TwitterItem(Item):
     item_id = mapped_column(UUID(as_uuid=True),
                             ForeignKey(Item.item_id, ondelete='CASCADE'),
                             default=uuid.uuid4, nullable=False, index=True, primary_key=True, unique=True)
-
-    item: Mapped['Item'] = relationship(back_populates='twitter_item')
 
     # mirror of `Item.project_id` so we can introduce the UniqueConstraint
     # https://docs.sqlalchemy.org/en/20/faq/ormconfiguration.html#i-m-getting-a-warning-or-error-about-implicitly-combining-column-x-under-attribute-y
