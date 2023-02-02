@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select, delete, func
+from sqlalchemy.exc import NoResultFound
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.crud import upsert_orm
@@ -22,8 +23,10 @@ async def read_item_count_for_import(import_id: UUID | str, engine: DatabaseEngi
         stmt = select(func.count())\
             .select_from(m2m_import_item_table)\
             .where(m2m_import_item_table.c.import_id == import_id)
-        result = await session.execute(stmt)
-        return result.scalar()
+        result = (await session.execute(stmt)).scalar()
+        if result is None:
+            raise NoResultFound('Something went majorly wrong...')
+        return result
 
 
 async def read_import(import_id: UUID | str,

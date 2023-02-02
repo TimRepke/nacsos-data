@@ -1,7 +1,9 @@
 import logging
+from uuid import UUID
+from typing import TYPE_CHECKING
+
 from sqlalchemy import select, insert
 from sqlalchemy.exc import IntegrityError
-from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import TwitterItem
@@ -9,6 +11,9 @@ from nacsos_data.db.schemas.imports import m2m_import_item_table
 from nacsos_data.db.crud.items import read_all_for_project, read_paged_for_project
 from nacsos_data.models.imports import M2MImportItemType
 from nacsos_data.models.items.twitter import TwitterItemModel
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 
 logger = logging.getLogger('nacsos-data.crud.twitter')
 
@@ -58,11 +63,10 @@ async def import_tweet(tweet: TwitterItemModel,
             raise RuntimeError('Failed in unclear state, undetermined tweet!')
 
         if import_id is not None:
-            stmt = insert(m2m_import_item_table) \
+            stmt_m2m = insert(m2m_import_item_table) \
                 .values(item_id=orm_tweet.item_id, import_id=import_id, type=import_type)
             try:
-                session.execute(stmt)
-                await session.commit()
+                await session.execute(stmt_m2m)
             except IntegrityError:
                 logger.debug(f'M2M_i2i already exists, ignoring {import_id} <-> {orm_tweet.item_id}')
                 await session.rollback()
