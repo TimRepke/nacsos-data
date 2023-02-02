@@ -1,5 +1,6 @@
-from sqlalchemy import select, delete
 from uuid import UUID
+
+from sqlalchemy import select, delete, func
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.crud import upsert_orm
@@ -18,9 +19,11 @@ async def read_all_imports_for_project(project_id: UUID | str,
 
 async def read_item_count_for_import(import_id: UUID | str, engine: DatabaseEngineAsync) -> int:
     async with engine.session() as session:
-        stmt = select(m2m_import_item_table).where(m2m_import_item_table.c.import_id == import_id)
-        result = len((await session.execute(stmt)).all())
-        return result
+        stmt = select(func.count())\
+            .select_from(m2m_import_item_table)\
+            .where(m2m_import_item_table.c.import_id == import_id)
+        result = await session.execute(stmt)
+        return result.scalar()
 
 
 async def read_import(import_id: UUID | str,
