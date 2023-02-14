@@ -160,7 +160,7 @@ class TwitterItemModel(ItemModel):
     cashtags: list[Cashtag] | None = None
     # from context_annotations (Contains context annotations for the Tweet.)
     # Entity recognition/extraction, topical analysis
-    annotations: list[ContextAnnotation] | None = None
+    context_annotations: list[ContextAnnotation] | None = None
 
     # Public engagement metrics for the Tweet at the time of the request.
     # taken from public_metrics.???
