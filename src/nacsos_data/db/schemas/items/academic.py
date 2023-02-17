@@ -1,29 +1,31 @@
-from sqlalchemy import String, Integer, ForeignKey
+import uuid
+from sqlalchemy import String, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import mapped_column
 from sqlalchemy_json import mutable_json_type
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from .base import Item
 from . import ItemType
 
 
-# TODO define schema
-# TODO mirror in model
-# TODO add to schemas.__all__
-
-
 class AcademicItem(Item):
     __tablename__ = 'academic_item'
+    __table_args__ = (
+        UniqueConstraint('doi', 'project_id'),
+        UniqueConstraint('wos_id', 'project_id'),
+        UniqueConstraint('scopus_id', 'project_id'),
+        UniqueConstraint('openalex_id', 'project_id'),
+        UniqueConstraint('s2_id', 'project_id'),
+        UniqueConstraint('pubmed_id', 'project_id'),
+        UniqueConstraint('title_slug', 'project_id'),
+    )
+
     item_id = mapped_column(UUID(as_uuid=True),
                             ForeignKey(Item.item_id, ondelete='CASCADE'),
-                            primary_key=True)
+                            default=uuid.uuid4, nullable=False, index=True, primary_key=True, unique=True)
 
     # Article DOI (normalised format, e.g. '00.000/0000.0000-00' rather than 'https://dx.doi.org/00.000/0000.0000-00')
     doi = mapped_column(String, nullable=True, unique=False, index=True)
-
-    # TODO Summarise design decisions in the documentation
-
-    # TODO Set unique constraints on proprietary IDs and project
 
     # wos ID exactly as it comes from WoS, including redudant WOS:
     wos_id = mapped_column(String, nullable=True, unique=False, index=True)

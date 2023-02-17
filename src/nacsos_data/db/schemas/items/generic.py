@@ -1,7 +1,8 @@
+import uuid
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import mapped_column
-from sqlalchemy_json import mutable_json_type
 from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy_json import mutable_json_type
 
 from .base import Item
 from . import ItemType
@@ -11,7 +12,7 @@ class GenericItem(Item):
     __tablename__ = 'generic_item'
     item_id = mapped_column(UUID(as_uuid=True),
                             ForeignKey(Item.item_id, ondelete='CASCADE'),
-                            primary_key=True)
+                            default=uuid.uuid4, nullable=False, index=True, primary_key=True, unique=True)
 
     # any kind of (json-formatted) meta-data
     #   For project marked as "basic" this information may be shown to the user.
