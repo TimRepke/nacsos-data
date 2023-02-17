@@ -4,9 +4,9 @@ from sqlalchemy import String, Integer, DateTime, Float, ForeignKey, UniqueConst
 from sqlalchemy.orm import mapped_column, column_property, Mapped
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
-from ..projects import Project
 from .base import Item
 from . import ItemType
+from ..projects import Project
 
 
 class TwitterItem(Item):

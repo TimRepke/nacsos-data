@@ -1,11 +1,12 @@
 import uuid
-from sqlalchemy import String, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Integer, ForeignKey, UniqueConstraint, Column
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import mapped_column,column_property, Mapped
 from sqlalchemy_json import mutable_json_type
 
 from .base import Item
 from . import ItemType
+from ..projects import Project
 
 
 class AcademicItem(Item):
@@ -23,6 +24,13 @@ class AcademicItem(Item):
     item_id = mapped_column(UUID(as_uuid=True),
                             ForeignKey(Item.item_id, ondelete='CASCADE'),
                             default=uuid.uuid4, nullable=False, index=True, primary_key=True, unique=True)
+
+
+    # mirror of `Item.project_id` so we can introduce the UniqueConstraint
+    # https://docs.sqlalchemy.org/en/20/faq/ormconfiguration.html#i-m-getting-a-warning-or-error-about-implicitly-combining-column-x-under-attribute-y
+    project_id: Mapped[uuid.UUID] = column_property(Column(UUID(as_uuid=True),  # type: ignore[assignment]
+                                                           ForeignKey(Project.project_id, ondelete='cascade'),
+                                                           index=True, nullable=False), Item.project_id)
 
     # Article DOI (normalised format, e.g. '00.000/0000.0000-00' rather than 'https://dx.doi.org/00.000/0000.0000-00')
     doi = mapped_column(String, nullable=True, unique=False, index=True)
