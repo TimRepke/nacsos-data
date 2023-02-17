@@ -28,7 +28,7 @@ class User(Base):
     username = mapped_column(String, nullable=False, unique=True)
 
     # Contact information for that user
-    email = mapped_column(String, nullable=False, unique=True)
+    email = mapped_column(String, nullable=False, unique=False)
 
     # Real name of that user (or "descriptor" if this is a bot account)
     full_name = mapped_column(String, nullable=False)
