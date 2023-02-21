@@ -26,6 +26,7 @@ from nacsos_data.db.schemas import \
 from nacsos_data.models.annotations import AnnotationSchemeLabel, AnnotationSchemeLabelChoice, AssignmentStatus
 from nacsos_data.models.bot_annotations import BotKind
 from nacsos_data.models.imports import ImportType, M2MImportItemType
+from nacsos_data.models.items.academic import AcademicAuthorModel, AffiliationModel
 
 
 def main(
@@ -103,7 +104,48 @@ def main(
                             like_count=2, quote_count=1)
             ]
         elif p_type == ItemType.academic:
-            raise NotImplementedError()
+            items = [
+                AcademicItem(project_id=project.project_id,
+                             text='We introduce Spatio-Temporal Momentum strategies, a class of models that unify both time-series and cross-sectional momentum strategies by trading assets based on their cross-sectional momentum features over time. ',
+                             title='Spatio-Temporal Momentum', title_slug='spaciotemporalmomentum',
+                             publication_year=2023,
+                             source='arXiv', keywords=['kw 1', 'kw 2'],
+                             authors=[
+                                 AcademicAuthorModel(name='Wee Ling', orcid='https://orcid.org/0000-0001-9661-6325').dict(),
+                                 AcademicAuthorModel(name='Stephen Roberts',
+                                                     affiliations=[AffiliationModel(name='Oxford', country='UK').dict()]).dict()],
+                             meta={'meta_str': 'test', 'meta_int': 10, '_meta_hidden': 'secret'},
+                             doi='10.48550/arXiv.2302.10175'),
+                AcademicItem(project_id=project.project_id,
+                             text='With generative models proliferating at a rapid rate, there is a growing need for general purpose fake image detectors. In this work, we first show that the existing paradigm, ',
+                             title='Towards Universal Fake Image', title_slug='towardsuniversialfakeimages',
+                             publication_year=2022,
+                             source='arXiv', keywords=['kw 2', 'kw 3'],
+                             authors=[
+                                 AcademicAuthorModel(name='Utkarsh Ojha', orcid='https://orcid.org/0000-0001-9661-6325').dict(),
+                                 AcademicAuthorModel(name='Yong Jae Lee',
+                                                     affiliations=[AffiliationModel(name='Wisconsin-Madison', country='USA').dict()]).dict()],
+                             doi='10.48550/arXiv.2302.10174'),
+                AcademicItem(project_id=project.project_id,
+                             text='Exploiting robots for activities in human-shared environments, whether warehouses, shopping centres or hospitals, calls for such robots to understand the underlying physical interactions between nearby agents and objects. In particular, ',
+                             title='Causal Discovery of Dynamic Models for Predicting Human Spatial Interactions',
+                             title_slug='causaldiscovery',
+                             publication_year=1980,
+                             source='arXiv', keywords=['kw 4', 'kw 5'],
+                             authors=[AcademicAuthorModel(name='Luca Castri').dict()],
+                             doi='10.48550/arXiv.2210.16535'),
+                AcademicItem(project_id=project.project_id,
+                             text='Modern policy optimization methods in applied reinforcement learning, such as Trust Region Policy Optimization and Policy Mirror Descent, are often based on the policy gradient framework. While theoretical guarantees have been established for this class of algorithms, particularly in the tabular setting, the use of a general parametrization scheme remains mostly unjustified.',
+                             title='A Novel Framework for Policy Mirror Descent with General Parametrization and Linear Convergence',
+                             title_slug='anovelframeworkforpolicymirror',
+                             publication_year=2023,
+                             source='arXiv', keywords=['kw 1', 'kw 2'],
+                             authors=[
+                                 AcademicAuthorModel(name='Carlo Alfano').dict(),
+                                 AcademicAuthorModel(name='Rui Yuan').dict(),
+                                 AcademicAuthorModel(name='Patrick Rebeshini').dict()],
+                             doi='10.48550/arXiv.2301.13139'),
+            ]
         elif p_type == ItemType.generic:
             raise NotImplementedError()
         else:
