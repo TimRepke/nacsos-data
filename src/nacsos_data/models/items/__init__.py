@@ -1,10 +1,10 @@
-from typing import TypeVar
+from typing import TypeVar, Union
 
 from .generic import GenericItemModel
 from .twitter import TwitterItemModel
 from .academic import AcademicItemModel
 
-AnyItemModel = GenericItemModel | TwitterItemModel | AcademicItemModel
+AnyItemModel = Union[TwitterItemModel, AcademicItemModel, GenericItemModel]
 AnyItemModelList = list[TwitterItemModel] | list[AcademicItemModel] | list[GenericItemModel]
 AnyItemModelType = TypeVar('AnyItemModelType', GenericItemModel, TwitterItemModel, AcademicItemModel)
 

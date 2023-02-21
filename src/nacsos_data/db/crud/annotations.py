@@ -103,11 +103,15 @@ async def read_assignment_scopes_for_project(project_id: str | uuid.UUID,
 
 async def read_assignments_for_scope_for_user(assignment_scope_id: str | uuid.UUID,
                                               user_id: str | uuid.UUID,
-                                              db_engine: DatabaseEngineAsync) -> list[AssignmentModel]:
+                                              db_engine: DatabaseEngineAsync,
+                                              limit: int | None = None) -> list[AssignmentModel]:
     async with db_engine.session() as session:  # type: AsyncSession
         stmt = select(Assignment) \
             .filter_by(assignment_scope_id=assignment_scope_id, user_id=user_id) \
             .order_by(asc(Assignment.order))
+        if limit is not None:
+            stmt = stmt.limit(limit)
+
         result = (await session.execute(stmt)).scalars().all()
         return [AssignmentModel(**res.__dict__) for res in result]
 
@@ -147,7 +151,7 @@ async def read_next_assignment_for_scope_for_user(current_assignment_id: str | u
 
 async def read_next_open_assignment_for_scope_for_user(assignment_scope_id: str | uuid.UUID,
                                                        user_id: str | uuid.UUID,
-                                                       db_engine: DatabaseEngineAsync) -> AssignmentModel:
+                                                       db_engine: DatabaseEngineAsync) -> AssignmentModel | None:
     async with db_engine.session() as session:  # type: AsyncSession
         stmt = select(Assignment) \
             .where(Assignment.user_id == user_id,
@@ -156,6 +160,8 @@ async def read_next_open_assignment_for_scope_for_user(assignment_scope_id: str 
             .order_by(asc(Assignment.order)) \
             .limit(1)
         result = (await session.execute(stmt)).scalars().one_or_none()
+        if result is None:
+            return None
         return AssignmentModel(**result.__dict__)
 
 

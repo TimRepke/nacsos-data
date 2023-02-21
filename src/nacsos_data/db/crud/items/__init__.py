@@ -4,8 +4,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
-from nacsos_data.db.schemas import Item, TwitterItem, AnyItemSchema, AnyItemType, ItemType, ItemTypeLiteral, GenericItem
-from nacsos_data.models.items import AnyItemModel, TwitterItemModel, AnyItemModelType, GenericItemModel
+from nacsos_data.db.schemas import \
+    Item, \
+    TwitterItem, \
+    GenericItem, \
+    AcademicItem, \
+    ItemType, \
+    ItemTypeLiteral, \
+    AnyItemType, \
+    AnyItemSchema
+from nacsos_data.models.items import \
+    GenericItemModel, \
+    TwitterItemModel, \
+    AcademicItemModel, \
+    AnyItemModelType, \
+    AnyItemModel
 
 import logging
 
@@ -51,7 +64,9 @@ def _get_schema_model_for_type(item_type: ItemType | ItemTypeLiteral) \
         return GenericItem, GenericItemModel
     if item_type == 'twitter' or item_type == ItemType.twitter:
         return TwitterItem, TwitterItemModel
-    # FIXME: add academic
+    if item_type == 'academic' or item_type == ItemType.academic:
+        return AcademicItem, AcademicItemModel
+
     raise ValueError(f'Not implemented for {item_type}')
 
 
