@@ -87,9 +87,9 @@ class BaseTask(BaseModel):
     # json-encoded dict of the call parameters (or the dict unpacked)
     params: dict[str, int | float | str | dict[str, Any] | SerializedArtefactReference] | str | None = None
     # user_id (from nacsos-core) who triggered this task
-    user_id: str | None = None
+    user_id: str | uuid.UUID | None = None
     # project_id (from nacsos-core) as context where task was triggered
-    project_id: str | None = None
+    project_id: str | uuid.UUID | None = None
     # user comment to keep notes
     comment: str | None = None
     # where this task is running
@@ -101,17 +101,16 @@ class SubmittedTask(BaseTask):
     # previously run (based on fingerprint)
     force_run: bool = False
     # A list of additional dependencies (task_ids) that can't be derived from ArtefactReferences
-    forced_dependencies: list[str] | None = None
+    forced_dependencies: list[str] | list[uuid.UUID] | None = None
 
 
 class TaskModel(BaseTask):
     # a unique hash value (based on function name and parameters)
     fingerprint: str
     # datetime YYYY-MM-DDThh:mm:ss of when task was submitted, started, and finished
-    dt_submitted: datetime | None = None
-    dt_started: datetime | None = None
-    dt_finished: datetime | None = None
-    dt_cancelled: datetime | None = None
+    time_created: datetime | None = None
+    time_started: datetime | None = None
+    time_finished: datetime | None = None
 
     # estimated runtime (in seconds) and memory (in megabyte) consumption
     # Leave `None` if unknown (not encouraged) or relatively short/constant runtime
@@ -124,7 +123,7 @@ class TaskModel(BaseTask):
     rec_expunge: datetime | None = None
 
     # indicates the tasks (referenced by task_id) this task depends on (or None if no dependencies exist)
-    dependencies: list[str] | None = None
+    dependencies: list[str] | list[uuid.UUID] | None = None
     # current status of the task
     status: TaskStatus = TaskStatus.PENDING
 

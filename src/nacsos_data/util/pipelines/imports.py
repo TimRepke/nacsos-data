@@ -5,9 +5,10 @@ from uuid import UUID
 
 import httpx
 from httpx import HTTPError
+from sqlalchemy import select
 
 from ...db import DatabaseEngineAsync
-from ...db.crud.imports import read_import
+from ...db.schemas.imports import Import
 from ...models.imports import ImportConfigJSONL, LineEncoding, ImportModel
 
 logger = logging.getLogger('nacsos_data.util.pipelines')
@@ -92,11 +93,13 @@ class ImportDetailsNotFound(Exception):
 async def submit_wos_import_task(import_id: UUID | str,
                                  base_url: str,
                                  engine: DatabaseEngineAsync) -> str:
-    import_details = await read_import(import_id=import_id, engine=engine)
-    if import_details is None:
-        raise ImportDetailsNotFound(f"No import found in db for id {import_id}")
-
     async with httpx.AsyncClient() as client, engine.session() as session:
+        import_details: Import = (await session.scalars(select(Import)
+                                                        .where(Import.import_id == import_id))
+                                  ).one_or_none()
+        if import_details is None:
+            raise ImportDetailsNotFound(f"No import found in db for id {import_id}")
+
         payload = {
             'task_id': None,
             'function_name': 'nacsos_lib.academic.import.import_wos_file',
@@ -106,7 +109,7 @@ async def submit_wos_import_task(import_id: UUID | str,
                 'records': {
                     'user_serializer': 'WebOfScienceSerializer',
                     'user_dtype': 'AcademicItemModel',
-                    'filenames': import_details.config.filenames  # type: ignore[union-attr]
+                    'filenames': import_details.config['filenames']
                 }
             },
             'user_id': str(import_details.user_id),
@@ -138,11 +141,13 @@ async def submit_wos_import_task(import_id: UUID | str,
 async def submit_jsonl_import_task(import_id: UUID | str,
                                    base_url: str,
                                    engine: DatabaseEngineAsync) -> str:
-    import_details = await read_import(import_id=import_id, engine=engine)
-    if import_details is None:
-        raise ImportDetailsNotFound(f'No import found in db for id {import_id}')
-
     async with httpx.AsyncClient() as client, engine.session() as session:
+        import_details: Import = (await session.scalars(select(Import)
+                                                        .where(Import.import_id == import_id))
+                                  ).one_or_none()
+        if import_details is None:
+            raise ImportDetailsNotFound(f"No import found in db for id {import_id}")
+
         assert type(import_details.config) == ImportConfigJSONL
         config: ImportConfigJSONL = import_details.config
 
@@ -153,7 +158,7 @@ async def submit_jsonl_import_task(import_id: UUID | str,
         payload = {
             'task_id': None,
             'function_name': converter.func_name,
-            'params': converter.convert_details(import_details),
+            'params': converter.convert_details(ImportModel.parse_obj(import_details.__dict__)),
             'user_id': str(import_details.user_id),
             'project_id': str(import_details.project_id),
             'comment': f'Import for "{import_details.name}" ({import_id})',
