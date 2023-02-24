@@ -1,11 +1,10 @@
 import datetime
-import json
 import uuid
 from typing import Any
 
 from pydantic import BaseModel
 from sqlalchemy import func, select, asc, desc, delete, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session # noqa: F401
 
 from nacsos_data.db import DatabaseEngine
 from nacsos_data.db.crud import MissingIdError
