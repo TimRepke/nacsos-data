@@ -6,6 +6,7 @@ from .bot_annotations import BotAnnotationMetaData, BotAnnotation
 from .projects import Project, ProjectPermissions
 from .users import User
 from .imports import Import, m2m_import_item_table
+from .pipeline import Task
 
 from .items import ItemType, ItemTypeLiteral
 from .items.base import Item
@@ -27,4 +28,6 @@ __all__ = ['Base',
            # Schemas for organising data
            'Import', 'm2m_import_item_table',
            # Schemas for project management
-           'Project', 'ProjectPermissions', 'User']
+           'Project', 'ProjectPermissions', 'User',
+           # Schemas for pipelines
+           'Task']
