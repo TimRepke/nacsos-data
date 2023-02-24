@@ -1,4 +1,5 @@
 pydantic[dotenv]==1.10.5
+python-dotenv==1.0.0
 setuptools==67.4.0
 psycopg[binary]==3.1.8
 psycopg2-binary==2.9.5
