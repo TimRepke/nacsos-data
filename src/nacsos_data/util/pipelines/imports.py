@@ -94,9 +94,9 @@ async def submit_wos_import_task(import_id: UUID | str,
                                  base_url: str,
                                  engine: DatabaseEngineAsync) -> str:
     async with httpx.AsyncClient() as client, engine.session() as session:
-        import_details: Import = (await session.scalars(select(Import)
-                                                        .where(Import.import_id == import_id))
-                                  ).one_or_none()
+        import_details: Import | None = (await session.scalars(select(Import)
+                                                               .where(Import.import_id == import_id))
+                                         ).one_or_none()
         if import_details is None:
             raise ImportDetailsNotFound(f"No import found in db for id {import_id}")
 
@@ -142,9 +142,9 @@ async def submit_jsonl_import_task(import_id: UUID | str,
                                    base_url: str,
                                    engine: DatabaseEngineAsync) -> str:
     async with httpx.AsyncClient() as client, engine.session() as session:
-        import_details: Import = (await session.scalars(select(Import)
-                                                        .where(Import.import_id == import_id))
-                                  ).one_or_none()
+        import_details: Import | None = (await session.scalars(select(Import)
+                                                               .where(Import.import_id == import_id))
+                                         ).one_or_none()
         if import_details is None:
             raise ImportDetailsNotFound(f"No import found in db for id {import_id}")
 

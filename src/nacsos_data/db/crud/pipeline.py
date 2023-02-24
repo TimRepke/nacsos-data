@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel
 from sqlalchemy import func, select, asc, desc, delete, update
-from sqlalchemy.orm import Session # noqa: F401
+from sqlalchemy.orm import Session  # noqa: F401
 
 from nacsos_data.db import DatabaseEngine
 from nacsos_data.db.crud import MissingIdError
@@ -80,7 +80,7 @@ def read_num_tasks_for_fingerprint(fingerprint: str, engine: DatabaseEngine) -> 
     with engine.session() as session:  # type: Session
         stmt = select(func.count(Task.task_id)).where(Task.fingerprint == fingerprint)
         result = session.execute(stmt)
-        return result.scalar()
+        return result.scalar() or 0
 
 
 def check_fingerprint_exists(fingerprint: str, engine: DatabaseEngine) -> bool:
@@ -91,7 +91,7 @@ def check_task_id_exists(task_id: str, engine: DatabaseEngine) -> bool:
     with engine.session() as session:  # type: Session
         stmt = select(func.count(Task.task_id)).where(Task.task_id == task_id)
         result = session.execute(stmt)
-        return (result.scalar()) > 0
+        return (result.scalar() or 0) > 0
 
 
 class StatusForTask(BaseModel):
@@ -106,25 +106,26 @@ def read_task_statuses(task_ids: list[str], engine: DatabaseEngine) -> list[Stat
                 for r in session.execute(stmt).scalars().all()]
 
 
-def read_task_status_by_id(task_id: str, engine: DatabaseEngine) -> TaskStatus | str:
+def read_task_status_by_id(task_id: str, engine: DatabaseEngine) -> TaskStatus | str | None:
     with engine.session() as session:  # type: Session
         stmt = select(Task.status).where(Task.task_id == task_id)
-        return session.execute(stmt).scalar().one_or_none()
+        result: TaskStatus | str | None = session.scalar(stmt)
+        return result
 
 
-def delete_task_by_id(task_id: uuid.UUID | str, engine: DatabaseEngine):
+def delete_task_by_id(task_id: uuid.UUID | str, engine: DatabaseEngine) -> None:
     with engine.session() as session:  # type: Session
         stmt = delete(Task).where(Task.task_id == task_id)
         session.execute(stmt)
 
 
-def delete_tasks_by_fingerprint(fingerprint: str, engine: DatabaseEngine):
+def delete_tasks_by_fingerprint(fingerprint: str, engine: DatabaseEngine) -> None:
     with engine.session() as session:  # type: Session
         stmt = delete(Task).where(Task.fingerprint == fingerprint)
         session.execute(stmt)
 
 
-def reset_failed(engine: DatabaseEngine):
+def reset_failed(engine: DatabaseEngine) -> None:
     with engine.session() as session:  # type: Session
         stmt = update(Task).where(Task.status == TaskStatus.RUNNING).values(status=TaskStatus.FAILED)
         session.execute(stmt)
@@ -144,9 +145,9 @@ def upsert_task(task: TaskModel, engine: DatabaseEngine) -> TaskModel:
         return TaskModel.parse_obj(result.__dict__)
 
 
-def update_status(task_id: str | uuid.UUID, status: TaskStatus, engine: DatabaseEngine):
+def update_status(task_id: str | uuid.UUID, status: TaskStatus, engine: DatabaseEngine) -> None:
     with engine.session() as session:  # type: Session
-        task: Task = session.scalars(select(Task).where(Task.task_id == task_id)).one_or_none()
+        task: Task | None = session.scalars(select(Task).where(Task.task_id == task_id)).one_or_none()
         if task is None:
             raise MissingIdError(f'No task with ID={task_id} in database!')
 
