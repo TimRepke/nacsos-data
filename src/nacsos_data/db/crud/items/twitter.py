@@ -85,13 +85,19 @@ async def import_tweets(tweets: list[TwitterItemModel], engine: DatabaseEngineAs
 
 async def read_all_twitter_items_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) \
         -> list[TwitterItemModel]:
-    return await read_all_for_project(project_id=project_id, Schema=TwitterItem, Model=TwitterItemModel, engine=engine)
+    tweets: list[TwitterItemModel] = await read_all_for_project(project_id=project_id,
+                                                                Schema=TwitterItem, Model=TwitterItemModel,
+                                                                engine=engine)
+    return tweets
 
 
 async def read_all_twitter_items_for_project_paged(project_id: str | UUID, page: int, page_size: int,
                                                    engine: DatabaseEngineAsync) -> list[TwitterItemModel]:
-    return await read_paged_for_project(project_id=project_id, page=page, page_size=page_size,
-                                        Schema=TwitterItem, Model=TwitterItemModel, engine=engine)
+    tweets: list[TwitterItemModel] = await read_paged_for_project(project_id=project_id,
+                                                                  page=page, page_size=page_size,
+                                                                  Schema=TwitterItem, Model=TwitterItemModel,
+                                                                  engine=engine)
+    return tweets
 
 
 async def read_twitter_item_by_item_id(item_id: str | UUID, engine: DatabaseEngineAsync) -> TwitterItemModel | None:

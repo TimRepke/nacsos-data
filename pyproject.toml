@@ -23,6 +23,10 @@ warn_unreachable = true
 warn_unused_configs = true
 no_implicit_reexport = false
 strict_optional = true
+explicit_package_bases = true
+exclude = [
+    'scripts\/.*'
+]
 
 # for strict mypy: (this is the tricky one :-))
 disallow_untyped_defs = true

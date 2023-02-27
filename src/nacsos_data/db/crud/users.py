@@ -58,6 +58,8 @@ async def read_users_by_ids(user_ids: list[str], engine: DatabaseEngineAsync) ->
         if result is not None:
             return [UserInDBModel(**res.__dict__) for res in result]
 
+    return None
+
 
 async def read_user_by_name(username: str, engine: DatabaseEngineAsync) -> UserInDBModel | None:
     async with engine.session() as session:
@@ -95,6 +97,8 @@ async def read_users(engine: DatabaseEngineAsync,
         result = (await session.execute(stmt)).scalars().all()
         if result is not None:
             return [UserInDBModel(**res.__dict__) for res in result]
+
+    return None
 
 
 async def create_or_update_user(user: UserModel | UserInDBModel, engine: DatabaseEngineAsync) -> str:

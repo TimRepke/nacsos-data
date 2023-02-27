@@ -20,10 +20,10 @@ async def read_all_imports_for_project(project_id: UUID | str,
 
 async def read_item_count_for_import(import_id: UUID | str, engine: DatabaseEngineAsync) -> int:
     async with engine.session() as session:
-        stmt = select(func.count())\
-            .select_from(m2m_import_item_table)\
+        stmt = select(func.count()) \
+            .select_from(m2m_import_item_table) \
             .where(m2m_import_item_table.c.import_id == import_id)
-        result = (await session.execute(stmt)).scalar()
+        result: int | None = (await session.execute(stmt)).scalar()
         if result is None:
             raise NoResultFound('Something went majorly wrong...')
         return result
@@ -41,10 +41,10 @@ async def read_import(import_id: UUID | str,
 
 async def upsert_import(import_model: ImportModel,
                         engine: DatabaseEngineAsync) -> str | UUID | None:
-    key = await upsert_orm(upsert_model=import_model,
-                           Schema=Import,
-                           primary_key=Import.import_id.name,
-                           db_engine=engine)
+    key: str = await upsert_orm(upsert_model=import_model,
+                                Schema=Import,
+                                primary_key=Import.import_id.name,
+                                db_engine=engine)
     return key
 
 

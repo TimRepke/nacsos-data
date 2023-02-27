@@ -16,22 +16,25 @@ class Command(str, Enum):
 
 
 ROOT_PATH = Path(__file__).parent.parent.parent.parent.parent
-ALEMBIC_INI = ROOT_PATH / 'alembic.ini'
 
 
 def main(cmd: Command,
          revision: str | None = None,
          verbose: bool = True,
-         ini_file: Path = ALEMBIC_INI):
+         root_path: Path = ROOT_PATH,
+         ini_file: Path | None = None):
     """
     Alembic database migration wrapper.
 
     :param cmd:
     :param revision: typically `head` for upgrade, specific version for downgrade
     :param verbose:
-    :param ini_file: absolute path to the alembic.ini file
+    :param root_path: absolute path to the package base
+    :param ini_file: absolute path to the alembic.ini file (defaults to 'alembic.ini' in ROOT_PATH)
     :return:
     """
+    if ini_file is None:
+        ini_file = root_path / 'alembic.ini'
 
     print(f'Using alembic config at: {ini_file}')
     if not ini_file.is_file():
@@ -39,7 +42,7 @@ def main(cmd: Command,
 
     ALEMBIC_CFG = Config(ini_file,
                          config_args={
-                             'script_location': str(ROOT_PATH / 'src/nacsos_data/scripts/migrations'),
+                             'script_location': str(ROOT_PATH / 'nacsos_data/scripts/migrations'),
                              'prepend_sys_path': str(ROOT_PATH)
                          })
 

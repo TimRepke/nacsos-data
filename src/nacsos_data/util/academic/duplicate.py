@@ -56,8 +56,9 @@ async def find_duplicates(item: AcademicItemModel,
         stmt = stmt.where(AcademicItem.wos_id == item.wos_id)
 
     if db_engine is not None:
-        async with db_engine.session() as session:
-            item_ids: list[UUID] = (await session.execute(stmt)).scalars().all()  # type: ignore[assignment]
+        async with db_engine.session() as new_session:  # type: AsyncSession
+            tmp = await new_session.execute(stmt)
+            item_ids: list[UUID] = tmp.scalars().all()  # type: ignore[assignment]
     elif session is not None:
         item_ids = (await session.execute(stmt)).scalars().all()  # type: ignore[assignment]
     else:
@@ -65,4 +66,5 @@ async def find_duplicates(item: AcademicItemModel,
 
     if len(item_ids) > 0:
         return [str(iid) for iid in item_ids]
+
     return None

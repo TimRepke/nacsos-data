@@ -66,7 +66,7 @@ def create_annotations_lookup(annotations: list[AnnotationModel]) -> AnnotationM
         annotations_map[annotation.key].append(annotation)
 
     for key in annotations_map.keys():
-        annotations_map[key] = sorted(annotations_map[key], key=lambda a: a.repeat)
+        annotations_map[key] = sorted(annotations_map[key], key=lambda a: a.repeat)  # type: ignore[no-any-return]
 
     return annotations_map
 
@@ -144,11 +144,11 @@ def merge_scheme_and_annotations(annotation_scheme: AnnotationSchemeModel,
 
 def has_annotation(label: AnnotationSchemeLabel) -> bool:
     return label.annotation is not None \
-           and (label.annotation.value_int is not None
-                or label.annotation.value_str is not None
-                or label.annotation.value_bool is not None
-                or label.annotation.value_float is not None
-                or label.annotation.multi_int is not None)
+        and (label.annotation.value_int is not None
+             or label.annotation.value_str is not None
+             or label.annotation.value_bool is not None
+             or label.annotation.value_float is not None
+             or label.annotation.multi_int is not None)
 
 
 def annotated_scheme_to_annotations(scheme: AnnotationSchemeModel) -> list[AnnotationModel]:
