@@ -6,7 +6,7 @@ from sqlalchemy import pool, URL
 
 from alembic import context
 
-from src.nacsos_data.db.schemas import Base
+from nacsos_data.db.schemas import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
