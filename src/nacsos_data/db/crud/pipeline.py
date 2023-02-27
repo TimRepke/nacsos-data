@@ -53,7 +53,7 @@ def query_tasks(engine: DatabaseEngine,
         return [TaskModel.parse_obj(r.__dict__) for r in result]
 
 
-def read_task_by_id(task_id: uuid.UUID | str, engine: DatabaseEngine) -> TaskModel | None:
+def read_task_by_id(task_id: str | uuid.UUID, engine: DatabaseEngine) -> TaskModel | None:
     with engine.session() as session:  # type: Session
         stmt = select(Task).where(Task.task_id == task_id)
         result = session.execute(stmt).scalars().one_or_none()
@@ -62,7 +62,7 @@ def read_task_by_id(task_id: uuid.UUID | str, engine: DatabaseEngine) -> TaskMod
         return None
 
 
-def read_tasks_by_ids(task_ids: list[str], engine: DatabaseEngine) -> list[TaskModel]:
+def read_tasks_by_ids(task_ids: list[str] | list[uuid.UUID], engine: DatabaseEngine) -> list[TaskModel]:
     with engine.session() as session:  # type: Session
         stmt = select(Task).where(Task.task_id.in_(task_ids))
         return [TaskModel.parse_obj(r.__dict__)
@@ -87,7 +87,7 @@ def check_fingerprint_exists(fingerprint: str, engine: DatabaseEngine) -> bool:
     return read_num_tasks_for_fingerprint(fingerprint, engine) > 0
 
 
-def check_task_id_exists(task_id: str, engine: DatabaseEngine) -> bool:
+def check_task_id_exists(task_id: str | uuid.UUID, engine: DatabaseEngine) -> bool:
     with engine.session() as session:  # type: Session
         stmt = select(func.count(Task.task_id)).where(Task.task_id == task_id)
         result = session.execute(stmt)
@@ -99,21 +99,21 @@ class StatusForTask(BaseModel):
     status: TaskStatus | str
 
 
-def read_task_statuses(task_ids: list[str], engine: DatabaseEngine) -> list[StatusForTask]:
+def read_task_statuses(task_ids: list[str] | list[uuid.UUID], engine: DatabaseEngine) -> list[StatusForTask]:
     with engine.session() as session:  # type: Session
         stmt = select(Task.task_id, Task.status).where(Task.task_id.in_(task_ids))
         return [StatusForTask.parse_obj(r.__dict__)
                 for r in session.execute(stmt).scalars().all()]
 
 
-def read_task_status_by_id(task_id: str, engine: DatabaseEngine) -> TaskStatus | str | None:
+def read_task_status_by_id(task_id: str | uuid.UUID, engine: DatabaseEngine) -> TaskStatus | str | None:
     with engine.session() as session:  # type: Session
         stmt = select(Task.status).where(Task.task_id == task_id)
         result: TaskStatus | str | None = session.scalar(stmt)
         return result
 
 
-def delete_task_by_id(task_id: uuid.UUID | str, engine: DatabaseEngine) -> None:
+def delete_task_by_id(task_id: str | uuid.UUID, engine: DatabaseEngine) -> None:
     with engine.session() as session:  # type: Session
         stmt = delete(Task).where(Task.task_id == task_id)
         session.execute(stmt)
