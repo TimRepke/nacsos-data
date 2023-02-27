@@ -42,8 +42,8 @@ def main(cmd: Command,
 
     ALEMBIC_CFG = Config(ini_file,
                          config_args={
-                             'script_location': str(ROOT_PATH / 'nacsos_data/scripts/migrations'),
-                             'prepend_sys_path': str(ROOT_PATH)
+                             'script_location': str(root_path / 'nacsos_data/scripts/migrations'),
+                             'prepend_sys_path': str(root_path)
                          })
 
     if cmd == Command.current:
