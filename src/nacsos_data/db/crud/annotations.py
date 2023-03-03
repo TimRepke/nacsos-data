@@ -166,10 +166,14 @@ async def read_next_open_assignment_for_scope_for_user(assignment_scope_id: str 
 
 
 async def read_assignment(assignment_id: str | uuid.UUID,
-                          db_engine: DatabaseEngineAsync) -> AssignmentModel:
+                          db_engine: DatabaseEngineAsync) -> AssignmentModel | None:
     async with db_engine.session() as session:
         stmt = select(Assignment).filter_by(assignment_id=assignment_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
+
+        if result is None:
+            return None
+
         return AssignmentModel(**result.__dict__)
 
 

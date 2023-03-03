@@ -13,6 +13,8 @@ class Command(str, Enum):
     upgrade = 'upgrade'
     # Revert to a previous database revision
     downgrade = 'downgrade'
+    # Autogenerate/create a new revision
+    revision = 'revision'
 
 
 ROOT_PATH = Path(__file__).parent.parent.parent.parent.parent
@@ -22,7 +24,9 @@ def main(cmd: Command,
          revision: str | None = None,
          verbose: bool = True,
          root_path: Path = ROOT_PATH,
-         ini_file: Path | None = None):
+         ini_file: Path | None = None,
+         autogenerate: bool = False,
+         message: str | None = None):
     """
     Alembic database migration wrapper.
 
@@ -31,6 +35,8 @@ def main(cmd: Command,
     :param verbose:
     :param root_path: absolute path to the package base
     :param ini_file: absolute path to the alembic.ini file (defaults to 'alembic.ini' in ROOT_PATH)
+    :param message: used as `-m` in `alembic revision --autogenerate -m "message"`
+    :param autogenerate: used as `--autogenerate` in `alembic revision --autogenerate -m "message"`
     :return:
     """
     if ini_file is None:
@@ -52,6 +58,8 @@ def main(cmd: Command,
         command.upgrade(ALEMBIC_CFG, revision)
     elif cmd == Command.downgrade:
         command.downgrade(ALEMBIC_CFG, revision)
+    elif cmd == Command.revision:
+        command.revision(ALEMBIC_CFG, autogenerate=autogenerate, message=message)
 
 
 def run():

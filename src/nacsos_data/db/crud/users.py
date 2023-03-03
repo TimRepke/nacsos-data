@@ -14,32 +14,12 @@ if TYPE_CHECKING:
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
+def get_password_hash(password):
     return pwd_context.hash(password)
 
 
-async def authenticate_user_by_name(username: str, plain_password: str,
-                                    engine: DatabaseEngineAsync) -> UserInDBModel | None:
-    user = await read_user_by_name(username=username, engine=engine)
-    if not user:
-        return None
-    if not verify_password(plain_password, user.password):
-        return None
-    return user
-
-
-async def authenticate_user_by_id(user_id: str, plain_password: str,
-                                  engine: DatabaseEngineAsync) -> UserInDBModel | None:
-    user = await read_user_by_id(user_id=user_id, engine=engine)
-    if not user:
-        return None
-    if not verify_password(plain_password, user.password):
-        return None
-    return user
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 async def read_user_by_id(user_id: str, engine: DatabaseEngineAsync) -> UserInDBModel | None:

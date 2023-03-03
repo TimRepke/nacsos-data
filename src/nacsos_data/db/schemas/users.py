@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING
-from sqlalchemy import String, Boolean
+from sqlalchemy import String, Boolean, ForeignKey, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -25,10 +25,10 @@ class User(Base):
 
     # Username for that user
     # -> nicer than using email and allows us to have multiple accounts per email
-    username = mapped_column(String, nullable=False, unique=True)
+    username = mapped_column(String, nullable=False, unique=True, index=True)
 
     # Contact information for that user
-    email = mapped_column(String, nullable=False, unique=True)
+    email = mapped_column(String, nullable=False, unique=True, index=True)
 
     # Real name of that user (or "descriptor" if this is a bot account)
     full_name = mapped_column(String, nullable=False)
@@ -49,3 +49,23 @@ class User(Base):
     is_active = mapped_column(Boolean, nullable=False, default=True)
 
     project_permissions: Relationship['ProjectPermissions'] = relationship('ProjectPermissions', cascade='all, delete')
+    auth_tokens: Relationship['AuthToken'] = relationship('AuthToken', cascade='all, delete')
+
+
+class AuthToken(Base):
+    """
+    Stores the JSON Web Tokens for user authentication.
+    A user might have multiple tokens, e.g. in order to use as API tokens.
+    """
+    __tablename__ = 'auth_tokens'
+
+    token_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+                             nullable=False, unique=True, index=True)
+
+    # Refers to the User this auth token belongs to
+    username = mapped_column(String,
+                             ForeignKey(User.username),
+                             nullable=False, index=True, unique=False)
+
+    # Timestamp to indicate until when this token is valid; null means valid forever
+    valid_till = mapped_column(DateTime(timezone=True), nullable=True)

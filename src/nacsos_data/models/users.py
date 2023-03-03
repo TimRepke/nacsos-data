@@ -1,3 +1,5 @@
+import datetime
+
 from pydantic import EmailStr
 from uuid import UUID
 from pydantic import BaseModel
@@ -64,3 +66,12 @@ class UserInDBModel(UserInDBBaseModel):
     # Hashed password
     # via CryptContext(schemes=["bcrypt"], deprecated="auto").hash(plaintext_password)
     password: str
+
+
+# SON Web Token for user authentication.
+class AuthTokenModel(BaseModel):
+    token_id: str | UUID
+    # Refers to the User this auth token belongs to
+    username: str
+    # Timestamp to indicate until when this token is valid; null means valid forever
+    valid_till: datetime.datetime
