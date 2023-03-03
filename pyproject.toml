@@ -23,7 +23,8 @@ warn_unreachable = true
 warn_unused_configs = true
 no_implicit_reexport = false
 strict_optional = true
-explicit_package_bases = true
+explicit_package_bases = false
+
 exclude = [
     'scripts\/.*'
 ]

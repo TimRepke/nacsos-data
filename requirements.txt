@@ -7,4 +7,3 @@ SQLAlchemy==2.0.4
 sqlalchemy-json==0.5.0
 httpx[http2]==0.23.3
 passlib==1.7.4
-jose==1.0.0

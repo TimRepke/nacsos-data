@@ -89,17 +89,17 @@ class Authentication:
 
             return AuthTokenModel.parse_obj(token.__dict__)
 
-    async def clear_tokens_inactive(self):
+    async def clear_tokens_inactive(self) -> None:
         async with self.db_engine.session() as session:  # type: AsyncSession
             stmt = delete(AuthToken).where(AuthToken.valid_till < datetime.datetime.now())
             await session.execute(stmt)
 
-    async def clear_tokens_by_user(self, username: str):
+    async def clear_tokens_by_user(self, username: str) -> None:
         async with self.db_engine.session() as session:  # type: AsyncSession
             stmt = delete(AuthToken).where(AuthToken.username == username)
             await session.execute(stmt)
 
-    async def clear_token_by_id(self, token_id: str | uuid.UUID):
+    async def clear_token_by_id(self, token_id: str | uuid.UUID) -> None:
         async with self.db_engine.session() as session:  # type: AsyncSession
             stmt = delete(AuthToken).where(AuthToken.token_id == token_id)
             await session.execute(stmt)
@@ -164,12 +164,16 @@ class Authentication:
     async def get_project_permissions(self,
                                       project_id: str | uuid.UUID,
                                       user: UserInDBModel) -> ProjectPermissionsModel:
+        user_id = user.user_id
+        if user_id is None:
+            raise RuntimeError('Inconsistent behaviour, user is missing an ID!')
+
         if user.is_superuser:
             # admin gets to do anything always, so return with simulated full permissions
             return ProjectPermissionsModel.get_virtual_admin(project_id=str(project_id),
-                                                             user_id=str(user.user_id))
+                                                             user_id=str(user_id))
 
-        permissions = await read_project_permissions_for_user(user_id=user.user_id,
+        permissions = await read_project_permissions_for_user(user_id=user_id,
                                                               project_id=project_id,
                                                               engine=self.db_engine)
         if permissions is None:
@@ -191,8 +195,10 @@ class Authentication:
         if user is None:
             if username is not None:
                 user = await read_user_by_name(username=username, engine=self.db_engine)
-            else:
+            elif user_id is not None:
                 user = await read_user_by_id(user_id=user_id, engine=self.db_engine)
+            else:
+                raise RuntimeError('Implausible state: `username` and `user_id` is None!')
 
             # double-check that we actually found a user
             if user is None:
@@ -201,7 +207,8 @@ class Authentication:
         if type(required_permissions) is str:
             required_permissions = [required_permissions]
 
-        permissions = await self.get_project_permissions(project_id=project_id, user=user)
+        permissions = await self.get_project_permissions(project_id=project_id,
+                                                         user=user)  # type: ignore[arg-type]  # FIXME
         user_permissions = UserPermissions(user=UserModel.parse_obj(user), permissions=permissions)
 
         # no specific permissions were required (only basic access to the project) -> permitted!

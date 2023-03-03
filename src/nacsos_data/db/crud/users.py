@@ -1,3 +1,4 @@
+import uuid
 from uuid import uuid4
 from typing import TYPE_CHECKING
 
@@ -14,15 +15,15 @@ if TYPE_CHECKING:
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
 
-def get_password_hash(password):
+def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def verify_password(plain_password, hashed_password):
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-async def read_user_by_id(user_id: str, engine: DatabaseEngineAsync) -> UserInDBModel | None:
+async def read_user_by_id(user_id: str | uuid.UUID, engine: DatabaseEngineAsync) -> UserInDBModel | None:
     async with engine.session() as session:
         stmt = select(User).filter_by(user_id=user_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
@@ -35,7 +36,7 @@ async def read_users_by_ids(user_ids: list[str], engine: DatabaseEngineAsync) ->
     async with engine.session() as session:
         stmt = select(User).filter(User.user_id.in_(user_ids))
         result = (await session.execute(stmt)).scalars().all()
-        if result is not None:
+        if result is not None and len(result) > 0:
             return [UserInDBModel(**res.__dict__) for res in result]
 
     return None
@@ -75,7 +76,7 @@ async def read_users(engine: DatabaseEngineAsync,
             stmt.order_by(asc(User.username))
 
         result = (await session.execute(stmt)).scalars().all()
-        if result is not None:
+        if result is not None and len(result) > 0:
             return [UserInDBModel(**res.__dict__) for res in result]
 
     return None
