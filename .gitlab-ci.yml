@@ -59,10 +59,11 @@ backup:
   tags:
     - bare-metal
   script:
-    - cd /home/nacsos/nacsos-core
-    - mkdir -p backups
-    - cd backups
+    - cd /home/nacsos/backups
     - ls -lisah .
     - export PGPASSWORD="${NACSOS_DB__PASSWORD}"
     - pg_dump --format=c --verbose --blobs --clean --if-exists --inserts --dbname=${NACSOS_DB__DATABASE} --host=${NACSOS_DB__HOST} --port=${NACSOS_DB__PORT} --username=${NACSOS_DB__USER} --file="backup_$(date +"%Y-%m-%dT%H-%M-%S").sql"
+    - ls -lisah .
+    - echo "Keep the six most recent backups and drop the rest"
+    - ls -tp | grep -v '/$' | tail -n +6 | xargs -I {} rm -- {}
     - ls -lisah .
