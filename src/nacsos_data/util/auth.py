@@ -4,7 +4,7 @@ import datetime
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, or_
 
 from ..db import DatabaseEngineAsync
 from ..db.crud.projects import read_project_permissions_for_user
@@ -70,7 +70,8 @@ class Authentication:
         async with self.db_engine.session() as session:  # type: AsyncSession
             stmt = select(AuthToken).where(AuthToken.username == username)
             if only_active:
-                stmt = stmt.where(AuthToken.valid_till > datetime.datetime.now())
+                stmt = stmt.where(or_(AuthToken.valid_till > datetime.datetime.now(),
+                                      AuthToken.valid_till.is_(None)))
             token = (await session.scalars(stmt)).one_or_none()
 
             if token is None:
@@ -81,7 +82,8 @@ class Authentication:
         async with self.db_engine.session() as session:  # type: AsyncSession
             stmt = select(AuthToken).where(AuthToken.token_id == token_id)
             if only_active:
-                stmt = stmt.where(AuthToken.valid_till > datetime.datetime.now())
+                stmt = stmt.where(or_(AuthToken.valid_till > datetime.datetime.now(),
+                                      AuthToken.valid_till.is_(None)))
             token = (await session.scalars(stmt)).one_or_none()
 
             if token is None:
