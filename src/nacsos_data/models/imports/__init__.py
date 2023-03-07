@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Type
 from enum import Enum
 from uuid import UUID
 from pydantic import BaseModel
@@ -10,7 +10,7 @@ from .import_config_jsonl import ImportConfigJSONL, LineEncoding
 from .import_config_wos import ImportConfigWoS
 
 
-class ImportType(Enum):
+class ImportType(str, Enum):
     # File import
     ris = 'ris'  # single or bulk import of publications via RIS file(s)
     csv = 'csv'  # single or bulk import of publications via CSV file(s)
@@ -30,10 +30,25 @@ class ImportType(Enum):
 
 
 ImportTypeLiteral = Literal['ris', 'csv', 'jsonl',
-                            'wos', 'scopus', 'ebsco', 'jstor', 'ovid', 'pop',
-                            'twitter', 'script']
+'wos', 'scopus', 'ebsco', 'jstor', 'ovid', 'pop',
+'twitter', 'script']
 
-ImportConfig = ImportConfigRIS | ImportConfigTwitter | ImportConfigJSONL | ImportConfigWoS
+ImportConfig = ImportConfigTwitter | ImportConfigJSONL | ImportConfigWoS
+
+Type2Conf: dict[ImportTypeLiteral, Type[ImportConfig] | None] = {
+    'jsonl': ImportConfigJSONL,
+    'wos': ImportConfigWoS,
+    'twitter': ImportConfigTwitter,
+    # TODO: not implemented, yet
+    'ris': None,
+    'csv': None,
+    'scopus': None,
+    'ebsco': None,
+    'jstor': None,
+    'ovid': None,
+    'pop': None,
+    'script': None
+}
 
 
 class ImportModel(BaseModel):

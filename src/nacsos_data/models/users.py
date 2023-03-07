@@ -74,4 +74,4 @@ class AuthTokenModel(BaseModel):
     # Refers to the User this auth token belongs to
     username: str
     # Timestamp to indicate until when this token is valid; null means valid forever
-    valid_till: datetime.datetime
+    valid_till: datetime.datetime | None

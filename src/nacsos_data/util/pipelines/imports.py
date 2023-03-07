@@ -9,7 +9,13 @@ from sqlalchemy import select
 
 from ...db import DatabaseEngineAsync
 from ...db.schemas.imports import Import
-from ...models.imports import ImportConfigJSONL, LineEncoding, ImportModel, ImportConfigWoS
+from ...models.imports import \
+    ImportConfigJSONL, \
+    LineEncoding, \
+    ImportModel, \
+    ImportConfigWoS, \
+    Type2Conf, \
+    ImportTypeLiteral
 
 logger = logging.getLogger('nacsos_data.util.pipelines')
 
@@ -137,15 +143,23 @@ async def _submit_import_task(import_id: UUID | str,
             raise ImportDetailsNotFound(f"No import found in db for id {import_id}")
 
         converter: Type[JSONLConverter] | Type[WebOfScienceConverter] | None = None
-        if type(import_details.config) == ImportConfigJSONL:
-            config: ImportConfigJSONL = import_details.config
+
+        logger.debug(f'Import config type: {import_details.type} ({type(import_details.config)})')
+
+        conf_type: ImportTypeLiteral = import_details.type.value
+        ConfigModel = Type2Conf.get(conf_type)
+
+        if ConfigModel is None:
+            raise UndefinedEncoding(f'This import type ({import_details.type}) has no known pipeline function.')
+
+        config = ConfigModel.parse_obj(import_details.config)
+        if type(config) == ImportConfigJSONL:
             converter = get_jsonl_converter(config.line_type)
-        elif type(import_details.config) == ImportConfigWoS:
-            config: ImportConfigWoS = import_details.config  # type: ignore[no-redef]
+        elif type(config) == ImportConfigWoS:
             converter = WebOfScienceConverter
 
-        if converter is None:
-            raise UndefinedEncoding(f'Line encoding "{config.line_type}" has no matching pipeline task (yet).')
+        if config is None or converter is None:
+            raise UndefinedEncoding('Could not find a proper converter for this config.')
 
         payload = {
             'task_id': None,
@@ -163,7 +177,8 @@ async def _submit_import_task(import_id: UUID | str,
             response = await client.put(f'{base_url}/queue/submit/task',
                                         json=payload,
                                         headers={
-                                            'Authorization': f'Bearer {auth_token}'
+                                            'Authorization': f'Bearer {auth_token}',
+                                            'X-Project-ID': str(import_details.project_id)
                                         })
             if response.status_code != 200:
                 error = response.json()
