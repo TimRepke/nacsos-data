@@ -1,5 +1,5 @@
 import logging
-from typing import Any, ClassVar, Type
+from typing import Any, ClassVar, Type, Literal
 from abc import ABC, abstractmethod
 from uuid import UUID
 
@@ -9,17 +9,14 @@ from sqlalchemy import select
 
 from ...db import DatabaseEngineAsync
 from ...db.schemas.imports import Import
-from ...models.imports import ImportConfigJSONL, LineEncoding, ImportModel
+from ...models.imports import ImportConfigJSONL, LineEncoding, ImportModel, ImportConfigWoS
 
 logger = logging.getLogger('nacsos_data.util.pipelines')
 
+FileType = Literal['wos-file']
+
 
 class Converter(ABC):
-    @property
-    @abstractmethod
-    def encoding(self) -> LineEncoding:
-        ...
-
     func_name: ClassVar[str]
 
     @staticmethod
@@ -28,7 +25,21 @@ class Converter(ABC):
         ...
 
 
-class TwitterConverter(Converter):
+class GenericConverter(Converter):
+    @property
+    @abstractmethod
+    def encoding(self) -> FileType:
+        ...
+
+
+class JSONLConverter(Converter):
+    @property
+    @abstractmethod
+    def encoding(self) -> LineEncoding:
+        ...
+
+
+class TwitterConverter(JSONLConverter):
     encoding: LineEncoding = 'db-twitter-item'
     func_name = 'nacsos_lib.twitter.import.import_twitter_db'
 
@@ -47,7 +58,7 @@ class TwitterConverter(Converter):
         }
 
 
-class TwitterApiConverter(Converter):
+class TwitterApiConverter(JSONLConverter):
     encoding: LineEncoding = 'twitter-api-page'
     func_name = 'nacsos_lib.twitter.import.import_twitter_api'
 
@@ -70,15 +81,40 @@ class TwitterApiConverter(Converter):
 # 'db-academic-item': '',
 # 'db-patent-item': ''
 
+class WebOfScienceConverter(Converter):
+    encoding: FileType = 'wos-file'
+    func_name = 'nacsos_lib.academic.import.import_wos_file'
 
-def get_converter(line_type: LineEncoding) -> Type[Converter] | None:
-    for sc in Converter.__subclasses__():
+    @staticmethod
+    def convert_details(import_details: ImportModel) -> dict[str, Any]:
+        if type(import_details.config) != ImportConfigWoS:
+            raise AttributeError('Incompatible import details config.')
+        return {
+            'project_id': str(import_details.project_id),
+            'import_id': str(import_details.import_id),
+            'records': {
+                'user_serializer': 'WebOfScienceSerializer',
+                'user_dtype': 'AcademicItemModel',
+                'filenames': import_details.config.filenames
+            }
+        }
+
+
+def get_jsonl_converter(line_type: LineEncoding) -> Type[JSONLConverter] | None:
+    for sc in JSONLConverter.__subclasses__():
         if sc.encoding == line_type:  # type: ignore[comparison-overlap]
             return sc
     return None
 
 
-class UndefinedJSONLEncoding(Exception):
+def get_generic_converter(line_type: FileType) -> Type[GenericConverter] | None:
+    for sc in GenericConverter.__subclasses__():
+        if sc.encoding == line_type:  # type: ignore[comparison-overlap]
+            return sc  # type: ignore[unreachable] # FIXME
+    return None
+
+
+class UndefinedEncoding(Exception):
     pass
 
 
@@ -90,70 +126,26 @@ class ImportDetailsNotFound(Exception):
     pass
 
 
-async def submit_wos_import_task(import_id: UUID | str,
-                                 base_url: str,
-                                 engine: DatabaseEngineAsync) -> str:
+async def _submit_import_task(import_id: UUID | str,
+                              base_url: str,
+                              auth_token: str,
+                              engine: DatabaseEngineAsync) -> str:
     async with httpx.AsyncClient() as client, engine.session() as session:
-        import_details: Import | None = (await session.scalars(select(Import)
-                                                               .where(Import.import_id == import_id))
-                                         ).one_or_none()
+        stmt = select(Import).where(Import.import_id == import_id)
+        import_details: Import | None = (await session.scalars(stmt)).one_or_none()
         if import_details is None:
             raise ImportDetailsNotFound(f"No import found in db for id {import_id}")
 
-        payload = {
-            'task_id': None,
-            'function_name': 'nacsos_lib.academic.import.import_wos_file',
-            'params': {
-                'project_id': str(import_details.project_id),
-                'import_id': str(import_details.import_id),
-                'records': {
-                    'user_serializer': 'WebOfScienceSerializer',
-                    'user_dtype': 'AcademicItemModel',
-                    'filenames': import_details.config['filenames']
-                }
-            },
-            'user_id': str(import_details.user_id),
-            'project_id': str(import_details.project_id),
-            'comment': f'Import for "{import_details.name}" ({import_id})',
-            'location': 'LOCAL',
-            'force_run': True,
-            'forced_dependencies': None,
-        }
-        logger.debug(payload)
-        try:
-            response = await client.put(f'{base_url}/queue/submit/task', json=payload)
-        except HTTPError as e:
-            logger.exception(e)
+        converter: Type[JSONLConverter] | Type[WebOfScienceConverter] | None = None
+        if type(import_details.config) == ImportConfigJSONL:
+            config: ImportConfigJSONL = import_details.config
+            converter = get_jsonl_converter(config.line_type)
+        elif type(import_details.config) == ImportConfigWoS:
+            config: ImportConfigWoS = import_details.config  # type: ignore[no-redef]
+            converter = WebOfScienceConverter
 
-        if response.status_code != 200:
-            error = response.json()
-            raise FailedJobSubmission('Failed to submit job', payload, error)
-
-        task_id: str = response.json()
-
-        # remember that we submitted this import job (and its reference)
-        import_details.pipeline_task_id = task_id
-        await session.commit()
-
-    return task_id
-
-
-async def submit_jsonl_import_task(import_id: UUID | str,
-                                   base_url: str,
-                                   engine: DatabaseEngineAsync) -> str:
-    async with httpx.AsyncClient() as client, engine.session() as session:
-        import_details: Import | None = (await session.scalars(select(Import)
-                                                               .where(Import.import_id == import_id))
-                                         ).one_or_none()
-        if import_details is None:
-            raise ImportDetailsNotFound(f"No import found in db for id {import_id}")
-
-        assert type(import_details.config) == ImportConfigJSONL
-        config: ImportConfigJSONL = import_details.config
-
-        converter = get_converter(config.line_type)
         if converter is None:
-            raise UndefinedJSONLEncoding(f'Line encoding "{config.line_type}" has no matching pipeline task (yet).')
+            raise UndefinedEncoding(f'Line encoding "{config.line_type}" has no matching pipeline task (yet).')
 
         payload = {
             'task_id': None,
@@ -168,18 +160,40 @@ async def submit_jsonl_import_task(import_id: UUID | str,
         }
 
         try:
-            response = await client.put(f'{base_url}/queue/submit/task', json=payload)
+            response = await client.put(f'{base_url}/queue/submit/task',
+                                        json=payload,
+                                        headers={
+                                            'Authorization': f'Bearer {auth_token}'
+                                        })
+            if response.status_code != 200:
+                error = response.json()
+                raise FailedJobSubmission('Failed to submit job', payload, error)
+
+            task_id: str = response.json()
+
+            # remember that we submitted this import job (and its reference)
+            import_details.pipeline_task_id = task_id
+            await session.commit()
+
+            return task_id
         except HTTPError as e:
             logger.exception(e)
+            raise FailedJobSubmission('Failed to submit job', repr(e))
 
-        if response.status_code != 200:
-            error = response.json()
-            raise FailedJobSubmission('Failed to submit job', payload, error)
 
-        task_id: str = response.json()
+async def submit_wos_import_task(import_id: UUID | str,
+                                 base_url: str, auth_token: str,
+                                 engine: DatabaseEngineAsync) -> str:
+    return await _submit_import_task(import_id=import_id,
+                                     base_url=base_url,
+                                     auth_token=auth_token,
+                                     engine=engine)
 
-        # remember that we submitted this import job (and its reference)
-        import_details.pipeline_task_id = task_id
-        await session.commit()
 
-    return task_id
+async def submit_jsonl_import_task(import_id: UUID | str,
+                                   base_url: str, auth_token: str,
+                                   engine: DatabaseEngineAsync) -> str:
+    return await _submit_import_task(import_id=import_id,
+                                     base_url=base_url,
+                                     auth_token=auth_token,
+                                     engine=engine)
