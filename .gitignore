@@ -8,3 +8,4 @@ scripts/testing/
 scripts/scratch/
 build/*
 venv/*
+backups/
