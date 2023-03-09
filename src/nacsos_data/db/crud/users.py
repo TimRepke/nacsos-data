@@ -101,6 +101,11 @@ async def create_or_update_user(user: UserModel | UserInDBModel, engine: Databas
             await session.execute(select(User).where(User.user_id == user.user_id))
         ).scalars().one_or_none()
 
+        password: str | None = getattr(user, 'password', None)
+        hashed_password: str | None = None
+        if password is not None:
+            hashed_password = get_password_hash(password)
+
         if user_db is None:  # seems to be a new user
             user_id = user.user_id
             if user.user_id is None:
@@ -108,6 +113,10 @@ async def create_or_update_user(user: UserModel | UserInDBModel, engine: Databas
                 user.user_id = user_id
             else:
                 user_id = str(user_id)
+
+            if hashed_password is None:
+                raise ValueError('Missing password!')
+            user.password = hashed_password
             session.add(User(**user.dict()))
         else:
             # user_id -> not editable
@@ -118,9 +127,8 @@ async def create_or_update_user(user: UserModel | UserInDBModel, engine: Databas
             user_db.is_active = user.is_active
             user_db.is_superuser = user.is_superuser
 
-            password: str | None = getattr(user, 'password', None)
-            if password is not None:
-                user_db.password = get_password_hash(password)
+            if hashed_password is not None:
+                user_db.password = hashed_password
 
             user_id = str(user_db.user_id)
 
