@@ -69,13 +69,13 @@ async def read_users(engine: DatabaseEngineAsync,
         stmt = select(User)
 
         if project_id is not None:
-            stmt.join(ProjectPermissions, ProjectPermissions.user_id == User.user_id)
-            stmt.where(ProjectPermissions.project_id == project_id)
+            stmt = stmt.join(ProjectPermissions, ProjectPermissions.user_id == User.user_id)
+            stmt = stmt.where(ProjectPermissions.project_id == project_id)
 
         if order_by_username:
-            stmt.order_by(asc(User.username))
+            stmt = stmt.order_by(asc(User.username))
 
-        result = (await session.execute(stmt)).scalars().all()
+        result = (await session.scalars(stmt)).all()
         if result is not None and len(result) > 0:
             return [UserInDBModel(**res.__dict__) for res in result]
 
