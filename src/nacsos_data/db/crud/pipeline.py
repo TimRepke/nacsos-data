@@ -140,8 +140,6 @@ def upsert_task(task: TaskModel, engine: DatabaseEngine) -> TaskModel:
                                                         set_=task.dict())
                                  .returning(Task),
                                  execution_options={"populate_existing": True}).one_or_none()
-        print(result)
-        print(result.__dict__)
         return TaskModel.parse_obj(result.__dict__)
 
 
