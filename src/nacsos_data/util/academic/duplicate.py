@@ -23,6 +23,7 @@ async def find_duplicates(item: AcademicItemModel,
                           project_id: str | None = None,
                           check_doi: bool = False,
                           check_wos_id: bool = False,
+                          check_oa_id: bool = False,
                           db_engine: DatabaseEngineAsync | None = None,
                           session: AsyncSession | None = None) -> list[str] | None:
     """
@@ -36,6 +37,7 @@ async def find_duplicates(item: AcademicItemModel,
     :param db_engine:
     :param check_doi:
     :param check_wos_id:
+    :param check_oa_id:
     :param session:
     :return:
     """
@@ -54,6 +56,8 @@ async def find_duplicates(item: AcademicItemModel,
         stmt = stmt.where(AcademicItem.doi == item.doi)
     if check_wos_id and item.wos_id is not None:
         stmt = stmt.where(AcademicItem.wos_id == item.wos_id)
+    if check_oa_id and item.openalex_id is not None:
+        stmt = stmt.where(AcademicItem.openalex_id == item.openalex_id)
 
     if db_engine is not None:
         async with db_engine.session() as new_session:  # type: AsyncSession
