@@ -18,7 +18,7 @@ class AcademicItem(Item):
         UniqueConstraint('openalex_id', 'project_id'),
         UniqueConstraint('s2_id', 'project_id'),
         UniqueConstraint('pubmed_id', 'project_id'),
-        UniqueConstraint('title_slug', 'project_id'),
+        # UniqueConstraint('title_slug', 'project_id'),
     )
 
     item_id = mapped_column(UUID(as_uuid=True),
