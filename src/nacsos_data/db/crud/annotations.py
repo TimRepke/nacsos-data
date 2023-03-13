@@ -146,7 +146,11 @@ async def read_next_assignment_for_scope_for_user(current_assignment_id: str | u
                                                'assignment_id': current_assignment_id})).mappings().one_or_none()
         if result is not None:
             return AssignmentModel(**result)
-    return None
+
+    # Try to fall back on next open assignment (apparently we reached the end of the list here).
+    return await read_next_open_assignment_for_scope_for_user(assignment_scope_id=assignment_scope_id,
+                                                              user_id=user_id,
+                                                              db_engine=db_engine)
 
 
 async def read_next_open_assignment_for_scope_for_user(assignment_scope_id: str | uuid.UUID,
