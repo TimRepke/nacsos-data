@@ -7,7 +7,7 @@ from .projects import Project, ProjectPermissions
 from .users import User
 from .imports import Import, m2m_import_item_table
 from .pipeline import Task
-from .hightlight import Highlighter
+from .highlight import Highlighter
 
 from .items import ItemType, ItemTypeLiteral
 from .items.base import Item
