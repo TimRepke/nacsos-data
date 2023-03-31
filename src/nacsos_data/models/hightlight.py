@@ -2,7 +2,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
-class Highlighter(BaseModel):
+class HighlighterModel(BaseModel):
     """
     A highlighter can be used in a project to highlight tokens in text to make
     it easier for users to annotate documents when certain keywords are highlighted.
