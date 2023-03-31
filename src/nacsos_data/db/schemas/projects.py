@@ -10,6 +10,10 @@ from .items import ItemType
 
 if TYPE_CHECKING:
     from .items.base import Item
+    from .hightlight import Highlighter
+    from .annotations import AnnotationScheme
+    from .bot_annotations import BotAnnotationMetaData
+    from .imports import Import
 
 
 class Project(Base):
@@ -44,7 +48,16 @@ class Project(Base):
     items: WriteOnlyMapped[list['Item']] = relationship(cascade="all, delete-orphan",
                                                         passive_deletes=True)
 
-    permissions: Relationship['ProjectPermissions'] = relationship('ProjectPermissions', cascade='all, delete')
+    permissions: Relationship['ProjectPermissions'] = relationship('ProjectPermissions',
+                                                                   cascade='all, delete')
+    highlighters: Relationship['Highlighter'] = relationship('Highlighter',
+                                                             cascade='all, delete')
+    bot_annotation_metadata_entries: Relationship['BotAnnotationMetaData'] = relationship('BotAnnotationMetaData',
+                                                                                          cascade='all, delete')
+    annotation_schemes: Relationship['AnnotationScheme'] = relationship('AnnotationScheme',
+                                                                        cascade='all, delete')
+    imports: Relationship['Import'] = relationship('Import',
+                                                   cascade='all, delete')
 
 
 class ProjectPermissions(Base):

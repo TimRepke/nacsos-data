@@ -39,7 +39,7 @@ class BotAnnotationMetaData(Base):
     kind = mapped_column(SAEnum(BotKind), nullable=False)
     # Reference to a project
     project_id = mapped_column(UUID(as_uuid=True),
-                               ForeignKey(Project.project_id),
+                               ForeignKey(Project.project_id, ondelete='CASCADE'),
                                nullable=False, index=True)
 
     # Date and time when this meta entry was created (or last changed)
@@ -92,7 +92,7 @@ class BotAnnotation(Base):
 
     # Reference to the parent labels' annotation.
     parent = mapped_column(UUID(as_uuid=True),
-                           ForeignKey('bot_annotation.bot_annotation_id'),
+                           ForeignKey('bot_annotation.bot_annotation_id', ondelete='CASCADE'),
                            nullable=True, index=True)
 
     # (Optional) Defines which AnnotationSchemeLabel.key this Annotation refers to.

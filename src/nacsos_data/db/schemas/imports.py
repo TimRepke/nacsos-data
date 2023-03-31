@@ -48,7 +48,7 @@ class Import(Base):
 
     # The project this import is attached to
     project_id = mapped_column(UUID(as_uuid=True),
-                               ForeignKey(Project.project_id),
+                               ForeignKey(Project.project_id, ondelete='CASCADE'),
                                nullable=False, index=True, primary_key=False)
 
     # The task_id assigned by nacsos-pipes service (if this import is handled by a pipeline)

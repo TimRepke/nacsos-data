@@ -30,7 +30,7 @@ class Task(Base):
 
     # Project this task is attached to
     project_id = mapped_column(UUID(as_uuid=True),
-                               ForeignKey(Project.project_id),
+                               ForeignKey(Project.project_id, ondelete='CASCADE'),
                                nullable=False, index=True, primary_key=False)
 
     # fingerprint based on the parameters for this task

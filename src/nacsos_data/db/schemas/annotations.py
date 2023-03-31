@@ -17,6 +17,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship, mapped_column, Relationship, Mapped
 from sqlalchemy_json import mutable_json_type
 
+from .hightlight import Highlighter
 from ...models.annotations import AssignmentStatus
 from ...db.base_class import Base
 
@@ -43,7 +44,7 @@ class AnnotationScheme(Base):
 
     # Reference to the project this AnnotationScheme belongs to.
     project_id = mapped_column(UUID(as_uuid=True),
-                               ForeignKey(Project.project_id),
+                               ForeignKey(Project.project_id, ondelete='CASCADE'),
                                nullable=False)
 
     # A short descriptive title / name for this AnnotationScheme.
@@ -98,6 +99,11 @@ class AssignmentScope(Base):
 
     # Stores the config parameters used in creating the assignments for future reference
     config = mapped_column(mutable_json_type(dbtype=JSONB, nested=True), nullable=True)
+
+    # List of keywords to highlight in this assignment scope (based on Highlighter)
+    highlighter_id = mapped_column(UUID(as_uuid=True),
+                                   ForeignKey(Highlighter.highlighter_id),
+                                   nullable=True, index=False)
 
     # reference to the associated assignments
     assignments: Relationship['Assignment'] = relationship('Assignment', cascade='all, delete')
@@ -190,12 +196,12 @@ class Annotation(Base):
 
     # The Assignment this Annotation is responding to.
     assignment_id = mapped_column(UUID(as_uuid=True),
-                                  ForeignKey(Assignment.assignment_id),
+                                  ForeignKey(Assignment.assignment_id, ondelete='CASCADE'),
                                   nullable=False, index=True)
 
     # The User the AnnotationScheme/Item combination is assigned to (redundant to implicit information from Assignment)
     user_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(User.user_id),
+                            ForeignKey(User.user_id, ondelete='CASCADE'),
                             nullable=False, index=True)
 
     # The Item this assigment refers to (redundant to implicit information from Assignment)
@@ -206,7 +212,7 @@ class Annotation(Base):
     # The AnnotationScheme defining the annotation scheme to be used for this assignment
     # (redundant to implicit information from Assignment)
     annotation_scheme_id = mapped_column(UUID(as_uuid=True),
-                                         ForeignKey(AnnotationScheme.annotation_scheme_id),
+                                         ForeignKey(AnnotationScheme.annotation_scheme_id, ondelete='CASCADE'),
                                          nullable=False, index=True)
 
     # Defines which AnnotationSchemeLabel.key this Annotation refers to.
@@ -220,7 +226,7 @@ class Annotation(Base):
 
     # Reference to the parent labels' annotation.
     parent = mapped_column(UUID(as_uuid=True),
-                           ForeignKey('annotation.annotation_id'),
+                           ForeignKey('annotation.annotation_id', ondelete='CASCADE'),
                            nullable=True, index=True)
 
     # Depending on the AnnotationSchemeLabel.kind, one of the following fields should be filled.

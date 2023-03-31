@@ -8,11 +8,15 @@ does not provide the required functionality.
 
 ## Creating database revision
 ```bash
+# uncomment "script_location" line in alembic.ini
+
 # automatically creating up/downgrade script
 $ alembic revision --autogenerate -m "Helpful comment"
 
 # apply the migration
 $ alembic upgrade head
+
+# revert uncommenting in alembic.ini
 ```
 
 ## Testing
