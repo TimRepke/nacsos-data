@@ -8,7 +8,14 @@ from .projects import Project
 
 class Highlighter(Base):
     """
+    A highlighter can be used in a project to highlight tokens in text to make
+    it easier for users to annotate documents when certain keywords are highlighted.
 
+    It is assumed, that a highlighter roughly corresponds to query terms.
+    Furthermore, keywords in a highlighter will typically be joined into
+    a regular expression group (e.g. "(keyword1|double keyword|wildcar.*)").
+
+    Each matching group will be wrapped in a highlight span in the frontend.
     """
     __tablename__ = 'highlighters'
 
@@ -20,3 +27,6 @@ class Highlighter(Base):
                                nullable=False, index=True)
     # List of keywords (regexes) to match
     keywords = mapped_column(ARRAY(String), nullable=False, index=False)
+
+    # Valid HTML style="..." string (typically sth. like 'background-color: #123456')
+    style = mapped_column(String, nullable=True, index=False)

@@ -21,6 +21,7 @@ def upgrade():
                     sa.Column('highlighter_id', sa.UUID(), nullable=False),
                     sa.Column('project_id', sa.UUID(), nullable=False),
                     sa.Column('keywords', postgresql.ARRAY(sa.String()), nullable=False),
+                    sa.Column('style', sa.String(), nullable=True),
                     sa.ForeignKeyConstraint(['project_id'], ['project.project_id'], ),
                     sa.PrimaryKeyConstraint('highlighter_id')
                     )
