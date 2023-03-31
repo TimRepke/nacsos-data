@@ -17,6 +17,8 @@ class HighlighterModel(BaseModel):
     highlighter_id: str | UUID
     # Reference to a project
     project_id: str | UUID
+    # Useful and recognisable name
+    name: str
     # List of keywords (regexes) to match
     keywords: list[str]
     # Valid HTML style="..." string (typically sth. like 'background-color: #123456')

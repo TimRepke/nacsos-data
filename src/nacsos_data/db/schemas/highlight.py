@@ -25,6 +25,10 @@ class Highlighter(Base):
     # Reference to a project
     project_id = mapped_column(UUID(as_uuid=True), ForeignKey(Project.project_id, ondelete='CASCADE'),
                                nullable=False, index=True)
+
+    # Useful and recognisable name
+    name = mapped_column(String, nullable=False, index=False)
+
     # List of keywords (regexes) to match
     keywords = mapped_column(ARRAY(String), nullable=False, index=False)
 
