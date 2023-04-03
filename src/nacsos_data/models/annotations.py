@@ -1,11 +1,12 @@
 from __future__ import annotations
+
+import uuid
 from typing import Literal, Optional, Union
 
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel
-
 
 # Types of Labels:
 #   - bool: stored in `Annotation.value_bool`, used for binary labels (no children)
@@ -100,7 +101,7 @@ class AnnotationSchemeModelFlat(_AnnotationSchemeModel):
     labels: list[FlattenedAnnotationSchemeLabel]
 
 
-AssignmentScopeBaseConfigTypes = Literal['random']
+AssignmentScopeBaseConfigTypes = Literal['random', 'random_exclusion']
 
 
 class AssignmentScopeBaseConfig(BaseModel):
@@ -118,7 +119,12 @@ class AssignmentScopeRandomConfig(AssignmentScopeBaseConfig):
     random_seed: int
 
 
-AssignmentScopeConfig = AssignmentScopeRandomConfig
+class AssignmentScopeRandomWithExclusionConfig(AssignmentScopeRandomConfig):
+    config_type: AssignmentScopeBaseConfigTypes = 'random_exclusion'
+    excluded_scopes: list[UUID] | list[str]
+
+
+AssignmentScopeConfig = AssignmentScopeRandomConfig | AssignmentScopeRandomWithExclusionConfig
 
 
 class AssignmentScopeModel(BaseModel):
@@ -145,6 +151,8 @@ class AssignmentScopeModel(BaseModel):
     description: str | None = None
     # Config for the assignment (for reference, optional)
     config: AssignmentScopeConfig | None = None
+    # List of keywords to highlight in this assignment scope (based on Highlighter)
+    highlighter_id: str | uuid.UUID | None = None
 
 
 class AssignmentStatus(str, Enum):
