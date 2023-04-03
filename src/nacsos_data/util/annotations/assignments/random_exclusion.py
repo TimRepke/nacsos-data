@@ -45,7 +45,7 @@ async def read_random_items(project_id: str | UUID,
         return [str(res['item_id']) for res in result]
 
 
-async def random_assignments_with_excludion(assignment_scope_id: str | UUID,
+async def random_assignments_with_exclusion(assignment_scope_id: str | UUID,
                                             annotation_scheme_id: str | UUID,
                                             project_id: str | UUID,
                                             config: AssignmentScopeRandomWithExclusionConfig,
