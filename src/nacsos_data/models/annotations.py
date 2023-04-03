@@ -121,10 +121,10 @@ class AssignmentScopeRandomConfig(AssignmentScopeBaseConfig):
 
 class AssignmentScopeRandomWithExclusionConfig(AssignmentScopeRandomConfig):
     config_type: AssignmentScopeBaseConfigTypes = 'random_exclusion'
-    excluded_scopes: list[UUID] | list[str]
+    excluded_scopes: list[str] | list[UUID]
 
 
-AssignmentScopeConfig = AssignmentScopeRandomConfig | AssignmentScopeRandomWithExclusionConfig
+AssignmentScopeConfig = AssignmentScopeRandomWithExclusionConfig | AssignmentScopeRandomConfig
 
 
 class AssignmentScopeModel(BaseModel):
