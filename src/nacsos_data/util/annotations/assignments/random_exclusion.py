@@ -2,7 +2,8 @@ import random
 from uuid import UUID, uuid4
 from typing import TYPE_CHECKING
 
-from sqlalchemy import text
+from sqlalchemy import text, bindparam
+from sqlalchemy.dialects.postgresql import ARRAY, UUID as pguuid
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.models.annotations import \
@@ -34,7 +35,7 @@ async def read_random_items(project_id: str | UUID,
             LIMIT :num_items;
             """)
         stmt = stmt.bindparams(
-            bindparam('scope_ids', type_=ARRAY(String), value=scopes),
+            bindparam('scope_ids', type_=ARRAY(pguuid), value=scopes),
         )
         result = (await session.execute(stmt, {
             'project_id': project_id,
