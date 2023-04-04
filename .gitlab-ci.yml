@@ -57,9 +57,9 @@ backup:
   only:
     - schedules
   tags:
-    - bare-metal
+    - vm,bare-metal
   script:
-    - cd /home/nacsos/backups
+    - cd $NACSOS_BACKUP_LOCATION
     - ls -lisah .
     - export PGPASSWORD="${NACSOS_DB__PASSWORD}"
     - pg_dump --format=c --verbose --blobs --clean --if-exists --inserts --dbname=${NACSOS_DB__DATABASE} --host=${NACSOS_DB__HOST} --port=${NACSOS_DB__PORT} --username=${NACSOS_DB__USER} --file="backup_$(date +"%Y-%m-%dT%H-%M-%S").sql"
