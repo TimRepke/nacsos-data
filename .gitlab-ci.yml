@@ -59,6 +59,11 @@ backup:
   tags:
     - vm,bare-metal
   script:
+    - echo $NACSOS_BACKUP_LOCATION
+    - echo $NACSOS_BACKUP_COUNT
+    - echo $NACSOS_DB__DATABASE
+    - echo $NACSOS_DB__HOST
+    - echo $NACSOS_DB__PORT
     - cd $NACSOS_BACKUP_LOCATION
     - ls -lisah .
     - export PGPASSWORD="${NACSOS_DB__PASSWORD}"
