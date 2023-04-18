@@ -86,13 +86,13 @@ backup-nacsos:
     - du -hd1 .
     #
     - echo "Put the backup folder into an archive and delete the folder"
-    - tar czvf ${BACKUP_PATH}.tar.gz ${BACKUP_PATH}
+    - tar czvf ${BACKUP_PATH}.tar.gz ${BACKUP_NAME}
     - ls -lisah .
     - rm -r ${BACKUP_PATH}
     - ls -lisah .
     #
     - echo "Keep the six most recent backups and drop the rest"
-    - ls -tp | grep -v '/$' | tail -n $KEEP_DAILY | xargs -I {} rm -- {}
+    - ls -tp | grep -v '/$' | tail -n +$KEEP_DAILY | xargs -I {} rm -- {}
     - ls -lisah .
     # On Sunday, move the backup
     - |-
@@ -100,7 +100,7 @@ backup-nacsos:
         echo "Time for a remote backup, syncing to MCC Synology"
         scp ${BACKUP_PATH}.tar.gz apsis-backup@10.10.14.150:${REMOTE_TARGET}
         ssh apsis-backup@10.10.14.150 "ls -lisah ${REMOTE_TARGET}"
-        ssh apsis-backup@10.10.14.150 "cd ${REMOTE_TARGET}; ls -tp | grep -v '/$' | tail -n ${KEEP_WEEKLY} | xargs -I {} rm -- {}"
+        ssh apsis-backup@10.10.14.150 "cd ${REMOTE_TARGET}; ls -tp | grep -v '/$' | tail -n +${KEEP_WEEKLY} | xargs -I {} rm -- {}"
         ssh apsis-backup@10.10.14.150 "ls -lisah ${REMOTE_TARGET}"
       else
         echo "Not syncing backup with remote."
