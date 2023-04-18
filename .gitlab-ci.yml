@@ -77,7 +77,7 @@ backup-nacsos:
     - cd $BACKUP_LOCATION
     - ls -lisah .
     #
-    - echo "Run the actual database export
+    - echo "Run the actual database export"
     - export PGPASSWORD="${DB_PASSWORD}"
     - pg_dump -Fd -j 12 -Z 9 -d ${DB_DATABASE} -h ${DB_PORT} -p ${DB_PORT} -U ${DB_USER} -W -v --file="${BACKUP_PATH}"
     #
