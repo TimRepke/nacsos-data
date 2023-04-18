@@ -64,6 +64,7 @@ backup-nacsos:
     #
     - echo "Echo some variables, just for debug purposes"
     - echo $REMOTE_TARGET
+    - echo $REMOTE_DAY
     - echo $BACKUP_LOCATION
     - echo $BACKUP_NAME
     - echo $BACKUP_PATH
@@ -96,7 +97,7 @@ backup-nacsos:
     - ls -lisah .
     # On Sunday, move the backup
     - |-
-      if [ $(date +"%u") = '7' ]; then
+      if [ $(date +"%u") = '${REMOTE_DAY}' ]; then
         echo "Time for a remote backup, syncing to MCC Synology"
         scp ${BACKUP_PATH}.tar.gz apsis-backup@10.10.14.150:${REMOTE_TARGET}
         echo "remote ls of ${REMOTE_TARGET}" 
