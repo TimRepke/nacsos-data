@@ -99,8 +99,11 @@ backup-nacsos:
       if [ $(date +"%u") = '2' ]; then
         echo "Time for a remote backup, syncing to MCC Synology"
         scp ${BACKUP_PATH}.tar.gz apsis-backup@10.10.14.150:${REMOTE_TARGET}
+        echo "remote ls of ${REMOTE_TARGET}" 
         ssh apsis-backup@10.10.14.150 "ls -lisah ${REMOTE_TARGET}"
+        echo "dropping older files"
         ssh apsis-backup@10.10.14.150 "cd ${REMOTE_TARGET}; ls -tp | grep -v '/$' | tail -n +${KEEP_WEEKLY} | xargs -I {} rm -- {}"
+        echo "remote ls of ${REMOTE_TARGET} (after rm tail)"
         ssh apsis-backup@10.10.14.150 "ls -lisah ${REMOTE_TARGET}"
       else
         echo "Not syncing backup with remote."
