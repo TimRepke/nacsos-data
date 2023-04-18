@@ -53,22 +53,66 @@ test-job2:
     - source venv/bin/activate
     - mypy --config-file=pyproject.toml src/nacsos_data
 
-backup:
+backup-nacsos:
   only:
     - schedules
   tags:
     - vm,bare-metal
   script:
-    - echo $NACSOS_BACKUP_LOCATION
-    - echo $NACSOS_BACKUP_COUNT
-    - echo $NACSOS_DB__DATABASE
-    - echo $NACSOS_DB__HOST
-    - echo $NACSOS_DB__PORT
-    - cd $NACSOS_BACKUP_LOCATION
+    - export BACKUP_NAME="backup_$(date +"%Y-%m-%dT%H-%M-%S")"
+    - export BACKUP_PATH="${$BACKUP_LOCATION}/${BACKUP_NAME}"
+    #
+    - echo "Echo some variables, just for debug purposes"
+    - echo $REMOTE_TARGET
+    - echo $BACKUP_LOCATION
+    - echo $BACKUP_NAME
+    - echo $BACKUP_PATH
+    - echo $KEEP_DAILY
+    - echo $KEEP_WEEKLY
+    - echo $DB_DATABASE
+    - echo $DB_HOST
+    - echo $DB_PORT
+    #
+    - echo "Go to target location and have a look"
+    - cd $BACKUP_LOCATION
     - ls -lisah .
-    - export PGPASSWORD="${NACSOS_DB__PASSWORD}"
-    - pg_dump --format=c --verbose --blobs --clean --if-exists --inserts --dbname=${NACSOS_DB__DATABASE} --host=${NACSOS_DB__HOST} --port=${NACSOS_DB__PORT} --username=${NACSOS_DB__USER} --file="backup_$(date +"%Y-%m-%dT%H-%M-%S").sql"
+    #
+    - echo "Run the actual database export
+    - export PGPASSWORD="${DB_PASSWORD}"
+    - pg_dump -Fd -j 12 -Z 9 -d ${DB_DATABASE} -h ${DB_PORT} -p ${DB_PORT} -U ${DB_USER} -W -v --file="${$BACKUP_PATH}"
+    #
+    - echo "Check that the backup worked out"
     - ls -lisah .
+    - du -hd1 .
+    #
+    - echo "Put the backup folder into an archive and delete the folder"
+    - tar czvf ${BACKUP_PATH}.tar.gz ${BACKUP_PATH}
+    - ls -lisah .
+    - rm -r ${BACKUP_PATH}
+    - ls -lisah .
+    #
     - echo "Keep the six most recent backups and drop the rest"
-    - ls -tp | grep -v '/$' | tail -n +$NACSOS_BACKUP_COUNT | xargs -I {} rm -- {}
+    - ls -tp | grep -v '/$' | tail -n $KEEP_DAILY | xargs -I {} rm -- {}
     - ls -lisah .
+    # On Sunday, move the backup
+    - |-
+      if [ $(date +"%u") = '2' ]; then
+        echo "Time for a remote backup, syncing to MCC Synology"
+        scp ${BACKUP_PATH}.tar.gz apsis-backup@10.10.14.150:${REMOTE_TARGET}
+        ssh apsis-backup@10.10.14.150 "ls -lisah ${REMOTE_TARGET}"
+        ssh apsis-backup@10.10.14.150 "cd ${REMOTE_TARGET}; ls -tp | grep -v '/$' | tail -n ${KEEP_WEEKLY} | xargs -I {} rm -- {}"
+        ssh apsis-backup@10.10.14.150 "ls -lisah ${REMOTE_TARGET}"
+      else
+        echo "Not syncing backup with remote."
+      fi
+
+# from server moval
+# pg_dump -Fd -j 12 -Z 9 -d [db] -h [host] -p [port] -U [user] -W -v --file=/usr/local/apsis/backups/nacsos1/db/backup_20230406-132900/
+# pg_restore -Fd -C -j 12 -d [db] -h  [host] -p [port] -U [user] -W -v /usr/local/apsis/backups/nacsos1/db/backup_20230406-132900/
+# old ci
+#- pg_dump --format=c --verbose --blobs --clean --if-exists --inserts --dbname=${NACSOS_DB__DATABASE} --host=${NACSOS_DB__HOST} --port=${NACSOS_DB__PORT} --username=${NACSOS_DB__USER} --file="backup_$(date +"%Y-%m-%dT%H-%M-%S").sql"
+# old vm
+#backup the whole database on every saturday to weekly
+#5 4 * * 6 pg_dump --cluster 12/main --dbname=postgresql://[user]:[pw]@[host]:5432/[db] --format=c --file=/usr/local/apsis/db_backup/weekly/tmv_db_backup_$(date +"\%Y-\%m-\%d").sqlc
+# delete backup files from weekly older than 6 days (was 23 days to ensure one month coverage)
+#0 4 * * 6 find /usr/local/apsis/db_backup/weekly/* -mtime +5 -type f -delete
