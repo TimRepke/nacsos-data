@@ -1,8 +1,8 @@
 flake8==6.0.0
-tox==4.4.8
-pytest==7.2.2
+tox==4.4.12
+pytest==7.3.1
 pytest-cov==4.0.0
-mypy==1.1.1
-alembic==1.10.2
+mypy==1.2.0
+alembic==1.10.3
 types-passlib==1.7.7.11
 typer==0.7.0
