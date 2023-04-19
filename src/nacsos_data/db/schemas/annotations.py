@@ -17,7 +17,6 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship, mapped_column, Relationship, Mapped
 from sqlalchemy_json import mutable_json_type
 
-from .highlight import Highlighter
 from ...models.annotations import AssignmentStatus
 from ...db.base_class import Base
 
