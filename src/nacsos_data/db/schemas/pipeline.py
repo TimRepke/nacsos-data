@@ -40,7 +40,8 @@ class Task(Base):
     function_name = mapped_column(String, nullable=False, unique=False, index=True)
 
     # indicates the tasks (referenced by task_id) this task depends on (or None if no dependencies exist)
-    dependencies = mapped_column(ARRAY(UUID(as_uuid=True)), nullable=True)
+    dependencies = mapped_column(ARRAY(UUID(as_uuid=True)),  # ForeignKey(Task.task_id),
+                                 nullable=True, index=False)
 
     # current status of the task
     status = mapped_column(Enum(TaskStatus), nullable=False,

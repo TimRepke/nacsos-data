@@ -10,7 +10,7 @@ from .items import ItemType
 
 if TYPE_CHECKING:
     from .items.base import Item
-    from .hightlight import Highlighter
+    from .highlight import Highlighter
     from .annotations import AnnotationScheme
     from .bot_annotations import BotAnnotationMetaData
     from .imports import Import
