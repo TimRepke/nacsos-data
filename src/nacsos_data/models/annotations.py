@@ -152,7 +152,7 @@ class AssignmentScopeModel(BaseModel):
     # Config for the assignment (for reference, optional)
     config: AssignmentScopeConfig | None = None
     # List of keywords to highlight in this assignment scope (based on Highlighter)
-    highlighter_id: str | uuid.UUID | None = None
+    highlighter_ids: list[str] | list[uuid.UUID] | None = None
 
 
 class AssignmentStatus(str, Enum):

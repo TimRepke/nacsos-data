@@ -101,9 +101,8 @@ class AssignmentScope(Base):
     config = mapped_column(mutable_json_type(dbtype=JSONB, nested=True), nullable=True)
 
     # List of keywords to highlight in this assignment scope (based on Highlighter)
-    highlighter_id = mapped_column(UUID(as_uuid=True),
-                                   ForeignKey(Highlighter.highlighter_id),
-                                   nullable=True, index=False)
+    highlighter_ids = mapped_column(ARRAY(UUID(as_uuid=True)),  # ForeignKey(Highlighter.highlighter_id),
+                                    nullable=True, index=False)
 
     # reference to the associated assignments
     assignments: Relationship['Assignment'] = relationship('Assignment', cascade='all, delete')
