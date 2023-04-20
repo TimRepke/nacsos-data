@@ -75,7 +75,7 @@ class Authentication:
             token = (await session.scalars(stmt)).one_or_none()
 
             if token is None:
-                raise InvalidCredentialsError(f'No auth token found for user "{username}"')
+                raise InvalidCredentialsError(f'No valid auth token found for user "{username}"')
             return AuthTokenModel.parse_obj(token.__dict__)
 
     async def fetch_token_by_id(self, token_id: str | uuid.UUID, only_active: bool = True) -> AuthTokenModel:
@@ -87,7 +87,7 @@ class Authentication:
             token = (await session.scalars(stmt)).one_or_none()
 
             if token is None:
-                raise InvalidCredentialsError(f'No auth token found for token_id "{token_id}"')
+                raise InvalidCredentialsError(f'No valid auth token found for token_id "{token_id}"')
 
             return AuthTokenModel.parse_obj(token.__dict__)
 
