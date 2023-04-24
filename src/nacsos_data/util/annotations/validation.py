@@ -101,6 +101,7 @@ def validate_annotated_assignment(annotation_scheme: AnnotationSchemeModel,
                 if label.required and cnt == 0:
                     status = AssignmentStatus.PARTIAL
                 if cnt > label.max_repeat:
+                    logger.debug(f'{cnt} > {label.max_repeat}  || {label}')
                     status = AssignmentStatus.INVALID
 
         return status

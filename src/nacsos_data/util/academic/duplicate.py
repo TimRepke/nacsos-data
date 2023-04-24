@@ -1,6 +1,6 @@
 import re
 from uuid import UUID
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db import DatabaseEngineAsync
@@ -21,6 +21,7 @@ def get_title_slug(item: AcademicItemModel) -> str | None:
 
 async def find_duplicates(item: AcademicItemModel,
                           project_id: str | None = None,
+                          check_tslug: bool = False,
                           check_doi: bool = False,
                           check_wos_id: bool = False,
                           check_oa_id: bool = False,
@@ -35,6 +36,7 @@ async def find_duplicates(item: AcademicItemModel,
     :param item:
     :param project_id:
     :param db_engine:
+    :param check_tslug:
     :param check_doi:
     :param check_wos_id:
     :param check_oa_id:
@@ -48,16 +50,20 @@ async def find_duplicates(item: AcademicItemModel,
         item.title_slug = get_title_slug(item)
 
     stmt = select(AcademicItem.item_id)
-    stmt = stmt.where(AcademicItem.title_slug == item.title_slug)
 
     if project_id is not None:
         stmt = stmt.where(AcademicItem.project_id == project_id)
+
+    checks = []
+    if check_tslug and item.title_slug is not None and len(item.title_slug) > 0:
+        checks.append(AcademicItem.title_slug == item.title_slug)
     if check_doi and item.doi is not None:
-        stmt = stmt.where(AcademicItem.doi == item.doi)
+        checks.append(AcademicItem.doi == item.doi)
     if check_wos_id and item.wos_id is not None:
-        stmt = stmt.where(AcademicItem.wos_id == item.wos_id)
+        checks.append(AcademicItem.wos_id == item.wos_id)
     if check_oa_id and item.openalex_id is not None:
-        stmt = stmt.where(AcademicItem.openalex_id == item.openalex_id)
+        checks.append(AcademicItem.openalex_id == item.openalex_id)
+    stmt = stmt.where(or_(*checks))
 
     if db_engine is not None:
         async with db_engine.session() as new_session:  # type: AsyncSession
