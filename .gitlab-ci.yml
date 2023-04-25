@@ -97,7 +97,7 @@ backup-nacsos:
     - ls -lisah .
     # On Sunday, move the backup
     - |-
-      if [ $(date +"%u") = '${REMOTE_DAY}' ]; then
+      if [ $(date +"%u") = $REMOTE_DAY ]; then
         echo "Time for a remote backup, syncing to MCC Synology"
         scp ${BACKUP_PATH}.tar.gz apsis-backup@10.10.14.150:${REMOTE_TARGET}
         echo "remote ls of ${REMOTE_TARGET}" 
@@ -109,14 +109,3 @@ backup-nacsos:
       else
         echo "Not syncing backup with remote."
       fi
-
-# from server moval
-# pg_dump -Fd -j 12 -Z 9 -d [db] -h [host] -p [port] -U [user] -W -v --file=/usr/local/apsis/backups/nacsos1/db/backup_20230406-132900/
-# pg_restore -Fd -C -j 12 -d [db] -h  [host] -p [port] -U [user] -W -v /usr/local/apsis/backups/nacsos1/db/backup_20230406-132900/
-# old ci
-#- pg_dump --format=c --verbose --blobs --clean --if-exists --inserts --dbname=${NACSOS_DB__DATABASE} --host=${NACSOS_DB__HOST} --port=${NACSOS_DB__PORT} --username=${NACSOS_DB__USER} --file="backup_$(date +"%Y-%m-%dT%H-%M-%S").sql"
-# old vm
-#backup the whole database on every saturday to weekly
-#5 4 * * 6 pg_dump --cluster 12/main --dbname=postgresql://[user]:[pw]@[host]:5432/[db] --format=c --file=/usr/local/apsis/db_backup/weekly/tmv_db_backup_$(date +"\%Y-\%m-\%d").sqlc
-# delete backup files from weekly older than 6 days (was 23 days to ensure one month coverage)
-#0 4 * * 6 find /usr/local/apsis/db_backup/weekly/* -mtime +5 -type f -delete
