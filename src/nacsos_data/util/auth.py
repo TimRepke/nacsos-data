@@ -101,9 +101,13 @@ class Authentication:
             stmt = delete(AuthToken).where(AuthToken.username == username)
             await session.execute(stmt)
 
-    async def clear_token_by_id(self, token_id: str | uuid.UUID) -> None:
+    async def clear_token_by_id(self,
+                                token_id: str | uuid.UUID,
+                                verify_username: str | None = None) -> None:
         async with self.db_engine.session() as session:  # type: AsyncSession
             stmt = delete(AuthToken).where(AuthToken.token_id == token_id)
+            if verify_username:
+                stmt = stmt.where(AuthToken.username == verify_username)
             await session.execute(stmt)
 
     async def refresh_or_create_token(self,
