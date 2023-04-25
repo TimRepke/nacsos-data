@@ -109,7 +109,8 @@ class Authentication:
     async def refresh_or_create_token(self,
                                       username: str | None = None,
                                       token_id: str | uuid.UUID | None = None,
-                                      token_lifetime_minutes: int | None = None) -> AuthTokenModel:
+                                      token_lifetime_minutes: int | None = None,
+                                      verify_username: str | None = None) -> AuthTokenModel:
 
         if token_lifetime_minutes is None:
             token_lifetime_minutes = self.token_lifetime_minutes
@@ -123,10 +124,13 @@ class Authentication:
             else:
                 raise AssertionError('Missing username or token_id!')
 
-            token_orm = (await session.scalars(stmt)).one_or_none()
+            token_orm: AuthToken | None = (await session.scalars(stmt)).one_or_none()
 
             # There's an existing token that we just need to update
             if token_orm is not None:
+                if verify_username is not None and verify_username != token_orm.username:
+                    raise InvalidCredentialsError('This is not you!')
+
                 token_orm.valid_till = valid_till
                 token = AuthTokenModel.parse_obj(token_orm.__dict__)
                 await session.commit()
