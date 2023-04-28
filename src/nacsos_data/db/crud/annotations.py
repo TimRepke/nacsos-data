@@ -464,10 +464,21 @@ async def store_resolved_bot_annotations(project_id: str, name: str,
         session.add(metadata)
         await session.commit()
 
-        bot_annotations_orm = [BotAnnotation(**{**anno.dict(), 'bot_annotation_metadata_id': meta_uuid})
-                               for anno in bot_annotations]
-        session.add_all(bot_annotations_orm)
-        await session.commit()
+        annotation_heap = {anno.bot_annotation_id: anno for anno in bot_annotations}
+        added_ids = set()
+
+        while len(annotation_heap) > 0:
+            to_add = [
+                anno
+                for anno in annotation_heap.values()
+                if anno.parent is None or anno.parent in added_ids
+            ]
+            added_ids.update([anno.bot_annotation_id for anno in to_add])
+
+            for anno in to_add:
+                session.add(BotAnnotation(**{**anno.dict(), 'bot_annotation_metadata_id': meta_uuid}))
+                await session.commit()
+                del annotation_heap[anno.bot_annotation_id]
 
         return str(meta_uuid)
 
