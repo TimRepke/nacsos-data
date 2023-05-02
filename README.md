@@ -9,7 +9,8 @@ does not provide the required functionality.
 ## Creating database revision
 ```bash
 nacsos_migrate revision --autogenerate --root-path src/nacsos_data/ --ini-file alembic.ini --message "???"
-
+nacsos_migrate upgrade --revision head --root-path src/nacsos_data/ --ini-file alembic.ini
+ 
 # or directly
 # first, uncomment "script_location" line in alembic.ini
 
