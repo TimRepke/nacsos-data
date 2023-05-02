@@ -1,6 +1,6 @@
 import uuid
 from typing import TYPE_CHECKING
-from sqlalchemy import String, ForeignKey, Boolean, Enum as SAEnum, UniqueConstraint
+from sqlalchemy import String, ForeignKey, Boolean, Enum as SAEnum, UniqueConstraint, text
 from sqlalchemy.orm import mapped_column, WriteOnlyMapped, relationship, Relationship, Mapped
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -47,7 +47,11 @@ class Project(Base):
     # https://docs.sqlalchemy.org/en/20/orm/large_collections.html
     items: WriteOnlyMapped[list['Item']] = relationship(cascade="all, delete-orphan",
                                                         passive_deletes=True)
+    # === Project settings ===
+    # True = motivational quotes are shown to the user
+    setting_motivational_quotes = mapped_column(Boolean, nullable=False, server_default=text('true'), default=True)
 
+    # === Project relationships (quick way to access project-related data)
     permissions: Relationship['ProjectPermissions'] = relationship('ProjectPermissions',
                                                                    cascade='all, delete')
     highlighters: Relationship['Highlighter'] = relationship('Highlighter',

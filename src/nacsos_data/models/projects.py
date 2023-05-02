@@ -29,6 +29,10 @@ class ProjectModel(BaseModel):
     # This is used to show item-type specific interface elements and join enriched meta-data
     type: ItemTypeLiteral | ItemType
 
+    # === Project settings ===
+    # True = motivational quotes are shown to the user
+    setting_motivational_quotes: bool = True
+
 
 ProjectPermission = Literal['owner',
                             'dataset_read', 'dataset_edit',
