@@ -8,7 +8,10 @@ does not provide the required functionality.
 
 ## Creating database revision
 ```bash
-# uncomment "script_location" line in alembic.ini
+nacsos_migrate revision --autogenerate --root-path src/nacsos_data/ --ini-file alembic.ini --message "???"
+
+# or directly
+# first, uncomment "script_location" line in alembic.ini
 
 # automatically creating up/downgrade script
 $ alembic revision --autogenerate -m "Helpful comment"
