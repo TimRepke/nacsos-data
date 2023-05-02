@@ -40,7 +40,9 @@ def _get_settings(conf_file: str | None = None) -> DatabaseConfig:
     return DatabaseConfig(_env_file=conf_file, _env_file_encoding='utf-8')  # type: ignore[call-arg]
 
 
-def get_engine(conf_file: str | None = None, settings: DatabaseConfig | None = None) -> DatabaseEngine:
+def get_engine(conf_file: str | None = None,
+               settings: DatabaseConfig | None = None,
+               debug: bool = False) -> DatabaseEngine:
     """
     Returns a database connection (aka DatabaseEngine).
 
@@ -76,10 +78,11 @@ def get_engine(conf_file: str | None = None, settings: DatabaseConfig | None = N
         settings = _get_settings(conf_file)
 
     return DatabaseEngine(host=settings.HOST, port=settings.PORT, user=settings.USER, password=settings.PASSWORD,
-                          database=settings.DATABASE)
+                          database=settings.DATABASE, debug=debug)
 
 
-def get_engine_async(conf_file: str | None = None) -> DatabaseEngineAsync:
+def get_engine_async(conf_file: str | None = None,
+                     debug: bool = False) -> DatabaseEngineAsync:
     """
     Same as `get_engine()`, but returns async db engine.
 
@@ -93,4 +96,4 @@ def get_engine_async(conf_file: str | None = None) -> DatabaseEngineAsync:
     """
     settings = _get_settings(conf_file)
     return DatabaseEngineAsync(host=settings.HOST, port=settings.PORT, user=settings.USER, password=settings.PASSWORD,
-                               database=settings.DATABASE)
+                               database=settings.DATABASE, debug=debug)
