@@ -73,7 +73,7 @@ def _get_label_selects(labels: list[LabelSelector],
 
 async def prepare_export_table(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
                                assignment_scope_ids: list[str] | list[uuid.UUID] | None,
-                               user_ids: list[str] | list[uuid.UUID],
+                               user_ids: list[str] | list[uuid.UUID] | None,
                                labels: list[LabelSelector],
                                item_fields: list[Type[MappedColumn]],
                                item_type: AnyItemModelType,
