@@ -58,6 +58,22 @@ def _majority_vote_scalar(label_annotations: list[AnnotationModel],
     return AnnotationValue(**{field: Counter(flat_values).most_common()[0][0]})  # type: ignore[misc]
 
 
+def _majority_vote_str(label_annotations: list[AnnotationModel],
+                       field: AnnotationScalarValueField,
+                       label: list[Label]) -> AnnotationValue:
+    flat_values = [la.__dict__[field]
+                   for la in label_annotations
+                   if la is not None and la.__dict__[field] is not None and len(la.__dict__[field]) > 0]
+
+    logger.debug(f'Found {len(flat_values)} annotations for "{_label_to_str(label)}" of type "{field}".')
+
+    if len(flat_values) == 0:
+        raise EmptyAnnotationsError(f'No entries for "{_label_to_str(label)}" of type "{field}".')
+
+    # FIXME: mypy error: Keywords must be strings  [misc]
+    return AnnotationValue(**{field: '\n----\n'.join(flat_values)})  # type: ignore[misc]
+
+
 def _label_to_str(label: list[Label]) -> str:
     return ','.join([f'{li.key}-{li.repeat}' for li in label])
 
@@ -79,11 +95,11 @@ def naive_majority_vote(collection: AnnotationCollection,
                 value = _majority_vote_scalar(annotations, field='value_int', label=label)
             elif kind == 'multi':
                 value = _majority_vote_list(annotations, field='multi_int', label=label)
+            elif kind == 'str':
+                value = _majority_vote_str(annotations, field='value_str', label=label)
             # elif column_schemes[label_i].kind == 'int':
             #     pass
             # elif column_schemes[label_i].kind == 'float':
-            #     pass
-            # elif column_schemes[label_i].kind == 'str':
             #     pass
             # elif column_schemes[label_i].kind == 'intext':
             #     pass
