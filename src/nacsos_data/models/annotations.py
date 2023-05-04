@@ -37,6 +37,9 @@ class AnnotationSchemeLabel(BaseModel):
     max_repeat: int = 1
     required: bool = True
 
+    # if true, the choices will be rendered as a searchable dropdown rather than a list
+    dropdown: bool = False
+
     kind: AnnotationSchemeLabelTypes = 'single'
     # to be used in single or multi, which are dropdown menus
     choices: Optional[list[AnnotationSchemeLabelChoice]] = None
