@@ -123,7 +123,7 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
             return and_(Schema.key == label.key,
                         Schema.multi_int.overlap(label.options_multi))
         if label.strings:
-            return Schema.key == label.key
+            return Schema.key == label.key  # type: ignore[no-any-return]
 
         return None
 

@@ -61,9 +61,9 @@ def _majority_vote_scalar(label_annotations: list[AnnotationModel],
 def _majority_vote_str(label_annotations: list[AnnotationModel],
                        field: AnnotationScalarValueField,
                        label: list[Label]) -> AnnotationValue:
-    flat_values = [la.__dict__[field]
-                   for la in label_annotations
-                   if la is not None and la.__dict__[field] is not None and len(la.__dict__[field]) > 0]
+    flat_values: list[str] = [la.__dict__[field]
+                              for la in label_annotations
+                              if la is not None and la.__dict__[field] is not None and len(la.__dict__[field]) > 0]
 
     logger.debug(f'Found {len(flat_values)} annotations for "{_label_to_str(label)}" of type "{field}".')
 
@@ -71,7 +71,7 @@ def _majority_vote_str(label_annotations: list[AnnotationModel],
         raise EmptyAnnotationsError(f'No entries for "{_label_to_str(label)}" of type "{field}".')
 
     # FIXME: mypy error: Keywords must be strings  [misc]
-    return AnnotationValue(**{field: '\n----\n'.join(flat_values)})  # type: ignore[misc]
+    return AnnotationValue(**{field: '\n----\n'.join(flat_values)})  # type: ignore[arg-type, misc]
 
 
 def _label_to_str(label: list[Label]) -> str:
