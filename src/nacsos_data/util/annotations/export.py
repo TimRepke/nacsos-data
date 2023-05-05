@@ -80,7 +80,7 @@ def _multi_label_columns(key: str, repeat: int | None, values: list[int], cte: C
         label = lambda x: f'{key}({repeat})|{x}'  # noqa: E731
     return [
         case((F.count().filter(and_(*conditions)) > 0,
-              F.max(case((and_(any_(cte.c.multi) == v, *conditions), 1), else_=0))))
+              F.max(case((and_(any_(cte.c.multi_int) == v, *conditions), 1), else_=0))))
         .label(label(v))
         for v in values
     ]
