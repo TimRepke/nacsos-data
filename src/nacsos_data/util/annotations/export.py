@@ -15,6 +15,7 @@ from sqlalchemy import select, \
     String, \
     Integer, \
     Column, \
+    ColumnElement, \
     CTE, \
     Label
 from sqlalchemy.dialects.postgresql import UUID
@@ -37,6 +38,7 @@ class LabelOptions(BaseModel):
     options_int: list[int] | None = None
     options_bool: list[bool] | None = None
     options_multi: list[int] | None = None
+    strings: bool | None = None
 
 
 def _bool_label_columns(key: str, repeat: int, cte: CTE) \
@@ -109,7 +111,6 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
                      user_ids: list[str] | list[uuid.UUID] | None,
                      labels: dict[str, LabelOptions] | None,
                      ignore_order: bool) -> CTE:
-    from sqlalchemy import ColumnElement
     def _label_filter(Schema: Type[Annotation] | Type[BotAnnotation],
                       label: LabelOptions) -> ColumnElement[bool] | None:  # type: ignore[type-arg]
         if label.options_int:
@@ -121,6 +122,9 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
         if label.options_multi:
             return and_(Schema.key == label.key,
                         Schema.multi_int.overlap(label.options_multi))
+        if label.strings:
+            return Schema.key == label.key
+
         return None
 
     sub_queries = []
@@ -143,6 +147,7 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
                    Annotation.repeat if not ignore_order else literal(1, type_=Integer).label('repeat'),
                    Annotation.value_int,
                    Annotation.value_bool,
+                   Annotation.value_str,
                    Annotation.multi_int)
             .join(Annotation, Annotation.assignment_id == Assignment.assignment_id, isouter=True)
             .where(*where)
@@ -165,6 +170,7 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
                    BotAnnotation.repeat if not ignore_order else literal(1, type_=Integer).label('repeat'),
                    BotAnnotation.value_int,
                    BotAnnotation.value_bool,
+                   BotAnnotation.value_str,
                    BotAnnotation.multi_int)
             .where(*where)
         )
@@ -210,11 +216,12 @@ async def get_project_users(project_id: str | uuid.UUID, db_engine: DatabaseEngi
 
 async def get_labels(stmt_labels: CTE, db_engine: DatabaseEngineAsync) -> dict[str, LabelOptions]:
     stmt_labels_ = union(
-        select(stmt_labels.c.key, stmt_labels.c.value_int, stmt_labels.c.value_bool,
+        select(stmt_labels.c.key, stmt_labels.c.value_int, stmt_labels.c.value_bool, stmt_labels.c.value_str,
                F.unnest(stmt_labels.c.multi_int).label('multis')),
-        select(stmt_labels.c.key, stmt_labels.c.value_int, stmt_labels.c.value_bool,
+        select(stmt_labels.c.key, stmt_labels.c.value_int, stmt_labels.c.value_bool, stmt_labels.c.value_str,
                literal(None, type_=Integer).label('multis')),
     ).subquery()
+
     stmt_options = select(
         stmt_labels_.c.key,
         F.array_agg(distinct(stmt_labels_.c.value_int))
@@ -222,7 +229,8 @@ async def get_labels(stmt_labels: CTE, db_engine: DatabaseEngineAsync) -> dict[s
         F.array_agg(distinct(stmt_labels_.c.value_bool))
         .filter(stmt_labels_.c.value_bool.isnot(None)).label('options_bool'),
         F.array_agg(distinct(stmt_labels_.c.multis))
-        .filter(stmt_labels_.c.multis.isnot(None)).label('options_multi')
+        .filter(stmt_labels_.c.multis.isnot(None)).label('options_multi'),
+        (F.count().filter(stmt_labels_.c.value_str.isnot(None)) > 0).label('strings')
     ) \
         .where(stmt_labels_.c.key.isnot(None)) \
         .group_by(stmt_labels_.c.key) \
@@ -230,7 +238,7 @@ async def get_labels(stmt_labels: CTE, db_engine: DatabaseEngineAsync) -> dict[s
 
     async with db_engine.session() as session:  # type: AsyncSession
         result = (await session.execute(stmt_options)).mappings().all()
-        print(result)
+
         # construct a lookup map of key->options/values/choices
         return {row['key']: LabelOptions.parse_obj(row) for row in result}
 
