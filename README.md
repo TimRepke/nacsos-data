@@ -32,6 +32,9 @@ The general rule of thumb is to
 
 We count versions starting at zero and always include all three numbers prefixed by 'v'.
 
+The current version is defined in `setup.py` and the respective commit is tagged via git.
+This can be done either via `git tag ...` or [PIK GitLab](https://gitlab.pik-potsdam.de/mcc-apsis/nacsos/nacsos-data/-/tags)
+
 ## Testing
 
 ```bash
