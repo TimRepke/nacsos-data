@@ -1,3 +1,4 @@
+import datetime
 import logging
 import uuid
 from typing import Generator
@@ -104,7 +105,8 @@ async def import_academic_items(
                 import_id=import_id,
                 name=import_name,
                 description=description,
-                type=ImportType.script
+                type=ImportType.script,
+                time_created=datetime.datetime.now()
             )
             if dry_run:
                 logger.info('I will create a new `Import`!')
@@ -127,6 +129,9 @@ async def import_academic_items(
         else:
             raise AttributeError('Seems like neither provided information for creating '
                                  'a new import nor the ID to an existing import!')
+
+        # Keep track of when we started importing
+        import_orm.time_started = datetime.datetime.now()
 
         for item in items:
             logger.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
@@ -179,3 +184,6 @@ async def import_academic_items(
             except (UniqueViolation, IntegrityError) as e:
                 logger.exception(e)
                 await session.rollback()
+
+        # Keep track of when we finished importing
+        import_orm.time_finished = datetime.datetime.now()
