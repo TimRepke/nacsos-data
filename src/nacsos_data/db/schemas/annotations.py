@@ -1,4 +1,5 @@
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import \
     Integer, \
@@ -23,6 +24,9 @@ from ...db.base_class import Base
 from .projects import Project
 from .users import User
 from .items.base import Item
+
+if TYPE_CHECKING:
+    from . import BotAnnotationMetaData
 
 
 class AnnotationScheme(Base):
@@ -62,6 +66,10 @@ class AnnotationScheme(Base):
 
     # reference to the associated assignment scopes
     assignment_scopes: Relationship['AssignmentScope'] = relationship('AssignmentScope', cascade='all, delete')
+
+    # reference to the associated bot annotations
+    bot_annotation_scopes: Relationship['BotAnnotationMetaData'] = relationship('BotAnnotationMetaData',
+                                                                                cascade='all, delete')
 
 
 class AssignmentScope(Base):
