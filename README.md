@@ -23,6 +23,15 @@ $ alembic upgrade head
 # revert uncommenting in alembic.ini
 ```
 
+## Semantic versioning
+The general rule of thumb is to
+  - increment the third number on every change that is worth deploying into nacsos_core
+  - increment the second number on every change that includes a database migration
+  - increment the second number on every change that includes deprecations
+  - increment the first number when there is a fundamental paradigm shift with loads of deprecations
+
+We count versions starting at zero and always include all three numbers prefixed by 'v'.
+
 ## Testing
 
 ```bash
