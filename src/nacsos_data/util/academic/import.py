@@ -28,6 +28,62 @@ async def import_academic_items(
         check_title_slug: bool = True,
         dry_run: bool = True,
 ) -> None:
+    """
+    Helper function for programmatically importing `AcademicItem`s into the platform.
+
+    Example usage:
+    ```
+    from nacsos_data.db import get_engine_async
+    from nacsos_data.util.academic.scopus import read_scopus_file
+    from nacsos_data.util.academic.import import import_academic_items
+
+    PROJECT_ID = '??'
+
+    db_engine = get_engine_async(conf_file='/path/to/remote_config.env')
+    scopus_works = read_scopus_file('/path/to/scopus.csv', project_id=PROJECT_ID)
+    await import_academic_items(items=scopus_works, db_engine=db_engine, project_id=PROJECT_ID, ...)
+    ```
+
+    If you are working in a synchronous context, you can wrap the above code in a method and run with asyncio:
+    ```
+    import asyncio
+
+    def main():
+        ...
+
+    if __name__ == '__main__':
+        asyncio.run(main())
+    ```
+
+    Items are always associated with a project, and within a project with an `Import`.
+    This is used to indicate a "scope" of where the data comes from, e.g. a query from WoS or Scopus.
+    Item sets may overlap between Imports.
+
+    There are two modes:
+      1) You can use an existing Import by providing the `import_id`.
+         This might be useful when you already created a blank import via the WebUI or
+         want to add more items to that import. Note, that we recommend creating a new import if
+         the "scopes" are better semantically separate (e.g. query results from different points in time might be
+         two Imports rather than one Import that is added to).
+         In this case `user_id`, `import_name`, `description` are ignored.
+      2) Create a new Import by setting `user_id`, `import_name`, and `description`; optionally set `import_id`.
+         In this way, a new Import will be created and all items will be associated with that.
+
+
+    :param items: A list (or generator) of AcademicItems
+    :param project_id: ID of the project the items should be added to
+    :param import_id: (optional) ID to existing Import
+    :param user_id: (your) user_id, which this import will be associated with
+    :param import_name: Concise and descriptive name for this import
+    :param description: Proper (markdown) description for this import.
+                        Usually this should describe the source of the dataset and, if applicable, the search query.
+    :param check_title_slug: If true, use title_slug for duplicate detection
+    :param dry_run: If false, actually write data to the database;
+                    If true, simulate best as possible (note, that duplicates within the `items` are not validated
+                                                        and not all constraints can be checked)
+    :param db_engine: an async database engine
+    :return:
+    """
     if project_id is None:
         raise AttributeError('You have to provide a project ID!')
 
@@ -38,28 +94,33 @@ async def import_academic_items(
         if import_name is not None:
             if description is None or user_id is None:
                 raise AttributeError('You need to provide a meaningful description and a user id!')
+
             if import_id is None:
                 import_id = uuid.uuid4()
-                import_orm: Import | None = Import(
-                    project_id=project_id,
-                    user_id=user_id,
-                    import_id=import_id,
-                    name=import_name,
-                    description=description,
-                    type=ImportType.script
-                )
-                if dry_run:
-                    logger.info('I will create a new `Import`!')
-                else:
-                    session.add(import_orm)
-                    await session.commit()
-                    logger.info(f'Created new import with ID {import_id}')
+
+            import_orm: Import | None = Import(
+                project_id=project_id,
+                user_id=user_id,
+                import_id=import_id,
+                name=import_name,
+                description=description,
+                type=ImportType.script
+            )
+            if dry_run:
+                logger.info('I will create a new `Import`!')
+            else:
+                session.add(import_orm)
+                await session.commit()
+                logger.info(f'Created new import with ID {import_id}')
 
         elif import_id is not None:
             # check that the uuid actually exists...
             import_orm = await session.get(Import, {'import_id': import_id})
             if import_orm is None:
                 raise KeyError('No import found for the given ID!')
+            if str(import_orm.project_id) != str(project_id):
+                raise AssertionError(f'The project ID does not match with the `Import` you provided: '
+                                     f'"{import_orm.project_id}" vs "{project_id}"')
 
             logger.info(f'Using existing import with ID {import_id}')
 
