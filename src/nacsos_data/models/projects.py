@@ -1,5 +1,6 @@
 from typing import Literal
 from uuid import UUID
+import datetime
 from pydantic import BaseModel
 
 from nacsos_data.db.schemas.items import ItemType, ItemTypeLiteral
@@ -24,6 +25,9 @@ class ProjectModel(BaseModel):
     # A brief description of that project.
     # Optional, but should be used and can be Markdown formatted
     description: str | None = None
+
+    # Date and time when this project was created
+    time_created: datetime.datetime | None = None
 
     # Defines what sort of data this project works with
     # This is used to show item-type specific interface elements and join enriched meta-data

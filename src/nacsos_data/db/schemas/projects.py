@@ -1,6 +1,6 @@
 import uuid
 from typing import TYPE_CHECKING
-from sqlalchemy import String, ForeignKey, Boolean, Enum as SAEnum, UniqueConstraint, text
+from sqlalchemy import String, ForeignKey, Boolean, Enum as SAEnum, UniqueConstraint, text, func as F, DateTime
 from sqlalchemy.orm import mapped_column, WriteOnlyMapped, relationship, Relationship, Mapped
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -37,6 +37,9 @@ class Project(Base):
     # A brief description of that project.
     # Optional, but should be used and can be Markdown formatted
     description = mapped_column(String, nullable=True)
+
+    # Date and time when this project was created
+    time_created = mapped_column(DateTime(timezone=True), server_default=F.now(), nullable=False)
 
     # Defines what sort of data this project works with
     # This is used to show item-type specific interface elements and join enriched meta-data

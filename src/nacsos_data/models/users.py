@@ -36,6 +36,10 @@ class UserBaseModel(BaseModel):
     #       so setting this to "false" to remove access should be preferred.
     is_active: bool | None = True
 
+    # Date and time when this user was created (or last changed)
+    time_created: datetime.datetime | None = None
+    time_updated: datetime.datetime | None = None
+
 
 # Properties to receive via API on creation
 class UserCreateModel(UserBaseModel):
@@ -73,5 +77,10 @@ class AuthTokenModel(BaseModel):
     token_id: str | UUID
     # Refers to the User this auth token belongs to
     username: str
+
+    # Date and time when this auth token was created (or last changed)
+    time_created: datetime.datetime | None = None
+    time_updated: datetime.datetime | None = None
+
     # Timestamp to indicate until when this token is valid; null means valid forever
     valid_till: datetime.datetime | None

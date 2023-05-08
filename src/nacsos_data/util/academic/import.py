@@ -99,7 +99,7 @@ async def import_academic_items(
             if import_id is None:
                 import_id = uuid.uuid4()
 
-            import_orm: Import | None = Import(
+            import_orm = Import(
                 project_id=project_id,
                 user_id=user_id,
                 import_id=import_id,
@@ -117,7 +117,7 @@ async def import_academic_items(
 
         elif import_id is not None:
             # check that the uuid actually exists...
-            import_orm = await session.get(Import, {'import_id': import_id})
+            import_orm = await session.get(Import, {'import_id': import_id})  # type: ignore[assignment]
             if import_orm is None:
                 raise KeyError('No import found for the given ID!')
             if str(import_orm.project_id) != str(project_id):

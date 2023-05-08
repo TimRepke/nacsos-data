@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING
-from sqlalchemy import String, Boolean, ForeignKey, DateTime
+from sqlalchemy import String, Boolean, ForeignKey, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -48,6 +48,10 @@ class User(Base):
     #       so setting this to "false" to remove access should be preferred.
     is_active = mapped_column(Boolean, nullable=False, default=True)
 
+    # Date and time when this user was created (or last updated)
+    time_created = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    time_updated = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
     project_permissions: Relationship['ProjectPermissions'] = relationship('ProjectPermissions', cascade='all, delete')
     auth_tokens: Relationship['AuthToken'] = relationship('AuthToken', cascade='all, delete')
 
@@ -66,6 +70,10 @@ class AuthToken(Base):
     username = mapped_column(String,
                              ForeignKey(User.username),
                              nullable=False, index=True, unique=False)
+
+    # Date and time when this token was created (or last updated)
+    time_created = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    time_updated = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
     # Timestamp to indicate until when this token is valid; null means valid forever
     valid_till = mapped_column(DateTime(timezone=True), nullable=True)

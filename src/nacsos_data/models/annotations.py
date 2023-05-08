@@ -77,6 +77,10 @@ class _AnnotationSchemeModel(BaseModel):
     # Text should be formatted using Markdown.
     description: str | None = None
 
+    # Date and time when this annotation scheme was created (or last changed)
+    time_created: datetime | None = None
+    time_updated: datetime | None = None
+
 
 class AnnotationSchemeModel(_AnnotationSchemeModel):
     """

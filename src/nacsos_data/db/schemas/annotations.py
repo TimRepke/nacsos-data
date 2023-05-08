@@ -64,6 +64,10 @@ class AnnotationScheme(Base):
     # Note, this is always a list of labels!
     labels = mapped_column(mutable_json_type(dbtype=JSONB, nested=True))
 
+    # Date and time when this annotation scheme was created (or last changed)
+    time_created = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    time_updated = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
     # reference to the associated assignment scopes
     assignment_scopes: Relationship['AssignmentScope'] = relationship('AssignmentScope', cascade='all, delete')
 
