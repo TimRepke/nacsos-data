@@ -10,8 +10,8 @@ from nacsos_data.db.schemas import ItemType
 class AffiliationModel(BaseModel):
     name: str
     country: str | None = None
-    openalex_id: str | None = None
-    s2_id: str | None = None
+    openalex_id: str | None = None  # OpenAlex ID (if known/present)
+    s2_id: str | None = None  # SemanticScholar ID (if known/present)
 
 
 class AcademicAuthorModel(BaseModel):
@@ -22,7 +22,11 @@ class AcademicAuthorModel(BaseModel):
     # Surname initials is given in the format Surname, AB - where
     # AB are the initials of the first names
     surname_initials: str | None = None
-    orcid: str | None = None
+    email: str | None = None
+    orcid: str | None = None  # ORCID (if known/present)
+    scopus_id: str | None = None  # Scopus ID (if known/present)
+    openalex_id: str | None = None  # OpenAlex ID (if known/present)
+    s2_id: str | None = None  # SemanticScholar ID (if known/present)
     affiliations: list[AffiliationModel] | None = None
 
 

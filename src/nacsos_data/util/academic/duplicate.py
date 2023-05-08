@@ -10,13 +10,15 @@ from nacsos_data.models.items import AcademicItemModel
 REGEX_NON_ALPH = re.compile(r'[^a-z]')
 
 
-def get_title_slug(item: AcademicItemModel) -> str | None:
-    if item.title:
-        # remove all non-alphabetic characters
-        return REGEX_NON_ALPH.sub('', item.title.lower())
+def str_to_title_slug(title: str | None) -> str | None:
+    if title is None or len(title) == 0:
+        return None
+    # remove all non-alphabetic characters
+    return REGEX_NON_ALPH.sub('', title.lower())
 
-    # FIXME: should we rather raise an error or go for fallbacks?
-    return None
+
+def get_title_slug(item: AcademicItemModel) -> str | None:
+    return str_to_title_slug(item.title)
 
 
 async def find_duplicates(item: AcademicItemModel,
@@ -25,6 +27,9 @@ async def find_duplicates(item: AcademicItemModel,
                           check_doi: bool = False,
                           check_wos_id: bool = False,
                           check_oa_id: bool = False,
+                          check_pubmed_id: bool = False,
+                          check_scopus_id: bool = False,
+                          check_s2_id: bool = False,
                           db_engine: DatabaseEngineAsync | None = None,
                           session: AsyncSession | None = None) -> list[str] | None:
     """
@@ -40,6 +45,9 @@ async def find_duplicates(item: AcademicItemModel,
     :param check_doi:
     :param check_wos_id:
     :param check_oa_id:
+    :param check_scopus_id:
+    :param check_pubmed_id:
+    :param check_s2_id:
     :param session:
     :return:
     """
@@ -63,6 +71,13 @@ async def find_duplicates(item: AcademicItemModel,
         checks.append(AcademicItem.wos_id == item.wos_id)
     if check_oa_id and item.openalex_id is not None:
         checks.append(AcademicItem.openalex_id == item.openalex_id)
+    if check_scopus_id and item.scopus_id is not None:
+        checks.append(AcademicItem.scopus_id == item.scopus_id)
+    if check_pubmed_id and item.pubmed_id is not None:
+        checks.append(AcademicItem.pubmed_id == item.pubmed_id)
+    if check_s2_id and item.s2_id is not None:
+        checks.append(AcademicItem.s2_id == item.s2_id)
+
     stmt = stmt.where(or_(*checks))
 
     if db_engine is not None:

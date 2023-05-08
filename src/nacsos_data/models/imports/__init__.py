@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from .import_config_ris import ImportConfigRIS
+from .import_config_scopus import ImportConfigScopus
 from .import_config_twitter import ImportConfigTwitter
 from .import_config_jsonl import ImportConfigJSONL, LineEncoding
 from .import_config_wos import ImportConfigWoS
@@ -33,16 +34,16 @@ ImportTypeLiteral = Literal['ris', 'csv', 'jsonl',
 'wos', 'scopus', 'ebsco', 'jstor', 'ovid', 'pop',
 'twitter', 'script']
 
-ImportConfig = ImportConfigTwitter | ImportConfigJSONL | ImportConfigWoS
+ImportConfig = ImportConfigTwitter | ImportConfigJSONL | ImportConfigWoS | ImportConfigScopus
 
 Type2Conf: dict[ImportTypeLiteral, Type[ImportConfig] | None] = {
     'jsonl': ImportConfigJSONL,
     'wos': ImportConfigWoS,
     'twitter': ImportConfigTwitter,
+    'scopus': ImportConfigScopus,
     # TODO: not implemented, yet
     'ris': None,
     'csv': None,
-    'scopus': None,
     'ebsco': None,
     'jstor': None,
     'ovid': None,

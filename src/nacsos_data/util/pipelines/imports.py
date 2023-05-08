@@ -15,11 +15,11 @@ from ...models.imports import \
     ImportModel, \
     ImportConfigWoS, \
     Type2Conf, \
-    ImportTypeLiteral
+    ImportTypeLiteral, ImportConfigScopus
 
 logger = logging.getLogger('nacsos_data.util.pipelines')
 
-FileType = Literal['wos-file']
+FileType = Literal['wos-file', 'scopus-file']
 
 
 class Converter(ABC):
@@ -100,6 +100,25 @@ class WebOfScienceConverter(Converter):
             'import_id': str(import_details.import_id),
             'records': {
                 'user_serializer': 'WebOfScienceSerializer',
+                'user_dtype': 'AcademicItemModel',
+                'filenames': import_details.config.filenames
+            }
+        }
+
+
+class ScopusConverter(Converter):
+    encoding: FileType = 'scopus-file'
+    func_name = 'nacsos_lib.academic.import.import_scopus_file'
+
+    @staticmethod
+    def convert_details(import_details: ImportModel) -> dict[str, Any]:
+        if type(import_details.config) != ImportConfigScopus:
+            raise AttributeError('Incompatible import details config.')
+        return {
+            'project_id': str(import_details.project_id),
+            'import_id': str(import_details.import_id),
+            'records': {
+                'user_serializer': 'ScopusSerializer',
                 'user_dtype': 'AcademicItemModel',
                 'filenames': import_details.config.filenames
             }
