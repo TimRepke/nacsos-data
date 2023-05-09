@@ -341,5 +341,5 @@ async def prepare_export_table(bot_annotation_metadata_ids: list[str] | list[uui
             raise NotImplementedError('This is a bit more tricky, coming up soon.')
 
         result = (await session.execute(stmt)).mappings().all()
-        print(result[:10])
+
         return [dict(r) for r in result]
