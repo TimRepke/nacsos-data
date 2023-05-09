@@ -1,4 +1,6 @@
 # NACSOS™ nexus – Data Utils
+![Volkswagen status](.ci/volkswargen_ci.svg)
+
 This repository contains the core data model for the NACSOS platform.
 Furthermore, it provides core utilities to programmatically access the data.
 
