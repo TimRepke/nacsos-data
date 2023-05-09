@@ -62,7 +62,7 @@ class AnnotationScheme(Base):
     # The definition of the annotation scheme for this AnnotationScheme is stored here.
     # For more information on how an annotation scheme is defined, check out schemas.annotations.AnnotationSchemeLabel
     # Note, this is always a list of labels!
-    labels = mapped_column(mutable_json_type(dbtype=JSONB, nested=True))
+    labels = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True))
 
     # Date and time when this annotation scheme was created (or last changed)
     time_created = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -98,7 +98,7 @@ class AssignmentScope(Base):
                                          nullable=False, index=True)
 
     # Date and time when this assignment scope was created
-    time_created = mapped_column(DateTime(timezone=True), server_default=func.now())
+    time_created = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # A short descriptive title / name for this scope.
     # This may be displayed to the annotators.
@@ -109,7 +109,7 @@ class AssignmentScope(Base):
     description = mapped_column(String, nullable=True)
 
     # Stores the config parameters used in creating the assignments for future reference
-    config = mapped_column(mutable_json_type(dbtype=JSONB, nested=True), nullable=True)
+    config = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True)
 
     # List of keywords to highlight in this assignment scope (based on Highlighter)
     highlighter_ids = mapped_column(ARRAY(UUID(as_uuid=True)),  # ForeignKey(Highlighter.highlighter_id),

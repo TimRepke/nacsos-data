@@ -55,7 +55,7 @@ class BotAnnotationMetaData(Base):
                                          ForeignKey(AnnotationScheme.annotation_scheme_id, ondelete='CASCADE'),
                                          nullable=True, index=True)
     # Additional information for this Bot for future reference
-    meta: Mapped[BotMeta] = mapped_column(mutable_json_type(dbtype=JSONB, nested=True),
+    meta: Mapped[BotMeta] = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True),
                                           nullable=True)
 
     # reference to the associated bot_annotations

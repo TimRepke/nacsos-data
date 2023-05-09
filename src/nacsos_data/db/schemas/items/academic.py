@@ -53,17 +53,17 @@ class AcademicItem(Item):
 
     # These should be the keywords given by the authors (in WoS author-keywords)
     # This should be a list of strings
-    keywords = mapped_column(mutable_json_type(dbtype=JSONB, nested=True), nullable=True, index=True)
+    keywords = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=True)
 
     # JSON representation of authors: see models/academic.py
-    authors = mapped_column(mutable_json_type(dbtype=JSONB, nested=True))
+    authors = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True))
 
     # abstract inherited from `Item` as `Item.text`
 
     # any kind of (json-formatted) meta-data
     #   For project marked as "basic" this information may be shown to the user.
     #   Keys with prefix `_` will not be rendered by the frontend though.
-    meta = mapped_column(mutable_json_type(dbtype=JSONB, nested=True))
+    meta = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True))
 
     __mapper_args__ = {
         'polymorphic_identity': ItemType.academic,

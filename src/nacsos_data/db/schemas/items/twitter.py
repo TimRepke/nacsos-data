@@ -47,7 +47,7 @@ class TwitterItem(Item):
     conversation_id = mapped_column(String, nullable=True, index=True)
     # A list of Tweets this Tweet refers to. For example, if the parent Tweet is a Retweet, a Retweet with comment
     # (also known as Quoted Tweet) or a Reply, it will include the related Tweet referenced to by its parent.
-    referenced_tweets = mapped_column(JSONB, nullable=True)
+    referenced_tweets = mapped_column(JSONB(none_as_null=True), nullable=True)
 
     # Specifies the type of attachments (if any) present in this Tweet.
     # attachments: Optional[any] # TODO should we store that?
@@ -59,17 +59,17 @@ class TwitterItem(Item):
     longitude = mapped_column(Float, nullable=True)
 
     # from entities.hashtags (Contains details about text recognized as a Hashtag.)
-    hashtags = mapped_column(JSONB, nullable=True)
+    hashtags = mapped_column(JSONB(none_as_null=True), nullable=True)
     # from entities.mentions (Contains details about text recognized as a user mention.)
-    mentions = mapped_column(JSONB, nullable=True)
+    mentions = mapped_column(JSONB(none_as_null=True), nullable=True)
     # from entities.urls (Contains details about text recognized as a URL.)
-    urls = mapped_column(JSONB, nullable=True)
+    urls = mapped_column(JSONB(none_as_null=True), nullable=True)
     # from entities.cashtag (Contains details about text recognized as a Cashtag.)
     # [Cashtags are stock price symbols]
-    cashtags = mapped_column(JSONB, nullable=True)
+    cashtags = mapped_column(JSONB(none_as_null=True), nullable=True)
     # from context_annotations (Contains context annotations for the Tweet.)
     # Entity recognition/extraction, topical analysis
-    context_annotations = mapped_column(JSONB, nullable=True)
+    context_annotations = mapped_column(JSONB(none_as_null=True), nullable=True)
 
     # Public engagement metrics for the Tweet at the time of the request.
     # taken from public_metrics.???
@@ -79,7 +79,7 @@ class TwitterItem(Item):
     quote_count = mapped_column(Integer, nullable=False)
 
     # Additional information about the user (retrieved via expansions=author_id)
-    user = mapped_column(JSONB, nullable=True)
+    user = mapped_column(JSONB(none_as_null=True), nullable=True)
 
     __mapper_args__ = {
         'polymorphic_identity': ItemType.twitter,

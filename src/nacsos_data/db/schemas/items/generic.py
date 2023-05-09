@@ -17,7 +17,7 @@ class GenericItem(Item):
     # any kind of (json-formatted) meta-data
     #   For project marked as "basic" this information may be shown to the user.
     #   Keys with prefix `_` will not be rendered by the frontend though.
-    meta = mapped_column(mutable_json_type(dbtype=JSONB, nested=True))
+    meta = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True))
 
     __mapper_args__ = {
         'polymorphic_identity': ItemType.generic,

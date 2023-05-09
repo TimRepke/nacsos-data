@@ -52,7 +52,7 @@ class Task(Base):
                              server_default=ExecutionLocation.LOCAL)
 
     # json-encoded dict of the call parameters (or the dict unpacked)
-    params = mapped_column(mutable_json_type(dbtype=JSONB, nested=True))
+    params = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True))
 
     # (optional) short comment to keep notes on this task
     comment = mapped_column(String, nullable=True, unique=False, index=False)

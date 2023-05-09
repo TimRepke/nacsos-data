@@ -70,7 +70,7 @@ class Import(Base):
     time_finished = mapped_column(DateTime(timezone=True), nullable=True)
 
     # This stores the configuration of the respective import method
-    config = mapped_column(mutable_json_type(dbtype=JSONB, nested=True))
+    config = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True))
 
     # reference to the items
     items: Mapped[list[Item]] = relationship(
