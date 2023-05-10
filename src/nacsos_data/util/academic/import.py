@@ -10,6 +10,7 @@ from psycopg.errors import UniqueViolation
 
 from nacsos_data.db.schemas import Import, AcademicItem, m2m_import_item_table
 from nacsos_data.models.imports import ImportType, M2MImportItemType
+from nacsos_data.util.academic.clean import get_cleaned_meta_field
 from ...db.engine import DatabaseEngineAsync
 from ...models.items import AcademicItemModel
 
@@ -136,6 +137,9 @@ async def import_academic_items(
         for item in items:
             logger.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
 
+            # remove empty entries from the meta-data field
+            item.meta = get_cleaned_meta_field(item)
+
             # ensure we have a title_slug
             if item.title_slug is None or len(item.title_slug) == 0:
                 item.title_slug = str_to_title_slug(item.title)
@@ -153,6 +157,10 @@ async def import_academic_items(
 
             try:
                 if duplicates is not None and len(duplicates) > 0:
+                    for duplicate in duplicates:
+                        # TODO implement fusion of duplicates
+                        raise NotImplementedError
+
                     item_id = duplicates[0]
                     if dry_run:
                         logger.info(f'  -> There are at least {len(duplicates)}; I will probably use {item_id}')

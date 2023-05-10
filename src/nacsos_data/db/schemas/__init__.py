@@ -4,7 +4,7 @@ from ..base_class import Base
 from .annotations import AnnotationScheme, Annotation, Assignment, AssignmentScope
 from .bot_annotations import BotAnnotationMetaData, BotAnnotation
 from .projects import Project, ProjectPermissions
-from .users import User
+from .users import User, AuthToken
 from .imports import Import, m2m_import_item_table
 from .pipeline import Task
 from .highlight import Highlighter
@@ -19,6 +19,7 @@ AnyItemType = GenericItem | TwitterItem | AcademicItem
 AnyItemSchema = TypeVar('AnyItemSchema', GenericItem, TwitterItem, AcademicItem)
 
 __all__ = ['Base',
+           'User', 'AuthToken',
            # Schemas for annotations
            'Annotation', 'AnnotationScheme', 'Assignment', 'AssignmentScope',
            # Schemas for "automated" annotations

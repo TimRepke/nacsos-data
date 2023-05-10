@@ -8,7 +8,8 @@ from nacsos_data.models.annotations import \
     FlattenedAnnotationSchemeLabel, \
     AnnotationScalarValueField, \
     AnnotationListValueField, \
-    AnnotationModel, AnnotationSchemeLabelTypes
+    AnnotationModel, \
+    AnnotationSchemeLabelTypes
 from nacsos_data.models.bot_annotations import AnnotationCollection, BotAnnotationModel, Label, GroupedBotAnnotation
 
 logger = logging.getLogger('nacsos_data.util.annotations.resolve')
