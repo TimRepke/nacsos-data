@@ -1,9 +1,8 @@
 import uuid
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from sqlalchemy import update, delete, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.schemas import \
     Assignment, \
@@ -13,6 +12,9 @@ from nacsos_data.db.schemas import \
     m2m_import_item_table
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.models.bot_annotations import BotKind
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 
 logger = logging.getLogger('nacsos_data.util.duplicate')
 
