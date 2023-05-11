@@ -280,7 +280,7 @@ def read_nacsos1_annotations(
                                 .filter(query__project=p, doc__query=q, relevant__gt=0)
                                 .distinct('doc_id')
                                 .values('doc_id', 'id')),
-                           key=lambda x: x['id'])
+                           key=lambda x: x['id'])  # type: ignore[arg-type, no-any-return]
     ]
 
     assignments_new = []
@@ -326,7 +326,7 @@ def read_nacsos1_annotations(
                         # we don't really know, so let's take the time the assignment was finished
                         time_created=assignment['finish'],
                         time_updated=datetime.datetime.now(),
-                        assignment_id=assignment_new.assignment_id,
+                        assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
                         user_id=user_map[assignment['user_id']],
                         item_id=item_map[assignment['doc_id']],
                         annotation_scheme_id=annotation_scheme_id,
@@ -350,7 +350,7 @@ def read_nacsos1_annotations(
                         annotation_id=uuid.uuid4(),
                         time_created=cat['time'],
                         time_updated=datetime.datetime.now(),
-                        assignment_id=assignment_new.assignment_id,
+                        assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
                         user_id=user_map[cat['user_id']],
                         item_id=item_map[cat['doc_id']],
                         annotation_scheme_id=annotation_scheme_id,
@@ -373,7 +373,7 @@ def read_nacsos1_annotations(
                         # we don't really know, so let's take the time the assignment was finished
                         time_created=assignment['finish'],
                         time_updated=datetime.datetime.now(),
-                        assignment_id=assignment_new.assignment_id,
+                        assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
                         user_id=user_map[assignment['user_id']],
                         item_id=item_map[assignment['doc_id']],
                         annotation_scheme_id=annotation_scheme_id,
