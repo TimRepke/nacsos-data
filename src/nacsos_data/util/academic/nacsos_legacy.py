@@ -250,6 +250,8 @@ def read_nacsos1_annotations(
     Note, that all labels are assumed to be binary (except relevance: single-choice).
 
     We also assume that you created a matching annotation scheme and assignment scope already.
+    The scheme should not include any nesting. If you do, you have to do some post-processing to add the
+    necessary parent ids in the annotations.
     This method does not save anything, that's your job after double-checking the results.
     This is not considered to be a bullet-proof solution, results may vary between projects.
 
