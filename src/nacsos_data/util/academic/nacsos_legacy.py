@@ -1,6 +1,9 @@
+import datetime
+import uuid
 from collections import defaultdict
 from typing import Any
 
+from nacsos_data.models.annotations import AssignmentModel, AssignmentStatus, AnnotationModel
 from nacsos_data.models.items.academic import AcademicAuthorModel, AffiliationModel, AcademicItemModel
 from nacsos_data.util.academic.duplicate import get_title_slug
 from nacsos_data.util.errors import NotFoundError
@@ -227,3 +230,161 @@ def fetch_nacsos_legacy_doc(doc_id: int, project_id: str | None, models: Any) ->
         item.meta = {'nacsos1': meta}
 
     return item
+
+
+def read_nacsos1_annotations(
+        query_id: int,
+        models: Any,
+        assignment_scope_id: str | uuid.UUID,
+        annotation_scheme_id: str | uuid.UUID,
+        user_map: dict[int, str | uuid.UUID],
+        label_map: dict[int, str],
+        relevance_key: str | None,
+        item_map: dict[int, str | uuid.UUID]
+) -> tuple[list[AssignmentModel], list[AnnotationModel]]:
+    """
+    We'll assume you are running this on the VM and have the necessary connections open.
+    This function will read all `DocOwnership` and `DocUserCat` entries related to `query_id`.
+    Based on that, it will try to make a best effort of creating respective counterparts
+    for nacsos2 (`Assignment` and `Annotation`).
+    Note, that all labels are assumed to be binary (except relevance: single-choice).
+
+    We also assume that you created a matching annotation scheme and assignment scope already.
+    This method does not save anything, that's your job after double-checking the results.
+    This is not considered to be a bullet-proof solution, results may vary between projects.
+
+    Creating an `Annotation` for relevance if `relevance_key` is not None.
+    value_int will be 0=no, 1=maybe, 2=yes
+
+    :param query_id: nacsos1 query_id to get data from (assumed to be root query covering all annotations and documents)
+    :param models: Django models (see fetch_nacsos_legacy_doc() for more information)
+    :param relevance_key: `Annotation.key` to use for the relevance Annotation
+    :param assignment_scope_id: scope_id to refer the new objects to
+    :param annotation_scheme_id: scheme_id to refer the new objects to
+    :param user_map: mapping from nacsos1 user_id to nacsos2 user_id
+    :param label_map: mapping from nacsos1 `category_id` to nacsos2 `Annotation.key`
+    :param item_map: mapping from nacsos1 doc_id to nacsos2 item_id
+    :return:
+    """
+    q = models.Query.objects.get(pk=query_id)
+    p = q.project
+
+    all_categories = set(models.Category.objects.filter(project=p).values_list('id', flat=True))
+
+    # all unique doc_ids sorted in order of assignment
+    doc_ids = [
+        doid['doc_id']
+        for doid in sorted(list(models.DocOwnership.objects
+                                .filter(query__project=p, doc__query=q, relevant__gt=0)
+                                .distinct('doc_id')
+                                .values('doc_id', 'id')),
+                           key=lambda x: x['id'])
+    ]
+
+    assignments_new = []
+    annotations_new = []
+
+    for order, doc_id in enumerate(doc_ids):
+        # Assignments
+        assignments = models.DocOwnership.objects.filter(doc_id=doc_id, query__project=p)
+
+        for assignment in assignments:
+            doc_user_cats = models.DocUserCat.objects.filter(doc_id=doc_id, user=assignment.user, category__project=p)
+            pos_categories = set(doc_user_cats.values_list('category_id', flat=True))
+            neg_categories = all_categories - pos_categories
+
+            # User `assignment.user_id`
+            # thinks that document `assignment.doc_id`
+            # has relevance `assignment.relevant` (0=unrated, 1=yes, 2=no, 3=maybe)
+            # and is about categories `pos_categories`
+            # but not about categories `neg_categories`
+
+            assignment_new = AssignmentModel(
+                # creation date in nacsos1: assignment['date']
+                assignment_id=uuid.uuid4(),
+                assignment_scope_id=assignment_scope_id,
+                user_id=user_map[assignment['user_id']],
+                item_id=item_map[assignment['doc_id']],
+                annotation_scheme_id=annotation_scheme_id,
+                status=AssignmentStatus.FULL,
+                order=order)
+            assignments_new.append(assignment_new)
+
+            # assignment: ('id', 'doc_id', 'docpar_id', 'utterance_id', 'tweet_id', 'document_linked', 'utterance_linked',
+            #              'title_only', 'full_text', 'project_id', 'user_id', 'query_id', 'tag_id', 'order', 'relevant',
+            #              'date', 'start', 'finish')
+            # doc_user_cats: list[('id', 'doc_id', 'docpar_id', 'utterance_id', 'tweet_id', 'document_linked',
+            #                      'utterance_linked', 'title_only', 'full_text', 'project_id', 'user_id', 'query_id',
+            #                      'tag_id', 'order', 'relevant', 'date', 'start', 'finish')]
+
+            if relevance_key is not None and 0 < assignment['relevant'] < 4:
+                annotations_new.append(
+                    AnnotationModel(
+                        annotation_id=uuid.uuid4(),
+                        # we don't really know, so let's take the time the assignment was finished
+                        time_created=assignment['finish'],
+                        time_updated=datetime.datetime.now(),
+                        assignment_id=assignment_new.assignment_id,
+                        user_id=user_map[assignment['user_id']],
+                        item_id=item_map[assignment['doc_id']],
+                        annotation_scheme_id=annotation_scheme_id,
+                        key=relevance_key,
+                        repeat=1,
+                        parent=None,
+                        value_bool=None,
+                        # (0=unrated, 1=yes, 2=no, 3=maybe) -> (0=no, 1=maybe, 2=yes)
+                        value_int={0: None, 1: 2, 2: 0, 3: 1}[assignment['relevant']],
+                        value_float=None,
+                        value_str=None,
+                        multi_int=None,
+                        text_offset_start=None,
+                        text_offset_stop=None
+                    )
+                )
+
+            for cat in (doc_user_cats or []):
+                annotations_new.append(
+                    AnnotationModel(
+                        annotation_id=uuid.uuid4(),
+                        time_created=cat['time'],
+                        time_updated=datetime.datetime.now(),
+                        assignment_id=assignment_new.assignment_id,
+                        user_id=user_map[cat['user_id']],
+                        item_id=item_map[cat['doc_id']],
+                        annotation_scheme_id=annotation_scheme_id,
+                        key=label_map[cat['category_id']],
+                        repeat=1,
+                        parent=None,
+                        value_bool=True,
+                        value_int=None,
+                        value_float=None,
+                        value_str=None,
+                        multi_int=None,
+                        text_offset_start=None,
+                        text_offset_stop=None
+                    )
+                )
+            for neg_cat in neg_categories:
+                annotations_new.append(
+                    AnnotationModel(
+                        annotation_id=uuid.uuid4(),
+                        # we don't really know, so let's take the time the assignment was finished
+                        time_created=assignment['finish'],
+                        time_updated=datetime.datetime.now(),
+                        assignment_id=assignment_new.assignment_id,
+                        user_id=user_map[assignment['user_id']],
+                        item_id=item_map[assignment['doc_id']],
+                        annotation_scheme_id=annotation_scheme_id,
+                        key=label_map[neg_cat],
+                        repeat=1,
+                        parent=None,
+                        value_bool=False,
+                        value_int=None,
+                        value_float=None,
+                        value_str=None,
+                        multi_int=None,
+                        text_offset_start=None,
+                        text_offset_stop=None
+                    )
+                )
+    return assignments_new, annotations_new
