@@ -30,6 +30,8 @@ async def import_academic_items(
         user_id: str | uuid.UUID | None = None,
         description: str | None = None,
         dry_run: bool = True,
+        trust_new_authors: bool = False,
+        trust_new_keywords: bool = False,
 ) -> None:
     """
     Helper function for programmatically importing `AcademicItem`s into the platform.
@@ -73,6 +75,8 @@ async def import_academic_items(
          In this way, a new Import will be created and all items will be associated with that.
 
 
+    :param trust_new_authors:
+    :param trust_new_keywords:
     :param items: A list (or generator) of AcademicItems
     :param project_id: ID of the project the items should be added to
     :param import_id: (optional) ID to existing Import
@@ -166,8 +170,8 @@ async def import_academic_items(
                         await duplicate_insertion(item_id=item_id,
                                                   import_id=import_id,
                                                   new_item=item,
-                                                  trust_new_authors=False,
-                                                  trust_new_keywords=False,
+                                                  trust_new_authors=trust_new_authors,
+                                                  trust_new_keywords=trust_new_keywords,
                                                   session=session)
                 else:
                     if dry_run:
