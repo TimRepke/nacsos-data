@@ -6,6 +6,7 @@ from sqlalchemy_json import mutable_json_type
 
 from .base import Item
 from . import ItemType
+from .. import Import
 from ..projects import Project
 from ...base_class import Base
 
@@ -118,7 +119,7 @@ class AcademicItemVariant(Base):
 
     # (Optional) reference to the import where this variant came from
     import_id = mapped_column(UUID(as_uuid=True),
-                              ForeignKey(AcademicItem.item_id),
+                              ForeignKey(Import.import_id),
                               nullable=True, index=False, unique=False)
 
     doi = mapped_column(String, nullable=True, unique=False, index=False)
