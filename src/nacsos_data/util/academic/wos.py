@@ -1,8 +1,8 @@
 import re
 from typing import Generator
 from ...models.items import AcademicItemModel
-from .wosfile.record import records_from
 from ...models.items.academic import AcademicAuthorModel, AffiliationModel
+from .wosfile.record import records_from
 
 REGEX_C1 = re.compile(r'\[([^\]]+)\] (.*), (.*).')
 

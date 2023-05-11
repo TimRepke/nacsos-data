@@ -8,14 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 from sqlalchemy.exc import IntegrityError
 from psycopg.errors import UniqueViolation
 
-from nacsos_data.db.schemas import Import, AcademicItem, m2m_import_item_table
-from nacsos_data.db.schemas.items.academic import AcademicItemVariant
-from nacsos_data.models.imports import ImportType, M2MImportItemType
-from nacsos_data.util.academic.clean import get_cleaned_meta_field
-from nacsos_data.util.errors import NotFoundError
 from ...db.engine import DatabaseEngineAsync
+from ...db.schemas import Import, AcademicItem, m2m_import_item_table
+from ...db.schemas.items.academic import AcademicItemVariant
+from ...models.imports import ImportType, M2MImportItemType
 from ...models.items import AcademicItemModel
-
+from ..errors import NotFoundError
+from .clean import get_cleaned_meta_field
 from .duplicate import str_to_title_slug, find_duplicates, are_abstracts_duplicate, fuse_items
 
 logger = logging.getLogger('nacsos_data.util.academic.import')

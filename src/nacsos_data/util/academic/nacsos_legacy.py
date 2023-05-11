@@ -3,10 +3,10 @@ import uuid
 from collections import defaultdict
 from typing import Any
 
-from nacsos_data.models.annotations import AssignmentModel, AssignmentStatus, AnnotationModel
-from nacsos_data.models.items.academic import AcademicAuthorModel, AffiliationModel, AcademicItemModel
-from nacsos_data.util.academic.duplicate import get_title_slug
-from nacsos_data.util.errors import NotFoundError
+from ...models.annotations import AssignmentModel, AssignmentStatus, AnnotationModel
+from ...models.items.academic import AcademicAuthorModel, AffiliationModel, AcademicItemModel
+from ..errors import NotFoundError
+from .duplicate import get_title_slug
 
 
 def _convert_authors(authors: list[object]) -> list[AcademicAuthorModel] | None:

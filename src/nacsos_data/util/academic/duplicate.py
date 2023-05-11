@@ -7,11 +7,11 @@ from pydantic import BaseModel
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nacsos_data.db import DatabaseEngineAsync
-from nacsos_data.db.schemas import AcademicItem, ItemType
-from nacsos_data.models.items import AcademicItemModel
-from nacsos_data.models.items.academic import AcademicAuthorModel
-from nacsos_data.util.academic.clean import clear_empty
+from ...db import DatabaseEngineAsync
+from ...db.schemas import AcademicItem, ItemType
+from ...models.items import AcademicItemModel
+from ...models.items.academic import AcademicAuthorModel
+from .clean import clear_empty
 
 logger = logging.getLogger('nacsos_data.util.academic.duplicate')
 

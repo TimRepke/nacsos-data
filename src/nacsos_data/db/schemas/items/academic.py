@@ -4,9 +4,9 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import mapped_column, column_property, Mapped, Relationship, relationship
 from sqlalchemy_json import mutable_json_type
 
-from .base import Item
 from . import ItemType
 from .. import Import
+from .base import Item
 from ..projects import Project
 from ...base_class import Base
 

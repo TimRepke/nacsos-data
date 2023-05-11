@@ -1,6 +1,6 @@
 from typing import Any
 
-from nacsos_data.models.items import AcademicItemModel
+from ...models.items import AcademicItemModel
 
 
 def clear_empty(obj: Any | None) -> Any | None:

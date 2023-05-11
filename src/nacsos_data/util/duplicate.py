@@ -4,14 +4,14 @@ from typing import Any, TYPE_CHECKING
 
 from sqlalchemy import update, delete, select
 
-from nacsos_data.db.schemas import \
+from ..db import DatabaseEngineAsync
+from ..db.schemas import \
     Assignment, \
     Annotation, \
     BotAnnotationMetaData, \
     BotAnnotation, \
     m2m_import_item_table
-from nacsos_data.db import DatabaseEngineAsync
-from nacsos_data.models.bot_annotations import BotKind
+from ..models.bot_annotations import BotKind
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
