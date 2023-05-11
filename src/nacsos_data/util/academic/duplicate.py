@@ -48,33 +48,42 @@ def are_actually_duplicate(item: AcademicItemModel,
     :param candidate:
     :return:
     """
-    # Different non-empty slug means we must have matched on something else like an ID
-    #   -> in that case, we will always trust IDs and stop here
-    if (item.title_slug is not None and len(item.title_slug) > 0
-            and candidate.title_slug is not None and len(candidate.title_slug) > 0
-            and item.title_slug != candidate.title_slug):
-        # ... actually, we don't trust DOIs too much.
-        # Even though the DOIs matched, the papers seem to have different titles -> not duplicate!
-        # This is likely the case of the datasource (for example) using the DOI of the book rather than the chapters.
-        if item.doi == candidate.doi:
-            return False
 
-        # We trust wos_id and co -> true duplicate
-        return True
+    tslug_item = item.title_slug if item.title_slug is not None and len(item.title_slug) > 0 else None
+    tslug_cand = candidate.title_slug if candidate.title_slug is not None and len(candidate.title_slug) > 0 else None
 
-    # The non-empty title slugs match, let's dig deeper
-    if (item.title_slug is not None and len(item.title_slug) > 0
-            and candidate.title_slug is not None and len(candidate.title_slug) > 0
-            and item.title_slug == candidate.title_slug):
+    if tslug_item is not None and tslug_cand is not None:
+        # Different non-empty title-slug means we must have matched on something else like an ID
+        #   -> in that case, we will always trust IDs and stop here
+        if tslug_item != tslug_cand:
+            # ... actually, we don't trust DOIs too much.
+            # Even though the DOIs matched, the papers seem to have different titles -> not duplicate!
+            # This is likely the case of the datasource (for example) using the DOI of the book rather than the chapters.
+            if item.doi == candidate.doi:
+                return False
 
-        # This looks like an annual report (contains year pattern), always assume not-duplicate
-        if ((item.title is not None and YEAR_PATTERN.match(item.title))
-                or (candidate.title is not None and YEAR_PATTERN.match(candidate.title))):
-            return False
+            # We trust wos_id and co -> true duplicate
+            return True
 
-        # Publication years are more than a year apart, so we don't consider that duplicate anymore
-        if abs((item.publication_year or 0) - (candidate.publication_year or 0)) > 1:
-            return False
+        # The non-empty title-slugs match, let's dig deeper
+        if tslug_item == tslug_cand:
+
+            # This looks like an annual report (contains year pattern), always assume not-duplicate
+            if ((item.title is not None and YEAR_PATTERN.match(item.title))
+                    or (candidate.title is not None and YEAR_PATTERN.match(candidate.title))):
+                return False
+
+            # Publication years are more than a year apart, so we don't consider that duplicate anymore
+            if abs((item.publication_year or 0) - (candidate.publication_year or 0)) > 1:
+                return False
+
+    # We might have found this candidate because both title-slugs are empty
+    elif tslug_item is None and tslug_cand is None:
+        pass
+
+    # If title slugs are different, we must have matched on something else, so fall through
+    else:
+        pass
 
     # All else failed, so let's assume it's duplicate.
     return True
@@ -161,12 +170,17 @@ async def find_duplicates(item: AcademicItemModel,
     return None
 
 
-def fuse_items(item1: AcademicItemModel, item2: AcademicItemModel) -> AcademicItemModel:
+def fuse_items(item1: AcademicItemModel,
+               item2: AcademicItemModel,
+               fuse_authors: bool = True,
+               fuse_keywords: bool = True) -> AcademicItemModel:
     """
     This method fuses the data from two items together.
     When in doubt, it will prefer values from the first item over those in the second.
     For many attributes, it will try to find the best fit or even merge data.
 
+    :param fuse_authors: if True, fuse lists of authors; if False: just take author list from item1 (if available)
+    :param fuse_keywords: if True, fuse lists of keywords; if False: just take keywords from item1 (if available)
     :param item1:
     :param item2:
     :return:
@@ -211,6 +225,7 @@ def fuse_items(item1: AcademicItemModel, item2: AcademicItemModel) -> AcademicIt
     elif item2.publication_year is not None:
         item.publication_year = item2.publication_year
 
+    # TODO: Do we want to be more considerate and do recursive updating?
     meta1: dict[str, Any] | None = clear_empty(item1.meta)
     meta2: dict[str, Any] | None = clear_empty(item2.meta)
     if meta1 is not None and meta2 is not None:
@@ -232,42 +247,47 @@ def fuse_items(item1: AcademicItemModel, item2: AcademicItemModel) -> AcademicIt
         item.text = item2.text
 
     # TODO: Try de-duplicating keywords
-    if item1.keywords is not None and item2.keywords is not None:
+    if not fuse_keywords and item1.keywords is not None and len(item1.keywords) > 0:
+        item.keywords = item1.keywords
+    elif item1.keywords is not None and item2.keywords is not None:
         item.keywords = list(set(item1.keywords).union(set(item2.keywords)))
     elif item1.keywords is not None:
         item.keywords = item1.keywords
     elif item2.keywords is not None:
         item.keywords = item2.keywords
 
-    authors_: list[AcademicAuthorModel] = (item1.authors or []) + (item2.authors or [])
-    authors: dict[str, AcademicAuthorModel] = {}
-    for author in authors_:
-        if author.name not in authors:  # TODO: There's probably a better way to match authors than by literal string match
-            authors[author.name] = author
-        else:
-            if authors[author.name].surname_initials is None:
-                if author.surname_initials is not None and len(author.surname_initials) == 0:
-                    authors[author.name].surname_initials = author.surname_initials
-
-            authors[author.name].surname_initials = _pick_best_str_('surname_initials', authors[author.name], author)
-            authors[author.name].email = _pick_best_str_('email', authors[author.name], author)
-            authors[author.name].orcid = _pick_best_str_('orcid', authors[author.name], author)
-            authors[author.name].scopus_id = _pick_best_str_('scopus_id', authors[author.name], author)
-            authors[author.name].openalex_id = _pick_best_str_('openalex_id', authors[author.name], author)
-            authors[author.name].s2_id = _pick_best_str_('s2_id', authors[author.name], author)
-
-            aff1 = authors[author.name].affiliations if len(authors[author.name].affiliations or []) > 0 else None
-            aff2 = author.affiliations if len(author.affiliations or []) > 0 else None
-            if aff1 is not None and aff2 is not None:
-                # TODO: There's probably a better way to match affiliations than by literal string match
-                authors[author.name].affiliations = list({aff.name: aff for aff in aff1 + aff2}.values())
-            elif aff1 is None and aff2 is not None:
-                authors[author.name].affiliations = aff2
-            elif aff1 is not None and aff2 is None:
-                authors[author.name].affiliations = aff1
+    if not fuse_authors and item1.authors is not None and len(item1.authors)>0:
+        item = item1.authors
+    else:
+        authors_: list[AcademicAuthorModel] = (item1.authors or []) + (item2.authors or [])
+        authors: dict[str, AcademicAuthorModel] = {}
+        for author in authors_:
+            if author.name not in authors:  # TODO: There's probably a better way to match authors than by literal string match
+                authors[author.name] = author
             else:
-                authors[author.name].affiliations = None
+                if authors[author.name].surname_initials is None:
+                    if author.surname_initials is not None and len(author.surname_initials) == 0:
+                        authors[author.name].surname_initials = author.surname_initials
 
-    item.authors = list(authors.values())
+                authors[author.name].surname_initials = _pick_best_str_('surname_initials', authors[author.name], author)
+                authors[author.name].email = _pick_best_str_('email', authors[author.name], author)
+                authors[author.name].orcid = _pick_best_str_('orcid', authors[author.name], author)
+                authors[author.name].scopus_id = _pick_best_str_('scopus_id', authors[author.name], author)
+                authors[author.name].openalex_id = _pick_best_str_('openalex_id', authors[author.name], author)
+                authors[author.name].s2_id = _pick_best_str_('s2_id', authors[author.name], author)
+
+                aff1 = authors[author.name].affiliations if len(authors[author.name].affiliations or []) > 0 else None
+                aff2 = author.affiliations if len(author.affiliations or []) > 0 else None
+                if aff1 is not None and aff2 is not None:
+                    # TODO: There's probably a better way to match affiliations than by literal string match
+                    authors[author.name].affiliations = list({aff.name: aff for aff in aff1 + aff2}.values())
+                elif aff1 is None and aff2 is not None:
+                    authors[author.name].affiliations = aff2
+                elif aff1 is not None and aff2 is None:
+                    authors[author.name].affiliations = aff1
+                else:
+                    authors[author.name].affiliations = None
+
+        item.authors = list(authors.values())
 
     return item
