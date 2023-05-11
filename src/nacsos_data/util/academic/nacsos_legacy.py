@@ -1,18 +1,20 @@
 from collections import defaultdict
 from typing import Any
 
+from pydantic import BaseModel
+
 from nacsos_data.models.items.academic import AcademicAuthorModel, AffiliationModel, AcademicItemModel
 from nacsos_data.util.academic.duplicate import get_title_slug
 from nacsos_data.util.errors import NotFoundError
 
 
-def _convert_authors(authors) -> list[AcademicAuthorModel] | None:
+def _convert_authors(authors: list[object]) -> list[AcademicAuthorModel] | None:
     aggregate = defaultdict(list)
 
     # iterate list of authors and aggregate by "position"
     # authors with the same position are assumed to be identical with varying affiliation
     for author in authors:
-        aggregate[author.position].append(author.__dict__)
+        aggregate[author.position].append(author.__dict__)  # type: ignore[arg-type,attr-defined]
 
     ret = []
 
@@ -23,23 +25,27 @@ def _convert_authors(authors) -> list[AcademicAuthorModel] | None:
             a.get(src)
             for a in aggregate[key]
             for src in ['AU', 'AF', 'surname', 'initials']
-            if a.get(src) is not None and len(a.get(src)) > 0
-        ], key=lambda n: len(n)))
+            if a.get(src) is not None and len(a.get(src)) > 0  # type: ignore[arg-type]
+        ], key=lambda n: len(n)))  # type: ignore[arg-type]
 
         # Get all author fields in this aggregate, keep non-empty ones
-        name_initials = [a.get('AU') for a in aggregate[key] if a.get('AU') is not None and len(a.get('AU')) > 0]
+        name_initials = [
+            a.get('AU')
+            for a in aggregate[key]
+            if a.get('AU') is not None and len(a.get('AU')) > 0  # type: ignore[arg-type]
+        ]
 
         # Get all non-empty affiliations
         affiliations = [
-            AffiliationModel(name=a.get('institution'))
+            AffiliationModel(name=a.get('institution'))  # type: ignore[arg-type]
             for a in aggregate[key]
-            if a.get('institution') is not None and len(a.get('institution')) > 0
+            if a.get('institution') is not None and len(a.get('institution')) > 0  # type: ignore[arg-type]
         ]
 
         # If we have at least one non-empty name for this author, add them
         if len(names) > 0:
             ret.append(AcademicAuthorModel(
-                name=names[-1],
+                name=names[-1],  # type: ignore[arg-type]
                 surname_initials=name_initials[0] if len(name_initials) > 0 else None,
                 affiliations=affiliations if len(affiliations) > 0 else None
             ))
