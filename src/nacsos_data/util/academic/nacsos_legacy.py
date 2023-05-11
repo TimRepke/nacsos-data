@@ -1,8 +1,6 @@
 from collections import defaultdict
 from typing import Any
 
-from pydantic import BaseModel
-
 from nacsos_data.models.items.academic import AcademicAuthorModel, AffiliationModel, AcademicItemModel
 from nacsos_data.util.academic.duplicate import get_title_slug
 from nacsos_data.util.errors import NotFoundError

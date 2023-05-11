@@ -1,12 +1,13 @@
 import uuid
 from sqlalchemy import String, Integer, ForeignKey, UniqueConstraint, Column
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import mapped_column, column_property, Mapped
+from sqlalchemy.orm import mapped_column, column_property, Mapped, Relationship, relationship
 from sqlalchemy_json import mutable_json_type
 
 from .base import Item
 from . import ItemType
 from ..projects import Project
+from ...base_class import Base
 
 
 class AcademicItem(Item):
@@ -65,6 +66,72 @@ class AcademicItem(Item):
     #   Keys with prefix `_` will not be rendered by the frontend though.
     meta = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True))
 
+    variants: Relationship['AcademicItemVariant'] = relationship('AcademicItemVariant',
+                                                                 cascade='all, delete')
+
     __mapper_args__ = {
         'polymorphic_identity': ItemType.academic,
     }
+
+
+class AcademicItemVariant(Base):
+    """
+    This Class/Table mostly mirrors `AcademicItem`, please refer to that definition for additional comments.
+    The main purpose of this table is to be used in the context of keeping track of duplicates.
+
+    In particular, when we insert something into the `AcademicItem` table, we first check for duplicates.
+    If we find one, we insert something here
+      1. if, for the item_id we found, there's nothing here, copy that row from `AcademicItem` and insert it here
+      2. if at least one field does not equal what we had before, add the academic item here
+      3. fuse the new and existing item and update it in the AcademicItem table
+
+    Note, that we only keep unique values here.
+    """
+    __tablename__ = 'academic_item_variant'
+
+    __table_args__ = (
+        UniqueConstraint('item_id', 'doi'),
+        UniqueConstraint('item_id', 'wos_id'),
+        UniqueConstraint('item_id', 'scopus_id'),
+        UniqueConstraint('item_id', 'openalex_id'),
+        UniqueConstraint('item_id', 's2_id'),
+        UniqueConstraint('item_id', 'pubmed_id'),
+        UniqueConstraint('item_id', 'title'),
+        UniqueConstraint('item_id', 'publication_year'),
+        UniqueConstraint('item_id', 'source'),
+        UniqueConstraint('item_id', 'abstract')
+
+        # No constraint, too complicated:
+        # UniqueConstraint('item_id', 'meta')
+        # UniqueConstraint('item_id', 'authors')
+        # UniqueConstraint('item_id', 'keywords')
+    )
+
+    item_variant_id = mapped_column(UUID(as_uuid=True),
+                                    primary_key=True, default=uuid.uuid4,
+                                    nullable=False, unique=True, index=True)
+
+    # Reference to the `AcademicItem` this is a duplicate of
+    item_id = mapped_column(UUID(as_uuid=True),
+                            ForeignKey(AcademicItem.item_id, ondelete='CASCADE'),
+                            nullable=False, index=True, unique=False)
+
+    # (Optional) reference to the import where this variant came from
+    import_id = mapped_column(UUID(as_uuid=True),
+                              ForeignKey(AcademicItem.item_id),
+                              nullable=True, index=True, unique=False)
+
+    doi = mapped_column(String, nullable=True, unique=False, index=False)
+    wos_id = mapped_column(String, nullable=True, unique=False, index=False)
+    scopus_id = mapped_column(String, nullable=True, unique=False, index=False)
+    openalex_id = mapped_column(String, nullable=True, unique=False, index=False)
+    s2_id = mapped_column(String, nullable=True, unique=False, index=False)
+    pubmed_id = mapped_column(String, nullable=True, unique=False, index=False)
+    title = mapped_column(String, nullable=True, unique=False, index=False)
+    publication_year = mapped_column(Integer, nullable=True, unique=False, index=False)
+    source = mapped_column(String, nullable=True, unique=False, index=False)
+    keywords = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True,
+                             index=False)
+    authors = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=False)
+    abstract = mapped_column(String, nullable=True, unique=False, index=False)
+    meta = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=False)

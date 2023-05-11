@@ -40,8 +40,8 @@ class Candidate(BaseModel):
 YEAR_PATTERN = re.compile(r'\d{4}')
 
 
-def are_actually_duplicate(item: AcademicItemModel,
-                           candidate: Candidate) -> bool:
+def _are_actually_duplicate(item: AcademicItemModel,
+                            candidate: Candidate) -> bool:
     """
     Return True if the `candidate` looks like a true duplicate of `item` after looking at it more closely.
     :param item:
@@ -152,6 +152,10 @@ async def find_duplicates(item: AcademicItemModel,
     if check_s2_id and item.s2_id is not None:
         checks.append(AcademicItem.s2_id == item.s2_id)
 
+    # Note: We are not checking for possible alternative identifiers in
+    #       the academic_item_variants table, because this could lead to runaway
+    #       chains of false-positive duplicates.
+
     stmt = stmt.where(or_(*checks))
 
     if db_engine is not None:
@@ -164,10 +168,39 @@ async def find_duplicates(item: AcademicItemModel,
 
     if len(candidates) > 0:
         if check_tslug_advanced:
-            return [c for c in candidates if are_actually_duplicate(item, c)]
+            return [c for c in candidates if _are_actually_duplicate(item, c)]
         return candidates
 
     return None
+
+
+REGEX_ABSTRACT_WORD_STRIPPER = re.compile(r'(abstract|title|a|the)')
+REGEX_ABSTRACT_CHAR_STRIPPER = re.compile(r'[^A-Za-z0-9 \n]+')
+
+
+def are_abstracts_duplicate(abs1: str | None, abs2: str | None) -> bool:
+    # maybe both abstracts are already trivially the same
+    if abs1 == abs2:
+        return True
+
+    # apparently not, so let's simplify the abstracts
+    # so that minor differences are ignored before checking again for equality
+
+    if abs1 is not None:
+        abs1 = abs1.lower()
+        abs1 = REGEX_ABSTRACT_WORD_STRIPPER.sub(abs1, '')
+        abs1 = REGEX_ABSTRACT_CHAR_STRIPPER.sub(abs1, '')
+        if len(abs1) == 0:
+            abs1 = None
+
+    if abs2 is not None:
+        abs2 = abs2.lower()
+        abs2 = REGEX_ABSTRACT_WORD_STRIPPER.sub(abs2, '')
+        abs2 = REGEX_ABSTRACT_CHAR_STRIPPER.sub(abs2, '')
+        if len(abs2) == 0:
+            abs2 = None
+
+    return abs1 == abs2
 
 
 def fuse_items(item1: AcademicItemModel,
@@ -256,8 +289,8 @@ def fuse_items(item1: AcademicItemModel,
     elif item2.keywords is not None:
         item.keywords = item2.keywords
 
-    if not fuse_authors and item1.authors is not None and len(item1.authors)>0:
-        item = item1.authors
+    if not fuse_authors and item1.authors is not None and len(item1.authors) > 0:
+        item.authors = item1.authors
     else:
         authors_: list[AcademicAuthorModel] = (item1.authors or []) + (item2.authors or [])
         authors: dict[str, AcademicAuthorModel] = {}
@@ -269,7 +302,8 @@ def fuse_items(item1: AcademicItemModel,
                     if author.surname_initials is not None and len(author.surname_initials) == 0:
                         authors[author.name].surname_initials = author.surname_initials
 
-                authors[author.name].surname_initials = _pick_best_str_('surname_initials', authors[author.name], author)
+                authors[author.name].surname_initials = _pick_best_str_('surname_initials', authors[author.name],
+                                                                        author)
                 authors[author.name].email = _pick_best_str_('email', authors[author.name], author)
                 authors[author.name].orcid = _pick_best_str_('orcid', authors[author.name], author)
                 authors[author.name].scopus_id = _pick_best_str_('scopus_id', authors[author.name], author)
