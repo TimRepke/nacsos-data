@@ -12,12 +12,12 @@ from ..projects import Project
 class AcademicItem(Item):
     __tablename__ = 'academic_item'
     __table_args__ = (
-        UniqueConstraint('doi', 'project_id'),
         UniqueConstraint('wos_id', 'project_id'),
         UniqueConstraint('scopus_id', 'project_id'),
-        UniqueConstraint('openalex_id', 'project_id'),
         UniqueConstraint('s2_id', 'project_id'),
         UniqueConstraint('pubmed_id', 'project_id'),
+        # UniqueConstraint('doi', 'project_id'),
+        # UniqueConstraint('openalex_id', 'project_id'),
         # UniqueConstraint('title_slug', 'project_id'),
     )
 
