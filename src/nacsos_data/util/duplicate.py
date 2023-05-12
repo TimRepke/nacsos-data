@@ -105,10 +105,12 @@ async def update_references(old_item_id: str | uuid.UUID,
 
             if meta is not None and str(old_item_id) in meta['collection']['annotations']:
                 # update `item_ids` in `AnnotationCollection` entries if necessary
-                for aci, ac in enumerate(meta['collection']['annotations'][str(old_item_id)]):
-                    for ai, anno in enumerate(ac['annotations']):
-                        if str(anno['item_id']) == str(old_item_id):
-                            meta['collection']['annotations'][str(old_item_id)][aci][ai]['item_id'] = str(new_item_id)
+                for aci, collections in enumerate(meta['collection']['annotations'][str(old_item_id)]):
+                    for ci, collection in enumerate(collections):
+                        # collection[0] is always the path (e.g. recursive keys based on parent structure)
+                        for ai, anno in enumerate(collection[1]):
+                            if str(anno['item_id']) == str(old_item_id):
+                                meta['collection']['annotations'][str(old_item_id)][aci][ci][1][ai]['item_id'] = str(new_item_id)
 
                 # We already have something for the new `item_id`, so merge collections
                 # Even though there might be "duplicate" labels now (same user,item pairs), we keep them all!
