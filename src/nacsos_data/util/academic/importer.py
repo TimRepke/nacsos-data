@@ -12,7 +12,7 @@ from ...db.engine import DatabaseEngineAsync
 from ...db.schemas import Import, AcademicItem, m2m_import_item_table
 from ...db.schemas.items.academic import AcademicItemVariant
 from ...models.imports import ImportType, M2MImportItemType
-from ...models.items import AcademicItemModel
+from ...models.items import AcademicItemModel, AcademicItemVariantModel
 from ..errors import NotFoundError
 from .clean import get_cleaned_meta_field
 from .duplicate import str_to_title_slug, find_duplicates, are_abstracts_duplicate, fuse_items
@@ -163,10 +163,12 @@ async def import_academic_items(
                 if duplicates is not None and len(duplicates) > 0:
                     item_id = duplicates[0].item_id
                     if dry_run:
-                        logger.info(f'  -> There are at least {len(duplicates)}; I will probably use {item_id}')
+                        logger.debug(f'  -> There are at least {len(duplicates)}; I will probably use {item_id}')
                     else:
                         logger.debug(f' -> Has {len(duplicates)} duplicates; using {item_id}.')
-                        await duplicate_insertion(item_id=item_id,
+                        if item.item_id is None:
+                            item.item_id = uuid.uuid4()
+                        await duplicate_insertion(orig_item_id=item_id,
                                                   import_id=import_id,
                                                   new_item=item,
                                                   trust_new_authors=trust_new_authors,
@@ -174,7 +176,7 @@ async def import_academic_items(
                                                   session=session)
                 else:
                     if dry_run:
-                        logger.info('  -> I will create a new AcademicItem!')
+                        logger.debug('  -> I will create a new AcademicItem!')
                     else:
                         item_id = str(uuid.uuid4())
                         logger.debug(f' -> Creating new item with ID {item_id}!')
@@ -183,7 +185,7 @@ async def import_academic_items(
                         await session.commit()
 
                 if dry_run:
-                    logger.info('  -> I will create an m2m entry.')
+                    logger.debug('  -> I will create an m2m entry.')
                 else:
                     stmt_m2m = insert(m2m_import_item_table) \
                         .values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit)
@@ -201,6 +203,7 @@ async def import_academic_items(
 
         # Keep track of when we finished importing
         import_orm.time_finished = datetime.datetime.now()
+        await session.commit()
 
 
 def _safe_lower(s: str | None) -> str | None:
@@ -210,7 +213,7 @@ def _safe_lower(s: str | None) -> str | None:
 
 
 async def duplicate_insertion(new_item: AcademicItemModel,
-                              item_id: str | uuid.UUID,
+                              orig_item_id: str | uuid.UUID,
                               import_id: str | uuid.UUID | None,
                               trust_new_authors: bool,
                               trust_new_keywords: bool,
@@ -223,57 +226,59 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     :param import_id:
     :param session:
     :param new_item:
-    :param item_id: id in academic_item of which the `new_item` is a duplicate
+    :param orig_item_id: id in academic_item of which the `new_item` is a duplicate
     :return:
     """
 
     # Fetch the original item from the database
-    item_orig = await session.get(AcademicItem, {'item_id': item_id})
+    orig_item_orm = await session.get(AcademicItem, {'item_id': orig_item_id})
 
     # This should never happen, but let's check just in case
-    if item_orig is None:
-        raise NotFoundError(f'No item found for {item_id}')
+    if orig_item_orm is None:
+        raise NotFoundError(f'No item found for {orig_item_id}')
 
-    item = AcademicItemModel.parse_obj(item_orig.__dict__)
+    orig_item = AcademicItemModel.parse_obj(orig_item_orm.__dict__)
 
     # Get prior variants of that AcademicItem
     variants = (await session.scalars(select(AcademicItemVariant)
-                                      .where(AcademicItemVariant.item_id == item_id))).all()
+                                      .where(AcademicItemVariant.item_id == orig_item_id))).all()
 
     # If we have no prior variant, we need to create one
     if len(variants) == 0:
         # For the first variant, we need to fetch the original import_id
         orig_import_id = await session.scalar(select(m2m_import_item_table.c.import_id)
-                                              .where(m2m_import_item_table.c.item_id == item_id))
+                                              .where(m2m_import_item_table.c.item_id == orig_item_id))
         # Note, we are not checking for "not None", because it might be a valid case where no import_id exists
 
-        variant = AcademicItemVariant(
+        variant = AcademicItemVariantModel(
             item_variant_id=uuid.uuid4(),
-            item_id=item.item_id,
+            item_id=orig_item_id,
             import_id=orig_import_id,
-            doi=item.doi,
-            wos_id=item.wos_id,
-            scopus_id=item.scopus_id,
-            openalex_id=item.openalex_id,
-            s2_id=item.s2_id,
-            pubmed_id=item.pubmed_id,
-            title=item.title,
-            publication_year=item.publication_year,
-            source=item.source,
-            keywords=item.keywords,
-            authors=item.authors,
-            abstract=item.text,
-            meta=item.meta)
+            doi=orig_item.doi,
+            wos_id=orig_item.wos_id,
+            scopus_id=orig_item.scopus_id,
+            openalex_id=orig_item.openalex_id,
+            s2_id=orig_item.s2_id,
+            pubmed_id=orig_item.pubmed_id,
+            title=orig_item.title,
+            publication_year=orig_item.publication_year,
+            source=orig_item.source,
+            keywords=orig_item.keywords,
+            authors=orig_item.authors,
+            abstract=orig_item.text,
+            meta=orig_item.meta)
+
         # add to database
-        session.add(variant)
+        session.add(AcademicItemVariant(**variant.dict()))
         await session.commit()
 
+        logger.debug(f'Created first variant of item {orig_item_id} at {variant.item_variant_id}')
         # use this new variant for further value thinning
         variants = [variant]
 
-    new_variant = AcademicItemVariant(
+    new_variant = AcademicItemVariantModel(
         item_variant_id=uuid.uuid4(),
-        item_id=new_item.item_id,
+        item_id=orig_item_id,
         import_id=import_id,
         doi=new_item.doi,
         wos_id=new_item.wos_id,
@@ -320,42 +325,47 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     if any([new_item.source == var.source for var in variants]):
         new_variant.source = None
 
-    session.add(new_variant)
+    logger.debug(f'Found {len(variants or [])} variants and adding one more.')
+
+    session.add(AcademicItemVariant(**new_variant.dict()))
     await session.commit()
 
     # Fuse all the fields from both, the existing and new variant into a new item
     fused_item = fuse_items(item1=new_item,
-                            item2=item,
+                            item2=orig_item,
                             fuse_authors=not trust_new_authors,
                             fuse_keywords=not trust_new_keywords)
 
+    # Python seems to drop the ORM for some reason, so fetch us a fresh copy of the original item
+    orig_item_orm = await session.get(AcademicItem, {'item_id': orig_item_id})
+
     # Partially update the fields in the database that changed after fusion
-    if fused_item.doi != item_orig.doi:
-        item_orig.doi = fused_item.doi
-    if fused_item.wos_id != item_orig.wos_id:
-        item_orig.wos_id = fused_item.wos_id
-    if fused_item.scopus_id != item_orig.scopus_id:
-        item_orig.scopus_id = fused_item.scopus_id
-    if fused_item.openalex_id != item_orig.openalex_id:
-        item_orig.openalex_id = fused_item.openalex_id
-    if fused_item.s2_id != item_orig.s2_id:
-        item_orig.s2_id = fused_item.s2_id
-    if fused_item.pubmed_id != item_orig.pubmed_id:
-        item_orig.pubmed_id = fused_item.pubmed_id
-    if fused_item.title != item_orig.title:
-        item_orig.title = fused_item.title
-    if fused_item.title_slug != item_orig.title_slug:
-        item_orig.title_slug = fused_item.title_slug
-    if fused_item.publication_year != item_orig.publication_year:
-        item_orig.publication_year = fused_item.publication_year
-    if fused_item.source != item_orig.source:
-        item_orig.source = fused_item.source
-    if fused_item.text != item_orig.text:
-        item_orig.text = fused_item.text
+    if fused_item.doi != orig_item_orm.doi:
+        orig_item_orm.doi = fused_item.doi
+    if fused_item.wos_id != orig_item_orm.wos_id:
+        orig_item_orm.wos_id = fused_item.wos_id
+    if fused_item.scopus_id != orig_item_orm.scopus_id:
+        orig_item_orm.scopus_id = fused_item.scopus_id
+    if fused_item.openalex_id != orig_item_orm.openalex_id:
+        orig_item_orm.openalex_id = fused_item.openalex_id
+    if fused_item.s2_id != orig_item_orm.s2_id:
+        orig_item_orm.s2_id = fused_item.s2_id
+    if fused_item.pubmed_id != orig_item_orm.pubmed_id:
+        orig_item_orm.pubmed_id = fused_item.pubmed_id
+    if fused_item.title != orig_item_orm.title:
+        orig_item_orm.title = fused_item.title
+    if fused_item.title_slug != orig_item_orm.title_slug:
+        orig_item_orm.title_slug = fused_item.title_slug
+    if fused_item.publication_year != orig_item_orm.publication_year:
+        orig_item_orm.publication_year = fused_item.publication_year
+    if fused_item.source != orig_item_orm.source:
+        orig_item_orm.source = fused_item.source
+    if fused_item.text != orig_item_orm.text:
+        orig_item_orm.text = fused_item.text
     # here we don't check and just do
-    item_orig.meta = fused_item.meta
-    item_orig.keywords = fused_item.keywords
-    item.authors = fused_item.authors
+    orig_item_orm.meta = fused_item.meta
+    orig_item_orm.keywords = fused_item.keywords
+    orig_item_orm.authors = fused_item.authors
 
     # commit the changes
     await session.commit()

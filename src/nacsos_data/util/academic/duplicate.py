@@ -16,6 +16,7 @@ from .clean import clear_empty
 logger = logging.getLogger('nacsos_data.util.academic.duplicate')
 
 REGEX_NON_ALPH = re.compile(r'[^a-z]')
+REGEX_NON_ALPHNUM = re.compile(r'[^a-z0-9]')
 
 
 def str_to_title_slug(title: str | None) -> str | None:
@@ -34,6 +35,7 @@ class Candidate(BaseModel):
     title: str | None = None
     title_slug: str | None = None
     doi: str | None = None
+    openalex_id: str | None = None
     publication_year: int | None = None
 
 
@@ -59,8 +61,11 @@ def _are_actually_duplicate(item: AcademicItemModel,
             # ... actually, we don't trust DOIs too much.
             # Even though the DOIs matched, the papers seem to have different titles -> not duplicate!
             # This is likely the case of the datasource (for example) using the DOI of the book rather than the chapters.
+            # But we only do this, if we get long titles, otherwise there might be too many false positive non-duplicates.
+            # For example, consider "Carbon trading: What does it mean for RE?" vs "Carbon trading".
             if item.doi == candidate.doi:
-                return False
+                if len(tslug_item) > 20 and len(tslug_cand) > 20:
+                    return False
 
             # We trust wos_id and co -> true duplicate
             return True
@@ -70,12 +75,21 @@ def _are_actually_duplicate(item: AcademicItemModel,
 
             # This looks like an annual report (contains year pattern), always assume not-duplicate
             if ((item.title is not None and YEAR_PATTERN.match(item.title))
-                    or (candidate.title is not None and YEAR_PATTERN.match(candidate.title))):
+                    and (candidate.title is not None and YEAR_PATTERN.match(candidate.title))):
+                if REGEX_NON_ALPHNUM.sub(item.title.lower(), '') == REGEX_NON_ALPHNUM.sub(candidate.title.lower(), ''):
+                    return True
+
                 return False
 
             # Publication years are more than a year apart, so we don't consider that duplicate anymore
             if abs((item.publication_year or 0) - (candidate.publication_year or 0)) > 1:
                 return False
+
+            # TODO: Probably do something about authors for additional evidence
+            # TODO: Maybe (only) for short title slugs
+
+            if item.openalex_id != candidate.openalex_id:
+                return True
 
     # We might have found this candidate because both title-slugs are empty
     elif tslug_item is None and tslug_cand is None:
@@ -129,6 +143,7 @@ async def find_duplicates(item: AcademicItemModel,
 
     stmt = select(AcademicItem.item_id,
                   AcademicItem.doi,
+                  AcademicItem.openalex_id,
                   AcademicItem.publication_year,
                   AcademicItem.title,
                   AcademicItem.title_slug)
@@ -175,7 +190,7 @@ async def find_duplicates(item: AcademicItemModel,
 
 
 REGEX_ABSTRACT_WORD_STRIPPER = re.compile(r'(abstract|title|a|the)')
-REGEX_ABSTRACT_CHAR_STRIPPER = re.compile(r'[^A-Za-z0-9 \n]+')
+REGEX_ABSTRACT_CHAR_STRIPPER = re.compile(r'[^A-Za-z0-9 ]')
 
 
 def are_abstracts_duplicate(abs1: str | None, abs2: str | None) -> bool:
@@ -188,15 +203,21 @@ def are_abstracts_duplicate(abs1: str | None, abs2: str | None) -> bool:
 
     if abs1 is not None:
         abs1 = abs1.lower()
-        abs1 = REGEX_ABSTRACT_WORD_STRIPPER.sub(abs1, '')
-        abs1 = REGEX_ABSTRACT_CHAR_STRIPPER.sub(abs1, '')
+        try:
+            abs1 = REGEX_ABSTRACT_WORD_STRIPPER.sub(abs1, '')
+            abs1 = REGEX_ABSTRACT_CHAR_STRIPPER.sub(abs1, '')
+        except re.error:
+            pass
         if len(abs1) == 0:
             abs1 = None
 
     if abs2 is not None:
         abs2 = abs2.lower()
-        abs2 = REGEX_ABSTRACT_WORD_STRIPPER.sub(abs2, '')
-        abs2 = REGEX_ABSTRACT_CHAR_STRIPPER.sub(abs2, '')
+        try:
+            abs2 = REGEX_ABSTRACT_WORD_STRIPPER.sub(abs2, '')
+            abs2 = REGEX_ABSTRACT_CHAR_STRIPPER.sub(abs2, '')
+        except re.error:
+            pass
         if len(abs2) == 0:
             abs2 = None
 
