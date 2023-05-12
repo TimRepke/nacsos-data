@@ -31,7 +31,7 @@ async def import_academic_items(
         dry_run: bool = True,
         trust_new_authors: bool = False,
         trust_new_keywords: bool = False,
-) -> None:
+) -> tuple[str | uuid.UUID, list[str | uuid.UUID]]:
     """
     Helper function for programmatically importing `AcademicItem`s into the platform.
 
@@ -87,13 +87,15 @@ async def import_academic_items(
                     If true, simulate best as possible (note, that duplicates within the `items` are not validated
                                                         and not all constraints can be checked)
     :param db_engine: an async database engine
-    :return:
+    :return: import_id and list of item_ids that were actually used in the end
     """
     if project_id is None:
         raise AttributeError('You have to provide a project ID!')
 
     if items is None:
         raise AttributeError('You have to provide data!')
+
+    item_ids = []
 
     async with db_engine.session() as session:  # type: AsyncSession
         if import_name is not None:
@@ -187,6 +189,7 @@ async def import_academic_items(
                 if dry_run:
                     logger.debug('  -> I will create an m2m entry.')
                 else:
+                    item_ids.append(item_id)
                     stmt_m2m = insert(m2m_import_item_table) \
                         .values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit)
                     try:
@@ -204,6 +207,8 @@ async def import_academic_items(
         # Keep track of when we finished importing
         import_orm.time_finished = datetime.datetime.now()
         await session.commit()
+
+    return import_id, item_ids
 
 
 def _safe_lower(s: str | None) -> str | None:
