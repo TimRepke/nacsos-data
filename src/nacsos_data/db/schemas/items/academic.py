@@ -100,12 +100,12 @@ class AcademicItemVariant(Base):
         UniqueConstraint('item_id', 'title'),
         UniqueConstraint('item_id', 'publication_year'),
         UniqueConstraint('item_id', 'source'),
-        UniqueConstraint('item_id', 'abstract')
 
         # No constraint, too complicated:
         # UniqueConstraint('item_id', 'meta')
         # UniqueConstraint('item_id', 'authors')
         # UniqueConstraint('item_id', 'keywords')
+        # UniqueConstraint('item_id', 'abstract')
     )
 
     item_variant_id = mapped_column(UUID(as_uuid=True),

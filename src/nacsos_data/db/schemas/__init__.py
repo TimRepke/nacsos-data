@@ -13,7 +13,7 @@ from .items import ItemType, ItemTypeLiteral
 from .items.base import Item
 from .items.generic import GenericItem
 from .items.twitter import TwitterItem
-from .items.academic import AcademicItem
+from .items.academic import AcademicItem, AcademicItemVariant
 
 AnyItemType = GenericItem | TwitterItem | AcademicItem
 AnyItemSchema = TypeVar('AnyItemSchema', GenericItem, TwitterItem, AcademicItem)
@@ -25,7 +25,7 @@ __all__ = ['Base',
            # Schemas for "automated" annotations
            'BotAnnotationMetaData', 'BotAnnotation',
            # Schemas for items (i.e. documents) and util types
-           'Item', 'GenericItem', 'TwitterItem', 'AcademicItem',
+           'Item', 'GenericItem', 'TwitterItem', 'AcademicItem', 'AcademicItemVariant',
            'ItemType', 'ItemTypeLiteral', 'AnyItemSchema', 'AnyItemType',
            # Schemas for organising data
            'Import', 'm2m_import_item_table',
