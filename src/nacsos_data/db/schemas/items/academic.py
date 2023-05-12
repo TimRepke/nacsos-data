@@ -119,7 +119,7 @@ class AcademicItemVariant(Base):
 
     # (Optional) reference to the import where this variant came from
     import_id = mapped_column(UUID(as_uuid=True),
-                              ForeignKey(Import.import_id),
+                              ForeignKey(Import.import_id, ondelete='CASCADE'),
                               nullable=True, index=False, unique=False)
 
     doi = mapped_column(String, nullable=True, unique=False, index=False)
