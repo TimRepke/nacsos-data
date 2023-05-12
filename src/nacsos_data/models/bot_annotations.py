@@ -111,8 +111,8 @@ class BotAnnotationMetaDataBaseModel(BaseModel):
     # Date and time when this meta entry was created (or last changed)
     time_created: datetime | None = None
     time_updated: datetime | None = None
-    # (Optional) reference to an annotation scope
-    annotation_scope_id: str | UUID | None = None
+    # (Optional) reference to an assignment scope
+    assignment_scope_id: str | UUID | None = None
     # (Optional) reference to an annotation scheme used here
     annotation_scheme_id: str | UUID | None = None
 
