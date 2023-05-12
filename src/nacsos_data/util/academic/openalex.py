@@ -18,7 +18,7 @@ def download_openalex_query(target_file: str | Path,
                             query: str,
                             openalex_endpoint: str,
                             batch_size: int = 10000,
-                            export_fields: list[str] | None = None):
+                            export_fields: list[str] | None = None) -> None:
     """
     This executes a `query` in solr at the specified `openalex_endpoint` (collection's select endpoint)
     and writes each document as one json string per line into `target_file`.

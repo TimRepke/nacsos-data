@@ -274,7 +274,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
 
         logger.debug(f'Created first variant of item {orig_item_id} at {variant.item_variant_id}')
         # use this new variant for further value thinning
-        variants = [variant]
+        variants = [variant]  # type: ignore[list-item]
 
     new_variant = AcademicItemVariantModel(
         item_variant_id=uuid.uuid4(),
@@ -338,6 +338,8 @@ async def duplicate_insertion(new_item: AcademicItemModel,
 
     # Python seems to drop the ORM for some reason, so fetch us a fresh copy of the original item
     orig_item_orm = await session.get(AcademicItem, {'item_id': orig_item_id})
+    if orig_item_orm is None:  # if this happens, something went horribly wrong. But at least mypy is happy.
+        raise RuntimeError(f'No item found for {orig_item_id}')
 
     # Partially update the fields in the database that changed after fusion
     if fused_item.doi != orig_item_orm.doi:
