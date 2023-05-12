@@ -1,8 +1,8 @@
 import re
 from typing import Generator
 from ...models.items import AcademicItemModel
-from .wosfile.record import records_from
 from ...models.items.academic import AcademicAuthorModel, AffiliationModel
+from .wosfile.record import records_from
 
 REGEX_C1 = re.compile(r'\[([^\]]+)\] (.*), (.*).')
 
@@ -23,9 +23,8 @@ def read_wos_file(filepath: str) -> Generator[AcademicItemModel, None, None]:
         if wos_id and len(wos_id) > 0:
             item.wos_id = wos_id  # type: ignore[assignment]
 
-        # FIXME: add following lines once pubmed is part of model
-        # if record.get('PM') and len(record.get('PM')) > 0:
-        #    item.pubmed_id = record.get('PM')  # type: ignore[assignment]
+        if record.get('PM') and len(record.get('PM')) > 0:  # type: ignore[arg-type]
+            item.pubmed_id = record.get('PM')  # type: ignore[assignment]
 
         pub_year = record.get('PY')
         if pub_year and type(pub_year) == str and len(pub_year) > 0:

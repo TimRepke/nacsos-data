@@ -47,7 +47,7 @@ class BotAnnotationMetaData(Base):
     time_updated = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     # (Optional) reference to an assignment scope
-    annotation_scope_id = mapped_column(UUID(as_uuid=True),  # FIXME: fix name to assignment_scope_id
+    assignment_scope_id = mapped_column(UUID(as_uuid=True),
                                         ForeignKey(AssignmentScope.assignment_scope_id),
                                         nullable=True, index=True)
     # (Optional) reference to an annotation scheme used here

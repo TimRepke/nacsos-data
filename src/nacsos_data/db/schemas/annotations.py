@@ -106,7 +106,7 @@ class AssignmentScope(Base):
 
     # An (optional) slightly longer description of the scope.
     # This may be displayed to the annotators as refined instruction or background information.
-    description = mapped_column(String, nullable=True)
+    description = mapped_column(String, nullable=False)
 
     # Stores the config parameters used in creating the assignments for future reference
     config = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True)

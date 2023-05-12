@@ -1,12 +1,11 @@
 import logging
 from typing import Any, Type, TypeVar
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID, uuid4
 from pydantic import BaseModel
 
-from nacsos_data.db import DatabaseEngineAsync
-from nacsos_data.db.schemas import Base
+from ..engine import DatabaseEngineAsync
+from ..schemas import Base
 
 logger = logging.getLogger('nacsos_data.crud')
 

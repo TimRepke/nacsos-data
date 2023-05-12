@@ -1,3 +1,4 @@
+import uuid
 from typing import Any
 
 from .base import ItemModel
@@ -57,4 +58,23 @@ class AcademicItemModel(ItemModel):
 
     authors: list[AcademicAuthorModel] | None = None
 
+    meta: dict[str, Any] | None = None
+
+
+class AcademicItemVariantModel(BaseModel):
+    item_variant_id: str | uuid.UUID
+    item_id: str | uuid.UUID
+    import_id: str | uuid.UUID | None = None
+    doi: str | None = None
+    wos_id: str | None = None
+    scopus_id: str | None = None
+    openalex_id: str | None = None
+    s2_id: str | None = None
+    pubmed_id: str | None = None
+    title: str | None = None
+    publication_year: int | None = None
+    source: str | None = None
+    keywords: list[str] | None = None
+    authors: list[AcademicAuthorModel] | None = None
+    abstract: str | None = None
     meta: dict[str, Any] | None = None
