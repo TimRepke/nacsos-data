@@ -351,17 +351,17 @@ def read_nacsos1_annotations(
                         )
                     )
 
-                for cat in (doc_user_cats or []):
+                for pos_cat in pos_categories:
                     annotations_new.append(
                         AnnotationModel(
                             annotation_id=uuid.uuid4(),
-                            time_created=cat.time,
+                            time_created=assignment.finish,
                             time_updated=datetime.datetime.now(),
                             assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
-                            user_id=user_map[cat.user_id],
-                            item_id=item_map[cat.doc_id],
+                            user_id=user_map[assignment.user_id],
+                            item_id=item_map[assignment.doc_id],
                             annotation_scheme_id=annotation_scheme_id,
-                            key=label_map[cat.category_id],
+                            key=label_map[pos_cat],
                             repeat=1,
                             parent=None,
                             value_bool=True,
