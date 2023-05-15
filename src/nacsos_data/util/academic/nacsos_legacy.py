@@ -325,30 +325,31 @@ def read_nacsos1_annotations(
             #                      'utterance_linked', 'title_only', 'full_text', 'project_id', 'user_id', 'query_id',
             #                      'tag_id', 'order', 'relevant', 'date', 'start', 'finish')]
 
-            if relevance_key is not None and 0 < assignment.relevant < 4:
-                annotations_new.append(
-                    AnnotationModel(
-                        annotation_id=uuid.uuid4(),
-                        # we don't really know, so let's take the time the assignment was finished
-                        time_created=assignment.finish,
-                        time_updated=datetime.datetime.now(),
-                        assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
-                        user_id=user_map[assignment.user_id],
-                        item_id=item_map[assignment.doc_id],
-                        annotation_scheme_id=annotation_scheme_id,
-                        key=relevance_key,
-                        repeat=1,
-                        parent=None,
-                        value_bool=None,
-                        # (0=unrated, 1=yes, 2=no, 3=maybe) -> (0=no, 1=maybe, 2=yes)
-                        value_int={0: None, 1: 2, 2: 0, 3: 1}[assignment.relevant],
-                        value_float=None,
-                        value_str=None,
-                        multi_int=None,
-                        text_offset_start=None,
-                        text_offset_stop=None
+            if 0 < assignment.relevant < 4:
+                if relevance_key is not None:
+                    annotations_new.append(
+                        AnnotationModel(
+                            annotation_id=uuid.uuid4(),
+                            # we don't really know, so let's take the time the assignment was finished
+                            time_created=assignment.finish,
+                            time_updated=datetime.datetime.now(),
+                            assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
+                            user_id=user_map[assignment.user_id],
+                            item_id=item_map[assignment.doc_id],
+                            annotation_scheme_id=annotation_scheme_id,
+                            key=relevance_key,
+                            repeat=1,
+                            parent=None,
+                            value_bool=None,
+                            # (0=unrated, 1=yes, 2=no, 3=maybe) -> (0=no, 1=maybe, 2=yes)
+                            value_int={0: None, 1: 2, 2: 0, 3: 1}[assignment.relevant],
+                            value_float=None,
+                            value_str=None,
+                            multi_int=None,
+                            text_offset_start=None,
+                            text_offset_stop=None
+                        )
                     )
-                )
 
                 for cat in (doc_user_cats or []):
                     annotations_new.append(
