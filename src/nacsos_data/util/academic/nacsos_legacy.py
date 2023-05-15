@@ -1,3 +1,4 @@
+import logging
 import datetime
 import uuid
 from collections import defaultdict
@@ -7,6 +8,8 @@ from ...models.annotations import AssignmentModel, AssignmentStatus, AnnotationM
 from ...models.items.academic import AcademicAuthorModel, AffiliationModel, AcademicItemModel
 from ..errors import NotFoundError
 from .duplicate import get_title_slug
+
+logger = logging.getLogger('nacsos_data.util.academic.nacsos_legacy')
 
 
 def _convert_authors(authors: list[object]) -> list[AcademicAuthorModel] | None:
@@ -287,6 +290,9 @@ def read_nacsos1_annotations(
     annotations_new = []
 
     for order, doc_id in enumerate(doc_ids):
+        if doc_id not in item_map:
+            logger.warning(f'Encountered doc_id={doc_id} which I do not know about. Ignoring!')
+
         # Assignments
         assignments = models.DocOwnership.objects.filter(doc_id=doc_id, query__project=p)
 
@@ -305,8 +311,8 @@ def read_nacsos1_annotations(
                 # creation date in nacsos1: assignment['date']
                 assignment_id=uuid.uuid4(),
                 assignment_scope_id=assignment_scope_id,
-                user_id=user_map[assignment['user_id']],
-                item_id=item_map[assignment['doc_id']],
+                user_id=user_map[assignment.user_id],
+                item_id=item_map[assignment.doc_id],
                 annotation_scheme_id=annotation_scheme_id,
                 status=AssignmentStatus.FULL,
                 order=order)
@@ -319,23 +325,23 @@ def read_nacsos1_annotations(
             #                      'utterance_linked', 'title_only', 'full_text', 'project_id', 'user_id', 'query_id',
             #                      'tag_id', 'order', 'relevant', 'date', 'start', 'finish')]
 
-            if relevance_key is not None and 0 < assignment['relevant'] < 4:
+            if relevance_key is not None and 0 < assignment.relevant < 4:
                 annotations_new.append(
                     AnnotationModel(
                         annotation_id=uuid.uuid4(),
                         # we don't really know, so let's take the time the assignment was finished
-                        time_created=assignment['finish'],
+                        time_created=assignment.finish,
                         time_updated=datetime.datetime.now(),
                         assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
-                        user_id=user_map[assignment['user_id']],
-                        item_id=item_map[assignment['doc_id']],
+                        user_id=user_map[assignment.user_id],
+                        item_id=item_map[assignment.doc_id],
                         annotation_scheme_id=annotation_scheme_id,
                         key=relevance_key,
                         repeat=1,
                         parent=None,
                         value_bool=None,
                         # (0=unrated, 1=yes, 2=no, 3=maybe) -> (0=no, 1=maybe, 2=yes)
-                        value_int={0: None, 1: 2, 2: 0, 3: 1}[assignment['relevant']],
+                        value_int={0: None, 1: 2, 2: 0, 3: 1}[assignment.relevant],
                         value_float=None,
                         value_str=None,
                         multi_int=None,
@@ -348,13 +354,13 @@ def read_nacsos1_annotations(
                 annotations_new.append(
                     AnnotationModel(
                         annotation_id=uuid.uuid4(),
-                        time_created=cat['time'],
+                        time_created=cat.time,
                         time_updated=datetime.datetime.now(),
                         assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
-                        user_id=user_map[cat['user_id']],
-                        item_id=item_map[cat['doc_id']],
+                        user_id=user_map[cat.user_id],
+                        item_id=item_map[cat.doc_id],
                         annotation_scheme_id=annotation_scheme_id,
-                        key=label_map[cat['category_id']],
+                        key=label_map[cat.category_id],
                         repeat=1,
                         parent=None,
                         value_bool=True,
@@ -371,11 +377,11 @@ def read_nacsos1_annotations(
                     AnnotationModel(
                         annotation_id=uuid.uuid4(),
                         # we don't really know, so let's take the time the assignment was finished
-                        time_created=assignment['finish'],
+                        time_created=assignment.finish,
                         time_updated=datetime.datetime.now(),
                         assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
-                        user_id=user_map[assignment['user_id']],
-                        item_id=item_map[assignment['doc_id']],
+                        user_id=user_map[assignment.user_id],
+                        item_id=item_map[assignment.doc_id],
                         annotation_scheme_id=annotation_scheme_id,
                         key=label_map[neg_cat],
                         repeat=1,
