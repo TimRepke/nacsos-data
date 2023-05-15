@@ -318,9 +318,9 @@ def read_nacsos1_annotations(
                 order=order)
             assignments_new.append(assignment_new)
 
-            # assignment: ('id', 'doc_id', 'docpar_id', 'utterance_id', 'tweet_id', 'document_linked', 'utterance_linked',
-            #              'title_only', 'full_text', 'project_id', 'user_id', 'query_id', 'tag_id', 'order', 'relevant',
-            #              'date', 'start', 'finish')
+            # assignment: ('id', 'doc_id', 'docpar_id', 'utterance_id', 'tweet_id', 'document_linked',
+            #              'utterance_linked', 'title_only', 'full_text', 'project_id', 'user_id', 'query_id', 'tag_id',
+            #              'order', 'relevant', 'date', 'start', 'finish')
             # doc_user_cats: list[('id', 'doc_id', 'docpar_id', 'utterance_id', 'tweet_id', 'document_linked',
             #                      'utterance_linked', 'title_only', 'full_text', 'project_id', 'user_id', 'query_id',
             #                      'tag_id', 'order', 'relevant', 'date', 'start', 'finish')]
@@ -350,49 +350,49 @@ def read_nacsos1_annotations(
                     )
                 )
 
-            for cat in (doc_user_cats or []):
-                annotations_new.append(
-                    AnnotationModel(
-                        annotation_id=uuid.uuid4(),
-                        time_created=cat.time,
-                        time_updated=datetime.datetime.now(),
-                        assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
-                        user_id=user_map[cat.user_id],
-                        item_id=item_map[cat.doc_id],
-                        annotation_scheme_id=annotation_scheme_id,
-                        key=label_map[cat.category_id],
-                        repeat=1,
-                        parent=None,
-                        value_bool=True,
-                        value_int=None,
-                        value_float=None,
-                        value_str=None,
-                        multi_int=None,
-                        text_offset_start=None,
-                        text_offset_stop=None
+                for cat in (doc_user_cats or []):
+                    annotations_new.append(
+                        AnnotationModel(
+                            annotation_id=uuid.uuid4(),
+                            time_created=cat.time,
+                            time_updated=datetime.datetime.now(),
+                            assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
+                            user_id=user_map[cat.user_id],
+                            item_id=item_map[cat.doc_id],
+                            annotation_scheme_id=annotation_scheme_id,
+                            key=label_map[cat.category_id],
+                            repeat=1,
+                            parent=None,
+                            value_bool=True,
+                            value_int=None,
+                            value_float=None,
+                            value_str=None,
+                            multi_int=None,
+                            text_offset_start=None,
+                            text_offset_stop=None
+                        )
                     )
-                )
-            for neg_cat in neg_categories:
-                annotations_new.append(
-                    AnnotationModel(
-                        annotation_id=uuid.uuid4(),
-                        # we don't really know, so let's take the time the assignment was finished
-                        time_created=assignment.finish,
-                        time_updated=datetime.datetime.now(),
-                        assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
-                        user_id=user_map[assignment.user_id],
-                        item_id=item_map[assignment.doc_id],
-                        annotation_scheme_id=annotation_scheme_id,
-                        key=label_map[neg_cat],
-                        repeat=1,
-                        parent=None,
-                        value_bool=False,
-                        value_int=None,
-                        value_float=None,
-                        value_str=None,
-                        multi_int=None,
-                        text_offset_start=None,
-                        text_offset_stop=None
+                for neg_cat in neg_categories:
+                    annotations_new.append(
+                        AnnotationModel(
+                            annotation_id=uuid.uuid4(),
+                            # we don't really know, so let's take the time the assignment was finished
+                            time_created=assignment.finish,
+                            time_updated=datetime.datetime.now(),
+                            assignment_id=assignment_new.assignment_id,  # type: ignore[arg-type]
+                            user_id=user_map[assignment.user_id],
+                            item_id=item_map[assignment.doc_id],
+                            annotation_scheme_id=annotation_scheme_id,
+                            key=label_map[neg_cat],
+                            repeat=1,
+                            parent=None,
+                            value_bool=False,
+                            value_int=None,
+                            value_float=None,
+                            value_str=None,
+                            multi_int=None,
+                            text_offset_start=None,
+                            text_offset_stop=None
+                        )
                     )
-                )
     return assignments_new, annotations_new
