@@ -3,6 +3,7 @@ import logging
 from typing import AsyncIterator, Iterator, Any
 from json import JSONEncoder
 
+from pydantic import BaseModel
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import sessionmaker, Session
@@ -18,10 +19,18 @@ logger = logging.getLogger('nacsos_data.engine')
 
 class DictLikeEncoder(JSONEncoder):
     def default(self, o: Any) -> Any:
+        # Translate datetime into a string
         if type(o) == datetime:
             return o.strftime('%Y-%m-%dT%H:%M:%S')
 
-        return json.JSONEncoder.default(self, o)
+        # Translate pydantic models into dict
+        if isinstance(o, BaseModel):
+            o = o.dict()
+        try:
+            return json.JSONEncoder.default(self, o)
+        except TypeError as e:
+            print(o)
+            raise e
 
 
 class DatabaseEngineAsync:

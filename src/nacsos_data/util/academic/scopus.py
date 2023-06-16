@@ -138,6 +138,10 @@ def read_scopus_file(filepath: str,
 
             title = _get(row, 'Titles')
             title_slug = str_to_title_slug(title)
+            if title is None:
+                title = _get(row, 'Title')
+                title_slug = str_to_title_slug(title)
+
             authors = _parse_authors(row)
 
             py: int | None = None

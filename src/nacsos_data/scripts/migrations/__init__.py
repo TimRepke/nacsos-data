@@ -1,3 +1,5 @@
+from typing import Optional
+
 import typer
 from enum import Enum
 from pathlib import Path
@@ -21,12 +23,12 @@ ROOT_PATH = Path(__file__).parent.parent.parent.parent.parent
 
 
 def main(cmd: Command,
-         revision: str | None = None,
+         revision: Optional[str] = None,
          verbose: bool = True,
          root_path: Path = ROOT_PATH,
-         ini_file: Path | None = None,
+         ini_file: Optional[Path] = None,
          autogenerate: bool = False,
-         message: str | None = None):
+         message: Optional[str] = None):
     """
     Alembic database migration wrapper.
 
