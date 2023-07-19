@@ -50,15 +50,15 @@ class AnnotationSchemeLabel(BaseModel):
 
 class FlattenedAnnotationSchemeLabel(BaseModel):
     name: str
-    hint: str | None
+    hint: str | None = None
     key: str
     required: bool
     max_repeat: int
     implicit_max_repeat: int
     kind: AnnotationSchemeLabelTypes
-    choices: list[AnnotationSchemeLabelChoiceFlat] | None
-    parent_label: str | None
-    parent_choice: int | None
+    choices: list[AnnotationSchemeLabelChoiceFlat] | None = None
+    parent_label: str | None = None
+    parent_choice: int | None = None
 
 
 class _AnnotationSchemeModel(BaseModel):

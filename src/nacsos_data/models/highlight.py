@@ -22,4 +22,4 @@ class HighlighterModel(BaseModel):
     # List of keywords (regexes) to match
     keywords: list[str]
     # Valid HTML style="..." string (typically sth. like 'background-color: #123456')
-    style: str | None
+    style: str | None = None

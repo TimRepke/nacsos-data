@@ -83,4 +83,4 @@ class AuthTokenModel(BaseModel):
     time_updated: datetime.datetime | None = None
 
     # Timestamp to indicate until when this token is valid; null means valid forever
-    valid_till: datetime.datetime | None
+    valid_till: datetime.datetime | None = None

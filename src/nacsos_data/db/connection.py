@@ -1,12 +1,14 @@
 import os
-from typing import Any
 
-from pydantic import BaseSettings, PostgresDsn, validator
+from pydantic_settings import SettingsConfigDict, BaseSettings
+from pydantic.networks import PostgresDsn
+from pydantic import field_validator, FieldValidationInfo
 
 from .engine import DatabaseEngine, DatabaseEngineAsync
 
 
 class DatabaseConfig(BaseSettings):
+    SCHEME: str = 'postgresql'
     HOST: str = 'localhost'  # host of the db server
     PORT: int = 5432  # port of the db server
     USER: str = 'nacsos'  # username for the database
@@ -15,21 +17,23 @@ class DatabaseConfig(BaseSettings):
 
     CONNECTION_STR: PostgresDsn | None = None
 
-    @validator('CONNECTION_STR', pre=True)
-    def build_connection_string(cls, v: str | None, values: dict[str, Any]) -> Any:
+    @field_validator('CONNECTION_STR', mode='before')
+    def build_connection_string(cls, v: str | None, info: FieldValidationInfo) -> str:
+        assert info.config is not None
+
         if isinstance(v, str):
             return v
+
         return PostgresDsn.build(
-            scheme="postgresql",
-            user=values.get('USER'),
-            password=values.get('PASSWORD'),
-            host=values.get('HOST'),
-            path=f'/{values.get("DATABASE", "")}',
+            scheme=info.data.get('SCHEME', 'postgresql'),
+            username=info.data.get('USER'),
+            password=info.data.get('PASSWORD'),
+            host=info.data.get('HOST'),
+            port=info.data.get('PORT'),
+            path=f'/{info.data.get("DATABASE", "")}',
         )
 
-    class Config:
-        # Add this prefix to be compatible with nacsos-core config
-        env_prefix = 'NACSOS_DB__'
+    model_config = SettingsConfigDict(env_prefix='NACSOS_DB__')
 
 
 def _get_settings(conf_file: str | None = None) -> DatabaseConfig:
