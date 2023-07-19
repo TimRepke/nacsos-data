@@ -25,12 +25,9 @@ class DictLikeEncoder(JSONEncoder):
 
         # Translate pydantic models into dict
         if isinstance(o, BaseModel):
-            o = o.dict()
-        try:
-            return json.JSONEncoder.default(self, o)
-        except TypeError as e:
-            print(o)
-            raise e
+            return o.dict()
+
+        return json.JSONEncoder.default(self, o)
 
 
 class DatabaseEngineAsync:

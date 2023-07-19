@@ -1,15 +1,19 @@
 import re
+import uuid
 from typing import Generator
+
+from .wosfile.record import records_from
+
 from ...models.items import AcademicItemModel
 from ...models.items.academic import AcademicAuthorModel, AffiliationModel
-from .wosfile.record import records_from
 
 REGEX_C1 = re.compile(r'\[([^\]]+)\] (.*), (.*).')
 
 
-def read_wos_file(filepath: str) -> Generator[AcademicItemModel, None, None]:
+def read_wos_file(filepath: str,
+                  project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
     for record in records_from([filepath]):
-        item = AcademicItemModel()
+        item = AcademicItemModel(project_id=project_id)
 
         title = record.get('TI')
         if title and len(title) > 0:
