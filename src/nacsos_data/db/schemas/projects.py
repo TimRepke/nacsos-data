@@ -1,6 +1,6 @@
 import uuid
 from typing import TYPE_CHECKING
-from sqlalchemy import String, ForeignKey, Boolean, Enum as SAEnum, UniqueConstraint, text, func as F, DateTime
+from sqlalchemy import String, ForeignKey, Boolean, Enum as SAEnum, UniqueConstraint, text, func as F, DateTime, Integer
 from sqlalchemy.orm import mapped_column, WriteOnlyMapped, relationship, Relationship, Mapped
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -126,5 +126,14 @@ class ProjectPermissions(Base):
     artefacts_read = mapped_column(Boolean, nullable=False, default=False)
     # If true, the user has permission to edit and delete pipeline outputs (aka artefacts)
     artefacts_edit = mapped_column(Boolean, nullable=False, default=False)
+
+    # If true, the user has permission to use our dimensions access for search (excl. full query/import)
+    search_dimensions = mapped_column(Boolean, nullable=False, default=False)
+    # If true, the user has permission to use our OpenAlex database for search (excl. full query/import)
+    search_oa = mapped_column(Boolean, nullable=False, default=False)
+
+    # Max. number of items per import from OpenAlex (0 = direct OpenAlex import not allowed)
+    # This should only be editable by superusers!
+    import_limit_oa = mapped_column(Integer, nullable=False, default=0)
 
     user: Mapped['User'] = relationship(back_populates='project_permissions')
