@@ -7,7 +7,7 @@ Create Date: 2023-07-19 17:06:00.385207
 """
 from alembic import op
 import sqlalchemy as sa
-
+from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision = '4d4d3db5e1a5'
@@ -24,9 +24,12 @@ def upgrade():
     op.add_column('academic_item_variant', sa.Column('dimensions_id', sa.String(), nullable=True))
     op.create_unique_constraint(None, 'academic_item_variant', ['item_id', 'dimensions_id'])
 
-    op.add_column('project_permissions', sa.Column('search_dimensions', sa.Boolean(), nullable=False))
-    op.add_column('project_permissions', sa.Column('search_oa', sa.Boolean(), nullable=False))
-    op.add_column('project_permissions', sa.Column('import_limit_oa', sa.Integer(), nullable=False))
+    op.add_column('project_permissions', sa.Column('search_dimensions', sa.Boolean(),
+                                                   nullable=False, server_default=text('FALSE')))
+    op.add_column('project_permissions', sa.Column('search_oa', sa.Boolean(),
+                                                   nullable=False, server_default=text('FALSE')))
+    op.add_column('project_permissions', sa.Column('import_limit_oa', sa.Integer(),
+                                                   nullable=False, server_default=text('0')))
 
 
 def downgrade():
