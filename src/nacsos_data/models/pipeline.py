@@ -3,7 +3,8 @@ import uuid
 from enum import Enum
 from hashlib import sha256
 from datetime import datetime
-from typing import Any, TypedDict
+from typing import Any
+from typing_extensions import TypedDict
 
 from pydantic import BaseModel
 
