@@ -44,6 +44,7 @@ class AcademicItemModel(ItemModel):
     openalex_id: str | None = None
     s2_id: str | None = None
     pubmed_id: str | None = None
+    dimensions_id: str | None = None
 
     # (Primary) title of the paper
     title: str | None = None
@@ -71,6 +72,7 @@ class AcademicItemVariantModel(BaseModel):
     openalex_id: str | None = None
     s2_id: str | None = None
     pubmed_id: str | None = None
+    dimensions_id: str | None = None
     title: str | None = None
     publication_year: int | None = None
     source: str | None = None

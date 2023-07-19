@@ -18,6 +18,7 @@ class AcademicItem(Item):
         UniqueConstraint('scopus_id', 'project_id'),
         UniqueConstraint('s2_id', 'project_id'),
         UniqueConstraint('pubmed_id', 'project_id'),
+        UniqueConstraint('dimensions_id', 'project_id'),
         # UniqueConstraint('doi', 'project_id'),
         # UniqueConstraint('openalex_id', 'project_id'),
         # UniqueConstraint('title_slug', 'project_id'),
@@ -42,6 +43,7 @@ class AcademicItem(Item):
     openalex_id = mapped_column(String, nullable=True, unique=False, index=True)
     s2_id = mapped_column(String, nullable=True, unique=False, index=True)
     pubmed_id = mapped_column(String, nullable=True, unique=False, index=True)
+    dimensions_id = mapped_column(String, nullable=True, unique=False, index=True)
 
     # (Primary) title of the paper
     title = mapped_column(String, nullable=True, unique=False, index=False)
@@ -97,6 +99,7 @@ class AcademicItemVariant(Base):
         UniqueConstraint('item_id', 'openalex_id'),
         UniqueConstraint('item_id', 's2_id'),
         UniqueConstraint('item_id', 'pubmed_id'),
+        UniqueConstraint('item_id', 'dimensions_id'),
         UniqueConstraint('item_id', 'title'),
         UniqueConstraint('item_id', 'publication_year'),
         UniqueConstraint('item_id', 'source'),
@@ -128,6 +131,7 @@ class AcademicItemVariant(Base):
     openalex_id = mapped_column(String, nullable=True, unique=False, index=False)
     s2_id = mapped_column(String, nullable=True, unique=False, index=False)
     pubmed_id = mapped_column(String, nullable=True, unique=False, index=False)
+    dimensions_id = mapped_column(String, nullable=True, unique=False, index=False)
     title = mapped_column(String, nullable=True, unique=False, index=False)
     publication_year = mapped_column(Integer, nullable=True, unique=False, index=False)
     source = mapped_column(String, nullable=True, unique=False, index=False)

@@ -111,6 +111,7 @@ async def find_duplicates(item: AcademicItemModel,
                           check_wos_id: bool = False,
                           check_oa_id: bool = False,
                           check_pubmed_id: bool = False,
+                          check_dimensions_id: bool = False,
                           check_scopus_id: bool = False,
                           check_s2_id: bool = False,
                           db_engine: DatabaseEngineAsync | None = None,
@@ -131,6 +132,7 @@ async def find_duplicates(item: AcademicItemModel,
     :param check_oa_id:
     :param check_scopus_id:
     :param check_pubmed_id:
+    :param check_dimensions_id:
     :param check_s2_id:
     :param session:
     :return:
@@ -164,6 +166,8 @@ async def find_duplicates(item: AcademicItemModel,
         checks.append(AcademicItem.scopus_id == item.scopus_id)
     if check_pubmed_id and item.pubmed_id is not None:
         checks.append(AcademicItem.pubmed_id == item.pubmed_id)
+    if check_dimensions_id and item.dimensions_id is not None:
+        checks.append(AcademicItem.dimensions_id == item.dimensions_id)
     if check_s2_id and item.s2_id is not None:
         checks.append(AcademicItem.s2_id == item.s2_id)
 
@@ -266,6 +270,7 @@ def fuse_items(item1: AcademicItemModel,
     item.openalex_id = _pick_best_str('openalex_id')
     item.s2_id = _pick_best_str('s2_id')
     item.pubmed_id = _pick_best_str('pubmed_id')
+    item.dimensions_id = _pick_best_str('dimensions_id')
 
     # TODO: Do something more sensible than picking any title in order
     item.title = _pick_best_str('title')

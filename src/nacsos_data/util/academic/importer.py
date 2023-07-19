@@ -158,6 +158,7 @@ async def import_academic_items(
                                                check_scopus_id=True,
                                                check_oa_id=True,
                                                check_pubmed_id=True,
+                                               check_dimensions_id=True,
                                                check_s2_id=True,
                                                session=session)
 
@@ -265,6 +266,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
             openalex_id=orig_item.openalex_id,
             s2_id=orig_item.s2_id,
             pubmed_id=orig_item.pubmed_id,
+            dimensions_id=orig_item.dimensions_id,
             title=orig_item.title,
             publication_year=orig_item.publication_year,
             source=orig_item.source,
@@ -291,6 +293,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
         openalex_id=new_item.openalex_id,
         s2_id=new_item.s2_id,
         pubmed_id=new_item.pubmed_id,
+        dimensions_id=new_item.dimensions_id,
         title=new_item.title,
         publication_year=new_item.publication_year,
         source=new_item.source,
@@ -320,6 +323,9 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     # if we've seen this pubmed_id before, drop it
     if any([new_item.pubmed_id == var.pubmed_id for var in variants]):
         new_variant.pubmed_id = None
+    # if we've seen this dimensions_id before, drop it
+    if any([new_item.dimensions_id == var.dimensions_id for var in variants]):
+        new_variant.dimensions_id = None
     # if we've seen this title before, drop it
     if any([_safe_lower(new_item.title) == _safe_lower(var.title) for var in variants]):
         new_variant.title = None
@@ -359,6 +365,8 @@ async def duplicate_insertion(new_item: AcademicItemModel,
         orig_item_orm.s2_id = fused_item.s2_id
     if fused_item.pubmed_id != orig_item_orm.pubmed_id:
         orig_item_orm.pubmed_id = fused_item.pubmed_id
+    if fused_item.dimensions_id != orig_item_orm.dimensions_id:
+        orig_item_orm.dimensions_id = fused_item.dimensions_id
     if fused_item.title != orig_item_orm.title:
         orig_item_orm.title = fused_item.title
     if fused_item.title_slug != orig_item_orm.title_slug:
