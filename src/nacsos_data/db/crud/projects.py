@@ -66,7 +66,7 @@ async def read_project_permissions_for_user(user_id: str | UUID, project_id: str
 
 async def create_project(project: ProjectModel, engine: DatabaseEngineAsync) -> ProjectModel:
     async with engine.session() as session:
-        new_project = Project(**project.dict())
+        new_project = Project(**project.model_dump())
         session.add(new_project)
         await session.commit()
 
@@ -84,7 +84,7 @@ async def update_project(project: ProjectModel, engine: DatabaseEngineAsync) -> 
 async def create_project_permissions(permissions: ProjectPermissionsModel,
                                      engine: DatabaseEngineAsync) -> ProjectPermissionsModel:
     async with engine.session() as session:
-        new_permissions = ProjectPermissions(**permissions.dict())
+        new_permissions = ProjectPermissions(**permissions.model_dump())
         session.add(new_permissions)
         await session.commit()
 

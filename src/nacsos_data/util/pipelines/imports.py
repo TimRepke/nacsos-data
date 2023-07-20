@@ -171,7 +171,7 @@ async def _submit_import_task(import_id: UUID | str,
         if ConfigModel is None:
             raise UndefinedEncoding(f'This import type ({import_details.type}) has no known pipeline function.')
 
-        config = ConfigModel.parse_obj(import_details.config)
+        config = ConfigModel.model_validate(import_details.config)
         if type(config) == ImportConfigJSONL:
             converter = get_jsonl_converter(config.line_type)
         elif type(config) == ImportConfigWoS:
@@ -183,7 +183,7 @@ async def _submit_import_task(import_id: UUID | str,
         payload = {
             'task_id': None,
             'function_name': converter.func_name,
-            'params': converter.convert_details(ImportModel.parse_obj(import_details.__dict__)),
+            'params': converter.convert_details(ImportModel.model_validate(import_details.__dict__)),
             'user_id': str(import_details.user_id),
             'project_id': str(import_details.project_id),
             'comment': f'Import for "{import_details.name}" ({import_id})',

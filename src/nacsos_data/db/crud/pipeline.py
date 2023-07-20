@@ -50,7 +50,7 @@ def query_tasks(engine: DatabaseEngine,
         result = session.execute(stmt).scalars().all()
         if len(result) == 0:
             return None
-        return [TaskModel.parse_obj(r.__dict__) for r in result]
+        return [TaskModel.model_validate(r.__dict__) for r in result]
 
 
 def read_task_by_id(task_id: str | uuid.UUID, engine: DatabaseEngine) -> TaskModel | None:
@@ -58,21 +58,21 @@ def read_task_by_id(task_id: str | uuid.UUID, engine: DatabaseEngine) -> TaskMod
         stmt = select(Task).where(Task.task_id == task_id)
         result = session.execute(stmt).scalars().one_or_none()
         if result is not None:
-            return TaskModel.parse_obj(result.__dict__)
+            return TaskModel.model_validate(result.__dict__)
         return None
 
 
 def read_tasks_by_ids(task_ids: list[str] | list[uuid.UUID], engine: DatabaseEngine) -> list[TaskModel]:
     with engine.session() as session:  # type: Session
         stmt = select(Task).where(Task.task_id.in_(task_ids))
-        return [TaskModel.parse_obj(r.__dict__)
+        return [TaskModel.model_validate(r.__dict__)
                 for r in session.execute(stmt).scalars().all()]
 
 
 def read_tasks_by_fingerprint(fingerprint: str, engine: DatabaseEngine) -> list[TaskModel]:
     with engine.session() as session:  # type: Session
         stmt = select(Task).where(Task.fingerprint == fingerprint)
-        return [TaskModel.parse_obj(r.__dict__)
+        return [TaskModel.model_validate(r.__dict__)
                 for r in session.execute(stmt).scalars().all()]
 
 
@@ -102,7 +102,7 @@ class StatusForTask(BaseModel):
 def read_task_statuses(task_ids: list[str] | list[uuid.UUID], engine: DatabaseEngine) -> list[StatusForTask]:
     with engine.session() as session:  # type: Session
         stmt = select(Task.task_id, Task.status).where(Task.task_id.in_(task_ids))
-        return [StatusForTask.parse_obj(r.__dict__)
+        return [StatusForTask.model_validate(r.__dict__)
                 for r in session.execute(stmt).scalars().all()]
 
 
@@ -135,12 +135,12 @@ def upsert_task(task: TaskModel, engine: DatabaseEngine) -> TaskModel:
     from sqlalchemy.dialects.postgresql import insert as pg_insert
     with engine.session() as session:  # type: Session
         result = session.scalars(pg_insert(Task)
-                                 .values(**task.dict())
+                                 .values(**task.model_dump())
                                  .on_conflict_do_update(index_elements=[Task.task_id],
-                                                        set_=task.dict())
+                                                        set_=task.model_dump())
                                  .returning(Task),
                                  execution_options={"populate_existing": True}).one_or_none()
-        return TaskModel.parse_obj(result.__dict__)
+        return TaskModel.model_validate(result.__dict__)
 
 
 def update_status(task_id: str | uuid.UUID, status: TaskStatus, engine: DatabaseEngine) -> None:

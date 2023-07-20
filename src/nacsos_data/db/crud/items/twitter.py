@@ -40,7 +40,7 @@ async def import_tweet(tweet: TwitterItemModel,
     :return: TwitterItem(Model) that was affected by this operation
     """
     async with engine.session() as session:
-        orm_tweet = TwitterItem(**tweet.dict())
+        orm_tweet = TwitterItem(**tweet.model_dump())
 
         if project_id is not None:
             # FIXME: mypy  Union[str, UUID] vs Union[SQLCoreOperations[UUID], UUID]"
@@ -71,7 +71,7 @@ async def import_tweet(tweet: TwitterItemModel,
                 logger.debug(f'M2M_i2i already exists, ignoring {import_id} <-> {orm_tweet.item_id}')
                 await session.rollback()
 
-        return TwitterItemModel.parse_obj(orm_tweet.__dict__)
+        return TwitterItemModel.model_validate(orm_tweet.__dict__)
 
 
 async def import_tweets(tweets: list[TwitterItemModel], engine: DatabaseEngineAsync,
@@ -104,7 +104,7 @@ async def read_twitter_item_by_item_id(item_id: str | UUID, engine: DatabaseEngi
     async with engine.session() as session:  # type: AsyncSession
         result = await session.get(TwitterItem, item_id)
         if result is not None:
-            return TwitterItemModel.parse_obj(result.__dict__)
+            return TwitterItemModel.model_validate(result.__dict__)
     return None
 
 
@@ -115,7 +115,7 @@ async def read_twitter_item_by_twitter_id(twitter_id: str, project_id: str,
                                          TwitterItem.project_id == project_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
-            return TwitterItemModel.parse_obj(result.__dict__)
+            return TwitterItemModel.model_validate(result.__dict__)
     return None
 
 

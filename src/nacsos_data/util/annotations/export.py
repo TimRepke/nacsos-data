@@ -240,7 +240,7 @@ async def get_labels(stmt_labels: CTE, db_engine: DatabaseEngineAsync) -> dict[s
         result = (await session.execute(stmt_options)).mappings().all()
 
         # construct a lookup map of key->options/values/choices
-        return {row['key']: LabelOptions.parse_obj(row) for row in result}
+        return {row['key']: LabelOptions.model_validate(row) for row in result}
 
 
 async def get_project_labels(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> dict[str, LabelOptions]:

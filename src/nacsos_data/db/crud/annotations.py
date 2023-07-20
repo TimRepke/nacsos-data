@@ -354,7 +354,7 @@ async def upsert_annotations(annotations: list[AnnotationModel],
         new_annotations = []
         for annotation in annotations:
             if str(annotation.annotation_id) in ids_to_create:
-                new_annotations.append(Annotation(**annotation.dict()))
+                new_annotations.append(Annotation(**annotation.model_dump()))
 
         session.add_all(new_annotations)
         await session.commit()
@@ -442,7 +442,7 @@ async def read_assignment_counts_for_scope(assignment_scope_id: str | uuid.UUID,
 async def store_assignments(assignments: list[AssignmentModel],
                             db_engine: DatabaseEngineAsync) -> None:
     async with db_engine.session() as session:  # type: AsyncSession
-        assignments_orm = [Assignment(**assignment.dict()) for assignment in assignments]
+        assignments_orm = [Assignment(**assignment.model_dump()) for assignment in assignments]
         session.add_all(assignments_orm)
         await session.commit()
 
@@ -460,7 +460,7 @@ async def store_resolved_bot_annotations(project_id: str, name: str,
         # TODO: should we also store assignment_scope_id? might be more than one...
         metadata = BotAnnotationMetaData(bot_annotation_metadata_id=meta_uuid,
                                          name=name, kind=BotKind.RESOLVE, project_id=project_id,
-                                         annotation_scheme_id=filters.scheme_id, meta=meta.dict())
+                                         annotation_scheme_id=filters.scheme_id, meta=meta.model_dump())
         session.add(metadata)
         await session.commit()
 
@@ -476,7 +476,7 @@ async def store_resolved_bot_annotations(project_id: str, name: str,
             added_ids.update([anno.bot_annotation_id for anno in to_add])
 
             for anno in to_add:
-                session.add(BotAnnotation(**{**anno.dict(), 'bot_annotation_metadata_id': meta_uuid}))
+                session.add(BotAnnotation(**{**anno.model_dump(), 'bot_annotation_metadata_id': meta_uuid}))
                 await session.commit()
                 del annotation_heap[anno.bot_annotation_id]
 
@@ -535,6 +535,6 @@ async def update_resolved_bot_annotations(bot_annotation_metadata_id: str,
                 ba_orm.multi_int = annotation.multi_int
                 await session.commit()
             elif annotation.bot_annotation_id in ids_to_create:
-                bot_annotations_to_be_created.append(BotAnnotation(**annotation.dict()))
+                bot_annotations_to_be_created.append(BotAnnotation(**annotation.model_dump()))
         session.add_all(bot_annotations_to_be_created)
         await session.commit()

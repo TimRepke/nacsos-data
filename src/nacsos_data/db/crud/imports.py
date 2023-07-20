@@ -15,7 +15,7 @@ async def read_all_imports_for_project(project_id: UUID | str,
     async with engine.session() as session:
         stmt = select(Import).where(Import.project_id == project_id)
         result = (await session.execute(stmt)).scalars().all()
-        return [ImportModel.parse_obj(res.__dict__) for res in result]
+        return [ImportModel.model_validate(res.__dict__) for res in result]
 
 
 async def read_item_count_for_import(import_id: UUID | str, engine: DatabaseEngineAsync) -> int:
@@ -35,7 +35,7 @@ async def read_import(import_id: UUID | str,
         stmt = select(Import).where(Import.import_id == import_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
-            return ImportModel.parse_obj(result.__dict__)
+            return ImportModel.model_validate(result.__dict__)
         return None
 
 

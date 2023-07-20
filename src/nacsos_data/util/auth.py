@@ -76,7 +76,7 @@ class Authentication:
 
             if token is None:
                 raise InvalidCredentialsError(f'No valid auth token found for user "{username}"')
-            return AuthTokenModel.parse_obj(token.__dict__)
+            return AuthTokenModel.model_validate(token.__dict__)
 
     async def fetch_token_by_id(self, token_id: str | uuid.UUID, only_active: bool = True) -> AuthTokenModel:
         async with self.db_engine.session() as session:  # type: AsyncSession
@@ -89,7 +89,7 @@ class Authentication:
             if token is None:
                 raise InvalidCredentialsError(f'No valid auth token found for token_id "{token_id}"')
 
-            return AuthTokenModel.parse_obj(token.__dict__)
+            return AuthTokenModel.model_validate(token.__dict__)
 
     async def clear_tokens_inactive(self) -> None:
         async with self.db_engine.session() as session:  # type: AsyncSession
@@ -136,7 +136,7 @@ class Authentication:
                     raise InvalidCredentialsError('This is not you!')
 
                 token_orm.valid_till = valid_till
-                token = AuthTokenModel.parse_obj(token_orm.__dict__)
+                token = AuthTokenModel.model_validate(token_orm.__dict__)
                 await session.commit()
                 return token
 
@@ -144,7 +144,7 @@ class Authentication:
             elif token_orm is None and username is not None:
                 token_id = uuid.uuid4()
                 token = AuthTokenModel(token_id=token_id, username=username, valid_till=valid_till)
-                token_orm = AuthToken(**token.dict())
+                token_orm = AuthToken(**token.model_dump())
                 session.add(token_orm)
                 return token
 
@@ -218,8 +218,8 @@ class Authentication:
             required_permissions = [required_permissions]
 
         permissions = await self.get_project_permissions(project_id=project_id,
-                                                         user=user)  # type: ignore[arg-type]  # FIXME
-        user_permissions = UserPermissions(user=UserModel.parse_obj(user), permissions=permissions)
+                                                         user=user)
+        user_permissions = UserPermissions(user=UserModel.model_validate(user.model_dump()), permissions=permissions)
 
         # no specific permissions were required (only basic access to the project) -> permitted!
         if required_permissions is None:

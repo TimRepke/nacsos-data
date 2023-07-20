@@ -59,7 +59,7 @@ class AnnotationFilterObject(AnnotationFilters):
 
     def get_filters(self) -> AnnotationFiltersType:
         ret = {}
-        for key, value in self.dict().items():
+        for key, value in self.model_dump().items():
             if value is not None:
                 if type(value) == list:
                     if len(value) == 1:
@@ -118,7 +118,7 @@ async def read_changed_annotations_after(timestamp: str | datetime,
             f"WHERE {filter_where} "
             f"      AND (a.time_created > :timestamp OR a.time_updated > :timestamp);"
         ), filter_data)).mappings().all()
-        return [AnnotationModel.parse_obj(anno) for anno in annotations]
+        return [AnnotationModel.model_validate(anno) for anno in annotations]
 
 
 async def read_item_annotations(filters: AnnotationFilterObject,
@@ -182,9 +182,9 @@ async def read_item_annotations(filters: AnnotationFilterObject,
             item_uuid = str(row['item_id'])
             if item_uuid not in ret:
                 ret[item_uuid] = []
-            ret[item_uuid].append(GroupedAnnotations(path=[Label.parse_obj(label)
+            ret[item_uuid].append(GroupedAnnotations(path=[Label.model_validate(label)
                                                            for label in row['label']],
-                                                     annotations=[AnnotationModel.parse_obj(anno)
+                                                     annotations=[AnnotationModel.model_validate(anno)
                                                                   for anno in row['annotations']]))
 
         return ret
@@ -194,7 +194,7 @@ async def read_annotators(filters: AnnotationFilterObject, db_engine: DatabaseEn
     # list of all (unique) users that have at least one annotation in the set
     async with db_engine.session() as session:
         filter_join, filter_where, filter_data = filters.get_subquery()
-        return [UserModel.parse_obj(user) for user in (await session.execute(text(
+        return [UserModel.model_validate(user) for user in (await session.execute(text(
             "SELECT DISTINCT u.* "
             "FROM annotation AS a "
             f"   {filter_join} "
@@ -215,7 +215,7 @@ async def read_labels(filters: AnnotationFilterObject,
             repeat = '1'
         filter_join, filter_where, filter_data = filters.get_subquery()
         if ignore_hierarchy:
-            return [[Label.parse_obj(sub_label) for sub_label in label]
+            return [[Label.model_validate(sub_label) for sub_label in label]
                     for label in
                     (await session.execute(text(
                         "SELECT array_to_json(label) as label "
@@ -226,7 +226,7 @@ async def read_labels(filters: AnnotationFilterObject,
                         f"   WHERE {filter_where}) labels;"
                     ), filter_data)).scalars()]
         else:
-            return [[Label.parse_obj(sub_label) for sub_label in label]
+            return [[Label.model_validate(sub_label) for sub_label in label]
                     for label in
                     (await session.execute(text(
                         "SELECT array_to_json(label) as label "
@@ -277,7 +277,7 @@ async def read_bot_annotations(bot_annotation_metadata_id: str,
         for ba in bot_annotations:
             grouped_annotations[str(ba['item_id'])].append(
                 GroupedBotAnnotation(path=ba['label'],
-                                     annotation=BotAnnotationModel.parse_obj(ba['bot_annotation'])))
+                                     annotation=BotAnnotationModel.model_validate(ba['bot_annotation'])))
         return grouped_annotations
 
 

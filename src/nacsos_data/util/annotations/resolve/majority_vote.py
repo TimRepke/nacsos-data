@@ -113,7 +113,7 @@ def naive_majority_vote(collection: AnnotationCollection,
                 path=label,
                 annotation=BotAnnotationModel(bot_annotation_id=ba_uuid, item_id=item_id,
                                               key=label[0].key, repeat=label[0].repeat,
-                                              **value.dict())))
+                                              **value.model_dump())))
 
         # Second loop to back-fill parents
         # NOTICE: This does *not* check for validity!

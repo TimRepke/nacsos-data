@@ -117,7 +117,7 @@ async def create_or_update_user(user: UserModel | UserInDBModel, engine: Databas
             if hashed_password is None:
                 raise ValueError('Missing password!')
             setattr(user, 'password', hashed_password)
-            session.add(User(**user.dict()))
+            session.add(User(**user.model_dump()))
         else:
             # user_id -> not editable
             # username -> not editable

@@ -40,7 +40,7 @@ async def read_all_for_project(project_id: str | UUID, Schema: Type[AnyItemSchem
         stmt = (select(Schema)
                 .where(Schema.project_id == project_id))
         result = (await session.execute(stmt)).scalars().all()
-        return [Model.parse_obj(res.__dict__) for res in result]
+        return [Model.model_validate(res.__dict__) for res in result]
 
 
 async def read_paged_for_project(project_id: str | UUID, Schema: Type[AnyItemSchema], Model: Type[AnyItemModelType],
@@ -55,7 +55,16 @@ async def read_paged_for_project(project_id: str | UUID, Schema: Type[AnyItemSch
                 .offset(offset)
                 .limit(page_size))
         result = (await session.execute(stmt)).scalars().all()
-        return [Model(**res.__dict__) for res in result]
+
+        ret = []
+        for res in result:
+            try:
+               ret.append(Model(**res.__dict__))
+            except Exception as e:
+                logger.error(res)
+                logger.debug(res.__dict__)
+                raise e
+        return ret
 
 
 def _get_schema_model_for_type(item_type: ItemType | ItemTypeLiteral) \
@@ -77,5 +86,5 @@ async def read_any_item_by_item_id(item_id: str | UUID, item_type: ItemType | It
         stmt = select(Schema).filter_by(item_id=item_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
-            return Model.parse_obj(result.__dict__)
+            return Model.model_validate(result.__dict__)
     return None

@@ -48,7 +48,7 @@ async def update_orm(updated_model: BaseModel, Model: Type[M], Schema: Type[Base
         stmt = select(Schema).filter_by(**filter_by)
         orm_model = (await session.execute(stmt)).scalars().one_or_none()
         if orm_model is not None:
-            for key, value in updated_model.dict().items():
+            for key, value in updated_model.model_dump().items():
                 if key in skip_update:
                     continue
                 setattr(orm_model, key, value)
@@ -62,7 +62,7 @@ async def upsert_orm(upsert_model: BaseModel, Schema: Type[S], primary_key: str,
                      db_engine: DatabaseEngineAsync, skip_update: list[str] | None = None) -> str | UUID | None:
     # returns id of inserted or updated assignment scope
     async with db_engine.session() as session:
-        logger.debug(f'UPSERT "{Schema}" with keys: {list(upsert_model.dict().keys())}')
+        logger.debug(f'UPSERT "{Schema}" with keys: {list(upsert_model.model_dump().keys())}')
 
         p_key: str | UUID | None = getattr(upsert_model, primary_key, None)
 
@@ -81,7 +81,7 @@ async def upsert_orm(upsert_model: BaseModel, Schema: Type[S], primary_key: str,
             # check if it actually already exists in the database
             # if so, update all fields and commit
             if orm_model is not None:
-                for key, value in upsert_model.dict().items():
+                for key, value in upsert_model.model_dump().items():
                     if (skip_update is not None and key in skip_update) or key == primary_key:
                         continue
                     # logger.debug(f'{key}: "{value}"')
@@ -95,7 +95,7 @@ async def upsert_orm(upsert_model: BaseModel, Schema: Type[S], primary_key: str,
 
         logger.debug(f'"{Schema}" with {primary_key}={p_key} does not exist yet, '
                      f'attempting to INSERT!')
-        orm_model = Schema(**upsert_model.dict())
+        orm_model = Schema(**upsert_model.model_dump())
         session.add(orm_model)
         await session.commit()
 

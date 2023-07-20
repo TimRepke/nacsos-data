@@ -179,9 +179,9 @@ async def find_duplicates(item: AcademicItemModel,
 
     if db_engine is not None:
         async with db_engine.session() as new_session:  # type: AsyncSession
-            candidates = [Candidate.parse_obj(r) for r in (await new_session.execute(stmt)).mappings().all()]
+            candidates = [Candidate.model_validate(r) for r in (await new_session.execute(stmt)).mappings().all()]
     elif session is not None:
-        candidates = [Candidate.parse_obj(r) for r in (await session.execute(stmt)).mappings().all()]
+        candidates = [Candidate.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
     else:
         raise ConnectionError('No connection to database.')
 

@@ -68,11 +68,11 @@ def main(
         session.add_all(perms)
 
         scheme_obj = [AnnotationSchemeLabel(name='Dummy label 1', key='d1', max_repeat=1, required=True, kind='single',
-                                            choices=[AnnotationSchemeLabelChoice(name='d1_1', value=0).dict(),
-                                                     AnnotationSchemeLabelChoice(name='d1_2', value=1).dict()]).dict(),
+                                            choices=[AnnotationSchemeLabelChoice(name='d1_1', value=0).model_dump(),
+                                                     AnnotationSchemeLabelChoice(name='d1_2', value=1).model_dump()]).model_dump(),
                       AnnotationSchemeLabel(name='Dummy label 2', key='d2', max_repeat=1, required=True, kind='single',
-                                            choices=[AnnotationSchemeLabelChoice(name='d2_1', value=0).dict(),
-                                                     AnnotationSchemeLabelChoice(name='d2_2', value=1).dict()]).dict()]
+                                            choices=[AnnotationSchemeLabelChoice(name='d2_1', value=0).model_dump(),
+                                                     AnnotationSchemeLabelChoice(name='d2_2', value=1).model_dump()]).model_dump()]
         scheme = AnnotationScheme(project_id=project.project_id,
                                   name='Dummy scheme', description='Description for dummy scheme',
                                   labels=scheme_obj)
@@ -111,9 +111,9 @@ def main(
                              publication_year=2023,
                              source='arXiv', keywords=['kw 1', 'kw 2'],
                              authors=[
-                                 AcademicAuthorModel(name='Wee Ling', orcid='https://orcid.org/0000-0001-9661-6325').dict(),
+                                 AcademicAuthorModel(name='Wee Ling', orcid='https://orcid.org/0000-0001-9661-6325').model_dump(),
                                  AcademicAuthorModel(name='Stephen Roberts',
-                                                     affiliations=[AffiliationModel(name='Oxford', country='UK').dict()]).dict()],
+                                                     affiliations=[AffiliationModel(name='Oxford', country='UK').model_dump()]).model_dump()],
                              meta={'meta_str': 'test', 'meta_int': 10, '_meta_hidden': 'secret'},
                              doi='10.48550/arXiv.2302.10175'),
                 AcademicItem(project_id=project.project_id,
@@ -122,9 +122,9 @@ def main(
                              publication_year=2022,
                              source='arXiv', keywords=['kw 2', 'kw 3'],
                              authors=[
-                                 AcademicAuthorModel(name='Utkarsh Ojha', orcid='https://orcid.org/0000-0001-9661-6325').dict(),
+                                 AcademicAuthorModel(name='Utkarsh Ojha', orcid='https://orcid.org/0000-0001-9661-6325').model_dump(),
                                  AcademicAuthorModel(name='Yong Jae Lee',
-                                                     affiliations=[AffiliationModel(name='Wisconsin-Madison', country='USA').dict()]).dict()],
+                                                     affiliations=[AffiliationModel(name='Wisconsin-Madison', country='USA').model_dump()]).model_dump()],
                              doi='10.48550/arXiv.2302.10174'),
                 AcademicItem(project_id=project.project_id,
                              text='Exploiting robots for activities in human-shared environments, whether warehouses, shopping centres or hospitals, calls for such robots to understand the underlying physical interactions between nearby agents and objects. In particular, ',
@@ -132,7 +132,7 @@ def main(
                              title_slug='causaldiscovery',
                              publication_year=1980,
                              source='arXiv', keywords=['kw 4', 'kw 5'],
-                             authors=[AcademicAuthorModel(name='Luca Castri').dict()],
+                             authors=[AcademicAuthorModel(name='Luca Castri').model_dump()],
                              doi='10.48550/arXiv.2210.16535'),
                 AcademicItem(project_id=project.project_id,
                              text='Modern policy optimization methods in applied reinforcement learning, such as Trust Region Policy Optimization and Policy Mirror Descent, are often based on the policy gradient framework. While theoretical guarantees have been established for this class of algorithms, particularly in the tabular setting, the use of a general parametrization scheme remains mostly unjustified.',
@@ -141,9 +141,9 @@ def main(
                              publication_year=2023,
                              source='arXiv', keywords=['kw 1', 'kw 2'],
                              authors=[
-                                 AcademicAuthorModel(name='Carlo Alfano').dict(),
-                                 AcademicAuthorModel(name='Rui Yuan').dict(),
-                                 AcademicAuthorModel(name='Patrick Rebeshini').dict()],
+                                 AcademicAuthorModel(name='Carlo Alfano').model_dump(),
+                                 AcademicAuthorModel(name='Rui Yuan').model_dump(),
+                                 AcademicAuthorModel(name='Patrick Rebeshini').model_dump()],
                              doi='10.48550/arXiv.2301.13139'),
             ]
         elif p_type == ItemType.generic:

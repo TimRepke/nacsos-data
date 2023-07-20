@@ -184,7 +184,7 @@ async def import_academic_items(
                         item_id = str(uuid.uuid4())
                         logger.debug(f' -> Creating new item with ID {item_id}!')
                         item.item_id = item_id
-                        session.add(AcademicItem(**item.dict()))
+                        session.add(AcademicItem(**item.model_dump()))
                         await session.commit()
 
                 if dry_run:
@@ -243,7 +243,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     if orig_item_orm is None:
         raise NotFoundError(f'No item found for {orig_item_id}')
 
-    orig_item = AcademicItemModel.parse_obj(orig_item_orm.__dict__)
+    orig_item = AcademicItemModel.model_validate(orig_item_orm.__dict__)
 
     # Get prior variants of that AcademicItem
     variants = (await session.scalars(select(AcademicItemVariant)
@@ -276,7 +276,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
             meta=orig_item.meta)
 
         # add to database
-        session.add(AcademicItemVariant(**variant.dict()))
+        session.add(AcademicItemVariant(**variant.model_dump()))
         await session.commit()
 
         logger.debug(f'Created first variant of item {orig_item_id} at {variant.item_variant_id}')
@@ -338,7 +338,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
 
     logger.debug(f'Found {len(variants or [])} variants and adding one more.')
 
-    session.add(AcademicItemVariant(**new_variant.dict()))
+    session.add(AcademicItemVariant(**new_variant.model_dump()))
     await session.commit()
 
     # Fuse all the fields from both, the existing and new variant into a new item

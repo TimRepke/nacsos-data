@@ -7,7 +7,7 @@ from ...db.schemas import ItemType
 
 
 class ReferencedTweet(BaseModel):
-    id: str
+    id: str | int
     type: Literal['retweeted', 'quoted', 'replied_to']
 
 
@@ -37,7 +37,7 @@ class Mention(BaseModel):
     # The part of text recognized as a user mention.
     username: str
     # The twitter id for that user
-    user_id: str
+    user_id: str | int
 
 
 class URL(BaseModel):

@@ -25,7 +25,7 @@ class DictLikeEncoder(JSONEncoder):
 
         # Translate pydantic models into dict
         if isinstance(o, BaseModel):
-            return o.dict()
+            return o.model_dump()
 
         return json.JSONEncoder.default(self, o)
 
