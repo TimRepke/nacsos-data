@@ -1,9 +1,12 @@
-import logging
-import csv
 import re
+import csv
 import uuid
+import logging
 from typing import Generator
 
+import rispy
+
+from .clean import clear_empty
 from ...models.items import AcademicItemModel
 from ...models.items.academic import AcademicAuthorModel
 from .duplicate import str_to_title_slug
@@ -94,8 +97,8 @@ def _parse_authors(row: dict[str, str]) -> list[AcademicAuthorModel] | None:
     return None
 
 
-def read_scopus_file(filepath: str,
-                     project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
+def read_scopus_csv_file(filepath: str,
+                         project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
     """
     This function will read a scopus csv line by line and return a generator of parsed `AcademicItemModel`.
 
@@ -103,6 +106,7 @@ def read_scopus_file(filepath: str,
     :param filepath:
     :return:
     """
+
     with open(filepath, mode='r', newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
@@ -159,5 +163,188 @@ def read_scopus_file(filepath: str,
                                     title_slug=title_slug,
                                     source=_get(row, 'Source title'),
                                     authors=authors,
-                                    meta=meta_info)
+                                    meta=clear_empty(meta_info))
+            yield doc
+
+
+# Based on
+# https://service.elsevier.com/app/answers/detail/a_id/14805/supporthub/scopus/~/what-ris-format-mapping-does-scopus-use-when-exporting-results-when-exchanging/
+PUBMED_RIS_KEYS = {
+    # Abbreviated source title
+    # 'JA': 'abbreviated_source_title',  # Old Scopus RIS tag
+    'J2': 'abbreviated_source_title',
+    # Abstract
+    'AB': 'abstract',
+    # Affiliations
+    'AD': 'affiliations',
+    # Article number
+    # 'N1': 'article_number',  # Old Scopus RIS tag
+    'C7': 'article_number',
+    # Article title
+    # 'T1': 'article_title',  # Old Scopus RIS tag
+    'TI': 'article_title',
+    # Authors
+    'AU': 'authors',
+    # Chemical name and CAS registry number
+    # 'N1': 'note',  # "Chemicals/CAS:"
+    # Cited by count
+    # 'N1': 'note',  # "Cited by:"
+    # Conference Code
+    # 'N1': 'note',  # "Conference code:"
+    # CODEN
+    # 'N1': 'note',  # "CODEN:"
+    # Correspondence name
+    # 'N1': 'note',  # "Correspondence address:"
+    # DOI
+    # 'N1': 'doi',  # Old Scopus RIS tag
+    'DO': 'doi',
+    # Editor
+    'A2': 'editors',
+    # Export date
+    # 'N1': 'note',  # "Export date:"
+    # Funding Details
+    # 'N1': 'note',
+    # ISSN/ISBN/EISSN
+    'SN': 'issn',
+    # Issue
+    'IS': 'issue',
+    # Keywords
+    'KW': 'keywords',
+    # Language
+    # 'N1': 'language',  # Old Scopus RIS tag
+    'LA': 'language',
+    # First page
+    'SP': 'first_page',
+    # Last page
+    'EP': 'last_page',
+    # Conference name
+    # 'T': 'conference_name',  # Old Scopus RIS tag
+    'T2': 'conference_name',
+    # Conference date
+    'Y2': 'conference_date',
+    # Conference Location
+    'CY': 'conference_location',
+    # Manufacturers
+    # 'N1': 'note',
+    # PMID/PMCID
+    # 'N1': 'pmid',  # Old Scopus RIS tag
+    'C2': 'pmid',
+    # Proceedings title
+    # 'N1': 'proceedings_title',  # Old Scopus RIS tag
+    'C3': 'proceedings_title',
+    # Publication year
+    'PY': 'publication_year',
+    # Publisher
+    'PB': 'publisher',
+    # References
+    # 'N1': 'note',  # "References:"
+    # Scopus database
+    # 'N1': 'scopus_db',  # Old Scopus RIS tag
+    'DB': 'scopus_db',
+    # Scopus URL
+    'UR': 'scopus_url',
+    # Second article title
+    # 'T2': 'second_article_title',  # Old Scopus RIS tag
+    'ST': 'second_article_title',
+    # Sequence database accession number
+    # 'N1': 'note',  # Old Scopus RIS tag
+    # Source title
+    # 'JF': 'source_title',  # Old Scopus RIS tag
+    # 'T2': 'source_title',
+    # Source type
+    'TY': 'type_of_reference',
+    # Document type
+    'M3': 'document_type',
+    # Conference sponsors
+    # 'N1': 'conference_sponsors',  # Old Scopus RIS tag
+    'A4': 'conference_sponsors',
+    # Tradenames
+    # 'N1': 'note',  # "Tradenames:"
+    # Volume
+    'VL': 'volume',
+    # End tag
+    'ER': 'end_of_reference',
+    'UK': 'unknown_tag',
+}
+
+
+class ScopusParser(rispy.BaseParser):
+    START_TAG = "TY"
+    PATTERN = r"^[A-Z][A-Z0-9]  - |^ER  -\s*$"
+
+    DEFAULT_LIST_TAGS = [
+        'A1',
+        'A2',
+        'A3',
+        'A4',
+        'KW',
+        'N1',
+        'UR',
+        'AD',
+        'AU',
+    ]
+
+    DEFAULT_MAPPING = {**rispy.config.TAG_KEY_MAPPING, **PUBMED_RIS_KEYS}
+    DEFAULT_DELIMITER_MAPPING = rispy.config.DELIMITED_TAG_MAPPING
+
+    counter_re = re.compile("^[0-9]+.")
+
+    def get_content(self, line):
+        return line[6:].strip()
+
+    def is_header(self, line):
+        none_or_match = self.counter_re.match(line)
+        return bool(none_or_match)
+
+
+def read_scopus_ris_file(filepath: str,
+                         project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
+    """
+    This function will read a Scopus RIS file and return a generator of parsed `AcademicItemModel`s.
+
+    :param filepath: path to the RIS file
+    :param project_id: Optional, if set, will populate the returned items with this project_id
+    :return:
+    """
+
+    with open(filepath, 'r') as fin:
+        entries = ScopusParser().parse(text=fin.read())
+
+        for entry in entries:
+
+            scopus_id = None
+            if entry.get('scopus_url') is not None:
+                matches = re.findall(r'\?eid=(.+?)&', entry.get('scopus_url'))
+                if len(matches) > 0:
+                    scopus_id = matches[0]
+
+            meta = {
+                k: _get(entry, k)
+                for k in
+                ['abbreviated_source_title', 'article_number', 'editors', 'issn', 'issue', 'language', 'first_page',
+                 'last_page', 'conference_name', 'conference_date', 'conference_location', 'pmid', 'proceedings_title',
+                 'publication_year', 'publisher', 'scopus_db', 'scopus_url', 'second_article_title',
+                 'type_of_reference', 'document_type', 'conference_sponsors', 'volume']
+            }
+            authors = None
+            s_authors = _get(entry, 'authors')
+            if s_authors is not None and len(s_authors) > 0:
+                authors = [
+                    AcademicAuthorModel(name=au)
+                    for au in s_authors
+                ]
+
+            doc = AcademicItemModel(project_id=project_id,
+                                    scopus_id=scopus_id,
+                                    doi=_get(entry, 'doi'),
+                                    title=_get(entry, 'article_title'),
+                                    text=_get(entry, 'abstract'),
+                                    publication_year=(int(_get(entry, 'publication_year'))
+                                                      if _get(entry, 'publication_year') is not None else None),
+                                    keywords=_get(entry, 'keywords'),
+                                    pubmed_id=_get(entry, 'pmid'),
+                                    title_slug=str_to_title_slug(_get(entry, 'article_title')),
+                                    source=_get(entry, 'abbreviated_source_title'),
+                                    authors=authors,
+                                    meta=clear_empty(meta))
             yield doc
