@@ -31,7 +31,7 @@ def read_wos_file(filepath: str,
             item.pubmed_id = record.get('PM')  # type: ignore[assignment]
 
         pub_year = record.get('PY')
-        if pub_year and type(pub_year) == str and len(pub_year) > 0:
+        if pub_year and type(pub_year) is str and len(pub_year) > 0:
             item.publication_year = int(pub_year)  # type: ignore[assignment]
 
         abstract = record.get('AB')
