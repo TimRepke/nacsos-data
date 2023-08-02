@@ -1,4 +1,4 @@
-pydantic==2.0.3
+pydantic==2.1.1
 pydantic-settings==2.0.2
 python-dotenv==1.0.0
 email-validator==2.0.0.post2
@@ -10,3 +10,4 @@ sqlalchemy-json==0.6.0
 httpx[http2]==0.24.1
 passlib==1.7.4
 requests==2.31.0
+rispy==0.8.1

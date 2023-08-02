@@ -20,7 +20,7 @@ logger = logging.getLogger('nacsos_data.engine')
 class DictLikeEncoder(JSONEncoder):
     def default(self, o: Any) -> Any:
         # Translate datetime into a string
-        if type(o) == datetime:
+        if isinstance(o, datetime):
             return o.strftime('%Y-%m-%dT%H:%M:%S')
 
         # Translate pydantic models into dict

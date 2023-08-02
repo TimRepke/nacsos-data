@@ -9,3 +9,4 @@ scripts/scratch/
 build/*
 venv/*
 backups/
+alembic.secret.ini

@@ -1,4 +1,5 @@
 import os
+from urllib.parse import quote
 
 from pydantic_settings import SettingsConfigDict, BaseSettings
 from pydantic.networks import PostgresDsn
@@ -9,6 +10,7 @@ from .engine import DatabaseEngine, DatabaseEngineAsync
 
 class DatabaseConfig(BaseSettings):
     SCHEME: str = 'postgresql'
+    SCHEMA: str = 'public'
     HOST: str = 'localhost'  # host of the db server
     PORT: int = 5432  # port of the db server
     USER: str = 'nacsos'  # username for the database
@@ -27,10 +29,10 @@ class DatabaseConfig(BaseSettings):
         return PostgresDsn.build(
             scheme=info.data.get('SCHEME', 'postgresql'),
             username=info.data.get('USER'),
-            password=info.data.get('PASSWORD'),
+            password=quote(info.data.get('PASSWORD')),
             host=info.data.get('HOST'),
             port=info.data.get('PORT'),
-            path=f'/{info.data.get("DATABASE", "")}',
+            path=f'{info.data.get("DATABASE", "")}',
         )
 
     model_config = SettingsConfigDict(env_prefix='NACSOS_DB__')

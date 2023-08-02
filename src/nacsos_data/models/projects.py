@@ -38,13 +38,14 @@ class ProjectModel(BaseModel):
     setting_motivational_quotes: bool = True
 
 
-ProjectPermission = Literal['owner',
-'dataset_read', 'dataset_edit',
-'imports_read', 'imports_edit',
-'annotations_read', 'annotations_edit',
-'pipelines_read', 'pipelines_edit',
-'artefacts_read', 'artefacts_edit',
-'search_dimensions', 'search_oa'
+ProjectPermission = Literal[
+    'owner',
+    'dataset_read', 'dataset_edit',
+    'imports_read', 'imports_edit',
+    'annotations_read', 'annotations_edit',
+    'pipelines_read', 'pipelines_edit',
+    'artefacts_read', 'artefacts_edit',
+    'search_dimensions', 'search_oa'
 ]
 
 

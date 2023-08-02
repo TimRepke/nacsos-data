@@ -51,7 +51,7 @@ class TwitterConverter(JSONLConverter):
 
     @staticmethod
     def convert_details(import_details: ImportModel) -> dict[str, Any]:
-        if type(import_details.config) != ImportConfigJSONL:
+        if type(import_details.config) is not ImportConfigJSONL:
             raise AttributeError('Incompatible import details config.')
         return {
             'project_id': str(import_details.project_id),
@@ -70,7 +70,7 @@ class TwitterApiConverter(JSONLConverter):
 
     @staticmethod
     def convert_details(import_details: ImportModel) -> dict[str, Any]:
-        if type(import_details.config) != ImportConfigJSONL:
+        if type(import_details.config) is not ImportConfigJSONL:
             raise AttributeError('Incompatible import details config.')
         return {
             'project_id': str(import_details.project_id),
@@ -93,7 +93,7 @@ class WebOfScienceConverter(Converter):
 
     @staticmethod
     def convert_details(import_details: ImportModel) -> dict[str, Any]:
-        if type(import_details.config) != ImportConfigWoS:
+        if type(import_details.config) is not ImportConfigWoS:
             raise AttributeError('Incompatible import details config.')
         return {
             'project_id': str(import_details.project_id),
@@ -112,7 +112,7 @@ class ScopusConverter(Converter):
 
     @staticmethod
     def convert_details(import_details: ImportModel) -> dict[str, Any]:
-        if type(import_details.config) != ImportConfigScopus:
+        if type(import_details.config) is not ImportConfigScopus:
             raise AttributeError('Incompatible import details config.')
         return {
             'project_id': str(import_details.project_id),
@@ -172,9 +172,9 @@ async def _submit_import_task(import_id: UUID | str,
             raise UndefinedEncoding(f'This import type ({import_details.type}) has no known pipeline function.')
 
         config = ConfigModel.model_validate(import_details.config)
-        if type(config) == ImportConfigJSONL:
+        if type(config) is ImportConfigJSONL:
             converter = get_jsonl_converter(config.line_type)
-        elif type(config) == ImportConfigWoS:
+        elif type(config) is ImportConfigWoS:
             converter = WebOfScienceConverter
 
         if config is None or converter is None:
