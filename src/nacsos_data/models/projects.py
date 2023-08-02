@@ -43,7 +43,9 @@ ProjectPermission = Literal['owner',
 'imports_read', 'imports_edit',
 'annotations_read', 'annotations_edit',
 'pipelines_read', 'pipelines_edit',
-'artefacts_read', 'artefacts_edit']
+'artefacts_read', 'artefacts_edit',
+'search_dimensions', 'search_oa'
+]
 
 
 class ProjectPermissionsModel(BaseModel):
@@ -114,4 +116,5 @@ class ProjectPermissionsModel(BaseModel):
                    annotations_read=True, annotations_edit=True,
                    pipelines_read=True, pipelines_edit=True,
                    artefacts_read=True, artefacts_edit=True,
-                   search_oa=True, search_dimensions=True)
+                   search_oa=True, search_dimensions=True,
+                   import_limit_oa=10000)
