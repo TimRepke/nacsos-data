@@ -289,10 +289,10 @@ class ScopusParser(rispy.BaseParser):
 
     counter_re = re.compile("^[0-9]+.")
 
-    def get_content(self, line):
+    def get_content(self, line: str) -> str:
         return line[6:].strip()
 
-    def is_header(self, line):
+    def is_header(self, line: str) -> bool:
         none_or_match = self.counter_re.match(line)
         return bool(none_or_match)
 
@@ -339,9 +339,9 @@ def read_scopus_ris_file(filepath: str,
                                     doi=_get(entry, 'doi'),
                                     title=_get(entry, 'article_title'),
                                     text=_get(entry, 'abstract'),
-                                    publication_year=(int(_get(entry, 'publication_year'))
+                                    publication_year=(int(_get(entry, 'publication_year'))  # type: ignore[arg-type]
                                                       if _get(entry, 'publication_year') is not None else None),
-                                    keywords=_get(entry, 'keywords'),
+                                    keywords=_get(entry, 'keywords'),  # type: ignore[arg-type]
                                     pubmed_id=_get(entry, 'pmid'),
                                     title_slug=str_to_title_slug(_get(entry, 'article_title')),
                                     source=_get(entry, 'abbreviated_source_title'),

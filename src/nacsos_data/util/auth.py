@@ -218,7 +218,7 @@ class Authentication:
             required_permissions = [required_permissions]
 
         permissions = await self.get_project_permissions(project_id=project_id,
-                                                         user=user)
+                                                         user=user)  # type: ignore[arg-type]
         user_permissions = UserPermissions(user=UserModel.model_validate(user.model_dump()), permissions=permissions)
 
         # no specific permissions were required (only basic access to the project) -> permitted!

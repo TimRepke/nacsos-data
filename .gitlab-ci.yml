@@ -51,7 +51,7 @@ test-job2:
   stage: test
   script:
     - source venv/bin/activate
-    - mypy --config-file=pyproject.toml src/nacsos_data
+    - mypy --config-file=pyproject.toml src/nacsos_data --show-traceback --no-incremental
 
 backup-nacsos:
   only:
