@@ -45,7 +45,8 @@ def translate_doc(doc: WorkSolr) -> Work:
 def translate_authorship(author: Authorship) -> AcademicAuthorModel:
     ret = AcademicAuthorModel(name='[missing]')
     if author.author is not None:
-        ret.name = author.author.display_name
+        if author.author.display_name is not None:
+            ret.name = author.author.display_name
         ret.openalex_id = author.author.id
         ret.orcid = author.author.orcid
     if author.institutions is not None:
@@ -151,7 +152,7 @@ async def query_async(query: str,
         # 'hl.fl': 'title,abstract',
     }
 
-    if def_type is None:
+    if def_type == 'lucene':
         params['df'] = field
     else:
         params['defType'] = def_type
