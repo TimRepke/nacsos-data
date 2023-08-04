@@ -9,5 +9,4 @@ SQLAlchemy==2.0.19
 sqlalchemy-json==0.6.0
 httpx[http2]==0.24.1
 passlib==1.7.4
-requests==2.31.0
 rispy==0.8.1

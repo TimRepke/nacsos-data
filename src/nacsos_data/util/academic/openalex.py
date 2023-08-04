@@ -4,14 +4,178 @@ import logging
 from datetime import timedelta
 from pathlib import Path
 from time import time
-from typing import Generator
+from typing import Generator, Literal
 
-import requests as requests
+import httpx
+from pydantic import BaseModel
 
+from .duplicate import str_to_title_slug
 from ...models.items import AcademicItemModel
+from ...models.items.academic import AcademicAuthorModel, AffiliationModel
+from ...models.openalex.solr import WorkSolr, Work, Location, Authorship, Biblio
 from .clean import clear_empty
 
 logger = logging.getLogger('nacsos_data.util.academic.openalex')
+
+
+def translate_doc(doc: WorkSolr) -> Work:
+    locations = None
+    if doc.locations is not None:
+        raw = json.loads(doc.locations)
+        locations = [
+            Location.model_validate(loc)
+            for loc in raw
+        ]
+    authorships = None
+    if doc.authorships is not None:
+        raw = json.loads(doc.authorships)
+        authorships = [
+            Authorship.model_validate(loc)
+            for loc in raw
+        ]
+
+    return Work.model_validate({
+        **doc.model_dump(),
+        'locations': locations,
+        'authorships': authorships,
+        'biblio': Biblio.model_validate(json.loads(doc.biblio)) if doc.biblio is not None else None
+    })
+
+
+def translate_authorship(author: Authorship) -> AcademicAuthorModel:
+    ret = AcademicAuthorModel(name='[missing]')
+    if author.author is not None:
+        ret.name = author.author.display_name
+        ret.openalex_id = author.author.id
+        ret.orcid = author.author.orcid
+    if author.institutions is not None:
+        ret.affiliations = [
+            AffiliationModel(name=inst.display_name if inst.display_name is not None else '[missing]',
+                             openalex_id=inst.id,
+                             country=inst.country_code)
+            for inst in author.institutions
+        ]
+    elif author.raw_affiliation_string is not None:
+        ret.affiliations = [AffiliationModel(name=author.raw_affiliation_string)]
+
+    return ret
+
+
+def translate_work(work: Work) -> AcademicItemModel:
+    source = None
+    if work.locations is not None and len(work.locations) > 0:
+        # find the first location with a source name
+        for loc in work.locations:
+            if loc.source is not None and loc.source.display_name is not None:
+                source = loc.source.display_name
+                break
+
+    return AcademicItemModel(
+        item_id=None,
+        doi=work.doi,
+        openalex_id=work.id,
+        pubmed_id=work.pmid,  # work.pmcid
+        # wos_id
+        # scopus_id
+        # s2_id
+        # dimensions_id
+        title=work.title,
+        title_slug=str_to_title_slug(work.title),
+        publication_year=work.publication_year,
+        source=source,
+        # keywords
+        authors=[translate_authorship(a) for a in work.authorships] if work.authorships is not None else None,
+
+        meta={
+            'openalex': {
+                'locations': work.locations,
+                'type': work.type,
+                'updated_date': work.updated_date,
+                'mag': work.mag,
+                'pmid': work.pmid,
+                'pmcid': work.pmcid,
+                'display_name': work.display_name,
+                'is_oa': work.is_oa,
+                'is_paratext': work.is_paratext,
+                'is_retracted': work.is_retracted,
+                'language': work.language
+            }
+        }
+    )
+
+
+class SearchResult(BaseModel):
+    query_time: int
+    num_found: int
+    docs: list[AcademicItemModel]
+    histogram: dict[str, int] | None = None
+
+
+async def get_async(url: str) -> SearchResult:
+    async with httpx.AsyncClient() as client:
+        request = await client.get(url)
+        response = request.json()
+        logger.debug(f'Received response from OpenAlex: {response["responseHeader"]}')
+        return SearchResult(
+            num_found=response['response']['numFound'],
+            query_time=response['responseHeader']['QTime'],
+            docs=[
+                translate_work(translate_doc(WorkSolr.model_validate(d)))
+                for d in response['response']['docs']
+            ])
+
+
+async def query_async(query: str,
+                      openalex_endpoint: str,
+                      limit: int = 20,
+                      field: Literal['title', 'abstract', 'title_abstract'] = 'title_abstract',
+                      histogram: bool = False,
+                      op: Literal['OR', 'AND'] = 'AND',
+                      histogram_from: int = 1990,
+                      histogram_to: int = 2024) -> SearchResult:
+    params = {
+        'q': query,
+        'qf': field,
+        'defType': 'edismax',
+        'q.op': op,
+        'hl': 'true',
+        'hl.fl': 'title,abstract',
+        'useParams': '',
+        'rows': limit
+    }
+
+    if histogram:
+        params.update({
+            'facet.range': 'publication_year',
+            'facet': 'true',
+            'facet.sort': 'index',
+            'facet.range.gap': '1',
+            'facet.range.start': histogram_from,
+            'facet.range.end': histogram_to
+        })
+
+    async with httpx.AsyncClient() as client:
+        request = await client.post(str(openalex_endpoint), data=params)
+        response = request.json()
+        logger.debug(f'Received response from OpenAlex: {response["responseHeader"]}')
+
+        hist_facets = (response
+                       .get('facet_counts', {})
+                       .get('facet_ranges', {})
+                       .get('publication_year', {})
+                       .get('counts', None))
+
+        return SearchResult(
+            num_found=response['response']['numFound'],
+            query_time=response['responseHeader']['QTime'],
+            docs=[
+                translate_work(translate_doc(WorkSolr.model_validate(d)))
+                for d in response['response']['docs']
+            ],
+            histogram={
+                hist_facets[i]: hist_facets[i + 1]
+                for i in range(0, len(hist_facets), 2)
+            } if hist_facets is not None else None)
 
 
 def download_openalex_query(target_file: str | Path,
@@ -29,7 +193,7 @@ def download_openalex_query(target_file: str | Path,
     :param query:
     :param target_file:
     :param batch_size:
-    :param openalex_endpoint: sth like "http://[IP]:8983/solr/openalex/select"
+    :param openalex_endpoint: sth like "http://[IP]:8983/solr/openalex"
     :param export_fields:
     :return:
     """
@@ -66,7 +230,7 @@ def download_openalex_query(target_file: str | Path,
             batch_i += 1
             logger.info(f'Running query for batch {batch_i} with cursor "{data["cursorMark"]}"')
             t2 = time()
-            res = requests.post(openalex_endpoint, data=data).json()
+            res = httpx.post(openalex_endpoint, data=data).json()
             data['cursorMark'] = res['nextCursorMark']
             n_docs_total = res['response']['numFound']
             batch_docs = res['response']['docs']
