@@ -81,6 +81,7 @@ def translate_work(work: Work) -> AcademicItemModel:
         # dimensions_id
         title=work.title,
         title_slug=str_to_title_slug(work.title),
+        text=work.abstract,
         publication_year=work.publication_year,
         source=source,
         # keywords
@@ -125,24 +126,36 @@ async def get_async(url: str) -> SearchResult:
             ])
 
 
+DefType = Literal['edismax', 'lucene', 'dismax']
+SearchField = Literal['title', 'abstract', 'title_abstract']
+OpType = Literal['OR', 'AND']
+
+
 async def query_async(query: str,
                       openalex_endpoint: str,
                       limit: int = 20,
-                      field: Literal['title', 'abstract', 'title_abstract'] = 'title_abstract',
+                      offset: int = 0,
+                      def_type: DefType = 'lucene',
+                      field: SearchField = 'title_abstract',
                       histogram: bool = False,
-                      op: Literal['OR', 'AND'] = 'AND',
+                      op: OpType = 'AND',
                       histogram_from: int = 1990,
                       histogram_to: int = 2024) -> SearchResult:
     params = {
         'q': query,
-        'qf': field,
-        'defType': 'edismax',
         'q.op': op,
-        'hl': 'true',
-        'hl.fl': 'title,abstract',
         'useParams': '',
-        'rows': limit
+        'rows': limit,
+        'start': offset
+        # 'hl': 'true',
+        # 'hl.fl': 'title,abstract',
     }
+
+    if def_type is None:
+        params['df'] = field
+    else:
+        params['defType'] = def_type
+        params['qf'] = field
 
     if histogram:
         params.update({
