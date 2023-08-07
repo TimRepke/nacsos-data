@@ -298,7 +298,7 @@ async def get_resolved_item_annotations(strategy: ResolutionMethod, filters: Ann
     scheme = await read_annotation_scheme(annotation_scheme_id=filters.scheme_id, db_engine=db_engine)
 
     if not annotations or not scheme:
-        raise NotFoundError(f'No annotations ({bool(annotations)}) or no annotation scheme'
+        raise NotFoundError(f'No annotations ({bool(annotations)}) or no annotation scheme '
                             f'({bool(scheme)}) for {filters.scheme_id}')
 
     collection = AnnotationCollection(scheme_id=filters.scheme_id,
