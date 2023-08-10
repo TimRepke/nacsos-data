@@ -1,3 +1,4 @@
+import logging
 from typing import Type
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +21,7 @@ from nacsos_data.models.items import \
     AnyItemModelType, \
     AnyItemModel
 
-import logging
+from .query import query_to_sql, Query
 
 logger = logging.getLogger('nacsos-data.crud.items')
 
@@ -59,7 +60,7 @@ async def read_paged_for_project(project_id: str | UUID, Schema: Type[AnyItemSch
         ret = []
         for res in result:
             try:
-               ret.append(Model(**res.__dict__))
+                ret.append(Model(**res.__dict__))
             except Exception as e:
                 logger.error(res)
                 logger.debug(res.__dict__)
@@ -88,3 +89,8 @@ async def read_any_item_by_item_id(item_id: str | UUID, item_type: ItemType | It
         if result is not None:
             return Model.model_validate(result.__dict__)
     return None
+
+
+__all__ = ['Query', 'query_to_sql',
+           'read_all_for_project', 'read_paged_for_project',
+           'read_item_count_for_project', 'read_any_item_by_item_id']
