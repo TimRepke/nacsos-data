@@ -1,26 +1,7 @@
 from uuid import UUID
 from lark import Lark, Transformer, Tree, Token
 
-
-class TypeTransformer(Transformer):  # type: ignore[type-arg]
-    def INT(self, tok: Token) -> Token:
-        return tok.update(value=int(tok))
-
-    def UINT(self, tok: Token) -> Token:
-        return self.INT(tok)
-
-    def UUID(self, tok: Token) -> Token:
-        return tok.update(value=UUID(tok))
-
-    def FLOAT(self, tok: Token) -> Token:
-        return tok.update(value=float(tok))
-
-    def BOOLEAN(self, tok: Token) -> Token:
-        return tok.update(value=True if tok.lower() == 'true' else False)
-
-
-def parse_str(query: str) -> Tree[Token]:
-    parser = Lark('''
+GRAMMAR = '''
 ?clause: _TITLE      ":" str_clause     -> title_filter
        | _ABSTRACT   ":" str_clause     -> abstract_filter
        | _PYEAR      ":" uint_clause    -> py_filter
@@ -131,7 +112,28 @@ _or: "OR"i | "|"
 %import common.WS
 
 %ignore WS
-    ''', parser='earley', start='clause')
+'''
+
+
+class TypeTransformer(Transformer):  # type: ignore[type-arg]
+    def INT(self, tok: Token) -> Token:
+        return tok.update(value=int(tok))
+
+    def UINT(self, tok: Token) -> Token:
+        return self.INT(tok)
+
+    def UUID(self, tok: Token) -> Token:
+        return tok.update(value=UUID(tok))
+
+    def FLOAT(self, tok: Token) -> Token:
+        return tok.update(value=float(tok))
+
+    def BOOLEAN(self, tok: Token) -> Token:
+        return tok.update(value=True if tok.lower() == 'true' else False)
+
+
+def parse_str(query: str) -> Tree[Token]:
+    parser = Lark(GRAMMAR, parser='earley', start='clause')
     transformer = TypeTransformer()
     tree = parser.parse(query)
     tree = transformer.transform(tree)
