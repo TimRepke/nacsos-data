@@ -12,7 +12,7 @@ from nacsos_data.db.schemas import (
     Import,
     Annotation,
     BotAnnotation,
-    BotAnnotationMetaData, Assignment
+    BotAnnotationMetaData, Assignment, m2m_import_item_table
 )
 from nacsos_data.models.items import AcademicItemModel
 from .parse import parse_str
@@ -153,8 +153,9 @@ class Query:
                 if subtree.data == 'not':
                     return not_(*(recurse(child) for child in subtree.children))
             elif isinstance(subtree, Token):
-                return Import.import_id == subtree.value
-
+                return m2m_import_item_table.c.import_id == subtree.value
+        # FIXME: for the AND logic, this probably needs to be extended to using aliases
+        self._stmt = self.stmt.join(m2m_import_item_table, m2m_import_item_table.c.item_id == AcademicItem.item_id)
         return recurse(clause)
 
     def _annotation_filter(self, clause: Tree) -> ColumnExpressionArgument:
@@ -208,8 +209,8 @@ class Query:
             if scope_tree is not None:
                 scope_ids = [scope.value for scope in scope_tree.children[0].children]
                 if anno_type == 'H':
-                    inner_wheres += (and_(Assignment.assignment_id == Schema.assignment_id,
-                                          Assignment.assignment_scope_id.in_(scope_ids)),)
+                    self._stmt = self.stmt.join(Assignment, Assignment.assignment_id == Schema.assignment_id)
+                    inner_wheres += (Assignment.assignment_scope_id.in_(scope_ids),)
                 else:
                     inner_wheres += (BotAnnotation.bot_annotation_metadata_id.in_(scope_ids),)
 
