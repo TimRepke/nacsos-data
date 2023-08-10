@@ -2,7 +2,7 @@ from uuid import UUID
 from lark import Lark, Transformer, Tree, Token
 
 
-class TypeTransformer(Transformer):
+class TypeTransformer(Transformer):  # type: ignore[type-arg]
     def INT(self, tok: Token) -> Token:
         return tok.update(value=int(tok))
 
@@ -71,7 +71,7 @@ _ANNOTATION: "anno"i | "annotation"i | "label"i
             | "(" uuid_clause ")"
 
 anno_params: "(" key "," ltype "," lvalue ("," lrepeat)? ("," lusers)? ("," lschemas)? ("," lscopes)? ")"
-key: "'" CNAME "'" | CNAME 
+key: "'" CNAME "'" | CNAME
 
 lvalue: BOOLEAN      -> value_bool
       | int_clause   -> value_int
