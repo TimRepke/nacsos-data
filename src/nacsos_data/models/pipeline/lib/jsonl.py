@@ -21,8 +21,8 @@ class _JSONLImport(TaskParams, ABC):
 
 
 class TwitterDBFileImport(_JSONLImport):
-    encoding = 'db-twitter-item'
-    func_name: Literal['nacsos_lib.twitter.import.import_twitter_db']
+    func_name: Literal['nacsos_lib.twitter.import.import_twitter_db']  # type: ignore[misc]
+    encoding: str = 'db-twitter-item'
 
     project_id: str | uuid.UUID
     import_id: str | uuid.UUID
@@ -42,8 +42,8 @@ class TwitterDBFileImport(_JSONLImport):
 
 
 class TwitterAPIFileImport(_JSONLImport):
-    func_name: Literal['nacsos_lib.twitter.import.import_twitter_api']
-    encoding = 'twitter-api-page'
+    func_name: Literal['nacsos_lib.twitter.import.import_twitter_api']  # type: ignore[misc]
+    encoding: str = 'twitter-api-page'
 
     project_id: str | uuid.UUID
     import_id: str | uuid.UUID

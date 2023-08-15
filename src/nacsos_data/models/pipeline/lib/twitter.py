@@ -5,7 +5,7 @@ from .abc import TaskParams
 
 
 class ImportConfigTwitter(TaskParams):
-    func_name: Literal['nacsos_lib.twitter.twitter_api.search_twitter']
+    func_name: Literal['nacsos_lib.twitter.twitter_api.search_twitter']  # type: ignore[misc]
 
     # One query for matching Tweets. You can learn how to build this query by reading our build a query guide.
     # You can use all available operators and can make queries up to 1,024 characters long.

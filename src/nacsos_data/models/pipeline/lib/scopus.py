@@ -5,7 +5,7 @@ from .abc import TaskParams
 
 
 class ScopusCSVImport(TaskParams):
-    func_name: Literal['nacsos_lib.academic.import.import_scopus_csv_file']
+    func_name: Literal['nacsos_lib.academic.import.import_scopus_csv_file']  # type: ignore[misc]
 
     project_id: str | uuid.UUID
     import_id: str | uuid.UUID

@@ -5,7 +5,7 @@ from .abc import TaskParams
 
 
 class WOSImport(TaskParams):
-    func_name: Literal['nacsos_lib.academic.import.import_wos_file']
+    func_name: Literal['nacsos_lib.academic.import.import_wos_file']  # type: ignore[misc]
 
     project_id: str | uuid.UUID
     import_id: str | uuid.UUID
