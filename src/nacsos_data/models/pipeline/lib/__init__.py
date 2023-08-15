@@ -6,15 +6,17 @@ from .jsonl import TwitterDBFileImport, TwitterAPIFileImport
 from .scopus import ScopusCSVImport
 from .twitter import ImportConfigTwitter as TwitterImport
 from .wos import WOSImport
+from .openalex import OpenAlexImport
 
 ImportConfig = Annotated[TwitterDBFileImport
                          | TwitterAPIFileImport
                          | TwitterImport
+                         | OpenAlexImport
                          | WOSImport
                          | ScopusCSVImport, Field(discriminator='func_name')]
 
 APIParameters = ImportConfig
 
 __all__ = ['TwitterImport', 'TwitterAPIFileImport', 'TwitterDBFileImport',
-           'ScopusCSVImport', 'WOSImport',
+           'ScopusCSVImport', 'WOSImport', 'OpenAlexImport',
            'ImportConfig', 'APIParameters']
