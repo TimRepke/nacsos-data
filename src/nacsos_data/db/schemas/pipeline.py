@@ -8,7 +8,7 @@ from sqlalchemy_json import mutable_json_type
 from ..base_class import Base
 from .users import User
 from .projects import Project
-from ...models.pipeline import CPULoadClassification, TaskStatus, ExecutionLocation
+from ...models.pipeline.enums import CPULoadClassification, TaskStatus, ExecutionLocation
 
 
 class Task(Base):

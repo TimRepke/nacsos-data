@@ -1,9 +1,12 @@
 from datetime import datetime
-from typing import Literal
-from pydantic import BaseModel
+from typing import Literal, Any
+
+from .abc import TaskParams
 
 
-class ImportConfigTwitter(BaseModel):
+class ImportConfigTwitter(TaskParams):
+    func_name: Literal['nacsos_lib.twitter.twitter_api.search_twitter']
+
     # One query for matching Tweets. You can learn how to build this query by reading our build a query guide.
     # You can use all available operators and can make queries up to 1,024 characters long.
     # https://developer.twitter.com/en/docs/twitter-api/tweets/counts/integrate/build-a-query
@@ -42,3 +45,24 @@ class ImportConfigTwitter(BaseModel):
     # Tweets from 30 days before end_time will be returned by default. If not specified, end_time will
     # default to [now - 30 seconds].
     end_time: str | datetime | None = None
+
+    bearer_token: str
+    results_per_response: int = 500
+    max_requests: int = -1
+    max_tweets: int = -1
+
+    @property
+    def payload(self) -> dict[str, Any]:
+        return {
+            'query': self.query,
+            'bearer_token': self.bearer_token,
+            'next_token': self.next_token,
+            'since_id': self.since_id,
+            'until_id': self.until_id,
+            'sort_order': self.sort_order,
+            'start_time': self.start_time,
+            'end_time': self.end_time,
+            'results_per_response': self.results_per_response,
+            'max_requests': self.max_requests,
+            'max_tweets': self.max_tweets
+        }

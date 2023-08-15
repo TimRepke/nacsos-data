@@ -145,6 +145,9 @@ async def import_academic_items(
             # remove empty entries from the meta-data field
             item.meta = get_cleaned_meta_field(item)
 
+            # ensure the project id is set
+            item.project_id = project_id
+
             # ensure we have a title_slug
             if item.title_slug is None or len(item.title_slug) == 0:
                 item.title_slug = str_to_title_slug(item.title)

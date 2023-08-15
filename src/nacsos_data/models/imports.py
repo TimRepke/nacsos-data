@@ -1,14 +1,10 @@
 from datetime import datetime
-from typing import Literal, Type
+from typing import Literal
 from enum import Enum
 from uuid import UUID
 from pydantic import BaseModel
 
-from .import_config_ris import ImportConfigRIS
-from .import_config_scopus import ImportConfigScopus
-from .import_config_twitter import ImportConfigTwitter
-from .import_config_jsonl import ImportConfigJSONL, LineEncoding
-from .import_config_wos import ImportConfigWoS
+from nacsos_data.models.pipeline.lib import ImportConfig
 
 
 class ImportType(str, Enum):
@@ -30,26 +26,10 @@ class ImportType(str, Enum):
     script = 'script'  # Import was done with a script
 
 
-ImportTypeLiteral = Literal['ris', 'csv', 'jsonl',
-'wos', 'scopus', 'ebsco', 'jstor', 'ovid', 'pop',
-'twitter', 'script']
-
-ImportConfig = ImportConfigTwitter | ImportConfigJSONL | ImportConfigWoS | ImportConfigScopus
-
-Type2Conf: dict[ImportTypeLiteral, Type[ImportConfig] | None] = {
-    'jsonl': ImportConfigJSONL,
-    'wos': ImportConfigWoS,
-    'twitter': ImportConfigTwitter,
-    'scopus': ImportConfigScopus,
-    # TODO: not implemented, yet
-    'ris': None,
-    'csv': None,
-    'ebsco': None,
-    'jstor': None,
-    'ovid': None,
-    'pop': None,
-    'script': None
-}
+ImportTypeLiteral = Literal[
+    'ris', 'csv', 'jsonl',
+    'wos', 'scopus', 'ebsco', 'jstor', 'ovid', 'pop',
+    'twitter', 'script']
 
 
 class ImportModel(BaseModel):
@@ -93,3 +73,7 @@ class M2MImportItemType(str, Enum):
     """
     explicit = 'explicit'
     implicit = 'implicit'
+
+
+__all__ = ['M2MImportItemType', 'ImportType', 'ImportModel', 'ImportTypeLiteral',
+           'ImportConfig']

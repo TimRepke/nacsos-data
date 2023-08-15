@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session  # noqa: F401
 from nacsos_data.db import DatabaseEngine
 from nacsos_data.db.crud import MissingIdError
 from nacsos_data.db.schemas import Task
-from nacsos_data.models.pipeline import TaskStatus, TaskModel
+from nacsos_data.models.pipeline.task import TaskStatus, TaskModel
 
 
 def query_tasks(engine: DatabaseEngine,
