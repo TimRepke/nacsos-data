@@ -22,7 +22,7 @@ class _JSONLImport(TaskParams, ABC):
 
 class TwitterDBFileImport(_JSONLImport):
     func_name: Literal['nacsos_lib.twitter.import.import_twitter_db']  # type: ignore[misc]
-    encoding = 'db-twitter-item'  # type: ignore[pydantic-field]
+    encoding: Literal['db-twitter-item'] = 'db-twitter-item'  # type: ignore[misc]
 
     project_id: str | uuid.UUID
     import_id: str | uuid.UUID

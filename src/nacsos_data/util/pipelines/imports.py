@@ -7,6 +7,7 @@ from sqlalchemy import select
 from ...db import DatabaseEngineAsync
 from ...db.schemas.imports import Import
 from ...models.imports import ImportModel
+from ...models.pipeline import TaskPayload
 
 logger = logging.getLogger('nacsos_data.util.pipelines')
 
@@ -28,7 +29,14 @@ async def submit_import_task(import_details: ImportModel,
                              auth_token: str,
                              engine: DatabaseEngineAsync) -> str:
     async with httpx.AsyncClient() as client, engine.session() as session:
-        stmt = select(Import).where(Import.import_id == import_details.import_id)
+        import_id = import_details.import_id
+        user_id = import_details.user_id
+        if import_id is None:
+            raise ValueError('import_id is required here.')
+        if user_id is None:
+            raise ValueError('user_id is required here.')
+
+        stmt = select(Import).where(Import.import_id == import_id)
         import_orm: Import | None = (await session.scalars(stmt)).one_or_none()
         if import_orm is None:
             raise ImportDetailsNotFound(f'No import found in db for id {import_details.import_id}')
@@ -37,10 +45,18 @@ async def submit_import_task(import_details: ImportModel,
         config = import_details.config
         if config is None:
             raise UndefinedEncoding('The import config is empty!')
-
+        print(config)
         try:
+            params = TaskPayload(
+                import_id=import_id,
+                user_id=user_id,
+                project_id=import_details.project_id,
+                name=import_details.name,
+                params=config
+            )
+
             response = await client.put(f'{base_url}/queue/submit/task',
-                                        json=config.payload,
+                                        json=params.payload,
                                         headers={
                                             'Authorization': f'Bearer {auth_token}',
                                             'X-Project-ID': str(import_details.project_id)

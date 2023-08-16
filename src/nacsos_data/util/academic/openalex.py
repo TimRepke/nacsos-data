@@ -4,7 +4,7 @@ import logging
 from datetime import timedelta
 from pathlib import Path
 from time import time
-from typing import Generator, Literal
+from typing import Generator
 
 import httpx
 from pydantic import BaseModel
@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from .duplicate import str_to_title_slug
 from ...models.items import AcademicItemModel
 from ...models.items.academic import AcademicAuthorModel, AffiliationModel
-from ...models.openalex.solr import WorkSolr, Work, Location, Authorship, Biblio
+from ...models.openalex.solr import WorkSolr, Work, Location, Authorship, Biblio, DefType, SearchField, OpType
 from .clean import clear_empty
 
 logger = logging.getLogger('nacsos_data.util.academic.openalex')
@@ -131,11 +131,6 @@ async def get_async(url: str) -> SearchResult:
             ])
 
 
-DefType = Literal['edismax', 'lucene', 'dismax']
-SearchField = Literal['title', 'abstract', 'title_abstract']
-OpType = Literal['OR', 'AND']
-
-
 async def query_async(query: str,
                       openalex_endpoint: str,
                       limit: int = 20,
@@ -173,7 +168,7 @@ async def query_async(query: str,
         })
 
     async with httpx.AsyncClient() as client:
-        request = await client.post(str(openalex_endpoint), data=params)
+        request = await client.post(f'{openalex_endpoint}/select', data=params)
         response = request.json()
         logger.debug(f'Received response from OpenAlex: {response["responseHeader"]}')
 
@@ -196,14 +191,17 @@ async def query_async(query: str,
             } if hist_facets is not None else None)
 
 
-def generate_items_from_openalex(query: str,
-                                 openalex_endpoint: str,
-                                 export_fields: list[str] | None = None,
-                                 batch_size: int = 10000,
-                                 def_type: DefType = 'lucene',
-                                 field: SearchField = 'title_abstract',
-                                 op: OpType = 'AND',
-                                 translate: bool = False) -> Generator[AcademicItemModel, None, None]:
+def generate_docs_from_openalex(query: str,
+                                openalex_endpoint: str,
+                                export_fields: list[str] | None = None,
+                                batch_size: int = 10000,
+                                def_type: DefType = 'lucene',
+                                field: SearchField = 'title_abstract',
+                                op: OpType = 'AND',
+                                log: logging.Logger | None = None) -> Generator[WorkSolr, None, None]:
+    if log is None:
+        log = logger
+
     if export_fields is None:
         export_fields = [
             'id', 'title', 'abstract', 'display_name',  # 'title_abstract',
@@ -229,38 +227,54 @@ def generate_items_from_openalex(query: str,
         params['qf'] = field
 
     t0 = time()
-    logger.info(f'Querying endpoint with batch_size={batch_size:,}: {openalex_endpoint}')
+    log.info(f'Querying endpoint with batch_size={batch_size:,}: {openalex_endpoint}')
+    log.info(f'Request parameters: {params}')
 
     batch_i = 0
     num_docs_cum = 0
     while True:
         t1 = time()
         batch_i += 1
-        logger.info(f'Running query for batch {batch_i} with cursor "{params["cursorMark"]}"')
+        log.info(f'Running query for batch {batch_i} with cursor "{params["cursorMark"]}"')
         t2 = time()
-        res = httpx.post(openalex_endpoint, data=params).json()
+        res = httpx.post(f'{openalex_endpoint}/select', data=params).json()
         params['cursorMark'] = res['nextCursorMark']
         n_docs_total = res['response']['numFound']
         batch_docs = res['response']['docs']
         n_docs_batch = len(batch_docs)
         num_docs_cum += n_docs_batch
 
-        logger.debug(f'Query took {timedelta(seconds=time() - t2)}h and yielded {n_docs_batch:,} docs')
-        logger.debug(f'Current progress: {num_docs_cum:,}/{n_docs_total:,}={num_docs_cum / n_docs_total:.2%} docs')
+        log.debug(f'Query took {timedelta(seconds=time() - t2)}h and yielded {n_docs_batch:,} docs')
+        log.debug(f'Current progress: {num_docs_cum:,}/{n_docs_total:,}={num_docs_cum / n_docs_total:.2%} docs')
 
         if len(batch_docs) == 0:
-            logger.info('No documents in this batch, assuming to be done!')
+            log.info('No documents in this batch, assuming to be done!')
             break
 
-        if translate:
-            logger.debug('Yielding translated documents...')
-            yield from [translate_work(translate_doc(doc)) for doc in batch_docs]
-        else:
-            logger.debug('Yielding solr documents...')
-            yield from batch_docs
+        log.debug('Yielding documents...')
+        yield from [WorkSolr.model_validate(doc) for doc in batch_docs]
 
-        logger.debug(f'Done with batch {batch_i} in {timedelta(seconds=time() - t1)}h; '
-                     f'{timedelta(seconds=time() - t0)}h passed overall')
+        log.debug(f'Done with batch {batch_i} in {timedelta(seconds=time() - t1)}h; '
+                  f'{timedelta(seconds=time() - t0)}h passed overall')
+
+
+def generate_items_from_openalex(query: str,
+                                 openalex_endpoint: str,
+                                 export_fields: list[str] | None = None,
+                                 batch_size: int = 10000,
+                                 def_type: DefType = 'lucene',
+                                 field: SearchField = 'title_abstract',
+                                 op: OpType = 'AND',
+                                 log: logging.Logger | None = None) -> Generator[AcademicItemModel, None, None]:
+    for doc in generate_docs_from_openalex(query=query,
+                                           openalex_endpoint=openalex_endpoint,
+                                           export_fields=export_fields,
+                                           batch_size=batch_size,
+                                           def_type=def_type,
+                                           field=field,
+                                           op=op,
+                                           log=log):
+        yield translate_work(translate_doc(doc))
 
 
 def download_openalex_query(target_file: str | Path,
@@ -268,7 +282,7 @@ def download_openalex_query(target_file: str | Path,
                             openalex_endpoint: str,
                             export_fields: list[str] | None = None,
                             batch_size: int = 10000,
-                            translate: bool = False) -> None:
+                            log: logging.Logger | None = None) -> None:
     """
     This executes a `query` in solr at the specified `openalex_endpoint` (collection's select endpoint)
     and writes each document as one json string per line into `target_file`.
@@ -276,26 +290,28 @@ def download_openalex_query(target_file: str | Path,
     You can specify the `batch_size` (how many documents per request)
     and which `export_fields` from the collection to get.
 
+    :param log:
     :param query: solr query
     :param target_file:
     :param batch_size: Maximum number of documents to return per request
-    :param translate: True=OpenAlex Work objects will be translated to AcademicItemModel before saving
     :param openalex_endpoint: sth like "http://[IP]:8983/solr/openalex"
     :param export_fields:
     :return:
     """
+    if log is None:
+        log = logger
     # ensure the path to that file exists
     target_file = Path(target_file)
     target_file.parent.mkdir(exist_ok=True, parents=True)
-    logger.info(f'Writing results to: {target_file}')
+    log.info(f'Writing results to: {target_file}')
 
     with open(target_file, 'w') as f_out:
         [f_out.write(json.dumps(doc) + '\n') for doc in generate_items_from_openalex(
             query=query,
             openalex_endpoint=openalex_endpoint,
-            translate=translate,
             batch_size=batch_size,
-            export_fields=export_fields)]
+            export_fields=export_fields,
+            log=log)]
 
 
 def generate_items_from_openalex_export(openalex_export: str | Path,

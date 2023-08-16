@@ -1,4 +1,10 @@
+from typing import Literal
+
 from pydantic import BaseModel
+
+DefType = Literal['edismax', 'lucene', 'dismax']
+SearchField = Literal['title', 'abstract', 'title_abstract']
+OpType = Literal['OR', 'AND']
 
 
 class Biblio(BaseModel):

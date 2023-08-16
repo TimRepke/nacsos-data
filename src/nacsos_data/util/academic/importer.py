@@ -31,6 +31,7 @@ async def import_academic_items(
         dry_run: bool = True,
         trust_new_authors: bool = False,
         trust_new_keywords: bool = False,
+        log: logging.Logger | None = None
 ) -> tuple[str | uuid.UUID, list[str | uuid.UUID]]:
     """
     Helper function for programmatically importing `AcademicItem`s into the platform.
@@ -89,6 +90,9 @@ async def import_academic_items(
     :param db_engine: an async database engine
     :return: import_id and list of item_ids that were actually used in the end
     """
+    if log is None:
+        log = logger
+
     if project_id is None:
         raise AttributeError('You have to provide a project ID!')
 
@@ -115,11 +119,11 @@ async def import_academic_items(
                 time_created=datetime.datetime.now()
             )
             if dry_run:
-                logger.info('I will create a new `Import`!')
+                log.info('I will create a new `Import`!')
             else:
                 session.add(import_orm)
                 await session.commit()
-                logger.info(f'Created new import with ID {import_id}')
+                log.info(f'Created new import with ID {import_id}')
 
         elif import_id is not None:
             # check that the uuid actually exists...
@@ -130,7 +134,7 @@ async def import_academic_items(
                 raise AssertionError(f'The project ID does not match with the `Import` you provided: '
                                      f'"{import_orm.project_id}" vs "{project_id}"')
 
-            logger.info(f'Using existing import with ID {import_id}')
+            log.info(f'Using existing import with ID {import_id}')
 
         else:
             raise AttributeError('Seems like neither provided information for creating '
@@ -140,7 +144,7 @@ async def import_academic_items(
         import_orm.time_started = datetime.datetime.now()
 
         for item in items:
-            logger.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
+            log.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
 
             # remove empty entries from the meta-data field
             item.meta = get_cleaned_meta_field(item)
@@ -169,9 +173,9 @@ async def import_academic_items(
                 if duplicates is not None and len(duplicates) > 0:
                     item_id = duplicates[0].item_id
                     if dry_run:
-                        logger.debug(f'  -> There are at least {len(duplicates)}; I will probably use {item_id}')
+                        log.debug(f'  -> There are at least {len(duplicates)}; I will probably use {item_id}')
                     else:
-                        logger.debug(f' -> Has {len(duplicates)} duplicates; using {item_id}.')
+                        log.debug(f' -> Has {len(duplicates)} duplicates; using {item_id}.')
                         if item.item_id is None:
                             item.item_id = uuid.uuid4()
                         await duplicate_insertion(orig_item_id=item_id,
@@ -182,16 +186,16 @@ async def import_academic_items(
                                                   session=session)
                 else:
                     if dry_run:
-                        logger.debug('  -> I will create a new AcademicItem!')
+                        log.debug('  -> I will create a new AcademicItem!')
                     else:
                         item_id = str(uuid.uuid4())
-                        logger.debug(f' -> Creating new item with ID {item_id}!')
+                        log.debug(f' -> Creating new item with ID {item_id}!')
                         item.item_id = item_id
                         session.add(AcademicItem(**item.model_dump()))
                         await session.commit()
 
                 if dry_run:
-                    logger.debug('  -> I will create an m2m entry.')
+                    log.debug('  -> I will create an m2m entry.')
                 else:
                     item_ids.append(item_id)
                     stmt_m2m = insert(m2m_import_item_table) \
@@ -199,13 +203,13 @@ async def import_academic_items(
                     try:
                         await session.execute(stmt_m2m)
                         await session.commit()
-                        logger.debug(' -> Added many-to-many relationship for import/item')
+                        log.debug(' -> Added many-to-many relationship for import/item')
                     except IntegrityError:
-                        logger.debug(f' -> M2M_i2i already exists, ignoring {import_id} <-> {item_id}')
+                        log.debug(f' -> M2M_i2i already exists, ignoring {import_id} <-> {item_id}')
                         await session.rollback()
 
             except (UniqueViolation, IntegrityError) as e:
-                logger.exception(e)
+                log.exception(e)
                 await session.rollback()
 
         # Keep track of when we finished importing
@@ -226,10 +230,12 @@ async def duplicate_insertion(new_item: AcademicItemModel,
                               import_id: str | uuid.UUID | None,
                               trust_new_authors: bool,
                               trust_new_keywords: bool,
-                              session: AsyncSession) -> None:
+                              session: AsyncSession,
+                              log: logging.Logger | None = None) -> None:
     """
     This method handles insertion of an item for which we found a duplicate in the database with `item_id`
 
+    :param log:
     :param trust_new_keywords: if True, won't try to fuse list of keywords but just take them from `new_item` instead
     :param trust_new_authors: if True, won't try to fuse list of authors but just take them from `new_item` instead
     :param import_id:
@@ -238,6 +244,8 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     :param orig_item_id: id in academic_item of which the `new_item` is a duplicate
     :return:
     """
+    if log is None:
+        log = logger
 
     # Fetch the original item from the database
     orig_item_orm = await session.get(AcademicItem, {'item_id': orig_item_id})
@@ -282,7 +290,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
         session.add(AcademicItemVariant(**variant.model_dump()))
         await session.commit()
 
-        logger.debug(f'Created first variant of item {orig_item_id} at {variant.item_variant_id}')
+        log.debug(f'Created first variant of item {orig_item_id} at {variant.item_variant_id}')
         # use this new variant for further value thinning
         variants = [variant]  # type: ignore[list-item]
 
@@ -339,7 +347,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     if any([new_item.source == var.source for var in variants]):
         new_variant.source = None
 
-    logger.debug(f'Found {len(variants or [])} variants and adding one more.')
+    log.debug(f'Found {len(variants or [])} variants and adding one more.')
 
     session.add(AcademicItemVariant(**new_variant.model_dump()))
     await session.commit()

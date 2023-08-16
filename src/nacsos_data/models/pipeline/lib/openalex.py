@@ -1,16 +1,16 @@
 from typing import Any, Literal
 
-from nacsos_data.util.academic.openalex import DefType, SearchField, OpType
 from .abc import TaskParams
+from ...openalex.solr import DefType, SearchField, OpType
 
 
 class OpenAlexImport(TaskParams):
     func_name: Literal['nacsos_lib.academic.import.import_openalex']  # type: ignore[misc]
 
     query: str
-    def_type: DefType = 'lucene',
-    field: SearchField = 'title_abstract',
-    op: OpType = 'AND',
+    def_type: DefType = 'lucene'
+    field: SearchField = 'title_abstract'
+    op: OpType = 'AND'
     project_id: str | None = None
     import_id: str | None = None
 
