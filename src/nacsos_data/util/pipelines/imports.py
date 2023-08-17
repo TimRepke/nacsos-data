@@ -45,7 +45,7 @@ async def submit_import_task(import_details: ImportModel,
         config = import_details.config
         if config is None:
             raise UndefinedEncoding('The import config is empty!')
-        print(config)
+
         try:
             params = TaskPayload(
                 import_id=import_id,

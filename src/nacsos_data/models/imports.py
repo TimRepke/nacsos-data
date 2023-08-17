@@ -1,35 +1,9 @@
 from datetime import datetime
-from typing import Literal
 from enum import Enum
 from uuid import UUID
 from pydantic import BaseModel
 
 from nacsos_data.models.pipeline.lib import ImportConfig
-
-
-class ImportType(str, Enum):
-    # File import
-    ris = 'ris'  # single or bulk import of publications via RIS file(s)
-    csv = 'csv'  # single or bulk import of publications via CSV file(s)
-    jsonl = 'jsonl'  # single or bulk import of publications via JSON.l file(s)
-
-    # Scholarly databases
-    wos = 'wos'  # Import via Web of Science query
-    scopus = 'scopus'  # Import via Scopus query
-    ebsco = 'ebsco'  # Import via EBSCO query
-    jstor = 'jstor'  # Import via JSTOR query
-    ovid = 'ovid'  # Import via OVID query
-    pop = 'pop'  # Import via Publish or Perish query
-
-    # Others
-    twitter = 'twitter'  # Import via Twitter
-    script = 'script'  # Import was done with a script
-
-
-ImportTypeLiteral = Literal[
-    'ris', 'csv', 'jsonl',
-    'wos', 'scopus', 'ebsco', 'jstor', 'ovid', 'pop',
-    'twitter', 'script']
 
 
 class ImportModel(BaseModel):
@@ -50,7 +24,7 @@ class ImportModel(BaseModel):
     description: str
 
     # Defines what sort of import this is
-    type: ImportTypeLiteral | ImportType
+    type: str
 
     # Date and time when this import was created and when the actual import was triggered
     time_created: datetime | None = None
@@ -75,5 +49,4 @@ class M2MImportItemType(str, Enum):
     implicit = 'implicit'
 
 
-__all__ = ['M2MImportItemType', 'ImportType', 'ImportModel', 'ImportTypeLiteral',
-           'ImportConfig']
+__all__ = ['M2MImportItemType', 'ImportModel', 'ImportConfig']

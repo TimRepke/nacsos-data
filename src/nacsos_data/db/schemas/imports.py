@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB
 from .users import User
 from .projects import Project
 from ..base_class import Base
-from ...models.imports import ImportType, M2MImportItemType
+from ...models.imports import M2MImportItemType
 
 if TYPE_CHECKING:
     from .items.base import Item
@@ -62,7 +62,7 @@ class Import(Base):
     description = mapped_column(String, nullable=False)
 
     # Defines what sort of import this is
-    type = mapped_column(SAEnum(ImportType), nullable=False)
+    type = mapped_column(String, nullable=False)
 
     # Date and time when this import was created and when the actual import was triggered
     time_created = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -11,7 +11,7 @@ from psycopg.errors import UniqueViolation
 from ...db.engine import DatabaseEngineAsync
 from ...db.schemas import Import, AcademicItem, m2m_import_item_table
 from ...db.schemas.items.academic import AcademicItemVariant
-from ...models.imports import ImportType, M2MImportItemType
+from ...models.imports import M2MImportItemType
 from ...models.items import AcademicItemModel, AcademicItemVariantModel
 from ..errors import NotFoundError
 from .clean import get_cleaned_meta_field
@@ -115,7 +115,7 @@ async def import_academic_items(
                 import_id=import_id,
                 name=import_name,
                 description=description,
-                type=ImportType.script,
+                type='script',
                 time_created=datetime.datetime.now()
             )
             if dry_run:
