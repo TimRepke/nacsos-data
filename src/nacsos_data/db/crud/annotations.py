@@ -126,6 +126,70 @@ async def read_assignments_for_scope(assignment_scope_id: str | uuid.UUID,
         return [AssignmentModel(**res.__dict__) for res in result]
 
 
+class AssignmentInfoLabel(BaseModel):
+    repeat: int
+    value_int: int | None = None
+    value_bool: bool | None = None
+    multi_ind: list[int] | None = None
+
+
+class AssignmentInfo(BaseModel):
+    user_id: str | uuid.UUID
+    username: str
+    order: int
+    assignment_id: str | uuid.UUID
+    status: AssignmentStatus
+    labels: dict[str, list[AssignmentInfoLabel]] | None = None
+
+
+class AssignmentScopeEntry(BaseModel):
+    item_id: str | uuid.UUID
+    first_occurrence: int
+    identifier: int
+    assignments: list[AssignmentInfo]
+
+
+async def read_assignment_overview_for_scope(assignment_scope_id: str | uuid.UUID,
+                                             db_engine: DatabaseEngineAsync) -> list[AssignmentScopeEntry]:
+    async with db_engine.session() as session:  # type: AsyncSession
+        stmt = text('''
+            WITH labels_pre as (SELECT ass.assignment_id,
+                               ann.key,
+                               jsonb_agg(jsonb_build_object('repeat', ann.repeat,
+                                                            'value_bool', ann.value_bool,
+                                                            'value_int', ann.value_int,
+                                                            'multi_int', ann.multi_int)) as label
+                            FROM assignment ass
+                                     LEFT OUTER JOIN annotation ann on ann.assignment_id = ass.assignment_id
+                            WHERE ass.assignment_scope_id = :scope_id
+                            GROUP BY ass.assignment_id, ann.key),
+                 labels as (SELECT assignment_id,
+                                   jsonb_object_agg(key, label) filter (where key is not null ) as labels
+                            FROM labels_pre
+                            GROUP BY assignment_id),
+                 assis as (SELECT ass.item_id,
+                                  MIN(ass."order") as first_occurrence,
+                                  array_agg(jsonb_build_object(
+                                          'assignment_id', ass.assignment_id,
+                                          'user_id', ass.user_id,
+                                          'username', u.username,
+                                          'status', ass.status,
+                                          'order', ass."order",
+                                          'labels', labels.labels
+                                      )) as assignments
+                           FROM assignment ass
+                                    JOIN "user" u on u.user_id = ass.user_id
+                                    JOIN labels on labels.assignment_id = ass.assignment_id
+                           --WHERE ass.assignment_scope_id = :scope_id
+                           GROUP BY ass.item_id
+                           ORDER BY first_occurrence)
+            SELECT row_number() over () as identifier,
+                   assis.*
+            FROM assis;''')
+        result = await session.execute(stmt, {'scope_id': assignment_scope_id})
+        return [AssignmentScopeEntry.model_validate(r) for r in result.mappings().all()]
+
+
 async def read_next_assignment_for_scope_for_user(current_assignment_id: str | uuid.UUID,
                                                   assignment_scope_id: str | uuid.UUID,
                                                   user_id: str | uuid.UUID,
