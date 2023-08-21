@@ -238,14 +238,17 @@ def generate_docs_from_openalex(query: str,
         log.info(f'Running query for batch {batch_i} with cursor "{params["cursorMark"]}"')
         t2 = time()
         res = httpx.post(f'{openalex_endpoint}/select', data=params).json()
-        params['cursorMark'] = res['nextCursorMark']
+
+        next_curser = res.get('nextCursorMark')
+        params['cursorMark'] = next_curser
         n_docs_total = res['response']['numFound']
         batch_docs = res['response']['docs']
         n_docs_batch = len(batch_docs)
         num_docs_cum += n_docs_batch
 
         log.debug(f'Query took {timedelta(seconds=time() - t2)}h and yielded {n_docs_batch:,} docs')
-        log.debug(f'Current progress: {num_docs_cum:,}/{n_docs_total:,}={num_docs_cum / n_docs_total:.2%} docs')
+        if n_docs_total > 0:
+            log.debug(f'Current progress: {num_docs_cum:,}/{n_docs_total:,}={num_docs_cum / n_docs_total:.2%} docs')
 
         if len(batch_docs) == 0:
             log.info('No documents in this batch, assuming to be done!')
@@ -256,6 +259,10 @@ def generate_docs_from_openalex(query: str,
 
         log.debug(f'Done with batch {batch_i} in {timedelta(seconds=time() - t1)}h; '
                   f'{timedelta(seconds=time() - t0)}h passed overall')
+
+        if next_curser is None:
+            log.info('Did not receive a `nextCursorMark`, assuming to be done!')
+            break
 
 
 def generate_items_from_openalex(query: str,
