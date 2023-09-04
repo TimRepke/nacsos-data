@@ -25,12 +25,12 @@ from nacsos_data.db.schemas import \
     Import
 from nacsos_data.models.annotations import AnnotationSchemeLabel, AnnotationSchemeLabelChoice, AssignmentStatus
 from nacsos_data.models.bot_annotations import BotKind
-from nacsos_data.models.imports import ImportType, M2MImportItemType
+from nacsos_data.models.imports import M2MImportItemType
 from nacsos_data.models.items.academic import AcademicAuthorModel, AffiliationModel
 
 
 def main(
-        config: str = '../../nacsos-core/config/testing.env',
+        config: str = '../../nacsos-core/config/local.env',
         p_type: ItemType = ItemType.twitter,
         init_schema: bool = True,
         clear_schema: bool = True
@@ -156,7 +156,7 @@ def main(
 
         imp1 = Import(user_id=users[0].user_id, project_id=project.project_id,
                       name='Dummy import 1', description='Description for dummy import 1',
-                      type=ImportType.script,
+                      type='script',
                       time_created=datetime.datetime.now(),
                       time_started=datetime.datetime.now(),
                       time_finished=datetime.datetime.now())
@@ -164,7 +164,7 @@ def main(
 
         imp2 = Import(user_id=users[0].user_id, project_id=project.project_id,
                       name='Dummy import 2', description='Description for dummy import 2',
-                      type=ImportType.script,
+                      type='script',
                       time_created=datetime.datetime.now(),
                       time_started=datetime.datetime.now(),
                       time_finished=datetime.datetime.now())

@@ -2,13 +2,13 @@ from sqlalchemy import text, insert
 from nacsos_data.db.connection import get_engine
 from nacsos_data.db.schemas import Assignment, AssignmentScope, Annotation
 
-PROJECT_ID = '59577b91-5d6d-4460-9074-4cf2e4bd748c'
-SCHEME_ID = '98545fb3-3ed3-48b2-9748-a24015244be0'
-USER_IDS = ['b0949d0e-e3e1-47c3-9a5d-a2cbbdc2ea23',
-            '3c6eed89-e0c1-43b4-9d56-f12382fe65ef',
-            '9e896c7c-4c38-4a6e-950c-62f09e1a6511']
+PROJECT_ID = '3e87c64e-115b-42cb-8992-b266700eebd1'
+SCHEME_ID = 'c6d3f9a2-8465-42ea-a228-cbd9c00f9222'
+USER_IDS = ['562fc779-3541-4796-a9b8-d4da580892cb',
+            'a4b6c733-ea3a-43ce-a498-084c10f91110',
+            '24b642d5-26eb-4a05-858b-2244b2b2542a']
 
-engine = get_engine(conf_file='../../nacsos-core/config/default.env')
+engine = get_engine(conf_file='../../nacsos-core/config/local.env')
 
 
 def annotate(sess, uid, iid, rel: bool | None = None,
@@ -54,6 +54,7 @@ with engine.session() as session:
                              "LIMIT 10"),
                         {'project_id': PROJECT_ID})
     item_ids = r.scalars().all()
+    print(item_ids)
 
     scope = AssignmentScope(annotation_scheme_id=SCHEME_ID,
                             name='Test Scope',
