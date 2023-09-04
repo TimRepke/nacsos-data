@@ -283,5 +283,5 @@ class AnnotationModel(BaseModel):
     text_offset_stop: int | None = None
 
 
-AnnotationSchemeLabelChoice.update_forward_refs()
-AnnotationSchemeLabel.update_forward_refs()
+AnnotationSchemeLabelChoice.model_rebuild()
+AnnotationSchemeLabel.model_rebuild()

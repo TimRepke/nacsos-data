@@ -6,7 +6,7 @@ from typing import Generator
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 from sqlalchemy.exc import IntegrityError
-from psycopg.errors import UniqueViolation
+from psycopg.errors import UniqueViolation, OperationalError
 
 from ...db.engine import DatabaseEngineAsync
 from ...db.schemas import Import, AcademicItem, m2m_import_item_table
@@ -208,7 +208,7 @@ async def import_academic_items(
                         log.debug(f' -> M2M_i2i already exists, ignoring {import_id} <-> {item_id}')
                         await session.rollback()
 
-            except (UniqueViolation, IntegrityError) as e:
+            except (UniqueViolation, IntegrityError, OperationalError) as e:
                 log.exception(e)
                 await session.rollback()
 
