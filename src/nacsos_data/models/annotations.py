@@ -6,7 +6,7 @@ from typing import Literal, Optional, Union
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # Types of Labels:
 #   - bool: stored in `Annotation.value_bool`, used for binary labels (no children)
@@ -20,6 +20,7 @@ AnnotationSchemeLabelTypes = Literal['bool', 'str', 'float', 'int', 'single', 'm
 
 
 class AnnotationSchemeLabelChoiceFlat(BaseModel):
+    model_config = ConfigDict(extra='ignore')
     name: str
     hint: str | None = None
     # note, no constraint on value uniqueness; should be checked in frontend
@@ -61,7 +62,9 @@ class FlattenedAnnotationSchemeLabel(BaseModel):
     parent_choice: int | None = None
 
 
-class _AnnotationSchemeModel(BaseModel):
+class AnnotationSchemeInfo(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+
     # Unique identifier for this scheme.
     annotation_scheme_id: str | UUID | None = None
 
@@ -82,7 +85,7 @@ class _AnnotationSchemeModel(BaseModel):
     time_updated: datetime | None = None
 
 
-class AnnotationSchemeModel(_AnnotationSchemeModel):
+class AnnotationSchemeModel(AnnotationSchemeInfo):
     """
     Corresponds to db.models.annotations.AnnotationScheme
 
@@ -101,7 +104,7 @@ class AnnotationSchemeModel(_AnnotationSchemeModel):
     labels: list[AnnotationSchemeLabel]
 
 
-class AnnotationSchemeModelFlat(_AnnotationSchemeModel):
+class AnnotationSchemeModelFlat(AnnotationSchemeInfo):
     """
     Same as AnnotationSchemeModel but with flattened structure.
     """
@@ -208,6 +211,8 @@ AnnotationValueField = Union[AnnotationScalarValueField, AnnotationListValueFiel
 
 
 class AnnotationValue(BaseModel):
+    # Depending on the AnnotationSchemeLabel.kind, one of the following fields should be filled.
+    # For single and mixed, the AnnotationSchemeLabelChoice.value should be filled in value_int.
     value_bool: bool | None = None
     value_int: int | None = None
     value_float: float | None = None
@@ -215,7 +220,7 @@ class AnnotationValue(BaseModel):
     multi_int: list[int] | None = None
 
 
-class AnnotationModel(BaseModel):
+class AnnotationModel(AnnotationValue):
     """
     Corresponds to db.models.annotations.Annotation
 
@@ -268,14 +273,6 @@ class AnnotationModel(BaseModel):
 
     # Reference to the parent labels' annotation.
     parent: str | UUID | None = None
-
-    # Depending on the AnnotationSchemeLabel.kind, one of the following fields should be filled.
-    # For single and mixed, the AnnotationSchemeLabelChoice.value should be filled in value_int.
-    value_bool: bool | None = None
-    value_int: int | None = None
-    value_float: float | None = None
-    value_str: str | None = None
-    multi_int: list[int] | None = None
 
     # When the Annotation does not refer to an entire Item, but a sub-string (in-text annotation)
     # of that Item, the following fields should be set with the respective string offset.

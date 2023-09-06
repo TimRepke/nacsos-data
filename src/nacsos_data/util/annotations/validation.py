@@ -1,5 +1,8 @@
 from uuid import UUID, uuid4
 import logging
+
+from pydantic import BaseModel, ConfigDict
+
 from nacsos_data.models.annotations import \
     AnnotationModel, \
     AnnotationSchemeModel, \
@@ -7,9 +10,104 @@ from nacsos_data.models.annotations import \
     AssignmentStatus, \
     AnnotationSchemeLabel, \
     AnnotationSchemeModelFlat, \
-    AnnotationSchemeLabelChoiceFlat
+    AnnotationSchemeLabelChoiceFlat, AnnotationSchemeLabelTypes
+from nacsos_data.models.bot_annotations import Label
 
 logger = logging.getLogger('nacsos_data.annotation.validation')
+
+
+class FlatLabelChoice(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    name: str
+    hint: str | None = None
+    value: int
+
+
+class FlatLabel(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    path: list[Label]
+    repeat: int
+    path_key: str
+    parent_int: int | None = None
+    parent_key: str | None = None
+    parent_value: int | None = None
+
+    name: str
+    hint: str | None = None
+    key: str
+    required: bool
+    max_repeat: int
+    kind: AnnotationSchemeLabelTypes
+    choices: list[FlatLabelChoice] | None = None
+
+
+def labels_from_scheme(scheme: AnnotationSchemeModel,
+                       ignore_hierarchy: bool = False,
+                       ignore_order: bool = False,
+                       keys: list[str] | None = None,
+                       repeats: list[int] | None = None) -> list[FlatLabel]:
+    """
+    This method generates all possible label paths from the annotation scheme.
+    It respects the applied filters to exclude paths that would not exist under these conditions.
+
+    :param scheme: annotation scheme to generate the labels from
+    :param ignore_hierarchy: will not include nesting of labels (all paths will have length 1)
+    :param ignore_order: will not generate multiples for primary, secondary, ... labels
+    :param keys: if not None, include only these label keys and skip all others (ignores hierarchy!)
+    :param repeats: if not None, include only these repeats and skip all others
+    :return:
+    """
+    run = 0
+
+    def recurse(labels: list[AnnotationSchemeLabel],
+                prefix: list[Label], parent: int | None = None,
+                parent_key: str | None = None, parent_value: int | None = None) -> list[FlatLabel]:
+        nonlocal run
+        ret = []
+        for label in labels:
+            max_repeat = label.max_repeat
+            if keys is not None and label.key not in keys:
+                max_repeat = 1
+            for repeat in range(1 if ignore_order else max_repeat):
+                if repeats is None or (repeat + 1) in repeats:
+                    if keys is None or label.key in keys:
+                        run += 1
+                        path = [Label(key=label.key, repeat=repeat + 1)] + prefix
+                        ret.append(FlatLabel(path=path,
+                                             path_key=path_to_string(path),
+                                             repeat=repeat + 1,
+                                             parent_int=parent,
+                                             parent_key=parent_key,
+                                             parent_value=parent_value,
+                                             name=label.name,
+                                             hint=label.hint,
+                                             key=label.key,
+                                             required=label.required,
+                                             max_repeat=label.max_repeat,
+                                             kind=label.kind,
+                                             choices=[FlatLabelChoice(**c.model_dump()) for c in label.choices]))
+                    if label.choices and (ignore_hierarchy or keys is None or label.key in keys):
+                        next_parent = run - 1
+                        for choice in label.choices:
+                            if choice.children is not None and len(choice.children) > 0:
+                                if not ignore_hierarchy:
+                                    next_prefix = [Label(key=label.key, repeat=repeat + 1, value=choice.value)]
+                                else:
+                                    next_prefix = []
+                                sublabels = recurse(labels=choice.children,
+                                                    prefix=next_prefix + prefix,
+                                                    parent=next_parent,
+                                                    parent_key=path_to_string(next_prefix),
+                                                    parent_value=choice.value)
+                                ret += sublabels
+        return ret
+
+    result = recurse(scheme.labels, prefix=[], parent=None)
+    return result
+
+
+def path_to_string(path: list[Label]) -> str:
+    return '|'.join([f'{pl.key}-{pl.repeat}' for pl in path])
 
 
 def flatten_annotation_scheme(annotation_scheme: AnnotationSchemeModel) -> AnnotationSchemeModelFlat:

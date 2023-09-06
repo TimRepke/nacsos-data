@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 from sqlalchemy import select, delete, asc, desc
 from sqlalchemy.sql import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import \
@@ -30,9 +31,7 @@ from nacsos_data.models.bot_annotations import \
 from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_scheme_and_annotations
 
 from . import upsert_orm, MissingIdError
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
+from ..engine import ensure_session_async
 
 logger = logging.getLogger('nacsos_data.crud.annotations')
 
@@ -47,83 +46,83 @@ class UserProjectAssignmentScope(BaseModel):
     num_completed: int
 
 
+@ensure_session_async
 async def read_assignment_scopes_for_project_for_user(project_id: str | uuid.UUID,
                                                       user_id: str | uuid.UUID,
-                                                      db_engine: DatabaseEngineAsync) \
+                                                      session: AsyncSession) \
         -> list[UserProjectAssignmentScope]:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = text("""
-        SELECT scope.*,
-               scheme.name AS scheme_name,
-               scheme.description AS scheme_description,
-               COUNT(DISTINCT assi.assignment_id) AS num_assignments,
-               SUM(CASE WHEN assi.status = 'OPEN' THEN 1 ELSE 0 END) AS num_open,
-               SUM(CASE WHEN assi.status = 'PARTIAL' THEN 1 ELSE 0 END) AS num_partial,
-               SUM(CASE WHEN assi.status = 'FULL' THEN 1 ELSE 0 END) AS num_completed
-        FROM assignment_scope scope
-                 FULL OUTER JOIN annotation_scheme scheme ON scope.annotation_scheme_id = scheme.annotation_scheme_id
-                 LEFT OUTER JOIN assignment assi ON scope.assignment_scope_id = assi.assignment_scope_id
-        WHERE assi.user_id = :user_id AND
-              scheme.project_id = :project_id
-        GROUP BY scope.assignment_scope_id, scheme_name, scheme_description, scope.time_created
-        ORDER BY scope.time_created;
-        """)
-        result = await session.execute(stmt, {'user_id': user_id, 'project_id': project_id})
-        result_list = result.mappings().all()
-        return [
-            UserProjectAssignmentScope(
-                scope=AssignmentScopeModel(
-                    assignment_scope_id=res['assignment_scope_id'],
-                    annotation_scheme_id=res['annotation_scheme_id'],
-                    name=res['name'],
-                    description=res['description']
-                ),
-                scheme_name=res['scheme_name'],
-                scheme_description=res['scheme_description'],
-                num_assignments=res['num_assignments'],
-                num_open=res['num_open'],
-                num_partial=res['num_partial'],
-                num_completed=res['num_completed'],
-            )
-            for res in result_list
-        ]
+    stmt = text("""
+    SELECT scope.*,
+           scheme.name AS scheme_name,
+           scheme.description AS scheme_description,
+           COUNT(DISTINCT assi.assignment_id) AS num_assignments,
+           SUM(CASE WHEN assi.status = 'OPEN' THEN 1 ELSE 0 END) AS num_open,
+           SUM(CASE WHEN assi.status = 'PARTIAL' THEN 1 ELSE 0 END) AS num_partial,
+           SUM(CASE WHEN assi.status = 'FULL' THEN 1 ELSE 0 END) AS num_completed
+    FROM assignment_scope scope
+             FULL OUTER JOIN annotation_scheme scheme ON scope.annotation_scheme_id = scheme.annotation_scheme_id
+             LEFT OUTER JOIN assignment assi ON scope.assignment_scope_id = assi.assignment_scope_id
+    WHERE assi.user_id = :user_id AND
+          scheme.project_id = :project_id
+    GROUP BY scope.assignment_scope_id, scheme_name, scheme_description, scope.time_created
+    ORDER BY scope.time_created;
+    """)
+    result = await session.execute(stmt, {'user_id': user_id, 'project_id': project_id})
+    result_list = result.mappings().all()
+    return [
+        UserProjectAssignmentScope(
+            scope=AssignmentScopeModel(
+                assignment_scope_id=res['assignment_scope_id'],
+                annotation_scheme_id=res['annotation_scheme_id'],
+                name=res['name'],
+                description=res['description']
+            ),
+            scheme_name=res['scheme_name'],
+            scheme_description=res['scheme_description'],
+            num_assignments=res['num_assignments'],
+            num_open=res['num_open'],
+            num_partial=res['num_partial'],
+            num_completed=res['num_completed'],
+        )
+        for res in result_list
+    ]
 
 
+@ensure_session_async
 async def read_assignment_scopes_for_project(project_id: str | uuid.UUID,
-                                             db_engine: DatabaseEngineAsync) -> list[AssignmentScopeModel]:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = (select(AssignmentScope)
-                .join(AnnotationScheme,
-                      AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id)
-                .where(AnnotationScheme.project_id == project_id)
-                .order_by(desc(AssignmentScope.time_created)))
-        result = (await session.execute(stmt)).scalars().all()
-        return [AssignmentScopeModel(**res.__dict__) for res in result]
+                                             session: AsyncSession) -> list[AssignmentScopeModel]:
+    stmt = (select(AssignmentScope)
+            .join(AnnotationScheme,
+                  AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id)
+            .where(AnnotationScheme.project_id == project_id)
+            .order_by(desc(AssignmentScope.time_created)))
+    result = (await session.execute(stmt)).scalars().all()
+    return [AssignmentScopeModel(**res.__dict__) for res in result]
 
 
+@ensure_session_async
 async def read_assignments_for_scope_for_user(assignment_scope_id: str | uuid.UUID,
                                               user_id: str | uuid.UUID,
-                                              db_engine: DatabaseEngineAsync,
+                                              session: AsyncSession,
                                               limit: int | None = None) -> list[AssignmentModel]:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = select(Assignment) \
-            .filter_by(assignment_scope_id=assignment_scope_id, user_id=user_id) \
-            .order_by(asc(Assignment.order))
-        if limit is not None:
-            stmt = stmt.limit(limit)
+    stmt = select(Assignment) \
+        .filter_by(assignment_scope_id=assignment_scope_id, user_id=user_id) \
+        .order_by(asc(Assignment.order))
+    if limit is not None:
+        stmt = stmt.limit(limit)
 
-        result = (await session.execute(stmt)).scalars().all()
-        return [AssignmentModel(**res.__dict__) for res in result]
+    result = (await session.execute(stmt)).scalars().all()
+    return [AssignmentModel(**res.__dict__) for res in result]
 
 
+@ensure_session_async
 async def read_assignments_for_scope(assignment_scope_id: str | uuid.UUID,
-                                     db_engine: DatabaseEngineAsync) -> list[AssignmentModel]:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = select(Assignment) \
-            .filter_by(assignment_scope_id=assignment_scope_id) \
-            .order_by(asc(Assignment.order))
-        result = (await session.execute(stmt)).scalars().all()
-        return [AssignmentModel(**res.__dict__) for res in result]
+                                     session: AsyncSession) -> list[AssignmentModel]:
+    stmt = select(Assignment) \
+        .filter_by(assignment_scope_id=assignment_scope_id) \
+        .order_by(asc(Assignment.order))
+    result = (await session.execute(stmt)).scalars().all()
+    return [AssignmentModel(**res.__dict__) for res in result]
 
 
 class AssignmentInfoLabel(BaseModel):
@@ -149,45 +148,45 @@ class AssignmentScopeEntry(BaseModel):
     assignments: list[AssignmentInfo]
 
 
+@ensure_session_async
 async def read_assignment_overview_for_scope(assignment_scope_id: str | uuid.UUID,
-                                             db_engine: DatabaseEngineAsync) -> list[AssignmentScopeEntry]:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = text('''
-            WITH labels_pre as (SELECT ass.assignment_id,
-                               ann.key,
-                               jsonb_agg(jsonb_build_object('repeat', ann.repeat,
-                                                            'value_bool', ann.value_bool,
-                                                            'value_int', ann.value_int,
-                                                            'multi_int', ann.multi_int)) as label
-                            FROM assignment ass
-                                     LEFT OUTER JOIN annotation ann on ann.assignment_id = ass.assignment_id
-                            WHERE ass.assignment_scope_id = :scope_id
-                            GROUP BY ass.assignment_id, ann.key),
-                 labels as (SELECT assignment_id,
-                                   jsonb_object_agg(key, label) filter (where key is not null ) as labels
-                            FROM labels_pre
-                            GROUP BY assignment_id),
-                 assis as (SELECT ass.item_id,
-                                  MIN(ass."order") as first_occurrence,
-                                  array_agg(jsonb_build_object(
-                                          'assignment_id', ass.assignment_id,
-                                          'user_id', ass.user_id,
-                                          'username', u.username,
-                                          'status', ass.status,
-                                          'order', ass."order",
-                                          'labels', labels.labels
-                                      )) as assignments
-                           FROM assignment ass
-                                    JOIN "user" u on u.user_id = ass.user_id
-                                    JOIN labels on labels.assignment_id = ass.assignment_id
-                           --WHERE ass.assignment_scope_id = :scope_id
-                           GROUP BY ass.item_id
-                           ORDER BY first_occurrence)
-            SELECT row_number() over () as identifier,
-                   assis.*
-            FROM assis;''')
-        result = await session.execute(stmt, {'scope_id': assignment_scope_id})
-        return [AssignmentScopeEntry.model_validate(r) for r in result.mappings().all()]
+                                             session: AsyncSession) -> list[AssignmentScopeEntry]:
+    stmt = text('''
+        WITH labels_pre as (SELECT ass.assignment_id,
+                           ann.key,
+                           jsonb_agg(jsonb_build_object('repeat', ann.repeat,
+                                                        'value_bool', ann.value_bool,
+                                                        'value_int', ann.value_int,
+                                                        'multi_int', ann.multi_int)) as label
+                        FROM assignment ass
+                                 LEFT OUTER JOIN annotation ann on ann.assignment_id = ass.assignment_id
+                        WHERE ass.assignment_scope_id = :scope_id
+                        GROUP BY ass.assignment_id, ann.key),
+             labels as (SELECT assignment_id,
+                               jsonb_object_agg(key, label) filter (where key is not null ) as labels
+                        FROM labels_pre
+                        GROUP BY assignment_id),
+             assis as (SELECT ass.item_id,
+                              MIN(ass."order") as first_occurrence,
+                              array_agg(jsonb_build_object(
+                                      'assignment_id', ass.assignment_id,
+                                      'user_id', ass.user_id,
+                                      'username', u.username,
+                                      'status', ass.status,
+                                      'order', ass."order",
+                                      'labels', labels.labels
+                                  )) as assignments
+                       FROM assignment ass
+                                JOIN "user" u on u.user_id = ass.user_id
+                                JOIN labels on labels.assignment_id = ass.assignment_id
+                       --WHERE ass.assignment_scope_id = :scope_id
+                       GROUP BY ass.item_id
+                       ORDER BY first_occurrence)
+        SELECT row_number() over () as identifier,
+               assis.*
+        FROM assis;''')
+    result = await session.execute(stmt, {'scope_id': assignment_scope_id})
+    return [AssignmentScopeEntry.model_validate(r) for r in result.mappings().all()]
 
 
 async def read_next_assignment_for_scope_for_user(current_assignment_id: str | uuid.UUID,
@@ -217,106 +216,106 @@ async def read_next_assignment_for_scope_for_user(current_assignment_id: str | u
                                                               db_engine=db_engine)
 
 
+@ensure_session_async
 async def read_next_open_assignment_for_scope_for_user(assignment_scope_id: str | uuid.UUID,
                                                        user_id: str | uuid.UUID,
-                                                       db_engine: DatabaseEngineAsync) -> AssignmentModel | None:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = select(Assignment) \
-            .where(Assignment.user_id == user_id,
-                   Assignment.assignment_scope_id == assignment_scope_id,
-                   Assignment.status == 'OPEN') \
-            .order_by(asc(Assignment.order)) \
-            .limit(1)
-        result = (await session.execute(stmt)).scalars().one_or_none()
-        if result is None:
-            return None
-        return AssignmentModel(**result.__dict__)
+                                                       session: AsyncSession) -> AssignmentModel | None:
+    stmt = select(Assignment) \
+        .where(Assignment.user_id == user_id,
+               Assignment.assignment_scope_id == assignment_scope_id,
+               Assignment.status == 'OPEN') \
+        .order_by(asc(Assignment.order)) \
+        .limit(1)
+    result = (await session.execute(stmt)).scalars().one_or_none()
+    if result is None:
+        return None
+    return AssignmentModel(**result.__dict__)
 
 
+@ensure_session_async
 async def read_assignment(assignment_id: str | uuid.UUID,
-                          db_engine: DatabaseEngineAsync) -> AssignmentModel | None:
-    async with db_engine.session() as session:
-        stmt = select(Assignment).filter_by(assignment_id=assignment_id)
-        result = (await session.execute(stmt)).scalars().one_or_none()
+                          session: AsyncSession) -> AssignmentModel | None:
+    stmt = select(Assignment).filter_by(assignment_id=assignment_id)
+    result = (await session.execute(stmt)).scalars().one_or_none()
 
-        if result is None:
-            return None
+    if result is None:
+        return None
 
-        return AssignmentModel(**result.__dict__)
+    return AssignmentModel(**result.__dict__)
 
 
+@ensure_session_async
 async def read_annotations_for_scope_for_user(assignment_scope_id: str | uuid.UUID,
                                               user_id: str | uuid.UUID,
-                                              db_engine: DatabaseEngineAsync) -> list[AnnotationModel]:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = (select(Annotation)
-                .join(Assignment, Assignment.assignment_id == Annotation.assignment_id)
-                .where(Assignment.assignment_scope_id == assignment_scope_id,
-                       Assignment.user_id == user_id))
-        result = (await session.execute(stmt)).scalars().all()
-        return [AnnotationModel(**res.__dict__) for res in result]
+                                              session: AsyncSession) -> list[AnnotationModel]:
+    stmt = (select(Annotation)
+            .join(Assignment, Assignment.assignment_id == Annotation.assignment_id)
+            .where(Assignment.assignment_scope_id == assignment_scope_id,
+                   Assignment.user_id == user_id))
+    result = (await session.execute(stmt)).scalars().all()
+    return [AnnotationModel(**res.__dict__) for res in result]
 
 
+@ensure_session_async
 async def read_annotations_for_assignment(assignment_id: str | uuid.UUID,
-                                          db_engine: DatabaseEngineAsync) -> list[AnnotationModel]:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = select(Annotation).filter_by(assignment_id=assignment_id)
-        result = (await session.execute(stmt)).scalars().all()
-        return [AnnotationModel(**res.__dict__) for res in result]
+                                          session: AsyncSession) -> list[AnnotationModel]:
+    stmt = select(Annotation).filter_by(assignment_id=assignment_id)
+    result = (await session.execute(stmt)).scalars().all()
+    return [AnnotationModel(**res.__dict__) for res in result]
 
 
+@ensure_session_async
 async def read_assignment_scope(assignment_scope_id: str | uuid.UUID,
-                                db_engine: DatabaseEngineAsync) -> AssignmentScopeModel | None:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = select(AssignmentScope).filter_by(assignment_scope_id=assignment_scope_id)
-        result = (await session.execute(stmt)).scalars().one_or_none()
-        if result is not None:
-            return AssignmentScopeModel(**result.__dict__)
+                                session: AsyncSession) -> AssignmentScopeModel | None:
+    stmt = select(AssignmentScope).filter_by(assignment_scope_id=assignment_scope_id)
+    result = (await session.execute(stmt)).scalars().one_or_none()
+    if result is not None:
+        return AssignmentScopeModel(**result.__dict__)
     return None
 
 
+@ensure_session_async
 async def read_annotation_scheme(annotation_scheme_id: str | uuid.UUID,
-                                 db_engine: DatabaseEngineAsync) -> AnnotationSchemeModel | None:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = select(AnnotationScheme).filter_by(annotation_scheme_id=annotation_scheme_id)
-        result = (await session.execute(stmt)).scalars().one_or_none()
-        if result is not None:
-            return AnnotationSchemeModel(**result.__dict__)
+                                 session: AsyncSession) -> AnnotationSchemeModel | None:
+    stmt = select(AnnotationScheme).filter_by(annotation_scheme_id=annotation_scheme_id)
+    result = (await session.execute(stmt)).scalars().one_or_none()
+    if result is not None:
+        return AnnotationSchemeModel(**result.__dict__)
     return None
 
 
+@ensure_session_async
 async def read_annotation_scheme_for_assignment(assignment_id: str | uuid.UUID,
-                                                db_engine: DatabaseEngineAsync) -> AnnotationSchemeModel | None:
-    async with db_engine.session() as session:
-        stmt = (select(AnnotationScheme)
-                .join(Assignment,
-                      AnnotationScheme.annotation_scheme_id == Assignment.annotation_scheme_id)
-                .where(Assignment.assignment_id == assignment_id))
-        result = (await session.execute(stmt)).scalars().one_or_none()
-        if result is not None:
-            return AnnotationSchemeModel(**result.__dict__)
+                                                session: AsyncSession) -> AnnotationSchemeModel | None:
+    stmt = (select(AnnotationScheme)
+            .join(Assignment,
+                  AnnotationScheme.annotation_scheme_id == Assignment.annotation_scheme_id)
+            .where(Assignment.assignment_id == assignment_id))
+    result = (await session.execute(stmt)).scalars().one_or_none()
+    if result is not None:
+        return AnnotationSchemeModel(**result.__dict__)
     return None
 
 
+@ensure_session_async
 async def read_annotation_scheme_for_scope(assignment_scope_id: str | uuid.UUID,
-                                           db_engine: DatabaseEngineAsync) -> AnnotationSchemeModel | None:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = (select(AnnotationScheme)
-                .join(AssignmentScope,
-                      AssignmentScope.annotation_scheme_id == AnnotationScheme.annotation_scheme_id)
-                .where(AssignmentScope.assignment_scope_id == assignment_scope_id))
-        result = (await session.execute(stmt)).scalars().one_or_none()
-        if result is not None:
-            return AnnotationSchemeModel(**result.__dict__)
+                                           session: AsyncSession) -> AnnotationSchemeModel | None:
+    stmt = (select(AnnotationScheme)
+            .join(AssignmentScope,
+                  AssignmentScope.annotation_scheme_id == AnnotationScheme.annotation_scheme_id)
+            .where(AssignmentScope.assignment_scope_id == assignment_scope_id))
+    result = (await session.execute(stmt)).scalars().one_or_none()
+    if result is not None:
+        return AnnotationSchemeModel(**result.__dict__)
     return None
 
 
+@ensure_session_async
 async def read_annotation_schemes_for_project(project_id: str | uuid.UUID,
-                                              db_engine: DatabaseEngineAsync) -> list[AnnotationSchemeModel]:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = select(AnnotationScheme).filter_by(project_id=project_id)
-        result = (await session.execute(stmt)).scalars().all()
-        return [AnnotationSchemeModel(**res.__dict__) for res in result]
+                                              session: AsyncSession) -> list[AnnotationSchemeModel]:
+    stmt = select(AnnotationScheme).filter_by(project_id=project_id)
+    result = (await session.execute(stmt)).scalars().all()
+    return [AnnotationSchemeModel(**res.__dict__) for res in result]
 
 
 async def read_scheme_with_annotations(assignment_id: str | uuid.UUID,
@@ -330,13 +329,13 @@ async def read_scheme_with_annotations(assignment_id: str | uuid.UUID,
     return None
 
 
+@ensure_session_async
 async def update_assignment_status(assignment_id: str | uuid.UUID, status: AssignmentStatus,
-                                   db_engine: DatabaseEngineAsync) -> None:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = select(Assignment).where(Assignment.assignment_id == assignment_id)
-        assignment: Assignment = (await session.scalars(stmt)).one()
-        assignment.status = status
-        await session.commit()
+                                   session: AsyncSession) -> None:
+    stmt = select(Assignment).where(Assignment.assignment_id == assignment_id)
+    assignment: Assignment = (await session.scalars(stmt)).one()
+    assignment.status = status
+    await session.commit()
 
 
 async def upsert_annotation_scheme(annotation_scheme: AnnotationSchemeModel,
@@ -348,16 +347,16 @@ async def upsert_annotation_scheme(annotation_scheme: AnnotationSchemeModel,
     return key
 
 
+@ensure_session_async
 async def delete_annotation_scheme(annotation_scheme_id: str | uuid.UUID,
-                                   db_engine: DatabaseEngineAsync) -> None:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = select(AnnotationScheme).filter_by(annotation_scheme_id=annotation_scheme_id)
-        annotation_scheme = (await session.scalars(stmt)).one_or_none()
-        if annotation_scheme is not None:
-            await session.delete(annotation_scheme)
-            await session.commit()
-        else:
-            raise ValueError(f'AnnotationScheme with id="{annotation_scheme_id}" does not seem to exist.')
+                                   session: AsyncSession) -> None:
+    stmt = select(AnnotationScheme).filter_by(annotation_scheme_id=annotation_scheme_id)
+    annotation_scheme = (await session.scalars(stmt)).one_or_none()
+    if annotation_scheme is not None:
+        await session.delete(annotation_scheme)
+        await session.commit()
+    else:
+        raise ValueError(f'AnnotationScheme with id="{annotation_scheme_id}" does not seem to exist.')
 
 
 async def upsert_assignment_scope(assignment_scope: AssignmentScopeModel,
@@ -369,16 +368,16 @@ async def upsert_assignment_scope(assignment_scope: AssignmentScopeModel,
     return key
 
 
+@ensure_session_async
 async def delete_assignment_scope(assignment_scope_id: str | uuid.UUID,
-                                  db_engine: DatabaseEngineAsync) -> None:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = select(AssignmentScope).filter_by(assignment_scope_id=assignment_scope_id)
-        assignment_scope = (await session.scalars(stmt)).one_or_none()
-        if assignment_scope is not None:
-            await session.delete(assignment_scope)
-            await session.commit()
-        else:
-            raise ValueError(f'Assignment scope with id="{assignment_scope_id}" does not seem to exist.')
+                                  session: AsyncSession) -> None:
+    stmt = select(AssignmentScope).filter_by(assignment_scope_id=assignment_scope_id)
+    assignment_scope = (await session.scalars(stmt)).one_or_none()
+    if assignment_scope is not None:
+        await session.delete(assignment_scope)
+        await session.commit()
+    else:
+        raise ValueError(f'Assignment scope with id="{assignment_scope_id}" does not seem to exist.')
 
 
 async def upsert_annotations(annotations: list[AnnotationModel],
@@ -458,22 +457,22 @@ class ItemWithCount(BaseModel):
     num_full: int
 
 
+@ensure_session_async
 async def read_item_ids_with_assignment_count_for_project(project_id: str | uuid.UUID,
-                                                          db_engine: DatabaseEngineAsync) -> list[ItemWithCount]:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = text("""
-        SELECT assignment.item_id,
-               COUNT(DISTINCT assignment.assignment_id) AS num_total,
-               SUM(CASE WHEN assignment.status = 'OPEN' THEN 1 ELSE 0 END) AS num_open,
-               SUM(CASE WHEN assignment.status = 'PARTIAL' THEN 1 ELSE 0 END) AS num_partial,
-               SUM(CASE WHEN assignment.status = 'FULL' THEN 1 ELSE 0 END) AS num_full
-        FROM assignment
-        JOIN annotation_scheme ON annotation_scheme.annotation_scheme_id = assignment.annotation_scheme_id
-        WHERE annotation_scheme.project_id = :project_id
-        GROUP BY assignment.item_id;
-        """)
-        result = (await session.execute(stmt, {'project_id': project_id})).mappings().all()
-        return [ItemWithCount(**res) for res in result]  # type: ignore[misc]
+                                                          session: AsyncSession) -> list[ItemWithCount]:
+    stmt = text("""
+    SELECT assignment.item_id,
+           COUNT(DISTINCT assignment.assignment_id) AS num_total,
+           SUM(CASE WHEN assignment.status = 'OPEN' THEN 1 ELSE 0 END) AS num_open,
+           SUM(CASE WHEN assignment.status = 'PARTIAL' THEN 1 ELSE 0 END) AS num_partial,
+           SUM(CASE WHEN assignment.status = 'FULL' THEN 1 ELSE 0 END) AS num_full
+    FROM assignment
+    JOIN annotation_scheme ON annotation_scheme.annotation_scheme_id = assignment.annotation_scheme_id
+    WHERE annotation_scheme.project_id = :project_id
+    GROUP BY assignment.item_id;
+    """)
+    result = (await session.execute(stmt, {'project_id': project_id})).mappings().all()
+    return [ItemWithCount(**res) for res in result]  # type: ignore[misc]
 
 
 class AssignmentCounts(BaseModel):
@@ -483,122 +482,122 @@ class AssignmentCounts(BaseModel):
     num_full: int
 
 
+@ensure_session_async
 async def read_assignment_counts_for_scope(assignment_scope_id: str | uuid.UUID,
-                                           db_engine: DatabaseEngineAsync) -> AssignmentCounts:
-    async with db_engine.session() as session:  # type: AsyncSession
-        stmt = text("""
-        SELECT COUNT(DISTINCT assignment.assignment_id)                       AS num_total,
-               SUM(CASE WHEN assignment.status = 'OPEN' THEN 1 ELSE 0 END)    AS num_open,
-               SUM(CASE WHEN assignment.status = 'PARTIAL' THEN 1 ELSE 0 END) AS num_partial,
-               SUM(CASE WHEN assignment.status = 'FULL' THEN 1 ELSE 0 END)    AS num_full
-        FROM assignment
-        WHERE assignment_scope_id = :assignment_scope_id
-        GROUP BY assignment_scope_id;
-        """)
-        result = (await session.execute(stmt, {'assignment_scope_id': assignment_scope_id})).mappings().one_or_none()
+                                           session: AsyncSession) -> AssignmentCounts:
+    stmt = text("""
+    SELECT COUNT(DISTINCT assignment.assignment_id)                       AS num_total,
+           SUM(CASE WHEN assignment.status = 'OPEN' THEN 1 ELSE 0 END)    AS num_open,
+           SUM(CASE WHEN assignment.status = 'PARTIAL' THEN 1 ELSE 0 END) AS num_partial,
+           SUM(CASE WHEN assignment.status = 'FULL' THEN 1 ELSE 0 END)    AS num_full
+    FROM assignment
+    WHERE assignment_scope_id = :assignment_scope_id
+    GROUP BY assignment_scope_id;
+    """)
+    result = (await session.execute(stmt, {'assignment_scope_id': assignment_scope_id})).mappings().one_or_none()
 
-        if result is None:
-            return AssignmentCounts(num_full=0, num_open=0, num_total=0, num_partial=0)
+    if result is None:
+        return AssignmentCounts(num_full=0, num_open=0, num_total=0, num_partial=0)
 
-        return AssignmentCounts(**result)  # type: ignore[misc]
+    return AssignmentCounts(**result)  # type: ignore[misc]
 
 
+@ensure_session_async
 async def store_assignments(assignments: list[AssignmentModel],
-                            db_engine: DatabaseEngineAsync) -> None:
-    async with db_engine.session() as session:  # type: AsyncSession
-        assignments_orm = [Assignment(**assignment.model_dump()) for assignment in assignments]
-        session.add_all(assignments_orm)
-        await session.commit()
+                            session: AsyncSession) -> None:
+    assignments_orm = [Assignment(**assignment.model_dump()) for assignment in assignments]
+    session.add_all(assignments_orm)
+    await session.commit()
 
 
+@ensure_session_async
 async def store_resolved_bot_annotations(project_id: str, name: str,
                                          algorithm: ResolutionMethod, filters: AnnotationFilters,
                                          ignore_hierarchy: bool, ignore_repeat: bool,
                                          collection: AnnotationCollectionDB, bot_annotations: list[BotAnnotationModel],
-                                         db_engine: DatabaseEngineAsync) -> str:
-    async with db_engine.session() as session:  # type: AsyncSession
-        meta = BotMetaResolve(algorithm=algorithm, filters=filters,
-                              ignore_hierarchy=ignore_hierarchy, ignore_repeat=ignore_repeat,
-                              collection=collection)
-        meta_uuid = uuid.uuid4()
-        # TODO: should we also store assignment_scope_id? might be more than one...
-        metadata = BotAnnotationMetaData(bot_annotation_metadata_id=meta_uuid,
-                                         name=name, kind=BotKind.RESOLVE, project_id=project_id,
-                                         annotation_scheme_id=filters.scheme_id, meta=meta.model_dump())
-        session.add(metadata)
-        await session.commit()
+                                         session: AsyncSession) -> str:
+    meta = BotMetaResolve(algorithm=algorithm, filters=filters,
+                          ignore_hierarchy=ignore_hierarchy, ignore_repeat=ignore_repeat,
+                          collection=collection)
+    meta_uuid = uuid.uuid4()
+    # TODO: should we also store assignment_scope_id? might be more than one...
+    metadata = BotAnnotationMetaData(bot_annotation_metadata_id=meta_uuid,
+                                     name=name, kind=BotKind.RESOLVE, project_id=project_id,
+                                     annotation_scheme_id=filters.scheme_id, meta=meta.model_dump())
+    session.add(metadata)
+    await session.commit()
 
-        annotation_heap = {anno.bot_annotation_id: anno for anno in bot_annotations}
-        added_ids = set()
+    annotation_heap = {anno.bot_annotation_id: anno for anno in bot_annotations}
+    added_ids = set()
 
-        while len(annotation_heap) > 0:
-            to_add = [
-                anno
-                for anno in annotation_heap.values()
-                if anno.parent is None or anno.parent in added_ids
-            ]
-            added_ids.update([anno.bot_annotation_id for anno in to_add])
+    while len(annotation_heap) > 0:
+        to_add = [
+            anno
+            for anno in annotation_heap.values()
+            if anno.parent is None or anno.parent in added_ids
+        ]
+        added_ids.update([anno.bot_annotation_id for anno in to_add])
 
-            for anno in to_add:
-                session.add(BotAnnotation(**{**anno.model_dump(), 'bot_annotation_metadata_id': meta_uuid}))
-                await session.commit()
-                del annotation_heap[anno.bot_annotation_id]
+        for anno in to_add:
+            session.add(BotAnnotation(**{**anno.model_dump(), 'bot_annotation_metadata_id': meta_uuid}))
+            await session.commit()
+            del annotation_heap[anno.bot_annotation_id]
 
-        return str(meta_uuid)
+    return str(meta_uuid)
 
 
+@ensure_session_async
 async def update_resolved_bot_annotations(bot_annotation_metadata_id: str,
                                           name: str,
                                           bot_annotations: list[BotAnnotationModel],
-                                          db_engine: DatabaseEngineAsync) -> None:
-    async with db_engine.session() as session:  # type: AsyncSession
-        metadata: BotAnnotationMetaData | None = (await session.execute(
-            select(BotAnnotationMetaData)
-            .where(BotAnnotationMetaData.bot_annotation_metadata_id == bot_annotation_metadata_id))) \
-            .scalars().one_or_none()
-        if metadata is None:
-            raise MissingIdError(f'No `BotAnnotationMetaData` object for {bot_annotation_metadata_id}')
+                                          session: AsyncSession) -> None:
+    metadata: BotAnnotationMetaData | None = (await session.execute(
+        select(BotAnnotationMetaData)
+        .where(BotAnnotationMetaData.bot_annotation_metadata_id == bot_annotation_metadata_id))) \
+        .scalars().one_or_none()
+    if metadata is None:
+        raise MissingIdError(f'No `BotAnnotationMetaData` object for {bot_annotation_metadata_id}')
 
-        # update the name
-        metadata.name = name
-        await session.commit()
+    # update the name
+    metadata.name = name
+    await session.commit()
 
-        bot_annotations_orm: list[BotAnnotation] = list(
-            (await session.execute(
+    bot_annotations_orm: list[BotAnnotation] = list(
+        (await session.execute(
+            select(BotAnnotation)
+            .where(BotAnnotation.bot_annotation_metadata_id == bot_annotation_metadata_id)))
+        .scalars().all())
+
+    existing_ids = set([str(ba.bot_annotation_id) for ba in bot_annotations_orm])
+    submitted_ids = set([str(ba.bot_annotation_id) for ba in bot_annotations])
+
+    ids_to_remove = existing_ids - submitted_ids
+    ids_to_update = existing_ids - ids_to_remove
+    ids_to_create = submitted_ids - ids_to_update
+
+    logger.debug(f'[upsert_bot_annotations] CREATING new annotations with ids: {ids_to_create}')
+    logger.debug(f'[upsert_bot_annotations] UPDATING existing annotations with ids: {ids_to_update}')
+    logger.debug(f'[upsert_bot_annotations] DELETING existing annotations with ids: {ids_to_remove}')
+
+    if len(ids_to_remove) > 0:
+        stmt = delete(BotAnnotation).where(BotAnnotation.bot_annotation_id.in_(list(ids_to_remove)))
+        await session.execute(stmt)
+
+    bot_annotations_to_be_created = []
+    for annotation in bot_annotations:
+        if annotation.bot_annotation_id in ids_to_update:
+            ba_orm: BotAnnotation = (await session.execute(
                 select(BotAnnotation)
-                .where(BotAnnotation.bot_annotation_metadata_id == bot_annotation_metadata_id)))
-            .scalars().all())
-
-        existing_ids = set([str(ba.bot_annotation_id) for ba in bot_annotations_orm])
-        submitted_ids = set([str(ba.bot_annotation_id) for ba in bot_annotations])
-
-        ids_to_remove = existing_ids - submitted_ids
-        ids_to_update = existing_ids - ids_to_remove
-        ids_to_create = submitted_ids - ids_to_update
-
-        logger.debug(f'[upsert_bot_annotations] CREATING new annotations with ids: {ids_to_create}')
-        logger.debug(f'[upsert_bot_annotations] UPDATING existing annotations with ids: {ids_to_update}')
-        logger.debug(f'[upsert_bot_annotations] DELETING existing annotations with ids: {ids_to_remove}')
-
-        if len(ids_to_remove) > 0:
-            stmt = delete(BotAnnotation).where(BotAnnotation.bot_annotation_id.in_(list(ids_to_remove)))
-            await session.execute(stmt)
-
-        bot_annotations_to_be_created = []
-        for annotation in bot_annotations:
-            if annotation.bot_annotation_id in ids_to_update:
-                ba_orm: BotAnnotation = (await session.execute(
-                    select(BotAnnotation)
-                    .where(BotAnnotation.bot_annotation_id == annotation.bot_annotation_id))).scalars().one()
-                ba_orm.repeat = annotation.repeat
-                ba_orm.parent = annotation.parent
-                ba_orm.value_bool = annotation.value_bool
-                ba_orm.value_str = annotation.value_str
-                ba_orm.value_int = annotation.value_int
-                ba_orm.value_float = annotation.value_float
-                ba_orm.multi_int = annotation.multi_int
-                await session.commit()
-            elif annotation.bot_annotation_id in ids_to_create:
-                bot_annotations_to_be_created.append(BotAnnotation(**annotation.model_dump()))
-        session.add_all(bot_annotations_to_be_created)
-        await session.commit()
+                .where(BotAnnotation.bot_annotation_id == annotation.bot_annotation_id))).scalars().one()
+            ba_orm.repeat = annotation.repeat
+            ba_orm.parent = annotation.parent
+            ba_orm.value_bool = annotation.value_bool
+            ba_orm.value_str = annotation.value_str
+            ba_orm.value_int = annotation.value_int
+            ba_orm.value_float = annotation.value_float
+            ba_orm.multi_int = annotation.multi_int
+            await session.commit()
+        elif annotation.bot_annotation_id in ids_to_create:
+            bot_annotations_to_be_created.append(BotAnnotation(**annotation.model_dump()))
+    session.add_all(bot_annotations_to_be_created)
+    await session.commit()

@@ -1,36 +1,48 @@
+import json
 import logging
+import uuid
 from datetime import datetime
 from collections import defaultdict
-from sqlalchemy import text
+
+from pydantic import BaseModel
+from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.connection import DatabaseEngineAsync
 from nacsos_data.db.crud.annotations import read_annotation_scheme
-from nacsos_data.models.annotations import \
-    AnnotationModel, \
-    AnnotationSchemeModel, \
-    FlattenedAnnotationSchemeLabel
-from nacsos_data.models.bot_annotations import \
-    Label, \
-    AnnotationFilters, \
-    AnnotationFiltersType, \
-    ResolutionMethod, \
-    AnnotationCollection, \
-    GroupedAnnotations, \
-    GroupedBotAnnotation, BotAnnotationModel
+from nacsos_data.db.engine import ensure_session_async
+from nacsos_data.db.schemas import AssignmentScope
+from nacsos_data.models.annotations import (
+    AnnotationModel,
+    AnnotationSchemeModel,
+    AnnotationSchemeInfo
+)
+from nacsos_data.models.bot_annotations import (
+    Label,
+    AnnotationFilters,
+    AnnotationFiltersType,
+    ResolutionMethod,
+    GroupedBotAnnotation,
+    BotAnnotationModel,
+    ResolutionUserEntry,
+    ResolutionCell,
+    ResolutionMatrix,
+    OrderingEntry, ResolutionOrdering
+)
 from nacsos_data.models.users import UserModel
 from nacsos_data.util.annotations.resolve.majority_vote import naive_majority_vote
-from nacsos_data.util.annotations.validation import flatten_annotation_scheme
+from nacsos_data.util.annotations.validation import (
+    labels_from_scheme,
+    path_to_string,
+    FlatLabel
+)
 from nacsos_data.util.errors import NotFoundError, InvalidFilterError
 
-# ideas for resolving algorithms:
-#   - naive majority vote (per key,repeat)
-#   - majority vote (including secondary class if available)
-#   - weighted vote (with manually assigned "trust" weights per annotator)
-#   - weighted vote (compute annotator trust/reliability)
-#   - ...
-
 logger = logging.getLogger('nacsos_data.util.annotations.resolve')
+
+
+class ItemAnnotation(AnnotationModel):
+    path: list[Label]
 
 
 class AnnotationFilterObject(AnnotationFilters):
@@ -71,9 +83,10 @@ class AnnotationFilterObject(AnnotationFilters):
         return ret
 
 
+@ensure_session_async
 async def read_num_annotation_changes_after(timestamp: str | datetime,
                                             filters: AnnotationFilterObject,
-                                            db_engine: DatabaseEngineAsync) -> int:
+                                            session: AsyncSession) -> int:
     """
     Looks for `Annotation`s that were added or edited after `timestamp` and returns the count.
     This is assumed to be used in the context of `Annotation` resolution, so the same filter logic is used, so
@@ -82,232 +95,326 @@ async def read_num_annotation_changes_after(timestamp: str | datetime,
     If you are looking for the actually changed `Annotation`s, use `read_changed_annotations_after`.
     :param timestamp:
     :param filters:
-    :param db_engine:
+    :param session:
     :return:
     """
-    async with db_engine.session() as session:
-        filter_join, filter_where, filter_data = filters.get_subquery()
-        filter_data['timestamp'] = str(timestamp)
-        num_changes: int = (await session.execute(text(  # type: ignore[assignment] # FIXME mypy
-            "SELECT count(1) "
-            "FROM annotation AS a "
-            f" {filter_join} "
-            f"WHERE {filter_where} "
-            f"      AND (a.time_created > :timestamp OR a.time_updated > :timestamp);"
-        ), filter_data)).scalar()
-        return num_changes
+    filter_join, filter_where, filter_data = filters.get_subquery()
+    filter_data['timestamp'] = str(timestamp)
+    num_changes: int = (await session.execute(text(  # type: ignore[assignment]
+        "SELECT count(1) "
+        "FROM annotation AS a "
+        f" {filter_join} "
+        f"WHERE {filter_where} "
+        f"      AND (a.time_created > :timestamp OR a.time_updated > :timestamp);"
+    ), filter_data)).scalar()
+    return num_changes
 
 
+@ensure_session_async
 async def read_changed_annotations_after(timestamp: str | datetime,
                                          filters: AnnotationFilterObject,
-                                         db_engine: DatabaseEngineAsync) -> list[AnnotationModel]:
+                                         session: AsyncSession) -> list[AnnotationModel]:
     """
     See `read_num_annotation_changes_after`
     :param timestamp:
     :param filters:
-    :param db_engine:
+    :param session:
     :return:
     """
-    async with db_engine.session() as session:
-        filter_join, filter_where, filter_data = filters.get_subquery()
-        filter_data['timestamp'] = str(timestamp)
-        annotations = (await session.execute(text(
-            "SELECT a.* "
-            "FROM annotation AS a "
-            f" {filter_join} "
-            f"WHERE {filter_where} "
-            f"      AND (a.time_created > :timestamp OR a.time_updated > :timestamp);"
-        ), filter_data)).mappings().all()
-        return [AnnotationModel.model_validate(anno) for anno in annotations]
+    filter_join, filter_where, filter_data = filters.get_subquery()
+    filter_data['timestamp'] = str(timestamp)
+    annotations = (await session.execute(text(
+        "SELECT a.* "
+        "FROM annotation AS a "
+        f" {filter_join} "
+        f"WHERE {filter_where} "
+        f"      AND (a.time_created > :timestamp OR a.time_updated > :timestamp);"
+    ), filter_data)).mappings().all()
+    return [AnnotationModel.model_validate(anno) for anno in annotations]
 
 
+@ensure_session_async
 async def read_item_annotations(filters: AnnotationFilterObject,
-                                db_engine: DatabaseEngineAsync,
+                                session: AsyncSession,
                                 ignore_hierarchy: bool = False,
-                                ignore_order: bool = False) -> dict[str, list[GroupedAnnotations]]:
+                                ignore_order: bool = False) -> list[ItemAnnotation]:
     """
     asd
-    :param db_engine: Connection to the database
+    :param session: Connection to the database
     :param filters:
     :param ignore_hierarchy: if False, looking at keys linearly (ignoring parents)
     :param ignore_order: if False, the order is ignored and e.g. single-choice with secondary category
                            virtually becomes multi-choice of two categories
     :return: dictionary (keys are item_ids) of all annotations per item that match the filters.
     """
-    async with db_engine.session() as session:
-        filter_join, filter_where, filter_data = filters.get_subquery()
+    filter_join, filter_where, filter_data = filters.get_subquery()
 
-        repeat = 'a.repeat'
-        if ignore_order:  # if repeat is ignored, always forcing it to 1
-            repeat = '1'
-        if ignore_hierarchy:
-            annotations = (await session.execute(text(
-                "SELECT a.item_id, "
-                f"       array_to_json(ARRAY[(a.key, {repeat})::annotation_label]) as label, "
-                "       json_agg(a.*) as annotations "
-                "FROM annotation AS a "
-                f"         {filter_join} "
-                f"      WHERE {filter_where} "
-                "GROUP BY a.item_id, a.key, a.repeat;"
-            ), filter_data)).mappings().all()
-        else:
-            annotations = (await session.execute(text(
-                "WITH RECURSIVE ctename AS ( \n"
-                "      SELECT a.annotation_id, a.time_created, a.time_updated, a.assignment_id, a.user_id, a.item_id, "
-                "             a.annotation_scheme_id, a.key, a.repeat,  a.value_bool, a.value_int,a.value_float, "
-                "             a.value_str, a.text_offset_start, a.text_offset_stop, a.multi_int, "
-                "             a.parent, a.parent as recurse_join, "
-                f"            ARRAY[(a.key, {repeat})::annotation_label] as path \n"
-                "      FROM annotation AS a \n"
-                f"         {filter_join} \n"
-                f"      WHERE {filter_where} \n"
-                "   UNION ALL \n"
-                "      SELECT ctename.annotation_id, ctename.time_created, ctename.time_updated,ctename.assignment_id,"
-                "             ctename.user_id, ctename.item_id, ctename.annotation_scheme_id, ctename.key, "
-                "             ctename.repeat, ctename.value_bool, ctename.value_int,ctename.value_float, "
-                "             ctename.value_str, ctename.text_offset_start, ctename.text_offset_stop, "
-                "             ctename.multi_int, ctename.parent, a.parent as recurse_join, "
-                f"            array_append(ctename.path, ((a.key, {repeat})::annotation_label)) \n"
-                "      FROM annotation a \n"
-                "         JOIN ctename ON a.annotation_id = ctename.recurse_join \n"
-                ") \n"
-                "SELECT item_id, array_to_json(path) as label, json_agg(ctename.*) as annotations \n"
-                "FROM ctename \n"
-                "WHERE recurse_join is NULL \n"
-                "GROUP BY item_id, path;"
-            ), filter_data)).mappings().all()
+    repeat = 'a.repeat'
+    if ignore_order:  # if repeat is ignored, always forcing it to 1
+        repeat = '1'
+    if ignore_hierarchy:
+        stmt = text(f'''
+            SELECT array_to_json(ARRAY[(a.key, {repeat})::annotation_label]) as path, 
+                   a.*
+            FROM annotation AS a 
+                     {filter_join} 
+            WHERE {filter_where};
+        ''')
+    else:
+        stmt = text(f'''
+            WITH RECURSIVE ctename AS ( 
+                  SELECT a.annotation_id, a.time_created, a.time_updated, a.assignment_id, a.user_id, a.item_id, 
+                         a.annotation_scheme_id, a.key, a.repeat,  a.value_bool, a.value_int,a.value_float, 
+                         a.value_str, a.text_offset_start, a.text_offset_stop, a.multi_int, 
+                         a.parent, a.parent as recurse_join, 
+                        ARRAY[(a.key, {repeat})::annotation_label] as path 
+                  FROM annotation AS a 
+                     {filter_join} 
+                  WHERE {filter_where} 
+               UNION ALL 
+                  SELECT ctename.annotation_id, ctename.time_created, ctename.time_updated,ctename.assignment_id,
+                         ctename.user_id, ctename.item_id, ctename.annotation_scheme_id, ctename.key, 
+                         ctename.repeat, ctename.value_bool, ctename.value_int,ctename.value_float, 
+                         ctename.value_str, ctename.text_offset_start, ctename.text_offset_stop, 
+                         ctename.multi_int, ctename.parent, a.parent as recurse_join, 
+                        array_append(ctename.path, ((a.key, {repeat})::annotation_label)) 
+                  FROM annotation a 
+                     JOIN ctename ON a.annotation_id = ctename.recurse_join 
+            ) 
+            SELECT array_to_json(path) as label, ctename.*
+            FROM ctename 
+            WHERE recurse_join is NULL;
+        ''')
 
-        ret: dict[str, list[GroupedAnnotations]] = {}
-        for row in annotations:
-            item_uuid = str(row['item_id'])
-            if item_uuid not in ret:
-                ret[item_uuid] = []
-            ret[item_uuid].append(GroupedAnnotations(path=[Label.model_validate(label)
-                                                           for label in row['label']],
-                                                     annotations=[AnnotationModel.model_validate(anno)
-                                                                  for anno in row['annotations']]))
-
-        return ret
+    res = (await session.execute(stmt, filter_data)).mappings().all()
+    ret = []
+    for r in res:
+        path = [Label.model_validate(label) for label in r['label']]
+        ret.append(ItemAnnotation(**{**r, 'path': path}))
+    return ret
 
 
-async def read_annotators(filters: AnnotationFilterObject, db_engine: DatabaseEngineAsync) -> list[UserModel]:
+@ensure_session_async
+async def read_scopes_for_scheme(scheme_id: str | uuid.UUID, session: AsyncSession) -> list[str]:
+    stmt = select(AssignmentScope.assignment_scope_id).where(AssignmentScope.annotation_scheme_id == scheme_id)
+    return [str(scope_id) for scope_id in (await session.execute(stmt)).scalars().all()]
+
+
+@ensure_session_async
+async def read_annotators(filters: AnnotationFilterObject, session: AsyncSession) -> list[UserModel]:
     # list of all (unique) users that have at least one annotation in the set
-    async with db_engine.session() as session:
-        filter_join, filter_where, filter_data = filters.get_subquery()
-        return [UserModel.model_validate(user) for user in (await session.execute(text(
-            "SELECT DISTINCT u.* "
-            "FROM annotation AS a "
-            f"   {filter_join} "
-            "    JOIN \"user\" u on u.user_id = a.user_id "
-            f"WHERE {filter_where};"
-        ), filter_data)).mappings().all()]
+    filter_join, filter_where, filter_data = filters.get_subquery()
+    return [UserModel.model_validate(user) for user in (await session.execute(text(
+        "SELECT DISTINCT u.* "
+        "FROM annotation AS a "
+        f"   {filter_join} "
+        "    JOIN \"user\" u on u.user_id = a.user_id "
+        f"WHERE {filter_where};"
+    ), filter_data)).mappings().all()]
 
 
+@ensure_session_async
 async def read_labels(filters: AnnotationFilterObject,
-                      db_engine: DatabaseEngineAsync,
+                      session: AsyncSession,
                       ignore_hierarchy: bool = True,
                       ignore_order: bool = True) -> list[list[Label]]:
     # list of all (unique) labels in this selection
-    async with db_engine.session() as session:  # type: AsyncSession
-
-        repeat = 'a.repeat'
-        if ignore_order:  # if repeat is ignored, always forcing it to 1
-            repeat = '1'
-        filter_join, filter_where, filter_data = filters.get_subquery()
-        if ignore_hierarchy:
-            return [[Label.model_validate(sub_label) for sub_label in label]
-                    for label in
-                    (await session.execute(text(
-                        "SELECT array_to_json(label) as label "
-                        "FROM ( "
-                        f"   SELECT DISTINCT ARRAY[(a.key, {repeat})::annotation_label] as label "
-                        "    FROM annotation AS a "
-                        f"      {filter_join} "
-                        f"   WHERE {filter_where}) labels;"
-                    ), filter_data)).scalars()]
-        else:
-            return [[Label.model_validate(sub_label) for sub_label in label]
-                    for label in
-                    (await session.execute(text(
-                        "SELECT array_to_json(label) as label "
-                        "FROM ( "
-                        "WITH RECURSIVE ctename AS ( "
-                        f"      SELECT a.annotation_id, a.parent, ARRAY[(a.key, {repeat})::annotation_label] as label "
-                        "       FROM annotation AS a "
-                        f"         {filter_join} "
-                        f"      WHERE {filter_where} "
-                        "   UNION ALL "
-                        "      SELECT a.annotation_id, a.parent,"
-                        f"             array_append(ctename.label, ((a.key, {repeat})::annotation_label)) "
-                        "      FROM annotation a "
-                        "         JOIN ctename ON a.annotation_id = ctename.parent "
-                        ") "
-                        "SELECT DISTINCT label "
-                        "FROM ctename "
-                        "WHERE parent is NULL) labels;"
-                    ), filter_data)).scalars()]
+    repeat = 'a.repeat'
+    if ignore_order:  # if repeat is ignored, always forcing it to 1
+        repeat = '1'
+    filter_join, filter_where, filter_data = filters.get_subquery()
+    if ignore_hierarchy:
+        return [[Label.model_validate(sub_label) for sub_label in label]
+                for label in
+                (await session.execute(text(
+                    "SELECT array_to_json(label) as label "
+                    "FROM ( "
+                    f"   SELECT DISTINCT ARRAY[(a.key, {repeat})::annotation_label] as label "
+                    "    FROM annotation AS a "
+                    f"      {filter_join} "
+                    f"   WHERE {filter_where}) labels;"
+                ), filter_data)).scalars()]
+    else:
+        return [[Label.model_validate(sub_label) for sub_label in label]
+                for label in
+                (await session.execute(text(
+                    "SELECT array_to_json(label) as label "
+                    "FROM ( "
+                    "WITH RECURSIVE ctename AS ( "
+                    f"      SELECT a.annotation_id, a.parent, ARRAY[(a.key, {repeat})::annotation_label] as label "
+                    "       FROM annotation AS a "
+                    f"         {filter_join} "
+                    f"      WHERE {filter_where} "
+                    "   UNION ALL "
+                    "      SELECT a.annotation_id, a.parent,"
+                    f"             array_append(ctename.label, ((a.key, {repeat})::annotation_label)) "
+                    "      FROM annotation a "
+                    "         JOIN ctename ON a.annotation_id = ctename.parent "
+                    ") "
+                    "SELECT DISTINCT label "
+                    "FROM ctename "
+                    "WHERE parent is NULL) labels;"
+                ), filter_data)).scalars()]
 
 
+@ensure_session_async
 async def read_bot_annotations(bot_annotation_metadata_id: str,
-                               db_engine: DatabaseEngineAsync) -> dict[str, list[GroupedBotAnnotation]]:
-    async with db_engine.session() as session:  # type: AsyncSession
-        bot_annotations = (await session.execute(text(
-            "WITH RECURSIVE ctename AS ( "
-            "    SELECT a.bot_annotation_id, a.bot_annotation_metadata_id, a.time_created, a.time_updated, a.item_id, "
-            "           a.key, a.repeat,  a.value_bool, a.value_int,a.value_float, "
-            "           a.value_str, a.multi_int, a.confidence, a.parent, a.parent as recurse_join, "
-            "           ARRAY [(a.key, a.repeat)::annotation_label] as path "
-            "       FROM bot_annotation AS a "
-            "       WHERE a.bot_annotation_metadata_id = :bot_annotation_metadata_id "
-            "    UNION ALL "
-            "      SELECT ctename.bot_annotation_id, ctename.bot_annotation_metadata_id, ctename.time_created, "
-            "             ctename.time_updated, ctename.item_id, ctename.key, ctename.repeat,  ctename.value_bool, "
-            "             ctename.value_int,ctename.value_float, ctename.value_str, ctename.multi_int, "
-            "             ctename.confidence, ctename.parent, a.parent as recurse_join, "
-            "             array_append(ctename.path, ((a.key, a.repeat)::annotation_label)) "
-            "       FROM bot_annotation a "
-            "            JOIN ctename ON a.bot_annotation_id = ctename.recurse_join) "
-            "SELECT item_id, array_to_json(path) as label, json_agg(ctename.*)::jsonb->0 as bot_annotation "
-            "FROM ctename "
-            "WHERE recurse_join is NULL "
-            "GROUP BY item_id, path;"),
-            {'bot_annotation_metadata_id': bot_annotation_metadata_id})).mappings().all()
+                               session: AsyncSession) -> dict[str, list[GroupedBotAnnotation]]:
+    bot_annotations = (await session.execute(text(
+        "WITH RECURSIVE ctename AS ( "
+        "    SELECT a.bot_annotation_id, a.bot_annotation_metadata_id, a.time_created, a.time_updated, a.item_id, "
+        "           a.key, a.repeat,  a.value_bool, a.value_int,a.value_float, "
+        "           a.value_str, a.multi_int, a.confidence, a.parent, a.parent as recurse_join, "
+        "           ARRAY [(a.key, a.repeat)::annotation_label] as path "
+        "       FROM bot_annotation AS a "
+        "       WHERE a.bot_annotation_metadata_id = :bot_annotation_metadata_id "
+        "    UNION ALL "
+        "      SELECT ctename.bot_annotation_id, ctename.bot_annotation_metadata_id, ctename.time_created, "
+        "             ctename.time_updated, ctename.item_id, ctename.key, ctename.repeat,  ctename.value_bool, "
+        "             ctename.value_int,ctename.value_float, ctename.value_str, ctename.multi_int, "
+        "             ctename.confidence, ctename.parent, a.parent as recurse_join, "
+        "             array_append(ctename.path, ((a.key, a.repeat)::annotation_label)) "
+        "       FROM bot_annotation a "
+        "            JOIN ctename ON a.bot_annotation_id = ctename.recurse_join) "
+        "SELECT item_id, array_to_json(path) as label, json_agg(ctename.*)::jsonb->0 as bot_annotation "
+        "FROM ctename "
+        "WHERE recurse_join is NULL "
+        "GROUP BY item_id, path;"),
+        {'bot_annotation_metadata_id': bot_annotation_metadata_id})).mappings().all()
 
-        grouped_annotations = defaultdict(list)
-        for ba in bot_annotations:
-            grouped_annotations[str(ba['item_id'])].append(
-                GroupedBotAnnotation(path=ba['label'],
-                                     annotation=BotAnnotationModel.model_validate(ba['bot_annotation'])))
-        return grouped_annotations
+    grouped_annotations = defaultdict(list)
+    for ba in bot_annotations:
+        grouped_annotations[str(ba['item_id'])].append(
+            GroupedBotAnnotation(path=ba['label'],
+                                 annotation=BotAnnotationModel.model_validate(ba['bot_annotation'])))
+    return grouped_annotations
 
 
-async def get_resolved_item_annotations(strategy: ResolutionMethod, filters: AnnotationFilterObject,
+@ensure_session_async
+async def get_ordering(scope_id: str | uuid.UUID, session: AsyncSession) -> list[OrderingEntry]:
+    stmt = text('''
+        SELECT row_number() over () as identifier, *
+        FROM (SELECT ass.item_id::text,
+             MIN(ass."order") as first_occurrence,
+             array_agg(jsonb_build_object(
+                     'assignment_id', ass.assignment_id::text,
+                     'item_id', ass.item_id::text,
+                     'user_id', ass.user_id::text,
+                     'username', u.username,
+                     'status', ass.status,
+                     'order', ass."order"
+                 ))           as assignments
+        FROM assignment ass
+               JOIN "user" u on u.user_id = ass.user_id
+        WHERE ass.assignment_scope_id = :scope_id
+        GROUP BY ass.item_id
+        ORDER BY first_occurrence) as sub;''')
+    res = (await session.execute(stmt, {'scope_id': scope_id})).mappings().all()
+
+    return [OrderingEntry(**r, key=f'{scope_id}|{r.item_id}', scope_id=str(scope_id)) for r in res]
+
+
+class ResolutionProposal(BaseModel):
+    scheme_info: AnnotationSchemeInfo
+    labels: list[FlatLabel]
+    annotators: list[UserModel]
+    ordering: list[ResolutionOrdering]
+    matrix: ResolutionMatrix
+
+
+async def get_resolved_item_annotations(strategy: ResolutionMethod,
+                                        filters: AnnotationFilterObject,
                                         db_engine: DatabaseEngineAsync,
                                         ignore_hierarchy: bool = False,
-                                        ignore_order: bool = False) \
-        -> tuple[AnnotationSchemeModel, list[FlattenedAnnotationSchemeLabel],
-                 AnnotationCollection, dict[str, list[GroupedBotAnnotation]]]:
+                                        ignore_order: bool = False,
+                                        include_empty: bool = True,
+                                        existing_resolution: str = None,
+                                        include_new: bool = False,
+                                        update_existing: bool = False) -> ResolutionProposal:
+    """
+    This method retrieves all annotations that match the selected filters and constructs a matrix
+    of annotations per item (rows) and label (columns).
+    The "cells" contain annotations by each user and the resolution.
+    The method also returns additional
+
+    :param strategy: Resolution strategy (e.g. majority vote of available user annotations)
+    :param filters: see `AnnotationFilterObject`
+    :param db_engine:
+    :param ignore_hierarchy: When True, this will respect the nested nature of the annotation scheme
+    :param ignore_order: When True, this will ignore the order (`repeat`, e.g. primary, secondary,...) of annotations
+    :param include_empty: Should items without annotations be included?
+    :param existing_resolution: When set, will load an existing resolution and include its data here
+    :param include_new: When `existing_resolution` is set, should I include new items?
+    :param update_existing: When `existing_resolution` is set, should I update existing resolutions?
+    :return:
+    """
     logger.debug(f'Fetching all annotations matching filters: {filters} '
                  f'with ignore_hierarchy={ignore_hierarchy} and ignore_order={ignore_order}.')
+    filter_keys = [filters.key] if type(filters.key) is str else filters.key
+    filter_repeats = [filters.repeat] if type(filters.repeat) is str else filters.repeat
+    filter_scopes = [filters.scope_id] if type(filters.scope_id) is str else filters.scope_id
+    scheme_id = filters.scheme_id
+    async with db_engine.session() as session:  # type: AsyncSession
+        scheme: AnnotationSchemeModel = await read_annotation_scheme(annotation_scheme_id=scheme_id,
+                                                                     session=session)
+        if not scheme:
+            raise NotFoundError(f'No annotation scheme for {scheme_id}')
 
-    annotations = await read_item_annotations(db_engine=db_engine, filters=filters,
-                                              ignore_hierarchy=ignore_hierarchy, ignore_order=ignore_order)
-    labels = await read_labels(db_engine=db_engine, filters=filters,
-                               ignore_hierarchy=ignore_hierarchy, ignore_order=ignore_order)
-    annotators = await read_annotators(filters=filters, db_engine=db_engine)
-    scheme = await read_annotation_scheme(annotation_scheme_id=filters.scheme_id, db_engine=db_engine)
+        annotators = await read_annotators(filters=filters,
+                                           session=session)
+        labels = labels_from_scheme(scheme,
+                                    ignore_hierarchy=ignore_hierarchy,
+                                    ignore_order=ignore_order,
+                                    keys=filter_keys,
+                                    repeats=filter_repeats)
+        label_map = {l.path_key: l for l in labels}
+        if filter_scopes is None:
+            filter_scopes = await read_scopes_for_scheme(scheme_id=filters.scheme_id, session=session)
 
-    if not annotations or not scheme:
-        raise NotFoundError(f'No annotations ({bool(annotations)}) or no annotation scheme '
-                            f'({bool(scheme)}) for {filters.scheme_id}')
+        item_order: list[OrderingEntry] = []
+        for scope_id in filter_scopes:
+            item_order += await get_ordering(scope_id=scope_id, session=session)
 
-    collection = AnnotationCollection(scheme_id=filters.scheme_id,
-                                      labels=labels, annotators=annotators, annotations=annotations)
+        annotations: list[ItemAnnotation] = await read_item_annotations(session=session,
+                                                                        filters=filters,
+                                                                        ignore_hierarchy=ignore_hierarchy,
+                                                                        ignore_order=ignore_order)
+        logger.debug(f'Got {len(labels)} labels, {len(annotators)} annotators, {len(item_order):,} items '
+                     f'and {len(annotations):,} annotations.')
+        assignments = {
+            str(ass.assignment_id): (ass, order_entry)
+            for order_entry in item_order
+            for ass in order_entry.assignments
+        }
+        annotation_map: ResolutionMatrix = {}
+        for annotation in annotations:
+            assignment, order_entry = assignments[str(annotation.assignment_id)]
+            row_key = order_entry.key
+            col_key = path_to_string(annotation.path)
+            user_id = str(annotation.user_id)
+            if row_key not in annotation_map:
+                annotation_map[row_key] = {}
+            if col_key not in annotation_map[row_key]:
+                annotation_map[row_key][col_key] = ResolutionCell(labels={})
+            if user_id not in annotation_map[row_key][col_key].labels:
+                annotation_map[row_key][col_key].labels[user_id] = []
+            entry = ResolutionUserEntry(annotation=annotation)
+            if str(annotation.assignment_id) is not None and str(annotation.assignment_id) in assignments:
+                entry.assignment = assignment
+            annotation_map[row_key][col_key].labels[user_id].append(entry)
 
-    flat_scheme = flatten_annotation_scheme(scheme)
+        # TODO compare existing and update status
+        # TODO drop empty
+        print(annotation_map.keys())
+        if strategy == 'majority':
+            annotation_map = naive_majority_vote(annotation_map, label_map)
+        else:
+            raise NotImplementedError(f'Resolution strategy "{strategy}" not implemented (yet)!')
 
-    if strategy == 'majority':
-        return scheme, flat_scheme.labels, \
-               collection, naive_majority_vote(collection=collection, scheme=flat_scheme.labels)
-
-    raise NotImplementedError(f'Resolution strategy "{strategy}" not implemented (yet)!')
+        return ResolutionProposal(
+            scheme_info=AnnotationSchemeInfo(**scheme.model_dump()),
+            labels=labels,
+            annotators=annotators,
+            ordering=[ResolutionOrdering(**o.model_dump()) for o in item_order],
+            matrix=annotation_map
+        )

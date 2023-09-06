@@ -1,14 +1,58 @@
 from __future__ import annotations
+
 from typing import Literal, NamedTuple
 
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
-from pydantic import BaseModel
-from .annotations import AnnotationModel
+from pydantic import BaseModel, ConfigDict
+from .annotations import AnnotationModel, AssignmentStatus
 from .users import UserModel
 
 AnnotationFiltersType = dict[str, str | list[str] | int | list[int] | None]
+
+
+class DehydratedAssignment(BaseModel):
+    assignment_id: str
+    user_id: str
+    item_id: str
+    username: str
+    status: AssignmentStatus
+    order: int
+
+
+class ResolutionOrdering(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    identifier: int
+    first_occurrence: int
+    item_id: str
+    scope_id: str
+    key: str
+
+
+class OrderingEntry(ResolutionOrdering):
+    assignments: list[DehydratedAssignment]
+
+
+class ResolutionStatus(str, Enum):
+    NEW = 'NEW'
+    CHANGED = 'CHANGED'
+    UNCHANGED = 'UNCHANGED'
+
+
+class ResolutionUserEntry(BaseModel):
+    assignment: DehydratedAssignment | None = None
+    annotation: AnnotationModel | None = None
+    status: ResolutionStatus = ResolutionStatus.UNCHANGED
+
+
+class ResolutionCell(BaseModel):
+    labels: dict[str, list[ResolutionUserEntry]]  # username: ResolutionUserEntry[]
+    resolution: BotAnnotationModel | None = None
+    status: ResolutionStatus = ResolutionStatus.UNCHANGED
+
+
+ResolutionMatrix = dict[str, dict[str, ResolutionCell]]
 
 
 class AnnotationFilters(BaseModel):
@@ -41,6 +85,7 @@ class Label(BaseModel):
     """
     key: str
     repeat: int
+    value: int | None = None  # value if this is a parent
 
 
 class GroupedAnnotations(NamedTuple):

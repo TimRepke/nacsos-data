@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import AsyncIterator, Iterator, Any
+from functools import wraps
+from typing import AsyncIterator, Iterator, Any, Callable
 from json import JSONEncoder
 
 from pydantic import BaseModel
@@ -135,3 +136,35 @@ class DatabaseEngine:
             raise e
         finally:
             session.close()
+
+
+def ensure_session_async(func):
+    @wraps(func)
+    async def wrapper(*args, session: AsyncSession | None = None,
+                      db_engine: DatabaseEngineAsync | None = None,
+                      **kwargs):
+        if session is not None:
+            return await func(*args, session=session, **kwargs)
+        if db_engine is not None:
+            logger.debug(f'Opening a new session to execute {func}')
+            async with db_engine.session() as session:  # type: AsyncSession
+                return await func(*args, session=session, **kwargs)
+
+        raise RuntimeError('I need a session or an engine to get a session!')
+
+    return wrapper
+
+
+def ensure_session(func):
+    @wraps(func)
+    def wrapper(*args, session: Session | None = None, db_engine: DatabaseEngine | None = None, **kwargs):
+        if session is not None:
+            return func(*args, session=session, **kwargs)
+        if db_engine is not None:
+            logger.debug(f'Opening a new session to execute {func}')
+            with db_engine.session() as session:  # type: Session
+                return func(*args, session=session, **kwargs)
+
+        raise RuntimeError('I need a session or an engine to get a session!')
+
+    return wrapper
