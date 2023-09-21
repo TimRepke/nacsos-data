@@ -1,22 +1,30 @@
 import logging
-import uuid
 from collections import Counter
 
-from nacsos_data.util.annotations.validation import FlatLabel
+from nacsos_data.util.annotations.validation import (
+    FlatLabel,
+    resolve_bot_annotation_parents,
+    same_values,
+    has_values
+)
 from nacsos_data.util.errors import EmptyAnnotationsError
-from nacsos_data.models.annotations import \
-    AnnotationValue, \
-    AnnotationScalarValueField, \
-    AnnotationListValueField, \
-    AnnotationModel, \
-    AnnotationSchemeLabelTypes
-from nacsos_data.models.bot_annotations import BotAnnotationModel, GroupedBotAnnotation, \
-    ResolutionMatrix, ResolutionCell
+from nacsos_data.models.annotations import (
+    AnnotationValue,
+    AnnotationScalarValueField,
+    AnnotationListValueField,
+    AnnotationSchemeLabelTypes,
+    ItemAnnotation
+)
+from nacsos_data.models.bot_annotations import (  # noqa: F401
+    ResolutionMatrix,
+    ResolutionCell,
+    ResolutionStatus
+)
 
 logger = logging.getLogger('nacsos_data.util.annotations.resolve')
 
 
-def _majority_vote_list(label_annotations: list[AnnotationModel],
+def _majority_vote_list(label_annotations: list[ItemAnnotation],
                         field: AnnotationListValueField,
                         label: FlatLabel) -> AnnotationValue:
     # form a union of all available sets of multi-labels (ignoring null values)
@@ -35,7 +43,7 @@ def _majority_vote_list(label_annotations: list[AnnotationModel],
     return AnnotationValue(**{field: list(set(flat_values))})  # type: ignore[misc, arg-type]
 
 
-def _majority_vote_scalar(label_annotations: list[AnnotationModel],
+def _majority_vote_scalar(label_annotations: list[ItemAnnotation],
                           field: AnnotationScalarValueField,
                           label: FlatLabel) -> AnnotationValue:
     flat_values = [la.__dict__[field]
@@ -50,7 +58,7 @@ def _majority_vote_scalar(label_annotations: list[AnnotationModel],
     return AnnotationValue(**{field: Counter(flat_values).most_common()[0][0]})  # type: ignore[misc]
 
 
-def _majority_vote_str(label_annotations: list[AnnotationModel],
+def _majority_vote_str(label_annotations: list[ItemAnnotation],
                        field: AnnotationScalarValueField,
                        label: FlatLabel) -> AnnotationValue:
     flat_values: list[str] = [la.__dict__[field]
@@ -66,11 +74,11 @@ def _majority_vote_str(label_annotations: list[AnnotationModel],
 
 
 def naive_majority_vote(annotation_map: ResolutionMatrix,
-                        label_map: dict[str, FlatLabel]) -> ResolutionMatrix:
+                        label_map: dict[str, FlatLabel],
+                        fix_parent_references: bool = True) -> ResolutionMatrix:
     for row_key, row in annotation_map.items():
-        item_id = row_key.split('|')[1]
         for label_key, cell in row.items():  # type: str, ResolutionCell
-            annotations = [entry.annotation for labels in cell.labels.values() for entry in labels]
+            annotations = [entry.annotation for labels in cell.labels.values() for entry in labels if entry.annotation]
 
             # No annotations to resolve, skipping the rest...
             if len(annotations) == 0:
@@ -90,22 +98,21 @@ def naive_majority_vote(annotation_map: ResolutionMatrix,
             else:
                 raise NotImplementedError(f'Majority vote for {kind} not implemented ({label})')
 
-            ba_uuid = uuid.uuid4()
-            cell.resolution = BotAnnotationModel(bot_annotation_id=ba_uuid, item_id=item_id,
-                                                 key=label.key, repeat=label.repeat,
-                                                 **value.model_dump())
+            if same_values(value, cell.resolution):
+                pass
+            else:
+                if not has_values(cell.resolution):
+                    cell.status = ResolutionStatus.NEW
+                else:
+                    cell.status = ResolutionStatus.CHANGED
 
-        # Second loop to back-fill parent_ids
-        # NOTICE: This does *not* check for validity!
-        #         (e.g. the parent might have been resolved to a choice where the current sub-label is not a child)
-        for label_key, cell in row.items():  # type: str, ResolutionCell
-            if cell.resolution is not None:
-                parent_key = label_map[label_key].parent_key
-                if parent_key is not None:
-                    parent = row[parent_key].resolution
-                    if parent is not None:
-                        cell.resolution.parent = parent.bot_annotation_id
-                    else:
-                        logger.debug(f'Looks like I have no parent for {row_key} -> {label_key}')
+                cell.resolution.value_bool = value.value_bool
+                cell.resolution.value_int = value.value_int
+                cell.resolution.value_str = value.value_str
+                cell.resolution.value_float = value.value_float
+                cell.resolution.multi_int = value.multi_int
+
+    if fix_parent_references:
+        resolve_bot_annotation_parents(annotation_map, label_map)
 
     return annotation_map

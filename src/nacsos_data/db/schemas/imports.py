@@ -17,10 +17,15 @@ if TYPE_CHECKING:
 m2m_import_item_table = Table(
     'm2m_import_item',
     Base.metadata,
-    Column('import_id', ForeignKey('import.import_id', ondelete='cascade'),
-           nullable=False, primary_key=True, index=True),
-    Column('item_id', ForeignKey('item.item_id', ondelete='cascade'),
-           nullable=False, primary_key=True, index=True),
+    Column('import_id',
+           UUID(as_uuid=True),
+           ForeignKey('import.import_id'),
+           nullable=False, index=True),
+    Column('item_id',
+           UUID(as_uuid=True),
+           ForeignKey('item.item_id'),
+           nullable=False, index=True),
+
     Column('time_created', DateTime(timezone=True), server_default=func.now()),
 
     # This is a type to specify an entry in the many-to-many relation for items to imports.
@@ -74,6 +79,7 @@ class Import(Base):
 
     # reference to the items
     items: Mapped[list[Item]] = relationship(
+        'Item',
         secondary=m2m_import_item_table,
         back_populates='imports',
         cascade='all, delete'

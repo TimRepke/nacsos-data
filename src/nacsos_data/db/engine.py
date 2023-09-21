@@ -1,7 +1,7 @@
 import json
 import logging
 from functools import wraps
-from typing import AsyncIterator, Iterator, Any, Callable
+from typing import AsyncIterator, Iterator, Any
 from json import JSONEncoder
 
 from pydantic import BaseModel
@@ -138,32 +138,36 @@ class DatabaseEngine:
             session.close()
 
 
-def ensure_session_async(func):
+def ensure_session_async(func):  # type: ignore[no-untyped-def]
     @wraps(func)
-    async def wrapper(*args, session: AsyncSession | None = None,
+    async def wrapper(*args,  # type: ignore[no-untyped-def]
+                      session: AsyncSession | None = None,
                       db_engine: DatabaseEngineAsync | None = None,
                       **kwargs):
         if session is not None:
-            return await func(*args, session=session, **kwargs)
+            return await func(*args, session=session, **kwargs)  # type: ignore[arg-type]
         if db_engine is not None:
             logger.debug(f'Opening a new session to execute {func}')
-            async with db_engine.session() as session:  # type: AsyncSession
-                return await func(*args, session=session, **kwargs)
+            async with db_engine.session() as fresh_session:  # type: AsyncSession
+                return await func(*args, session=fresh_session, **kwargs)  # type: ignore[arg-type]
 
         raise RuntimeError('I need a session or an engine to get a session!')
 
     return wrapper
 
 
-def ensure_session(func):
+def ensure_session(func):  # type: ignore[no-untyped-def]
     @wraps(func)
-    def wrapper(*args, session: Session | None = None, db_engine: DatabaseEngine | None = None, **kwargs):
+    def wrapper(*args,  # type: ignore[no-untyped-def]
+                session: Session | None = None,
+                db_engine: DatabaseEngine | None = None,
+                **kwargs):
         if session is not None:
-            return func(*args, session=session, **kwargs)
+            return func(*args, session=session, **kwargs)  # type: ignore[arg-type]
         if db_engine is not None:
             logger.debug(f'Opening a new session to execute {func}')
-            with db_engine.session() as session:  # type: Session
-                return func(*args, session=session, **kwargs)
+            with db_engine.session() as fresh_session:  # type: Session
+                return func(*args, session=fresh_session, **kwargs)  # type: ignore[arg-type]
 
         raise RuntimeError('I need a session or an engine to get a session!')
 

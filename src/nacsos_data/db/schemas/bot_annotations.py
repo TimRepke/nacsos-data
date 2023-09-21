@@ -102,6 +102,10 @@ class BotAnnotation(Base):
     # Default should always be 1.
     repeat = mapped_column(Integer, nullable=False, default=1)
 
+    # (Optional) Indicate the order of this annotation (e.g. from assignment order);
+    # Only assumed to be valid within each BotAnnotationMetaData scope
+    order = mapped_column(Integer, nullable=True)
+
     # Exactly one of the following fields should be filled.
     # Contains the value for this annotation (e.g. numbered class from annotation_scheme)
     value_bool = mapped_column(Boolean, nullable=True)

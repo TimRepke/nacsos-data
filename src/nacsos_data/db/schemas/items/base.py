@@ -43,9 +43,9 @@ class Item(Base):
     type = mapped_column(SAEnum(ItemType), nullable=False)
 
     imports: Mapped[list[Import]] = relationship(
+        'Import',
         secondary=m2m_import_item_table,
         back_populates='items',
-        cascade='all, delete'
     )
 
     annotations: Mapped[list['Annotation']] = relationship('Annotation')

@@ -8,6 +8,44 @@ from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel, ConfigDict
 
+
+class FlatLabelChoice(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    name: str
+    hint: str | None = None
+    value: int
+
+
+class Label(BaseModel):
+    """
+    Convenience type (corresponding to internal type in db annotation_label).
+    For Annotation or BotAnnotation, this is the combination of their respective key, repeat value.
+
+    Mainly used during resolving annotations.
+    """
+    key: str
+    repeat: int
+    value: int | None = None  # value if this is a parent
+
+
+class FlatLabel(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    path: list[Label]
+    repeat: int
+    path_key: str
+    parent_int: int | None = None
+    parent_key: str | None = None
+    parent_value: int | None = None
+
+    name: str
+    hint: str | None = None
+    key: str
+    required: bool
+    max_repeat: int
+    kind: AnnotationSchemeLabelTypes
+    choices: list[FlatLabelChoice] | None = None
+
+
 # Types of Labels:
 #   - bool: stored in `Annotation.value_bool`, used for binary labels (no children)
 #   - int: stored in `Annotation.value_int`, used for extracted numbers (no children)
@@ -211,7 +249,7 @@ AnnotationValueField = Union[AnnotationScalarValueField, AnnotationListValueFiel
 
 
 class AnnotationValue(BaseModel):
-    # Depending on the AnnotationSchemeLabel.kind, one of the following fields should be filled.
+    # Depending on the AnnotationSchemeLabel.kind, exactly one of the following fields should be filled.
     # For single and mixed, the AnnotationSchemeLabelChoice.value should be filled in value_int.
     value_bool: bool | None = None
     value_int: int | None = None
@@ -278,6 +316,11 @@ class AnnotationModel(AnnotationValue):
     # of that Item, the following fields should be set with the respective string offset.
     text_offset_start: int | None = None
     text_offset_stop: int | None = None
+
+
+class ItemAnnotation(AnnotationModel):
+    path: list[Label]
+    old: AnnotationValue | None = None
 
 
 AnnotationSchemeLabelChoice.model_rebuild()

@@ -1,12 +1,18 @@
 from __future__ import annotations
 
-from typing import Literal, NamedTuple
+from typing import Literal
 
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel, ConfigDict
-from .annotations import AnnotationModel, AssignmentStatus
+from .annotations import (
+    AssignmentStatus,
+    AnnotationSchemeInfo,
+    FlatLabel,
+    Label,
+    AnnotationValue,
+    ItemAnnotation)
 from .users import UserModel
 
 AnnotationFiltersType = dict[str, str | list[str] | int | list[int] | None]
@@ -42,16 +48,17 @@ class ResolutionStatus(str, Enum):
 
 class ResolutionUserEntry(BaseModel):
     assignment: DehydratedAssignment | None = None
-    annotation: AnnotationModel | None = None
+    annotation: ItemAnnotation | None = None
     status: ResolutionStatus = ResolutionStatus.UNCHANGED
 
 
 class ResolutionCell(BaseModel):
     labels: dict[str, list[ResolutionUserEntry]]  # username: ResolutionUserEntry[]
-    resolution: BotAnnotationModel | None = None
+    resolution: BotAnnotationModel
     status: ResolutionStatus = ResolutionStatus.UNCHANGED
 
 
+AssignmentMap = dict[str, tuple[DehydratedAssignment, OrderingEntry]]
 ResolutionMatrix = dict[str, dict[str, ResolutionCell]]
 
 
@@ -75,45 +82,55 @@ class AnnotationFilters(BaseModel):
     key: str | list[str] | None = None
     repeat: int | list[int] | None = None
 
+    @property
+    def user_ids(self) -> list[str] | None:
+        if self.user_id is None:
+            return None
+        return [self.user_id] if type(self.user_id) is str else self.user_id  # type: ignore[return-value]
 
-class Label(BaseModel):
-    """
-    Convenience type (corresponding to internal type in db annotation_label).
-    For Annotation or BotAnnotation, this is the combination of their respective key, repeat value.
+    @property
+    def scope_ids(self) -> list[str] | None:
+        if self.scope_id is None:
+            return None
+        return [self.scope_id] if type(self.scope_id) is str else self.scope_id  # type: ignore[return-value]
 
-    Mainly used during resolving annotations.
-    """
-    key: str
-    repeat: int
-    value: int | None = None  # value if this is a parent
+    @property
+    def keys(self) -> list[str] | None:
+        if self.key is None:
+            return None
+        return [self.key] if type(self.key) is str else self.key  # type: ignore[return-value]
 
-
-class GroupedAnnotations(NamedTuple):
-    path: list[Label]
-    annotations: list[AnnotationModel]
-
-
-class GroupedBotAnnotation(NamedTuple):
-    path: list[Label]
-    annotation: BotAnnotationModel
-
-
-class _AnnotationCollection(BaseModel):
-    scheme_id: str
-    labels: list[list[Label]]
-
-    annotations: dict[str, list[GroupedAnnotations]]  # key: item_id
+    @property
+    def repeats(self) -> list[int] | None:
+        if self.repeat is None:
+            return None
+        return [self.repeat] if type(self.repeat) is int else self.repeat  # type: ignore[return-value]
 
 
-class AnnotationCollectionDB(_AnnotationCollection):
-    annotators: list[str]
-
-
-class AnnotationCollection(_AnnotationCollection):
+class ResolutionProposal(BaseModel):
+    scheme_info: AnnotationSchemeInfo
+    labels: list[FlatLabel]
     annotators: list[UserModel]
+    ordering: list[ResolutionOrdering]
+    matrix: ResolutionMatrix
 
 
 ResolutionMethod = Literal['majority', 'first', 'last', 'trust']
+
+
+class SnapshotEntry(AnnotationValue):
+    # values are inherited
+    order_key: str  # see `ResolutionOrdering.key` (row in matrix)
+    path_key: str  # see `FlatLabel.path_key` (column in matrix)
+    item_id: str  # id of the item
+    anno_id: str  # related `annotation.annotation_id`
+    user_id: str  # id of the user
+
+
+class ResolutionSnapshotEntry(BaseModel):
+    order_key: str  # see `ResolutionOrdering.key` (row in matrix)
+    path_key: str  # see `FlatLabel.path_key` (column in matrix)
+    ba_id: str  # related `bot_annotation.bot_annotation_id`
 
 
 class BotMetaResolve(BaseModel):
@@ -125,8 +142,9 @@ class BotMetaResolve(BaseModel):
     ignore_repeat: bool
     # (optional) dictionary of user UUID -> float weights (i.e. trust in the user for weighted majority votes)
     trust: dict[str, float] | None = None
-    # snapshot of the annotations used to resolve this
-    collection: AnnotationCollectionDB
+    # snapshot of the annotations and bot_annotations used to resolve this
+    snapshot: list[SnapshotEntry]
+    resolutions: list[ResolutionSnapshotEntry]
 
 
 BotMeta = BotMetaResolve
@@ -162,12 +180,17 @@ class BotAnnotationMetaDataBaseModel(BaseModel):
     annotation_scheme_id: str | UUID | None = None
 
 
+class BotAnnotationResolution(BotAnnotationMetaDataBaseModel):
+    # Additional information for this Bot for future reference
+    meta: BotMetaResolve
+
+
 class BotAnnotationMetaDataModel(BotAnnotationMetaDataBaseModel):
     # Additional information for this Bot for future reference
     meta: BotMeta | None = None
 
 
-class BotAnnotationModel(BaseModel):
+class BotAnnotationModel(AnnotationValue):
     # Unique identifier for this BotAnnotation
     bot_annotation_id: str | UUID | None = None
     # The AnnotationScheme (or its ID) defining the annotation scheme to be used for this assignment
@@ -185,12 +208,13 @@ class BotAnnotationModel(BaseModel):
     # Indicates primary/secondary label, but can also be used to store multiple predictions (e.g. the top five topics)
     # Default should always be 1.
     repeat: int = 1
-    # Exactly one of the following fields should be filled.
-    # Contains the value for this annotation (e.g. numbered class from annotation_scheme)
-    value_bool: bool | None = None
-    value_int: int | None = None
-    value_float: float | None = None
-    value_str: str | None = None
-    multi_int: list[int] | None = None
+    # (Optional) Indicate the order of this annotation (e.g. from assignment order);
+    # Only assumed to be valid within each BotAnnotationMetaData scope
+    order: int | None = None
     # (Optional) Confidence scores / probabilities provided by the underlying model
     confidence: float | None = None
+
+
+class BotItemAnnotation(BotAnnotationModel):
+    path: list[Label]
+    old: AnnotationValue | None = None

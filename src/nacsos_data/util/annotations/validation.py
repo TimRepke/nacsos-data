@@ -1,49 +1,26 @@
 from uuid import UUID, uuid4
 import logging
 
-from pydantic import BaseModel, ConfigDict
-
-from nacsos_data.models.annotations import \
-    AnnotationModel, \
-    AnnotationSchemeModel, \
-    FlattenedAnnotationSchemeLabel, \
-    AssignmentStatus, \
-    AnnotationSchemeLabel, \
-    AnnotationSchemeModelFlat, \
-    AnnotationSchemeLabelChoiceFlat, AnnotationSchemeLabelTypes
-from nacsos_data.models.bot_annotations import Label
+from nacsos_data.models.annotations import (
+    AnnotationModel,
+    AnnotationSchemeModel,
+    FlattenedAnnotationSchemeLabel,
+    AssignmentStatus,
+    AnnotationSchemeLabel,
+    AnnotationSchemeModelFlat,
+    AnnotationSchemeLabelChoiceFlat,
+    FlatLabelChoice,
+    FlatLabel,
+    Label, AnnotationValue
+)
+from nacsos_data.models.bot_annotations import ResolutionMatrix, ResolutionCell  # noqa: F401
 
 logger = logging.getLogger('nacsos_data.annotation.validation')
 
 
-class FlatLabelChoice(BaseModel):
-    model_config = ConfigDict(extra='ignore')
-    name: str
-    hint: str | None = None
-    value: int
-
-
-class FlatLabel(BaseModel):
-    model_config = ConfigDict(extra='ignore')
-    path: list[Label]
-    repeat: int
-    path_key: str
-    parent_int: int | None = None
-    parent_key: str | None = None
-    parent_value: int | None = None
-
-    name: str
-    hint: str | None = None
-    key: str
-    required: bool
-    max_repeat: int
-    kind: AnnotationSchemeLabelTypes
-    choices: list[FlatLabelChoice] | None = None
-
-
 def labels_from_scheme(scheme: AnnotationSchemeModel,
                        ignore_hierarchy: bool = False,
-                       ignore_order: bool = False,
+                       ignore_repeat: bool = False,
                        keys: list[str] | None = None,
                        repeats: list[int] | None = None) -> list[FlatLabel]:
     """
@@ -52,7 +29,7 @@ def labels_from_scheme(scheme: AnnotationSchemeModel,
 
     :param scheme: annotation scheme to generate the labels from
     :param ignore_hierarchy: will not include nesting of labels (all paths will have length 1)
-    :param ignore_order: will not generate multiples for primary, secondary, ... labels
+    :param ignore_repeat: will not generate multiples for primary, secondary, ... labels
     :param keys: if not None, include only these label keys and skip all others (ignores hierarchy!)
     :param repeats: if not None, include only these repeats and skip all others
     :return:
@@ -68,7 +45,7 @@ def labels_from_scheme(scheme: AnnotationSchemeModel,
             max_repeat = label.max_repeat
             if keys is not None and label.key not in keys:
                 max_repeat = 1
-            for repeat in range(1 if ignore_order else max_repeat):
+            for repeat in range(1 if ignore_repeat else max_repeat):
                 if repeats is None or (repeat + 1) in repeats:
                     if keys is None or label.key in keys:
                         run += 1
@@ -85,7 +62,9 @@ def labels_from_scheme(scheme: AnnotationSchemeModel,
                                              required=label.required,
                                              max_repeat=label.max_repeat,
                                              kind=label.kind,
-                                             choices=[FlatLabelChoice(**c.model_dump()) for c in label.choices]))
+                                             choices=[FlatLabelChoice(**c.model_dump())
+                                                      for c in label.choices]
+                                             if label.choices is not None else None))
                     if label.choices and (ignore_hierarchy or keys is None or label.key in keys):
                         next_parent = run - 1
                         for choice in label.choices:
@@ -108,6 +87,25 @@ def labels_from_scheme(scheme: AnnotationSchemeModel,
 
 def path_to_string(path: list[Label]) -> str:
     return '|'.join([f'{pl.key}-{pl.repeat}' for pl in path])
+
+
+def resolve_bot_annotation_parents(annotation_map: ResolutionMatrix,
+                                   label_map: dict[str, FlatLabel]) -> ResolutionMatrix:
+    # Loop to back-fill parent_ids
+    # NOTICE: This does *not* check for validity!
+    #         (e.g. the parent might have been resolved to a choice where the current sub-label is not a child)
+    for row_key, row in annotation_map.items():
+        for label_key, cell in row.items():  # type: str, ResolutionCell
+            if cell.resolution is not None and label_key in row:
+                parent_key = label_map[label_key].parent_key
+                if parent_key is not None and parent_key in row:
+                    parent = row[parent_key].resolution
+                    if parent is not None:
+                        cell.resolution.parent = parent.bot_annotation_id
+                    else:
+                        logger.debug(  # type: ignore[unreachable]
+                            f'Looks like I have no parent for {row_key} -> {label_key}')
+    return annotation_map
 
 
 def flatten_annotation_scheme(annotation_scheme: AnnotationSchemeModel) -> AnnotationSchemeModelFlat:
@@ -226,7 +224,7 @@ def merge_scheme_and_annotations(annotation_scheme: AnnotationSchemeModel,
                 for annotation in annotations_map[label.key]:
                     if annotation.parent == parent:
                         cnt += 1
-                        label_cpy = label.copy(deep=True)
+                        label_cpy = label.model_copy(deep=True)
                         label_cpy.annotation = annotation
 
                         for ci, choice in enumerate(label_cpy.choices or []):
@@ -248,6 +246,22 @@ def has_annotation(label: AnnotationSchemeLabel) -> bool:
              or label.annotation.value_bool is not None
              or label.annotation.value_float is not None
              or label.annotation.multi_int is not None)
+
+
+def has_values(anno: AnnotationValue) -> bool:
+    return (anno.value_int is not None
+            or anno.value_bool is not None
+            or anno.value_float is not None
+            or anno.value_str is not None
+            or anno.multi_int is not None)
+
+
+def same_values(anno_a: AnnotationValue, anno_b: AnnotationValue) -> bool:
+    return (anno_a.value_int != anno_b.value_int
+            or anno_a.value_str != anno_b.value_str
+            or anno_a.value_float != anno_b.value_float
+            or anno_a.value_bool != anno_b.value_bool
+            or (set(anno_a.multi_int or []) != set(anno_b.multi_int or [])))
 
 
 def annotated_scheme_to_annotations(scheme: AnnotationSchemeModel) -> list[AnnotationModel]:

@@ -110,7 +110,7 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
                      assignment_scope_ids: list[str] | list[uuid.UUID] | None,
                      user_ids: list[str] | list[uuid.UUID] | None,
                      labels: dict[str, LabelOptions] | None,
-                     ignore_order: bool) -> CTE:
+                     ignore_repeat: bool) -> CTE:
     def _label_filter(Schema: Type[Annotation] | Type[BotAnnotation],
                       label: LabelOptions) -> ColumnElement[bool] | None:  # type: ignore[type-arg]
         if label.options_int:
@@ -144,7 +144,7 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
                    Annotation.annotation_id.label('label_id'),
                    Annotation.parent,
                    Annotation.key,
-                   Annotation.repeat if not ignore_order else literal(1, type_=Integer).label('repeat'),
+                   Annotation.repeat if not ignore_repeat else literal(1, type_=Integer).label('repeat'),
                    Annotation.value_int,
                    Annotation.value_bool,
                    Annotation.value_str,
@@ -167,7 +167,7 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
                    BotAnnotation.bot_annotation_id.label('label_id'),
                    BotAnnotation.parent,
                    BotAnnotation.key,
-                   BotAnnotation.repeat if not ignore_order else literal(1, type_=Integer).label('repeat'),
+                   BotAnnotation.repeat if not ignore_repeat else literal(1, type_=Integer).label('repeat'),
                    BotAnnotation.value_int,
                    BotAnnotation.value_bool,
                    BotAnnotation.value_str,
@@ -256,7 +256,7 @@ async def get_project_labels(project_id: str | uuid.UUID, db_engine: DatabaseEng
                                    assignment_scope_ids=assignment_scope_ids,
                                    user_ids=user_ids,
                                    labels=None,
-                                   ignore_order=True)
+                                   ignore_repeat=True)
 
     return await get_labels(stmt_labels=stmt_labels, db_engine=db_engine)
 
@@ -296,14 +296,14 @@ async def prepare_export_table(bot_annotation_metadata_ids: list[str] | list[uui
                                labels: list[LabelOptions],
                                item_fields: list[str] | None,
                                ignore_hierarchy: bool,
-                               ignore_order: bool,
+                               ignore_repeat: bool,
                                db_engine: DatabaseEngineAsync) -> list[dict[str, bool | int | str | None]]:
     labels_map = {lab.key: lab for lab in labels}
     stmt_labels = _labels_subquery(bot_annotation_metadata_ids=bot_annotation_metadata_ids,
                                    assignment_scope_ids=assignment_scope_ids,
                                    user_ids=user_ids,
                                    labels=labels_map,
-                                   ignore_order=ignore_order)
+                                   ignore_repeat=ignore_repeat)
 
     # Translate the list of strings into table columns (for extra fields from Items)
     ItemSchema, item_columns = await fields2col(project_id=project_id, fields=item_fields, db_engine=db_engine)
@@ -312,7 +312,7 @@ async def prepare_export_table(bot_annotation_metadata_ids: list[str] | list[uui
         if ignore_hierarchy:
             # Prepare the CASE expressions to spread label values across binary fields
             label_selects = _get_label_selects(labels=labels_map,
-                                               repeats=None if ignore_order else [1, 2, 3, 4],
+                                               repeats=None if ignore_repeat else [1, 2, 3, 4],
                                                cte=stmt_labels)
 
             # Finally construct the main query

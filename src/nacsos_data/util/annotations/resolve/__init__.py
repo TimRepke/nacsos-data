@@ -1,48 +1,46 @@
-import json
 import logging
 import uuid
-from datetime import datetime
-from collections import defaultdict
-
-from pydantic import BaseModel
 from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nacsos_data.db.connection import DatabaseEngineAsync
 from nacsos_data.db.crud.annotations import read_annotation_scheme
 from nacsos_data.db.engine import ensure_session_async
-from nacsos_data.db.schemas import AssignmentScope
+from nacsos_data.db.schemas import AssignmentScope, User
 from nacsos_data.models.annotations import (
-    AnnotationModel,
     AnnotationSchemeModel,
-    AnnotationSchemeInfo
+    AnnotationSchemeInfo,
+    ItemAnnotation,
+    FlatLabel,
+    AnnotationValue
 )
 from nacsos_data.models.bot_annotations import (
     Label,
     AnnotationFilters,
     AnnotationFiltersType,
     ResolutionMethod,
-    GroupedBotAnnotation,
     BotAnnotationModel,
     ResolutionUserEntry,
     ResolutionCell,
     ResolutionMatrix,
-    OrderingEntry, ResolutionOrdering
+    OrderingEntry,
+    ResolutionOrdering,
+    BotItemAnnotation,
+    ResolutionProposal,
+    BotAnnotationResolution,
+    ResolutionStatus,
+    AssignmentMap
 )
 from nacsos_data.models.users import UserModel
 from nacsos_data.util.annotations.resolve.majority_vote import naive_majority_vote
 from nacsos_data.util.annotations.validation import (
     labels_from_scheme,
     path_to_string,
-    FlatLabel
+    resolve_bot_annotation_parents,
+    same_values
 )
 from nacsos_data.util.errors import NotFoundError, InvalidFilterError
 
 logger = logging.getLogger('nacsos_data.util.annotations.resolve')
-
-
-class ItemAnnotation(AnnotationModel):
-    path: list[Label]
 
 
 class AnnotationFilterObject(AnnotationFilters):
@@ -84,77 +82,27 @@ class AnnotationFilterObject(AnnotationFilters):
 
 
 @ensure_session_async
-async def read_num_annotation_changes_after(timestamp: str | datetime,
-                                            filters: AnnotationFilterObject,
-                                            session: AsyncSession) -> int:
-    """
-    Looks for `Annotation`s that were added or edited after `timestamp` and returns the count.
-    This is assumed to be used in the context of `Annotation` resolution, so the same filter logic is used, so
-    it can be re-applied later to see if there have been changes that should be included in the resolution.
-    NOTICE: This does *not* recognise deletions (but `Annotation`s should never be deleted anyway).
-    If you are looking for the actually changed `Annotation`s, use `read_changed_annotations_after`.
-    :param timestamp:
-    :param filters:
-    :param session:
-    :return:
-    """
-    filter_join, filter_where, filter_data = filters.get_subquery()
-    filter_data['timestamp'] = str(timestamp)
-    num_changes: int = (await session.execute(text(  # type: ignore[assignment]
-        "SELECT count(1) "
-        "FROM annotation AS a "
-        f" {filter_join} "
-        f"WHERE {filter_where} "
-        f"      AND (a.time_created > :timestamp OR a.time_updated > :timestamp);"
-    ), filter_data)).scalar()
-    return num_changes
-
-
-@ensure_session_async
-async def read_changed_annotations_after(timestamp: str | datetime,
-                                         filters: AnnotationFilterObject,
-                                         session: AsyncSession) -> list[AnnotationModel]:
-    """
-    See `read_num_annotation_changes_after`
-    :param timestamp:
-    :param filters:
-    :param session:
-    :return:
-    """
-    filter_join, filter_where, filter_data = filters.get_subquery()
-    filter_data['timestamp'] = str(timestamp)
-    annotations = (await session.execute(text(
-        "SELECT a.* "
-        "FROM annotation AS a "
-        f" {filter_join} "
-        f"WHERE {filter_where} "
-        f"      AND (a.time_created > :timestamp OR a.time_updated > :timestamp);"
-    ), filter_data)).mappings().all()
-    return [AnnotationModel.model_validate(anno) for anno in annotations]
-
-
-@ensure_session_async
-async def read_item_annotations(filters: AnnotationFilterObject,
-                                session: AsyncSession,
+async def read_item_annotations(session: AsyncSession,
+                                filters: AnnotationFilterObject,
                                 ignore_hierarchy: bool = False,
-                                ignore_order: bool = False) -> list[ItemAnnotation]:
+                                ignore_repeat: bool = False) -> list[ItemAnnotation]:
     """
     asd
     :param session: Connection to the database
     :param filters:
     :param ignore_hierarchy: if False, looking at keys linearly (ignoring parents)
-    :param ignore_order: if False, the order is ignored and e.g. single-choice with secondary category
+    :param ignore_repeat: if False, the order is ignored and e.g. single-choice with secondary category
                            virtually becomes multi-choice of two categories
     :return: dictionary (keys are item_ids) of all annotations per item that match the filters.
     """
     filter_join, filter_where, filter_data = filters.get_subquery()
 
     repeat = 'a.repeat'
-    if ignore_order:  # if repeat is ignored, always forcing it to 1
+    if ignore_repeat:  # if repeat is ignored, always forcing it to 1
         repeat = '1'
     if ignore_hierarchy:
         stmt = text(f'''
-            SELECT array_to_json(ARRAY[(a.key, {repeat})::annotation_label]) as path, 
+            SELECT array_to_json(ARRAY[(a.key, {repeat})::annotation_label]) as label, 
                    a.*
             FROM annotation AS a 
                      {filter_join} 
@@ -195,13 +143,64 @@ async def read_item_annotations(filters: AnnotationFilterObject,
 
 
 @ensure_session_async
-async def read_scopes_for_scheme(scheme_id: str | uuid.UUID, session: AsyncSession) -> list[str]:
+async def read_bot_annotations(session: AsyncSession,
+                               bot_annotation_metadata_id: str) -> list[BotItemAnnotation]:
+    stmt = text(f'''
+        WITH RECURSIVE ctename AS ( 
+              SELECT a.bot_annotation_id, a.bot_annotation_metadata_id,
+                     a.time_created, a.time_updated, a.item_id,
+                     a.key, a.repeat, a.confidence, a.order,
+                     a.value_bool, a.value_int, a.value_float, a.multi_int, a.value_str,
+                     a.parent, a.parent as recurse_join, 
+                    ARRAY[(a.key, a.repeat)::annotation_label] as path 
+              FROM bot_annotation AS a 
+              WHERE a.bot_annotation_metadata_id = :bot_annotation_metadata_id
+           UNION ALL 
+              SELECT ctename.bot_annotation_id,  a.bot_annotation_metadata_id,
+                     ctename.time_created, ctename.time_updated, ctename.item_id, 
+                     ctename.key, ctename.repeat, ctename.confidence, ctename.order,
+                     ctename.value_bool, ctename.value_int, ctename.value_float, ctename.multi_int, ctename.value_str,
+                     ctename.parent, a.parent as recurse_join, 
+                    array_append(ctename.path, ((a.key, a.repeat)::annotation_label)) 
+              FROM bot_annotation AS a 
+                 JOIN ctename ON a.bot_annotation_id = ctename.recurse_join 
+        ) 
+        SELECT array_to_json(path) as label, ctename.*
+        FROM ctename 
+        WHERE recurse_join is NULL
+        ORDER BY ctename.order;
+    ''')
+
+    res = (await session.execute(stmt, {
+        'bot_annotation_metadata_id': bot_annotation_metadata_id
+    })).mappings().all()
+    ret = []
+    for r in res:
+        path = [Label.model_validate(label) for label in r['label']]
+        ret.append(BotItemAnnotation(**{**r, 'path': path}))
+    return ret
+
+
+@ensure_session_async
+async def read_scopes_for_scheme(session: AsyncSession, scheme_id: str | uuid.UUID, order_by_name: bool = False) \
+        -> list[str]:
+    """
+
+    :param scheme_id:
+    :param session:
+    :param order_by_name: if true, will order by name, otherwise by creation date.
+    :return:
+    """
     stmt = select(AssignmentScope.assignment_scope_id).where(AssignmentScope.annotation_scheme_id == scheme_id)
+    if order_by_name:
+        stmt = stmt.order_by(AssignmentScope.name)
+    else:
+        stmt = stmt.order_by(AssignmentScope.time_created)
     return [str(scope_id) for scope_id in (await session.execute(stmt)).scalars().all()]
 
 
 @ensure_session_async
-async def read_annotators(filters: AnnotationFilterObject, session: AsyncSession) -> list[UserModel]:
+async def read_annotators(session: AsyncSession, filters: AnnotationFilterObject) -> list[UserModel]:
     # list of all (unique) users that have at least one annotation in the set
     filter_join, filter_where, filter_data = filters.get_subquery()
     return [UserModel.model_validate(user) for user in (await session.execute(text(
@@ -214,13 +213,22 @@ async def read_annotators(filters: AnnotationFilterObject, session: AsyncSession
 
 
 @ensure_session_async
-async def read_labels(filters: AnnotationFilterObject,
-                      session: AsyncSession,
+async def read_users(session: AsyncSession, user_ids: list[str] | None) -> list[UserModel]:
+    if user_ids is None:
+        raise AttributeError('No users specified...')
+    stmt = select(User).where(User.user_id.in_(user_ids))
+    rslt = (await session.execute(stmt)).mappings().all()
+    return [UserModel(**u.__dict__) for u in rslt]
+
+
+@ensure_session_async
+async def read_labels(session: AsyncSession,
+                      filters: AnnotationFilterObject,
                       ignore_hierarchy: bool = True,
-                      ignore_order: bool = True) -> list[list[Label]]:
+                      ignore_repeat: bool = True) -> list[list[Label]]:
     # list of all (unique) labels in this selection
     repeat = 'a.repeat'
-    if ignore_order:  # if repeat is ignored, always forcing it to 1
+    if ignore_repeat:  # if repeat is ignored, always forcing it to 1
         repeat = '1'
     filter_join, filter_where, filter_data = filters.get_subquery()
     if ignore_hierarchy:
@@ -258,40 +266,7 @@ async def read_labels(filters: AnnotationFilterObject,
 
 
 @ensure_session_async
-async def read_bot_annotations(bot_annotation_metadata_id: str,
-                               session: AsyncSession) -> dict[str, list[GroupedBotAnnotation]]:
-    bot_annotations = (await session.execute(text(
-        "WITH RECURSIVE ctename AS ( "
-        "    SELECT a.bot_annotation_id, a.bot_annotation_metadata_id, a.time_created, a.time_updated, a.item_id, "
-        "           a.key, a.repeat,  a.value_bool, a.value_int,a.value_float, "
-        "           a.value_str, a.multi_int, a.confidence, a.parent, a.parent as recurse_join, "
-        "           ARRAY [(a.key, a.repeat)::annotation_label] as path "
-        "       FROM bot_annotation AS a "
-        "       WHERE a.bot_annotation_metadata_id = :bot_annotation_metadata_id "
-        "    UNION ALL "
-        "      SELECT ctename.bot_annotation_id, ctename.bot_annotation_metadata_id, ctename.time_created, "
-        "             ctename.time_updated, ctename.item_id, ctename.key, ctename.repeat,  ctename.value_bool, "
-        "             ctename.value_int,ctename.value_float, ctename.value_str, ctename.multi_int, "
-        "             ctename.confidence, ctename.parent, a.parent as recurse_join, "
-        "             array_append(ctename.path, ((a.key, a.repeat)::annotation_label)) "
-        "       FROM bot_annotation a "
-        "            JOIN ctename ON a.bot_annotation_id = ctename.recurse_join) "
-        "SELECT item_id, array_to_json(path) as label, json_agg(ctename.*)::jsonb->0 as bot_annotation "
-        "FROM ctename "
-        "WHERE recurse_join is NULL "
-        "GROUP BY item_id, path;"),
-        {'bot_annotation_metadata_id': bot_annotation_metadata_id})).mappings().all()
-
-    grouped_annotations = defaultdict(list)
-    for ba in bot_annotations:
-        grouped_annotations[str(ba['item_id'])].append(
-            GroupedBotAnnotation(path=ba['label'],
-                                 annotation=BotAnnotationModel.model_validate(ba['bot_annotation'])))
-    return grouped_annotations
-
-
-@ensure_session_async
-async def get_ordering(scope_id: str | uuid.UUID, session: AsyncSession) -> list[OrderingEntry]:
+async def get_ordering(session: AsyncSession, scope_id: str | uuid.UUID) -> list[OrderingEntry]:
     stmt = text('''
         SELECT row_number() over () as identifier, *
         FROM (SELECT ass.item_id::text,
@@ -311,110 +286,202 @@ async def get_ordering(scope_id: str | uuid.UUID, session: AsyncSession) -> list
         ORDER BY first_occurrence) as sub;''')
     res = (await session.execute(stmt, {'scope_id': scope_id})).mappings().all()
 
-    return [OrderingEntry(**r, key=f'{scope_id}|{r.item_id}', scope_id=str(scope_id)) for r in res]
+    return [OrderingEntry(**{**r, 'key': f'{scope_id}|{r.item_id}', 'scope_id': str(scope_id)}) for r in res]
 
 
-class ResolutionProposal(BaseModel):
-    scheme_info: AnnotationSchemeInfo
-    labels: list[FlatLabel]
-    annotators: list[UserModel]
-    ordering: list[ResolutionOrdering]
-    matrix: ResolutionMatrix
+@ensure_session_async
+async def _get_aux_data(session: AsyncSession,
+                        filters: AnnotationFilterObject,
+                        ignore_hierarchy: bool = False,
+                        ignore_repeat: bool = False) \
+        -> tuple[
+            AnnotationSchemeModel, list[FlatLabel], list[UserModel], AssignmentMap,
+            list[ItemAnnotation], list[OrderingEntry]]:
+    scheme: AnnotationSchemeModel | None = await read_annotation_scheme(annotation_scheme_id=filters.scheme_id,
+                                                                        session=session)
+    if not scheme:
+        raise NotFoundError(f'No annotation scheme for {filters.scheme_id}')
+    scopes = await read_scopes_for_scheme(scheme_id=filters.scheme_id, session=session)
+
+    annotators = await read_users(user_ids=filters.user_ids, session=session)
+    labels = labels_from_scheme(scheme,
+                                ignore_hierarchy=ignore_hierarchy,
+                                ignore_repeat=ignore_repeat,
+                                keys=filters.keys,
+                                repeats=filters.repeats)
+    if filters.scope_ids is None:
+        filter_scopes = scopes
+    else:
+        # doing it like this to retain the proper order of scopes
+        filter_scopes = [scope for scope in scopes if scope in filters.scope_ids]
+
+    item_order: list[OrderingEntry] = []
+    for scope_id in filter_scopes:
+        item_order += await get_ordering(scope_id=scope_id, session=session)
+
+    annotations: list[ItemAnnotation] = await read_item_annotations(session=session,
+                                                                    filters=filters,
+                                                                    ignore_hierarchy=ignore_hierarchy,
+                                                                    ignore_repeat=ignore_repeat)
+    logger.debug(f'Got {len(labels)} labels, {len(annotators)} annotators, {len(item_order):,} items '
+                 f'and {len(annotations):,} annotations.')
+    assignments: AssignmentMap = {
+        str(ass.assignment_id): (ass, order_entry)
+        for order_entry in item_order
+        for ass in order_entry.assignments
+    }
+    return scheme, labels, annotators, assignments, annotations, item_order
 
 
-async def get_resolved_item_annotations(strategy: ResolutionMethod,
+def _empty_matrix(item_order: list[OrderingEntry], labels: list[FlatLabel]) -> ResolutionMatrix:
+    annotation_map: ResolutionMatrix = {}
+    for order_entry in item_order:
+        annotation_map[order_entry.key] = {}
+        for label in labels:
+            annotation_map[order_entry.key][label.path_key] = ResolutionCell(
+                labels={},
+                resolution=BotAnnotationModel(bot_annotation_id=str(uuid.uuid4()),
+                                              item_id=order_entry.item_id, order=order_entry.identifier,
+                                              key=label.key, repeat=label.repeat),
+                status=ResolutionStatus.NEW)
+    return annotation_map
+
+
+def _populate_matrix_annotations(annotation_map: ResolutionMatrix,
+                                 assignments: AssignmentMap,
+                                 annotations: list[ItemAnnotation]) -> ResolutionMatrix:
+    for annotation in annotations:
+        assignment, order_entry = assignments[str(annotation.assignment_id)]
+        row_key = order_entry.key
+        col_key = path_to_string(annotation.path)
+        if row_key not in annotation_map or col_key not in annotation_map[row_key]:
+            logger.warning(f'Ignoring potentially dangerous incoherent '
+                           f'labels during resolution ({row_key} -> {col_key})')
+            continue
+
+        user_id = str(annotation.user_id)
+        if user_id not in annotation_map[row_key][col_key].labels:
+            annotation_map[row_key][col_key].labels[user_id] = []
+        entry = ResolutionUserEntry(annotation=annotation)
+        if str(annotation.assignment_id) is not None and str(annotation.assignment_id) in assignments:
+            entry.assignment = assignment
+        annotation_map[row_key][col_key].labels[user_id].append(entry)
+    return annotation_map
+
+
+@ensure_session_async
+async def get_resolved_item_annotations(session: AsyncSession,
+                                        strategy: ResolutionMethod,
                                         filters: AnnotationFilterObject,
-                                        db_engine: DatabaseEngineAsync,
                                         ignore_hierarchy: bool = False,
-                                        ignore_order: bool = False,
+                                        ignore_repeat: bool = False,
                                         include_empty: bool = True,
-                                        existing_resolution: str = None,
+                                        bot_meta: BotAnnotationResolution | None = None,
                                         include_new: bool = False,
                                         update_existing: bool = False) -> ResolutionProposal:
     """
     This method retrieves all annotations that match the selected filters and constructs a matrix
     of annotations per item (rows) and label (columns).
     The "cells" contain annotations by each user and the resolution.
-    The method also returns additional
+    The method also returns associated data
 
     :param strategy: Resolution strategy (e.g. majority vote of available user annotations)
     :param filters: see `AnnotationFilterObject`
-    :param db_engine:
+    :param session:
     :param ignore_hierarchy: When True, this will respect the nested nature of the annotation scheme
-    :param ignore_order: When True, this will ignore the order (`repeat`, e.g. primary, secondary,...) of annotations
+    :param ignore_repeat: When True, this will ignore the order (`repeat`, e.g. primary, secondary,...) of annotations
     :param include_empty: Should items without annotations be included?
-    :param existing_resolution: When set, will load an existing resolution and include its data here
+    :param bot_meta: Link to existing resolution
     :param include_new: When `existing_resolution` is set, should I include new items?
     :param update_existing: When `existing_resolution` is set, should I update existing resolutions?
     :return:
     """
     logger.debug(f'Fetching all annotations matching filters: {filters} '
-                 f'with ignore_hierarchy={ignore_hierarchy} and ignore_order={ignore_order}.')
-    filter_keys = [filters.key] if type(filters.key) is str else filters.key
-    filter_repeats = [filters.repeat] if type(filters.repeat) is str else filters.repeat
-    filter_scopes = [filters.scope_id] if type(filters.scope_id) is str else filters.scope_id
-    scheme_id = filters.scheme_id
-    async with db_engine.session() as session:  # type: AsyncSession
-        scheme: AnnotationSchemeModel = await read_annotation_scheme(annotation_scheme_id=scheme_id,
-                                                                     session=session)
-        if not scheme:
-            raise NotFoundError(f'No annotation scheme for {scheme_id}')
+                 f'with ignore_hierarchy={ignore_hierarchy} and ignore_repeat={ignore_repeat}.')
+    scheme: AnnotationSchemeModel
+    labels: list[FlatLabel]
+    annotators: list[UserModel]
+    assignments: AssignmentMap
+    annotations: list[ItemAnnotation]
+    item_order: list[OrderingEntry]
+    scheme, labels, annotators, assignments, annotations, item_order = await _get_aux_data(
+        filters=filters,
+        ignore_hierarchy=ignore_hierarchy,
+        ignore_repeat=ignore_repeat,
+        session=session)
+    label_map = {l.path_key: l for l in labels}
+    logger.debug(f'Got {len(labels)} labels, {len(annotators)} annotators, {len(item_order):,} items '
+                 f'and {len(annotations):,} annotations.')
 
-        annotators = await read_annotators(filters=filters,
-                                           session=session)
-        labels = labels_from_scheme(scheme,
-                                    ignore_hierarchy=ignore_hierarchy,
-                                    ignore_order=ignore_order,
-                                    keys=filter_keys,
-                                    repeats=filter_repeats)
-        label_map = {l.path_key: l for l in labels}
-        if filter_scopes is None:
-            filter_scopes = await read_scopes_for_scheme(scheme_id=filters.scheme_id, session=session)
+    annotation_map: ResolutionMatrix = _empty_matrix(item_order=item_order, labels=labels)
+    annotation_map = _populate_matrix_annotations(annotation_map, assignments=assignments, annotations=annotations)
 
-        item_order: list[OrderingEntry] = []
-        for scope_id in filter_scopes:
-            item_order += await get_ordering(scope_id=scope_id, session=session)
+    if bot_meta is not None:
+        # Fetch existing bot annotations (resolutions)
+        bot_annotations: list[BotItemAnnotation] = await read_bot_annotations(
+            bot_annotation_metadata_id=str(bot_meta.bot_annotation_metadata_id),
+            session=session
+        )
+        bot_annotations_map = {str(ba.bot_annotation_id): ba for ba in bot_annotations}
+        # Populate existing bot annotations (resolutions)
+        # Note: we trust that bot_meta and bot_annotations are in sync and ignore all inconsistencies
+        for r_entry in bot_meta.meta.resolutions:
+            if (r_entry.ba_id in bot_annotations_map
+                    and r_entry.order_key in annotation_map
+                    and r_entry.path_key in annotation_map[r_entry.order_key]):
+                annotation_map[r_entry.order_key][r_entry.path_key].resolution = bot_annotations_map[r_entry.ba_id]
+                # We mark it as unchanged here, this might be updated later
+                annotation_map[r_entry.order_key][r_entry.path_key].status = ResolutionStatus.UNCHANGED
 
-        annotations: list[ItemAnnotation] = await read_item_annotations(session=session,
-                                                                        filters=filters,
-                                                                        ignore_hierarchy=ignore_hierarchy,
-                                                                        ignore_order=ignore_order)
-        logger.debug(f'Got {len(labels)} labels, {len(annotators)} annotators, {len(item_order):,} items '
-                     f'and {len(annotations):,} annotations.')
-        assignments = {
-            str(ass.assignment_id): (ass, order_entry)
-            for order_entry in item_order
-            for ass in order_entry.assignments
-        }
-        annotation_map: ResolutionMatrix = {}
-        for annotation in annotations:
-            assignment, order_entry = assignments[str(annotation.assignment_id)]
-            row_key = order_entry.key
-            col_key = path_to_string(annotation.path)
-            user_id = str(annotation.user_id)
-            if row_key not in annotation_map:
-                annotation_map[row_key] = {}
-            if col_key not in annotation_map[row_key]:
-                annotation_map[row_key][col_key] = ResolutionCell(labels={})
-            if user_id not in annotation_map[row_key][col_key].labels:
-                annotation_map[row_key][col_key].labels[user_id] = []
-            entry = ResolutionUserEntry(annotation=annotation)
-            if str(annotation.assignment_id) is not None and str(annotation.assignment_id) in assignments:
-                entry.assignment = assignment
-            annotation_map[row_key][col_key].labels[user_id].append(entry)
+        # Compare old and current user annotations
+        for entry in bot_meta.meta.snapshot:
+            # Note: We are not handling the case where a previously existing annotation is now gone
+            if (entry.order_key in annotation_map
+                    and entry.path_key in annotation_map[entry.order_key]
+                    and entry.user_id in annotation_map[entry.order_key][entry.path_key].labels):
+                # Note: It might be, that the first old would match the second new annotation,
+                #       then the comparison is not aligned and wrong. More than one annotation
+                #       per user and item is rare, so we ignore the issue for simplicity.
+                for ai, elem in enumerate(annotation_map[entry.order_key][entry.path_key].labels[entry.user_id]):
+                    anno = elem.annotation
+                    if anno is not None:
+                        anno.old = AnnotationValue.model_validate(entry)
+                        # Note: The NEW case is the default, so we only need to set the other two cases
+                        if same_values(entry, anno):
+                            elem.status = ResolutionStatus.CHANGED
+                        else:
+                            elem.status = ResolutionStatus.UNCHANGED
 
-        # TODO compare existing and update status
-        # TODO drop empty
-        print(annotation_map.keys())
+        # Drop items that were not in the previous resolution
+        if not include_new:
+            known_keys = set([entry.order_key for entry in bot_meta.meta.snapshot])
+            current_keys = set(annotation_map.keys())
+            drop_keys = current_keys - known_keys
+            for key in drop_keys:
+                del annotation_map[key]
+            item_order = [io for io in item_order if io.key not in drop_keys]
+
+    if bot_meta is None or (bot_meta is not None and update_existing):
         if strategy == 'majority':
-            annotation_map = naive_majority_vote(annotation_map, label_map)
+            annotation_map = naive_majority_vote(annotation_map, label_map, fix_parent_references=False)
         else:
             raise NotImplementedError(f'Resolution strategy "{strategy}" not implemented (yet)!')
 
-        return ResolutionProposal(
-            scheme_info=AnnotationSchemeInfo(**scheme.model_dump()),
-            labels=labels,
-            annotators=annotators,
-            ordering=[ResolutionOrdering(**o.model_dump()) for o in item_order],
-            matrix=annotation_map
-        )
+    resolve_bot_annotation_parents(annotation_map, label_map)
+
+    # If requested, drop items without annotation from the matrix and the order
+    if not include_empty:
+        items_with_annotation = set([str(anno.item_id) for anno in annotations])
+        item_ids = set([str(o.item_id) for o in item_order])
+        empty_items = item_ids - items_with_annotation
+        for item_id in empty_items:
+            del annotation_map[item_id]
+        item_order = [o for o in item_order if str(o.item_id) in items_with_annotation]
+
+    return ResolutionProposal(
+        scheme_info=AnnotationSchemeInfo(**scheme.model_dump()),
+        labels=labels,
+        annotators=annotators,
+        ordering=[ResolutionOrdering(**o.model_dump()) for o in item_order],
+        matrix=annotation_map
+    )
