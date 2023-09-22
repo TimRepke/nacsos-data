@@ -54,8 +54,7 @@ class UserUpdateModel(UserBaseModel):
 
 
 class UserInDBBaseModel(UserBaseModel):
-    user_id: str | UUID | None = None
-
+    pass
     # class Config:
     #     orm_mode = True
 

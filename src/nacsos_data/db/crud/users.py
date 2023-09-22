@@ -107,12 +107,12 @@ async def create_or_update_user(user: UserModel | UserInDBModel, engine: Databas
             hashed_password = get_password_hash(password)
 
         if user_db is None:  # seems to be a new user
-            user_id = user.user_id
+            user_id: str
             if user.user_id is None:
-                user_id = str(uuid4())
+                user_id = str(uuid4())  # type: ignore[unreachable]
                 user.user_id = user_id
             else:
-                user_id = str(user_id)
+                user_id = str(user.user_id)
 
             if hashed_password is None:
                 raise ValueError('Missing password!')

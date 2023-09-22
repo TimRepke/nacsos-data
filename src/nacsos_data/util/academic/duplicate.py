@@ -300,7 +300,7 @@ def fuse_items(item1: AcademicItemModel,
             item.text = item1.text
         else:
             item.text = item2.text
-    elif item1.text is not None:
+    elif item1.text is not None:  # type: ignore[unreachable]
         item.text = item1.text
     elif item2.text is not None:
         item.text = item2.text

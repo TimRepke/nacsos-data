@@ -339,5 +339,5 @@ def generate_items_from_openalex_export(openalex_export: str | Path,
                 model = AcademicItemModel.model_validate_json(line)
             else:
                 model = translate_work(translate_doc(WorkSolr.model_validate_json(line)))
-            model.project_id = project_id
+            model.project_id = project_id  # type: ignore[assignment]
             yield model

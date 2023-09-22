@@ -241,7 +241,7 @@ def merge_scheme_and_annotations(annotation_scheme: AnnotationSchemeModel,
 
 def has_annotation(label: AnnotationSchemeLabel) -> bool:
     return label.annotation is not None \
-        and (label.annotation.value_int is not None
+        and (label.annotation.value_int is not None  # type: ignore[unreachable]
              or label.annotation.value_str is not None
              or label.annotation.value_bool is not None
              or label.annotation.value_float is not None

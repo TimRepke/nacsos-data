@@ -462,6 +462,7 @@ async def get_resolved_item_annotations(session: AsyncSession,
             item_order = [io for io in item_order if io.key not in drop_keys]
 
     if bot_meta is None or (bot_meta is not None and update_existing):
+        # FIXME: new items in an existing resolution are currently not resolved
         if strategy == 'majority':
             annotation_map = naive_majority_vote(annotation_map, label_map, fix_parent_references=False)
         else:
