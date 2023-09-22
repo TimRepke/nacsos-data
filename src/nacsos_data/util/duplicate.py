@@ -37,7 +37,7 @@ async def update_references(old_item_id: str | uuid.UUID,
     :param db_engine:
     :return:
     """
-
+    raise DeprecationWarning('The metadata in BotAnnotationMetaData changed for resolutions; Function needs updating!')
     # No updates needed in
     #  - annotation_scheme
     #  - assignment_scope
@@ -57,7 +57,7 @@ async def update_references(old_item_id: str | uuid.UUID,
     # Might need updates in `tasks`, but it's too painful for little gain.
     # May need to be done in the future, but not important for now.
 
-    async with db_engine.session() as session:  # type: AsyncSession
+    async with db_engine.session() as session:  # type: AsyncSession # type: ignore[unreachable]
 
         # Point Annotations to new Item
         n_annotations = await session.execute(

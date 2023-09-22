@@ -3,9 +3,8 @@ import uuid
 from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nacsos_data.db.crud.annotations import read_annotation_scheme
 from nacsos_data.db.engine import ensure_session_async
-from nacsos_data.db.schemas import AssignmentScope, User
+from nacsos_data.db.schemas import AssignmentScope, User, AnnotationScheme
 from nacsos_data.models.annotations import (
     AnnotationSchemeModel,
     AnnotationSchemeInfo,
@@ -28,7 +27,9 @@ from nacsos_data.models.bot_annotations import (
     ResolutionProposal,
     BotAnnotationResolution,
     ResolutionStatus,
-    AssignmentMap
+    AssignmentMap,
+    SnapshotEntry,
+    ResolutionSnapshotEntry
 )
 from nacsos_data.models.users import UserModel
 from nacsos_data.util.annotations.resolve.majority_vote import naive_majority_vote
@@ -200,6 +201,16 @@ async def read_scopes_for_scheme(session: AsyncSession, scheme_id: str | uuid.UU
 
 
 @ensure_session_async
+async def read_annotation_scheme(session: AsyncSession,
+                                 annotation_scheme_id: str | uuid.UUID) -> AnnotationSchemeModel | None:
+    stmt = select(AnnotationScheme).filter_by(annotation_scheme_id=annotation_scheme_id)
+    result = (await session.execute(stmt)).scalars().one_or_none()
+    if result is not None:
+        return AnnotationSchemeModel(**result.__dict__)
+    return None
+
+
+@ensure_session_async
 async def read_annotators(session: AsyncSession, filters: AnnotationFilterObject) -> list[UserModel]:
     # list of all (unique) users that have at least one annotation in the set
     filter_join, filter_where, filter_data = filters.get_subquery()
@@ -287,6 +298,32 @@ async def get_ordering(session: AsyncSession, scope_id: str | uuid.UUID) -> list
     res = (await session.execute(stmt, {'scope_id': scope_id})).mappings().all()
 
     return [OrderingEntry(**{**r, 'key': f'{scope_id}|{r.item_id}', 'scope_id': str(scope_id)}) for r in res]
+
+
+def dehydrate_user_annotations(matrix: ResolutionMatrix) -> list[SnapshotEntry]:
+    return [SnapshotEntry(order_key=row_key,
+                          path_key=col_key,
+                          user_id=str(user_id),
+                          item_id=str(anno.annotation.item_id),
+                          anno_id=str(anno.annotation.annotation_id),
+                          value_str=anno.annotation.value_str,
+                          value_bool=anno.annotation.value_bool,
+                          value_int=anno.annotation.value_int,
+                          value_float=anno.annotation.value_float,
+                          multi_int=anno.annotation.multi_int)
+            for row_key, row in matrix.items()
+            for col_key, cell in row.items()
+            for user_id, annos in cell.labels.items()
+            for anno in annos
+            if anno.annotation]
+
+
+def dehydrate_resolutions(matrix: ResolutionMatrix) -> list[ResolutionSnapshotEntry]:
+    return [ResolutionSnapshotEntry(order_key=row_key,
+                                    path_key=col_key,
+                                    ba_id=str(cell.resolution.bot_annotation_id))
+            for row_key, row in matrix.items()
+            for col_key, cell in row.items()]
 
 
 @ensure_session_async
@@ -414,6 +451,8 @@ async def get_resolved_item_annotations(session: AsyncSession,
                  f'and {len(annotations):,} annotations.')
 
     annotation_map: ResolutionMatrix = _empty_matrix(item_order=item_order, labels=labels)
+
+    # FIXME: in the update_existing=False case, we are still loading this (and we may want to wait for existing data)
     annotation_map = _populate_matrix_annotations(annotation_map, assignments=assignments, annotations=annotations)
 
     if bot_meta is not None:

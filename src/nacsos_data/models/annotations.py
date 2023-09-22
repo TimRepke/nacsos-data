@@ -8,6 +8,16 @@ from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel, ConfigDict
 
+# Types of Labels:
+#   - bool: stored in `Annotation.value_bool`, used for binary labels (no children)
+#   - int: stored in `Annotation.value_int`, used for extracted numbers (no children)
+#   - float: stored in `Annotation.value_float`, used for extracted numbers (no children)
+#   - single: stored in `Annotation.value_int`, single-choice annotations from list of choices (stores value)
+#   - multi: stored in `Annotation.multi_int`, multi-choice annotations from list of choices (stores list of value)
+#   - intext: tbd
+#   - str: tbd
+AnnotationSchemeLabelTypes = Literal['bool', 'str', 'float', 'int', 'single', 'multi', 'intext']
+
 
 class FlatLabelChoice(BaseModel):
     model_config = ConfigDict(extra='ignore')
@@ -44,17 +54,6 @@ class FlatLabel(BaseModel):
     max_repeat: int
     kind: AnnotationSchemeLabelTypes
     choices: list[FlatLabelChoice] | None = None
-
-
-# Types of Labels:
-#   - bool: stored in `Annotation.value_bool`, used for binary labels (no children)
-#   - int: stored in `Annotation.value_int`, used for extracted numbers (no children)
-#   - float: stored in `Annotation.value_float`, used for extracted numbers (no children)
-#   - single: stored in `Annotation.value_int`, single-choice annotations from list of choices (stores value)
-#   - multi: stored in `Annotation.multi_int`, multi-choice annotations from list of choices (stores list of value)
-#   - intext: tbd
-#   - str: tbd
-AnnotationSchemeLabelTypes = Literal['bool', 'str', 'float', 'int', 'single', 'multi', 'intext']
 
 
 class AnnotationSchemeLabelChoiceFlat(BaseModel):

@@ -29,15 +29,18 @@ from nacsos_data.models.bot_annotations import (
     BotKind,
     BotAnnotationResolution,
     ResolutionProposal,
-    ResolutionMatrix,
-    ResolutionSnapshotEntry,
-    SnapshotEntry
+    ResolutionMatrix
 )
 from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_scheme_and_annotations
 
 from . import upsert_orm, MissingIdError
 from ..engine import ensure_session_async
-from ...util.annotations.resolve import AnnotationFilterObject, get_resolved_item_annotations
+from ...util.annotations.resolve import (
+    AnnotationFilterObject,
+    get_resolved_item_annotations,
+    dehydrate_user_annotations,
+    dehydrate_resolutions
+)
 from ...util.errors import NotFoundError
 
 logger = logging.getLogger('nacsos_data.crud.annotations')
@@ -283,16 +286,6 @@ async def read_assignment_scope(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_annotation_scheme(session: AsyncSession,
-                                 annotation_scheme_id: str | uuid.UUID) -> AnnotationSchemeModel | None:
-    stmt = select(AnnotationScheme).filter_by(annotation_scheme_id=annotation_scheme_id)
-    result = (await session.execute(stmt)).scalars().one_or_none()
-    if result is not None:
-        return AnnotationSchemeModel(**result.__dict__)
-    return None
-
-
-@ensure_session_async
 async def read_annotation_scheme_for_assignment(session: AsyncSession,
                                                 assignment_id: str | uuid.UUID) -> AnnotationSchemeModel | None:
     stmt = (select(AnnotationScheme)
@@ -520,16 +513,22 @@ async def store_assignments(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_resolved_bot_annotations(session: AsyncSession,
-                                        existing_resolution: str,
-                                        include_empty: bool = True,
-                                        include_new: bool = False,
-                                        update_existing: bool = False) -> ResolutionProposal:
-    stmt = select(BotAnnotationMetaData).where(BotAnnotationMetaData.bot_annotation_metadata_id == existing_resolution)
+async def read_resolved_bot_annotation_meta(session: AsyncSession,
+                                            bot_annotation_metadata_id: str) -> BotAnnotationResolution:
+    stmt = (select(BotAnnotationMetaData)
+            .where(BotAnnotationMetaData.bot_annotation_metadata_id == bot_annotation_metadata_id))
     rslt = (await session.execute(stmt)).mappings().one_or_none()
     if rslt is None:
-        raise NotFoundError(f'No bot_annotation with id={existing_resolution}')
-    bot_meta = BotAnnotationResolution.model_validate(rslt)
+        raise NotFoundError(f'No bot_annotation with id={bot_annotation_metadata_id}')
+    return BotAnnotationResolution.model_validate(rslt)
+
+
+@ensure_session_async
+async def read_resolved_bot_annotations_for_meta(session: AsyncSession,
+                                                 bot_meta: BotAnnotationResolution,
+                                                 include_empty: bool = True,
+                                                 include_new: bool = False,
+                                                 update_existing: bool = False) -> ResolutionProposal:
     filters = AnnotationFilterObject.model_validate(bot_meta.meta.filters)
     ret: ResolutionProposal = await get_resolved_item_annotations(strategy=bot_meta.meta.algorithm,
                                                                   filters=filters,
@@ -542,30 +541,19 @@ async def read_resolved_bot_annotations(session: AsyncSession,
     return ret
 
 
-def dehydrate_user_annotations(matrix: ResolutionMatrix) -> list[SnapshotEntry]:
-    return [SnapshotEntry(order_key=row_key,
-                          path_key=col_key,
-                          user_id=str(user_id),
-                          item_id=str(anno.annotation.item_id),
-                          anno_id=str(anno.annotation.annotation_id),
-                          value_str=anno.annotation.value_str,
-                          value_bool=anno.annotation.value_bool,
-                          value_int=anno.annotation.value_int,
-                          value_float=anno.annotation.value_float,
-                          multi_int=anno.annotation.multi_int)
-            for row_key, row in matrix.items()
-            for col_key, cell in row.items()
-            for user_id, annos in cell.labels.items()
-            for anno in annos
-            if anno.annotation]
-
-
-def dehydrate_resolutions(matrix: ResolutionMatrix) -> list[ResolutionSnapshotEntry]:
-    return [ResolutionSnapshotEntry(order_key=row_key,
-                                    path_key=col_key,
-                                    ba_id=str(cell.resolution.bot_annotation_id))
-            for row_key, row in matrix.items()
-            for col_key, cell in row.items()]
+@ensure_session_async
+async def read_resolved_bot_annotations(session: AsyncSession,
+                                        existing_resolution: str,
+                                        include_empty: bool = True,
+                                        include_new: bool = False,
+                                        update_existing: bool = False) -> ResolutionProposal:
+    bot_meta = await read_resolved_bot_annotation_meta(bot_annotation_metadata_id=existing_resolution,
+                                                       session=session)
+    return await read_resolved_bot_annotations_for_meta(session=session,
+                                                        bot_meta=bot_meta,
+                                                        include_new=include_new,
+                                                        include_empty=include_empty,
+                                                        update_existing=update_existing)
 
 
 @ensure_session_async

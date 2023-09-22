@@ -17,49 +17,7 @@ from .users import UserModel
 
 AnnotationFiltersType = dict[str, str | list[str] | int | list[int] | None]
 
-
-class DehydratedAssignment(BaseModel):
-    assignment_id: str
-    user_id: str
-    item_id: str
-    username: str
-    status: AssignmentStatus
-    order: int
-
-
-class ResolutionOrdering(BaseModel):
-    model_config = ConfigDict(extra='ignore')
-    identifier: int
-    first_occurrence: int
-    item_id: str
-    scope_id: str
-    key: str
-
-
-class OrderingEntry(ResolutionOrdering):
-    assignments: list[DehydratedAssignment]
-
-
-class ResolutionStatus(str, Enum):
-    NEW = 'NEW'
-    CHANGED = 'CHANGED'
-    UNCHANGED = 'UNCHANGED'
-
-
-class ResolutionUserEntry(BaseModel):
-    assignment: DehydratedAssignment | None = None
-    annotation: ItemAnnotation | None = None
-    status: ResolutionStatus = ResolutionStatus.UNCHANGED
-
-
-class ResolutionCell(BaseModel):
-    labels: dict[str, list[ResolutionUserEntry]]  # username: ResolutionUserEntry[]
-    resolution: BotAnnotationModel
-    status: ResolutionStatus = ResolutionStatus.UNCHANGED
-
-
-AssignmentMap = dict[str, tuple[DehydratedAssignment, OrderingEntry]]
-ResolutionMatrix = dict[str, dict[str, ResolutionCell]]
+ResolutionMethod = Literal['majority', 'first', 'last', 'trust']
 
 
 class AnnotationFilters(BaseModel):
@@ -107,17 +65,6 @@ class AnnotationFilters(BaseModel):
         return [self.repeat] if type(self.repeat) is int else self.repeat  # type: ignore[return-value]
 
 
-class ResolutionProposal(BaseModel):
-    scheme_info: AnnotationSchemeInfo
-    labels: list[FlatLabel]
-    annotators: list[UserModel]
-    ordering: list[ResolutionOrdering]
-    matrix: ResolutionMatrix
-
-
-ResolutionMethod = Literal['majority', 'first', 'last', 'trust']
-
-
 class SnapshotEntry(AnnotationValue):
     # values are inherited
     order_key: str  # see `ResolutionOrdering.key` (row in matrix)
@@ -133,7 +80,7 @@ class ResolutionSnapshotEntry(BaseModel):
     ba_id: str  # related `bot_annotation.bot_annotation_id`
 
 
-class BotMetaResolve(BaseModel):
+class BotMetaResolveBase(BaseModel):
     # the algorithm used to (auto-)resolve conflicting annotations
     algorithm: ResolutionMethod
     # defines the "scope" of labels to include for the resolver
@@ -142,6 +89,9 @@ class BotMetaResolve(BaseModel):
     ignore_repeat: bool
     # (optional) dictionary of user UUID -> float weights (i.e. trust in the user for weighted majority votes)
     trust: dict[str, float] | None = None
+
+
+class BotMetaResolve(BotMetaResolveBase):
     # snapshot of the annotations and bot_annotations used to resolve this
     snapshot: list[SnapshotEntry]
     resolutions: list[ResolutionSnapshotEntry]
@@ -218,3 +168,55 @@ class BotAnnotationModel(AnnotationValue):
 class BotItemAnnotation(BotAnnotationModel):
     path: list[Label]
     old: AnnotationValue | None = None
+
+
+class DehydratedAssignment(BaseModel):
+    assignment_id: str
+    user_id: str
+    item_id: str
+    username: str
+    status: AssignmentStatus
+    order: int
+
+
+class ResolutionOrdering(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    identifier: int
+    first_occurrence: int
+    item_id: str
+    scope_id: str
+    key: str
+
+
+class OrderingEntry(ResolutionOrdering):
+    assignments: list[DehydratedAssignment]
+
+
+class ResolutionStatus(str, Enum):
+    NEW = 'NEW'
+    CHANGED = 'CHANGED'
+    UNCHANGED = 'UNCHANGED'
+
+
+class ResolutionUserEntry(BaseModel):
+    assignment: DehydratedAssignment | None = None
+    annotation: ItemAnnotation | None = None
+    status: ResolutionStatus = ResolutionStatus.UNCHANGED
+
+
+class ResolutionCell(BaseModel):
+    labels: dict[str, list[ResolutionUserEntry]]  # username: ResolutionUserEntry[]
+    resolution: BotAnnotationModel
+    status: ResolutionStatus = ResolutionStatus.UNCHANGED
+
+
+AssignmentMap = dict[str, tuple[DehydratedAssignment, OrderingEntry]]
+ResolutionMatrix = dict[str, dict[str, ResolutionCell]]
+
+
+class ResolutionProposal(BaseModel):
+    scheme_info: AnnotationSchemeInfo
+    labels: list[FlatLabel]
+    annotators: list[UserModel]
+    ordering: list[ResolutionOrdering]
+    matrix: ResolutionMatrix

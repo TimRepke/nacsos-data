@@ -11,3 +11,5 @@ httpx[http2]==0.25.0
 passlib==1.7.4
 rispy==0.8.1
 lark==1.1.7
+scipy==1.11.2
+numpy==1.26.0
