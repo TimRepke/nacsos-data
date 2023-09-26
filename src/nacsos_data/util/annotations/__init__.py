@@ -6,9 +6,52 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.engine import ensure_session_async
 from nacsos_data.models.annotations import AnnotationSchemeModel, AnnotationSchemeLabel, Label, ItemAnnotation
-from nacsos_data.models.bot_annotations import ResolutionSnapshotEntry, ResolutionMatrix, SnapshotEntry, OrderingEntry, \
-    BotItemAnnotation
-from nacsos_data.util.annotations.resolve import AnnotationFilterObject
+from nacsos_data.models.bot_annotations import (
+    ResolutionSnapshotEntry,
+    ResolutionMatrix,
+    SnapshotEntry,
+    OrderingEntry,
+    BotItemAnnotation, AnnotationFiltersType, AnnotationFilters
+)
+from nacsos_data.util.errors import InvalidFilterError
+
+
+class AnnotationFilterObject(AnnotationFilters):
+    def get_subquery(self) -> tuple[str, str, AnnotationFiltersType]:
+        where = []
+        filters = self.get_filters()
+        for db_col, key in [('ass.assignment_scope_id', 'scope_id'),
+                            ('a.annotation_scheme_id', 'scheme_id'),
+                            ('a.user_id', 'user_id'),
+                            ('a.key', 'key'),
+                            ('a.repeat', 'repeat')]:
+            if filters.get(key) is not None:
+                if type(filters[key]) == list:
+                    where.append(f' {db_col} = ANY(:{key}) ')
+                else:
+                    where.append(f' {db_col} = :{key} ')
+
+        if len(where) == 0:
+            raise InvalidFilterError('You did not specify any valid filter.')
+
+        join = f''
+        if filters.get('scope_id') is not None:
+            join = f' JOIN assignment ass on ass.assignment_id = a.assignment_id '
+
+        return join, ' AND '.join(where), filters
+
+    def get_filters(self) -> AnnotationFiltersType:
+        ret = {}
+        for key, value in self.model_dump().items():
+            if value is not None:
+                if type(value) == list:
+                    if len(value) == 1:
+                        ret[key] = value[0]
+                    else:
+                        ret[key] = list(value)
+                else:
+                    ret[key] = value
+        return ret
 
 
 def unravel_annotation_scheme_keys(scheme: AnnotationSchemeModel) -> list[str]:

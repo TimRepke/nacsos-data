@@ -1,4 +1,4 @@
-def get_new_label_batches(old_seq: list[list[int]], new_seq: list[list[int]]):
+def get_new_label_batches(old_seq: list[list[int]], new_seq: list[list[int]]) -> list[list[int]]:
     """
     When performing updates to evaluation metrics, you sometimes only want to focus on the new data.
     This method compares the two sequences for validity (only differences at the end of the sequence) and
@@ -27,7 +27,7 @@ def get_new_label_batches(old_seq: list[list[int]], new_seq: list[list[int]]):
         if old_batch_v != new_batch_v:
             raise ValueError('Labels in the beginning of the sequence changed, please recompute fully.')
 
-    new_data = []
+    new_data: list[list[int]] = []
     # The last batch from the old data got longer, so add the rest of that to our diff set
     if len(last_old_seq) < len(last_new_seq):
         new_data.append(last_new_seq[len(last_old_seq):])

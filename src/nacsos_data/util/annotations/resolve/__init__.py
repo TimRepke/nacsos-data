@@ -8,77 +8,42 @@ from nacsos_data.db.schemas import AssignmentScope, User, AnnotationScheme
 from nacsos_data.models.annotations import (
     AnnotationSchemeModel,
     AnnotationSchemeInfo,
+    AnnotationValue,
     ItemAnnotation,
     FlatLabel,
-    AnnotationValue,
     Label
 )
 from nacsos_data.models.bot_annotations import (
-    AnnotationFilters,
-    AnnotationFiltersType,
-    ResolutionMethod,
-    BotAnnotationModel,
-    ResolutionUserEntry,
-    ResolutionCell,
-    ResolutionMatrix,
-    OrderingEntry,
-    ResolutionOrdering,
-    BotItemAnnotation,
-    ResolutionProposal,
     BotAnnotationResolution,
+    ResolutionUserEntry,
+    ResolutionOrdering,
+    ResolutionProposal,
+    BotAnnotationModel,
+    BotItemAnnotation,
+    ResolutionMatrix,
+    ResolutionMethod,
     ResolutionStatus,
+    ResolutionCell,
+    OrderingEntry,
     AssignmentMap
 )
 from nacsos_data.models.users import UserModel
-from nacsos_data.util.annotations import read_item_annotations, get_ordering, read_bot_annotations
+from nacsos_data.util.annotations import (
+    AnnotationFilterObject,
+    read_item_annotations,
+    read_bot_annotations,
+    get_ordering
+)
 from nacsos_data.util.annotations.resolve.majority_vote import naive_majority_vote
 from nacsos_data.util.annotations.validation import (
+    resolve_bot_annotation_parents,
     labels_from_scheme,
     path_to_string,
-    resolve_bot_annotation_parents,
     same_values
 )
-from nacsos_data.util.errors import NotFoundError, InvalidFilterError
+from nacsos_data.util.errors import NotFoundError
 
 logger = logging.getLogger('nacsos_data.util.annotations.resolve')
-
-
-class AnnotationFilterObject(AnnotationFilters):
-    def get_subquery(self) -> tuple[str, str, AnnotationFiltersType]:
-        where = []
-        filters = self.get_filters()
-        for db_col, key in [('ass.assignment_scope_id', 'scope_id'),
-                            ('a.annotation_scheme_id', 'scheme_id'),
-                            ('a.user_id', 'user_id'),
-                            ('a.key', 'key'),
-                            ('a.repeat', 'repeat')]:
-            if filters.get(key) is not None:
-                if type(filters[key]) == list:
-                    where.append(f' {db_col} = ANY(:{key}) ')
-                else:
-                    where.append(f' {db_col} = :{key} ')
-
-        if len(where) == 0:
-            raise InvalidFilterError('You did not specify any valid filter.')
-
-        join = f''
-        if filters.get('scope_id') is not None:
-            join = f' JOIN assignment ass on ass.assignment_id = a.assignment_id '
-
-        return join, ' AND '.join(where), filters
-
-    def get_filters(self) -> AnnotationFiltersType:
-        ret = {}
-        for key, value in self.model_dump().items():
-            if value is not None:
-                if type(value) == list:
-                    if len(value) == 1:
-                        ret[key] = value[0]
-                    else:
-                        ret[key] = list(value)
-                else:
-                    ret[key] = value
-        return ret
 
 
 @ensure_session_async
