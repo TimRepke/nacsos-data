@@ -8,6 +8,7 @@ from .users import User, AuthToken
 from .imports import Import, m2m_import_item_table
 from .pipeline import Task
 from .highlight import Highlighter
+from .annotation_tracker import AnnotationTracker
 
 from .items import ItemType, ItemTypeLiteral
 from .items.base import Item
@@ -34,4 +35,6 @@ __all__ = ['Base',
            # Schemas for pipelines
            'Task',
            # Schemas for text highlighting
-           'Highlighter']
+           'Highlighter',
+           # Schemas for annotation statistics
+           'AnnotationTracker']

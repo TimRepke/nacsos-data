@@ -35,11 +35,13 @@ from nacsos_data.util.annotations.validation import validate_annotated_assignmen
 
 from . import upsert_orm, MissingIdError
 from ..engine import ensure_session_async
+from ...util.annotations import (
+    dehydrate_user_annotations,
+    dehydrate_resolutions
+)
 from ...util.annotations.resolve import (
     AnnotationFilterObject,
     get_resolved_item_annotations,
-    dehydrate_user_annotations,
-    dehydrate_resolutions
 )
 from ...util.errors import NotFoundError
 

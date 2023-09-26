@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from .annotations import AnnotationScheme
     from .bot_annotations import BotAnnotationMetaData
     from .imports import Import
+    from .annotation_tracker import AnnotationTracker
 
 
 class Project(Base):
@@ -63,6 +64,8 @@ class Project(Base):
                                                                                           cascade='all, delete')
     annotation_schemes: Relationship['AnnotationScheme'] = relationship('AnnotationScheme',
                                                                         cascade='all, delete')
+    annotation_trackers: Relationship['AnnotationTracker'] = relationship('AnnotationTracker',
+                                                                          cascade='all, delete')
     imports: Relationship['Import'] = relationship('Import',
                                                    cascade='all, delete')
 

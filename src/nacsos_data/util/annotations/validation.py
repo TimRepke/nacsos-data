@@ -11,7 +11,8 @@ from nacsos_data.models.annotations import (
     AnnotationSchemeLabelChoiceFlat,
     FlatLabelChoice,
     FlatLabel,
-    Label, AnnotationValue
+    Label,
+    AnnotationValue
 )
 from nacsos_data.models.bot_annotations import ResolutionMatrix, ResolutionCell  # noqa: F401
 
