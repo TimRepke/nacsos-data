@@ -144,8 +144,8 @@ async def read_users(session: AsyncSession, user_ids: list[str] | None) -> list[
     if user_ids is None:
         raise AttributeError('No users specified...')
     stmt = select(User).where(User.user_id.in_(user_ids))
-    rslt = (await session.execute(stmt)).mappings().all()
-    return [UserModel(**u.__dict__) for u in rslt]
+    rslt = (await session.execute(stmt)).scalars().all()
+    return [UserModel.model_validate(u.__dict__) for u in rslt]
 
 
 @ensure_session_async

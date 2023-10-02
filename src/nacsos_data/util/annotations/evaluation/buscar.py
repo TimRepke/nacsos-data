@@ -24,11 +24,12 @@ def calculate_h0(labels_: npt.ArrayLike, n_docs: int, recall_target: float = .95
 
     # Number of relevant documents we have seen
     r_seen = labels.sum()
-
+    print(r_seen)
     # Reverse the list so we can later construct the urns
     urns = labels[::-1]  # Urns of previous 1,2,...,N documents
     urn_sizes = np.arange(urns.shape[0]) + 1  # The sizes of these urns
-
+    print(urns)
+    print(urn_sizes)
     # Now we calculate k_hat, which is the minimum number of documents there would have to be
     # in each of our urns for the urn to be in keeping with our null hypothesis
     # that we have missed our target
@@ -39,7 +40,9 @@ def calculate_h0(labels_: npt.ArrayLike, n_docs: int, recall_target: float = .95
                 urns.cumsum()  # before each urn
         )
     )
-
+    print(k_hat)
+    print(urns.cumsum())
+    print(n_docs - (urns.shape[0] - urn_sizes))
     # Test the null hypothesis that a given recall target has been missed
     p: npt.NDArray[np.float_] = hypergeom.cdf(  # the probability of observing
         urns.cumsum(),  # the number of relevant documents in the sample
@@ -47,6 +50,8 @@ def calculate_h0(labels_: npt.ArrayLike, n_docs: int, recall_target: float = .95
         k_hat,  # where K_hat docs in the population are actually relevant
         urn_sizes  # after observing this many documents
     )
+
+    print(p)
 
     # We computed this for all, so only return the smallest
     p_min: float = p.min()
@@ -82,9 +87,9 @@ def calculate_h0s(labels_: npt.ArrayLike,
         yield n_seen, p_h0
 
 
-def calculate_h0s_for_batches(labels_: npt.ArrayLike,
+def calculate_h0s_for_batches(labels: npt.ArrayLike,
                               n_docs: int,
-                              recall_target: float = .95) -> Iterator[tuple[int, float]]:
+                              recall_target: float = .95) -> Iterator[tuple[int, float | None]]:
     """
     Calculates the p-score for H0 after each batch of labels.
     Similar to `calculate_h0s`, but we assume that batches are determined beforehand
@@ -96,18 +101,21 @@ def calculate_h0s_for_batches(labels_: npt.ArrayLike,
     :param recall_target:
     :return:
     """
-    labels: npt.NDArray[np.int_] = (labels_ if type(labels_) is np.ndarray
-                                    else np.array(labels_, dtype=np.int_))
-
+    pos = 0
     for batch_labels in labels:
         p_h0 = calculate_h0(batch_labels, n_docs=n_docs, recall_target=recall_target)
-        yield len(batch_labels), p_h0
 
-        if p_h0 < (1.0 - recall_target):
+        if np.isnan(p_h0):
+            p_h0 = None
+
+        pos += len(batch_labels)
+        yield pos, p_h0
+
+        if p_h0 is not None and p_h0 < (1.0 - recall_target):
             break
 
 
-def calculate_stopping_metric_for_batches(labels_: npt.ArrayLike,
+def calculate_stopping_metric_for_batches(labels: npt.ArrayLike,
                                           n_docs: int,
                                           recall_target: float = .95) -> tuple[H0Series, list[float]]:
     """
@@ -118,10 +126,7 @@ def calculate_stopping_metric_for_batches(labels_: npt.ArrayLike,
     :param recall_target:
     :return:
     """
-    labels: npt.NDArray[np.int_] = (labels_ if type(labels_) is np.ndarray
-                                    else np.array(labels_, dtype=np.int_))
-
-    p_h0s: H0Series = list(calculate_h0s_for_batches(labels_=labels_,
+    p_h0s: H0Series = list(calculate_h0s_for_batches(labels=labels,
                                                      recall_target=recall_target,
                                                      n_docs=n_docs))
 
@@ -150,10 +155,15 @@ def calculate_stopping_metric(labels_: npt.ArrayLike,
     return p_h0s, compute_recall(labels)
 
 
-def compute_recall(labels_: npt.ArrayLike) -> list[float]:
+def compute_recall(labels_: npt.ArrayLike) -> list[float | None]:
+    """
+    Takes 1D list of integers (or np.array) and returns recall at each label.
+    :param labels_:
+    :return:
+    """
     labels: npt.NDArray[np.int_] = (labels_ if type(labels_) is np.ndarray
                                     else np.array(labels_, dtype=np.int_))
     n_seen_relevant = labels.sum()
-    recall: npt.NDArray[np.float_] = labels[-1].cumsum() / n_seen_relevant
+    recall: npt.NDArray[np.float_] = labels.cumsum() / n_seen_relevant
     recall_lst: list[float] = recall.tolist()
-    return recall_lst
+    return [ri if not np.isnan(ri) else None for ri in recall_lst]

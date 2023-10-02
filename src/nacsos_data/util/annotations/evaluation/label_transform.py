@@ -101,8 +101,8 @@ async def get_annotations(session: AsyncSession, source_ids: list[str] | None = 
                                source_id,
                                'H'                                                                   as source_type,
                                min(ass."order")                                                      as item_order,
-                               ann.item_id,
-                               ann.key,
+                               ann.item_id                                                           as item_id,
+                               ann.key                                                               as key,
                                array_agg(ann.value_int) FILTER ( WHERE ann.value_int is not null )   as values_int,
                                mode() WITHIN GROUP ( ORDER BY ann.value_int )                        as value_int,
                                array_agg(ann.value_bool) FILTER ( WHERE ann.value_bool is not null ) as values_bool,
@@ -110,24 +110,24 @@ async def get_annotations(session: AsyncSession, source_ids: list[str] | None = 
                         FROM sources
                                  LEFT JOIN assignment ass ON ass.assignment_scope_id = source_id::uuid
                                  LEFT JOIN annotation ann ON ann.assignment_id = ass.assignment_id
-                        WHERE ass.item_id is not null
+                        WHERE ass.item_id is not null AND ann.key is not null
                         GROUP BY source_order, source_id, ann.item_id, ann.key
-
+        
                         UNION
-
+        
                         SELECT source_order,
                                source_id,
                                'R'                                                                 as source_type,
                                min(ba."order")                                                     as item_order,
-                               ba.item_id,
-                               ba.key,
+                               ba.item_id                                                          as item_id,
+                               ba.key                                                              as key,
                                array_agg(ba.value_int) FILTER ( WHERE ba.value_int is not null )   as values_int,
                                mode() WITHIN GROUP ( ORDER BY ba.value_int )                       as value_int,
                                array_agg(ba.value_bool) FILTER ( WHERE ba.value_bool is not null ) as values_bool,
                                mode() WITHIN GROUP ( ORDER BY ba.value_bool )                      as value_bool
                         FROM sources
                                  LEFT JOIN bot_annotation ba ON ba.bot_annotation_metadata_id = source_id::uuid
-                        WHERE ba.item_id is not null
+                        WHERE ba.item_id is not null AND ba.key is not null
                         GROUP BY source_order, source_id, ba.item_id, ba.key)
         SELECT source_order,
                source_id,

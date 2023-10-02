@@ -57,7 +57,7 @@ with engine.session() as session:
     print(item_ids)
 
     scope = AssignmentScope(annotation_scheme_id=SCHEME_ID,
-                            name='Test Scope',
+                            name='Test Scope 2',
                             description='programmatically generated set of annotations/assignments for testing')
     session.add(scope)
     session.commit()

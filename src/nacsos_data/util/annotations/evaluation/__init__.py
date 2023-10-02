@@ -9,6 +9,9 @@ def get_new_label_batches(old_seq: list[list[int]], new_seq: list[list[int]]) ->
     :param new_seq:
     :return:
     """
+    if len(old_seq) == 0:
+        return new_seq
+
     if len(old_seq) > len(new_seq):  # We have fewer batches than before
         raise ValueError('The old sequence should never be longer than the new sequence of labels!')
 
