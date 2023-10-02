@@ -24,12 +24,11 @@ def calculate_h0(labels_: npt.ArrayLike, n_docs: int, recall_target: float = .95
 
     # Number of relevant documents we have seen
     r_seen = labels.sum()
-    print(r_seen)
+
     # Reverse the list so we can later construct the urns
     urns = labels[::-1]  # Urns of previous 1,2,...,N documents
     urn_sizes = np.arange(urns.shape[0]) + 1  # The sizes of these urns
-    print(urns)
-    print(urn_sizes)
+
     # Now we calculate k_hat, which is the minimum number of documents there would have to be
     # in each of our urns for the urn to be in keeping with our null hypothesis
     # that we have missed our target
@@ -40,9 +39,7 @@ def calculate_h0(labels_: npt.ArrayLike, n_docs: int, recall_target: float = .95
                 urns.cumsum()  # before each urn
         )
     )
-    print(k_hat)
-    print(urns.cumsum())
-    print(n_docs - (urns.shape[0] - urn_sizes))
+
     # Test the null hypothesis that a given recall target has been missed
     p: npt.NDArray[np.float_] = hypergeom.cdf(  # the probability of observing
         urns.cumsum(),  # the number of relevant documents in the sample
@@ -50,8 +47,6 @@ def calculate_h0(labels_: npt.ArrayLike, n_docs: int, recall_target: float = .95
         k_hat,  # where K_hat docs in the population are actually relevant
         urn_sizes  # after observing this many documents
     )
-
-    print(p)
 
     # We computed this for all, so only return the smallest
     p_min: float = p.min()
@@ -96,7 +91,7 @@ def calculate_h0s_for_batches(labels: npt.ArrayLike,
     and we receive the batched sequence of annotations. This is useful, e.g. when batches are
     based on assignment scopes in the platform.
 
-    :param labels_: array of arrays of 0s (exclude) and 1s (include) screening annotations
+    :param labels: array of arrays of 0s (exclude) and 1s (include) screening annotations
     :param n_docs:
     :param recall_target:
     :return:
@@ -121,7 +116,7 @@ def calculate_stopping_metric_for_batches(labels: npt.ArrayLike,
     """
     Calculates the p-score for H0 after each batch of labels  and recall after each label.
 
-    :param labels_: array of arrays of 0s (exclude) and 1s (include) screening annotations
+    :param labels: array of arrays of 0s (exclude) and 1s (include) screening annotations
     :param n_docs:
     :param recall_target:
     :return:

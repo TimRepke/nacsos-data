@@ -31,7 +31,8 @@ from nacsos_data.models.bot_annotations import (
     ResolutionProposal,
     ResolutionMatrix
 )
-from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_scheme_and_annotations
+from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_scheme_and_annotations, \
+    has_values
 
 from . import upsert_orm, MissingIdError
 from ..engine import ensure_session_async
@@ -519,10 +520,10 @@ async def read_resolved_bot_annotation_meta(session: AsyncSession,
                                             bot_annotation_metadata_id: str) -> BotAnnotationResolution:
     stmt = (select(BotAnnotationMetaData)
             .where(BotAnnotationMetaData.bot_annotation_metadata_id == bot_annotation_metadata_id))
-    rslt = (await session.execute(stmt)).mappings().one_or_none()
+    rslt = (await session.execute(stmt)).scalars().one_or_none()
     if rslt is None:
         raise NotFoundError(f'No bot_annotation with id={bot_annotation_metadata_id}')
-    return BotAnnotationResolution.model_validate(rslt)
+    return BotAnnotationResolution.model_validate(rslt.__dict__)
 
 
 @ensure_session_async
@@ -531,7 +532,7 @@ async def read_resolved_bot_annotations_for_meta(session: AsyncSession,
                                                  include_empty: bool = True,
                                                  include_new: bool = False,
                                                  update_existing: bool = False) -> ResolutionProposal:
-    filters = AnnotationFilterObject.model_validate(bot_meta.meta.filters)
+    filters = AnnotationFilterObject.model_validate(bot_meta.meta.filters.model_dump())
     ret: ResolutionProposal = await get_resolved_item_annotations(strategy=bot_meta.meta.algorithm,
                                                                   filters=filters,
                                                                   ignore_hierarchy=bot_meta.meta.ignore_hierarchy,
@@ -588,11 +589,14 @@ async def store_resolved_bot_annotations(session: AsyncSession,
     # We are assuming, that the parent linkages are already done!
     for row in matrix.values():
         for cell in row.values():
-            if cell.resolution:
-                session.add(BotAnnotation(**{
-                    **cell.resolution.model_dump(),
-                    'bot_annotation_metadata_id': meta_uuid
-                }))
+            if cell.resolution and has_values(cell.resolution):
+                ba_dump = cell.resolution.model_dump()
+                ba_dump['bot_annotation_metadata_id'] = meta_uuid
+                ba_dump['bot_annotation_id'] = uuid.UUID(ba_dump['bot_annotation_id'])
+                session.add(BotAnnotation(**ba_dump))
+            # FIXME: When a parent is empty, it will be excluded, leading to a missing foreign key error!
+            #        However, just adding all BA's will add lots of junk to the database...
+
     await session.commit()
 
     return str(meta_uuid)
