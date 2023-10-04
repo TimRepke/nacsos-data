@@ -103,6 +103,7 @@ def calculate_h0s_for_batches(labels: npt.ArrayLike,
         if np.isnan(p_h0):
             p_h0 = None
 
+        print(pos, len(batch_labels))
         pos += len(batch_labels)
         yield pos, p_h0
 

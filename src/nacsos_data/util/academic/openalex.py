@@ -119,7 +119,7 @@ class SearchResult(BaseModel):
 
 async def get_async(url: str) -> SearchResult:
     async with httpx.AsyncClient() as client:
-        request = await client.get(url)
+        request = await client.get(url, timeout=60)
         response = request.json()
         logger.debug(f'Received response from OpenAlex: {response["responseHeader"]}')
         return SearchResult(
@@ -168,7 +168,7 @@ async def query_async(query: str,
         })
 
     async with httpx.AsyncClient() as client:
-        request = await client.post(f'{openalex_endpoint}/select', data=params)
+        request = await client.post(f'{openalex_endpoint}/select', data=params, timeout=60)
         response = request.json()
         logger.debug(f'Received response from OpenAlex: {response["responseHeader"]}')
 
@@ -237,7 +237,7 @@ def generate_docs_from_openalex(query: str,
         batch_i += 1
         log.info(f'Running query for batch {batch_i} with cursor "{params["cursorMark"]}"')
         t2 = time()
-        res = httpx.post(f'{openalex_endpoint}/select', data=params).json()
+        res = httpx.post(f'{openalex_endpoint}/select', data=params, timeout=60).json()
 
         next_curser = res.get('nextCursorMark')
         params['cursorMark'] = next_curser
