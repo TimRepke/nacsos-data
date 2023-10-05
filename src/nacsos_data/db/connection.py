@@ -3,7 +3,7 @@ from urllib.parse import quote
 
 from pydantic_settings import SettingsConfigDict, BaseSettings
 from pydantic.networks import PostgresDsn
-from pydantic import field_validator, FieldValidationInfo
+from pydantic import field_validator, ValidationInfo
 
 from .engine import DatabaseEngine, DatabaseEngineAsync
 
@@ -20,7 +20,7 @@ class DatabaseConfig(BaseSettings):
     CONNECTION_STR: PostgresDsn | None = None
 
     @field_validator('CONNECTION_STR', mode='before')
-    def build_connection_string(cls, v: str | None, info: FieldValidationInfo) -> PostgresDsn:
+    def build_connection_string(cls, v: str | None, info: ValidationInfo) -> PostgresDsn:
         assert info.config is not None
 
         if isinstance(v, str):

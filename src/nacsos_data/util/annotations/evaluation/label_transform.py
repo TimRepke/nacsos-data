@@ -112,9 +112,9 @@ async def get_annotations(session: AsyncSession, source_ids: list[str] | None = 
                                  LEFT JOIN annotation ann ON ann.assignment_id = ass.assignment_id
                         WHERE ass.item_id is not null AND ann.key is not null
                         GROUP BY source_order, source_id, ann.item_id, ann.key
-        
+
                         UNION
-        
+
                         SELECT source_order,
                                source_id,
                                'R'                                                                 as source_type,

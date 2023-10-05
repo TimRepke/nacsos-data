@@ -6,8 +6,12 @@ import numpy.typing as npt
 
 from nacsos_data.models.annotation_tracker import H0Series
 
+Array = np.ndarray[tuple[int], np.dtype[np.int64]]
+ArrayOrList = Array | list[int]
+ArrayOrListList = Array | list[list[int]]
 
-def calculate_h0(labels_: npt.ArrayLike, n_docs: int, recall_target: float = .95) -> float:
+
+def calculate_h0(labels_: ArrayOrList, n_docs: int, recall_target: float = .95) -> float | None:
     """
     TL;DR: Calculate stopping criterion at this point in time.
 
@@ -50,13 +54,16 @@ def calculate_h0(labels_: npt.ArrayLike, n_docs: int, recall_target: float = .95
 
     # We computed this for all, so only return the smallest
     p_min: float = p.min()
+
+    if np.isnan(p_min):
+        return None
     return p_min
 
 
-def calculate_h0s(labels_: npt.ArrayLike,
+def calculate_h0s(labels_: ArrayOrList,
                   n_docs: int,
                   recall_target: float = .95,
-                  batch_size: int = 100) -> Iterator[tuple[int, float]]:
+                  batch_size: int = 100) -> Iterator[tuple[int, float | None]]:
     """
     Calculates the p-score for H0 after each set of `batch_size` labels.
 
@@ -66,15 +73,15 @@ def calculate_h0s(labels_: npt.ArrayLike,
     :param batch_size: H0 will be calculated after each batch
     :return:
     """
-    labels: npt.NDArray[np.int_] = (labels_ if type(labels_) is np.ndarray
-                                    else np.array(labels_, dtype=np.int_))
+    labels: Array = (labels_ if type(labels_) is np.ndarray
+                     else np.array(labels_, dtype=np.int_))
     n_seen = labels.shape[0]
     for n_seen_batch in range(batch_size, n_seen, batch_size):
         batch_labels = labels[:n_seen_batch]
         p_h0 = calculate_h0(batch_labels, n_docs=n_docs, recall_target=recall_target)
         yield n_seen_batch, p_h0
 
-        if p_h0 < (1.0 - recall_target):
+        if p_h0 is not None and p_h0 < (1.0 - recall_target):
             break
     else:  # Called, when we didn't break (did not meet the target)
         # There might be one more step if n_seen is not a multiple of batch_size
@@ -82,7 +89,7 @@ def calculate_h0s(labels_: npt.ArrayLike,
         yield n_seen, p_h0
 
 
-def calculate_h0s_for_batches(labels: npt.ArrayLike,
+def calculate_h0s_for_batches(labels: list[list[int]],
                               n_docs: int,
                               recall_target: float = .95) -> Iterator[tuple[int, float | None]]:
     """
@@ -98,12 +105,8 @@ def calculate_h0s_for_batches(labels: npt.ArrayLike,
     """
     pos = 0
     for batch_labels in labels:
-        p_h0 = calculate_h0(batch_labels, n_docs=n_docs, recall_target=recall_target)
+        p_h0: float | None = calculate_h0(batch_labels, n_docs=n_docs, recall_target=recall_target)
 
-        if np.isnan(p_h0):
-            p_h0 = None
-
-        print(pos, len(batch_labels))
         pos += len(batch_labels)
         yield pos, p_h0
 
@@ -111,9 +114,9 @@ def calculate_h0s_for_batches(labels: npt.ArrayLike,
             break
 
 
-def calculate_stopping_metric_for_batches(labels: npt.ArrayLike,
+def calculate_stopping_metric_for_batches(labels: list[list[int]],
                                           n_docs: int,
-                                          recall_target: float = .95) -> tuple[H0Series, list[float]]:
+                                          recall_target: float = .95) -> tuple[H0Series, list[float | None]]:
     """
     Calculates the p-score for H0 after each batch of labels  and recall after each label.
 
@@ -129,10 +132,10 @@ def calculate_stopping_metric_for_batches(labels: npt.ArrayLike,
     return p_h0s, compute_recall(labels[-1])
 
 
-def calculate_stopping_metric(labels_: npt.ArrayLike,
+def calculate_stopping_metric(labels_: ArrayOrList,
                               n_docs: int,
                               recall_target: float = .95,
-                              batch_size: int = 100) -> tuple[H0Series, list[float]]:
+                              batch_size: int = 100) -> tuple[H0Series, list[float | None]]:
     """
     Calculates the p-score for H0 after each set of `batch_size` labels and recall after each label.
 
@@ -142,8 +145,8 @@ def calculate_stopping_metric(labels_: npt.ArrayLike,
     :param batch_size: H0 will be calculated after each batch
     :return:
     """
-    labels: npt.NDArray[np.int_] = (labels_ if type(labels_) is np.ndarray
-                                    else np.array(labels_, dtype=np.int_))
+    labels: Array = (labels_ if type(labels_) is np.ndarray
+                     else np.array(labels_, dtype=np.int_))
 
     p_h0s: H0Series = list(calculate_h0s(labels_=labels, batch_size=batch_size,
                                          n_docs=n_docs, recall_target=recall_target))
@@ -151,14 +154,14 @@ def calculate_stopping_metric(labels_: npt.ArrayLike,
     return p_h0s, compute_recall(labels)
 
 
-def compute_recall(labels_: npt.ArrayLike) -> list[float | None]:
+def compute_recall(labels_: ArrayOrList) -> list[float | None]:
     """
     Takes 1D list of integers (or np.array) and returns recall at each label.
     :param labels_:
     :return:
     """
-    labels: npt.NDArray[np.int_] = (labels_ if type(labels_) is np.ndarray
-                                    else np.array(labels_, dtype=np.int_))
+    labels: Array = (labels_ if type(labels_) is np.ndarray
+                     else np.array(labels_, dtype=np.int_))
     n_seen_relevant = labels.sum()
     recall: npt.NDArray[np.float_] = labels.cumsum() / n_seen_relevant
     recall_lst: list[float] = recall.tolist()
