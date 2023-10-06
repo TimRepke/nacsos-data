@@ -227,7 +227,7 @@ class Annotation(Base):
 
     # Defines which AnnotationSchemeLabel.key this Annotation refers to.
     # Note, that there is no correctness constraint, the frontend should make sure to send correct data!!
-    key = mapped_column(String, nullable=False)
+    key = mapped_column(String, nullable=False, index=True)
 
     # In the case of AnnotationSchemeLabel.repeats > 1, this field can be used
     # to track primary, secondary,... Annotations for that AnnotationScheme/key pair.

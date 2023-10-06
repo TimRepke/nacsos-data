@@ -8,7 +8,7 @@ from sqlalchemy import \
     Enum as SAEnum, \
     ForeignKey, \
     UniqueConstraint, \
-    CheckConstraint
+    CheckConstraint, Identity
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column, relationship, Relationship
 from sqlalchemy.dialects.postgresql import JSONB, UUID, ARRAY
@@ -96,7 +96,7 @@ class BotAnnotation(Base):
                            nullable=True, index=True)
 
     # (Optional) Defines which AnnotationSchemeLabel.key this Annotation refers to.
-    key = mapped_column(String, nullable=True)
+    key = mapped_column(String, nullable=True, index=True)
 
     # Indicates primary/secondary label, but can also be used to store multiple predictions (e.g. the top five topics)
     # Default should always be 1.
@@ -104,7 +104,7 @@ class BotAnnotation(Base):
 
     # (Optional) Indicate the order of this annotation (e.g. from assignment order);
     # Only assumed to be valid within each BotAnnotationMetaData scope
-    order = mapped_column(Integer, nullable=True)
+    order = mapped_column(Integer, Identity(always=False))
 
     # Exactly one of the following fields should be filled.
     # Contains the value for this annotation (e.g. numbered class from annotation_scheme)
