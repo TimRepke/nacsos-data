@@ -78,7 +78,10 @@ def naive_majority_vote(annotation_map: ResolutionMatrix,
                         fix_parent_references: bool = True) -> ResolutionMatrix:
     for row_key, row in annotation_map.items():
         for label_key, cell in row.items():  # type: str, ResolutionCell
-            annotations = [entry.annotation for labels in cell.labels.values() for entry in labels if entry.annotation]
+            annotations = [entry.annotation
+                           for labels in cell.labels.values()
+                           for entry in labels
+                           if entry.annotation and has_values(entry.annotation)]
 
             # No annotations to resolve, skipping the rest...
             if len(annotations) == 0:
@@ -87,30 +90,33 @@ def naive_majority_vote(annotation_map: ResolutionMatrix,
             label = label_map[label_key]
             kind: AnnotationSchemeLabelTypes = label.kind
 
-            if kind == 'bool':
-                value = _majority_vote_scalar(annotations, field='value_bool', label=label)
-            elif kind == 'single':
-                value = _majority_vote_scalar(annotations, field='value_int', label=label)
-            elif kind == 'multi':
-                value = _majority_vote_list(annotations, field='multi_int', label=label)
-            elif kind == 'str':
-                value = _majority_vote_str(annotations, field='value_str', label=label)
-            else:
-                raise NotImplementedError(f'Majority vote for {kind} not implemented ({label})')
-
-            if same_values(value, cell.resolution):
-                pass
-            else:
-                if not has_values(cell.resolution):
-                    cell.status = ResolutionStatus.NEW
+            try:
+                if kind == 'bool':
+                    value = _majority_vote_scalar(annotations, field='value_bool', label=label)
+                elif kind == 'single':
+                    value = _majority_vote_scalar(annotations, field='value_int', label=label)
+                elif kind == 'multi':
+                    value = _majority_vote_list(annotations, field='multi_int', label=label)
+                elif kind == 'str':
+                    value = _majority_vote_str(annotations, field='value_str', label=label)
                 else:
-                    cell.status = ResolutionStatus.CHANGED
+                    raise NotImplementedError(f'Majority vote for {kind} not implemented ({label})')
 
-                cell.resolution.value_bool = value.value_bool  # type: ignore[assignment]
-                cell.resolution.value_int = value.value_int  # type: ignore[assignment]
-                cell.resolution.value_str = value.value_str  # type: ignore[assignment]
-                cell.resolution.value_float = value.value_float  # type: ignore[assignment]
-                cell.resolution.multi_int = value.multi_int  # type: ignore[assignment]
+                if same_values(value, cell.resolution):
+                    pass
+                else:
+                    if not has_values(cell.resolution):
+                        cell.status = ResolutionStatus.NEW
+                    else:
+                        cell.status = ResolutionStatus.CHANGED
+
+                    cell.resolution.value_bool = value.value_bool  # type: ignore[assignment]
+                    cell.resolution.value_int = value.value_int  # type: ignore[assignment]
+                    cell.resolution.value_str = value.value_str  # type: ignore[assignment]
+                    cell.resolution.value_float = value.value_float  # type: ignore[assignment]
+                    cell.resolution.multi_int = value.multi_int  # type: ignore[assignment]
+            except EmptyAnnotationsError as e:
+                logger.debug(e)
 
     if fix_parent_references:
         resolve_bot_annotation_parents(annotation_map, label_map)
