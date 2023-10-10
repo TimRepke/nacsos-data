@@ -12,5 +12,6 @@ passlib==1.7.4
 rispy==0.8.1
 lark==1.1.7
 scipy==1.11.3
-numpy==1.26.0
+numpy==1.25.2  # 10. Oct 2023: Needs to be 1.25 for number (for pynndescent)
 scikit-learn==1.3.1
+pynndescent==0.5.10

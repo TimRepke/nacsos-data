@@ -15,9 +15,10 @@ from .items.base import Item
 from .items.generic import GenericItem
 from .items.twitter import TwitterItem
 from .items.academic import AcademicItem, AcademicItemVariant
+from .items.lexis_nexis import LexisNexisItem, LexisNexisItemSource
 
-AnyItemType = GenericItem | TwitterItem | AcademicItem
-AnyItemSchema = TypeVar('AnyItemSchema', GenericItem, TwitterItem, AcademicItem)
+AnyItemType = GenericItem | TwitterItem | AcademicItem | LexisNexisItem
+AnyItemSchema = TypeVar('AnyItemSchema', GenericItem, TwitterItem, AcademicItem, LexisNexisItem)
 
 __all__ = ['Base',
            'User', 'AuthToken',
@@ -26,7 +27,9 @@ __all__ = ['Base',
            # Schemas for "automated" annotations
            'BotAnnotationMetaData', 'BotAnnotation',
            # Schemas for items (i.e. documents) and util types
-           'Item', 'GenericItem', 'TwitterItem', 'AcademicItem', 'AcademicItemVariant',
+           'Item', 'GenericItem', 'TwitterItem',
+           'AcademicItem', 'AcademicItemVariant',
+           'LexisNexisItem', 'LexisNexisItemSource',
            'ItemType', 'ItemTypeLiteral', 'AnyItemSchema', 'AnyItemType',
            # Schemas for organising data
            'Import', 'm2m_import_item_table',

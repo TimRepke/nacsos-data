@@ -2,9 +2,10 @@ import time
 import signal
 import base64
 import logging
+from types import FrameType
 from urllib import parse
 from json import JSONDecodeError
-from typing import Literal, Generator, Any, TextIO
+from typing import Literal, Generator, Any, TextIO, Callable
 
 import httpx
 from httpx import RemoteProtocolError
@@ -30,7 +31,7 @@ Expand = Literal[
     'Document', 'SimilarDocuments', 'Source', 'PostFilters', 'AppliedPostFilter'
 ]
 
-DEFAULT_SELECT = [
+DEFAULT_SELECT: list[Select] = [
     'Jurisdiction', 'Location', 'ContentType', 'Byline', 'WordLength', 'WebNewsUrl', 'Geography', 'NegativeNews',
     'Language', 'Industry', 'People', 'Subject', 'Section', 'Company', 'PublicationType', 'Publisher', 'Document',
     'GroupDuplicates', 'InternationalLocation', 'LEI', 'CompanyName', 'LNGI', 'Exclusions', 'ResultId', 'SearchType',
@@ -52,21 +53,22 @@ SLEEP_TIMES = [
 
 class DelayedKeyboardInterrupt:
 
-    def __init__(self):
-        self.signal_received = None
+    def __init__(self) -> None:
+        self.signal_received: tuple[int, FrameType | None] | None = None
+        self.old_handler: Callable[[int, FrameType | None], Any | int | signal.Handlers | None] | int | None = None
 
-    def __enter__(self):
-        self.signal_received = False
+    def __enter__(self) -> None:
+        self.signal_received = None
         self.old_handler = signal.signal(signal.SIGINT, self.handler)
 
-    def handler(self, sig, frame):
+    def handler(self, sig: int, frame: FrameType | None) -> None:
         self.signal_received = (sig, frame)
         logging.warning('SIGINT received. Delaying KeyboardInterrupt.')
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, type: Any, value: Any, traceback: Any) -> None:
         signal.signal(signal.SIGINT, self.old_handler)
-        if self.signal_received:
-            self.old_handler(*self.signal_received)
+        if self.signal_received and self.old_handler:
+            self.old_handler(*self.signal_received)  # type: ignore[operator]
 
 
 class Progress(BaseModel):
@@ -112,10 +114,11 @@ class LexisNexis:
         self._CLIENT_ID: str = client_id
         self._CLIENT_SECRET: str = client_secret
 
-        if (len(self._CLIENT_ID) < 2 or len(self._CLIENT_SECRET) < 2) and len(self._CLIENT_TOKEN) < 2:
+        if len(self._CLIENT_ID) < 2 or len(self._CLIENT_SECRET) < 2:
             self.logger.warning('Looks like you did not set the environment variables for the secret values!')
 
         self._AUTH_TOKEN: str | None = None
+        self._CLIENT_TOKEN: str | None = None
 
         self._progress_file: str | None = progress_file
         self._progress_fp: TextIO | None = None
@@ -137,30 +140,31 @@ class LexisNexis:
         return self._AUTH_TOKEN
 
     @property
-    def progress(self) -> Progress:
+    def progress(self) -> Progress | None:
         return self._progress
 
     @property
     def unfinished(self) -> bool:
         return self._progress is not None and self._progress.link is not None and len(self._progress.link.strip()) > 5
 
-    def set_progress_extra(self, info: Any):
+    def set_progress_extra(self, info: Any) -> None:
         if self._progress is None:
             self._progress = Progress(info=info)
         else:
             self._progress.info = info
 
-    def _set_progress_from_file(self):
+    def _set_progress_from_file(self) -> None:
         latest = None
-        with open(self._progress_file, 'r') as f:
-            for line in f:
-                if len(line.strip()) > 10:
-                    latest = Progress.model_validate_json(line)
-        self.logger.info(f'Last progress is: {latest}')
-        if latest is not None:
-            self._progress = latest
+        if self._progress_file:
+            with open(self._progress_file, 'r') as f:
+                for line in f:
+                    if len(line.strip()) > 10:
+                        latest = Progress.model_validate_json(line)
+            self.logger.info(f'Last progress is: {latest}')
+            if latest is not None:
+                self._progress = latest
 
-    def __enter__(self):
+    def __enter__(self) -> 'LexisNexis':
         self.logger.info('Entering LexisNexis context manager...')
         if self._output_file is not None:
             self.logger.debug(f'Opening output file at {self._output_file}')
@@ -171,14 +175,14 @@ class LexisNexis:
             self._progress_fp = open(self._progress_file, 'a')
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_traceback):
+    def __exit__(self, exc_type: Any, exc_value: Any, exc_traceback: Any) -> None:
         self.logger.info('Leaving LexisNexis context manager!')
         if self._output_fp is not None:
             self._output_fp.close()
         if self._progress_fp is not None:
             self._progress_fp.close()
 
-    def _commit(self, link: str | None):
+    def _commit(self, link: str | None) -> None:
         self.logger.debug(f'Received a commit prompt, attempting to save the '
                           f'buffer ({len(self._buffer):,} lines) and record progress.')
         with DelayedKeyboardInterrupt():
@@ -204,11 +208,11 @@ class LexisNexis:
             },
             timeout=self.timeout,
             headers={'Authorization': f'Basic {auth_string}'}).json()
-        auth_token = response['access_token']
+        auth_token: str = response['access_token']
         self.logger.debug(f'AuthToken: {auth_token}')
         return auth_token
 
-    def _request(self, link: str, test_count: bool = False):
+    def _request(self, link: str, test_count: bool = False) -> dict[str, Any]:
         self.logger.debug(f'Calling: {link}')
         for retry in range(self.max_retries):
             try:
@@ -220,7 +224,7 @@ class LexisNexis:
                     self.logger.warning('Auth token was old, trying to reset!')
                     return self._request(link=link, test_count=test_count)
 
-                response = request.json()
+                response: dict[str, Any] = request.json()
 
                 if test_count:
                     cnt = response.get('@odata.count', -1)
@@ -323,5 +327,5 @@ class LexisNexis:
                 self.logger.warning(item)
                 raise e
 
-    def append_output(self, line: str):
+    def append_output(self, line: str) -> None:
         self._buffer.append(line)

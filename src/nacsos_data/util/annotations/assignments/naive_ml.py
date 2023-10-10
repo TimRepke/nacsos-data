@@ -1,4 +1,4 @@
-from typing import Callable, Iterator, Any
+from typing import Callable, Any, TypeAlias, AsyncGenerator
 
 from pydantic import BaseModel
 from sklearn.base import TransformerMixin
@@ -19,9 +19,17 @@ from nacsos_data.db.engine import ensure_session_async
 from nacsos_data.db.schemas import AcademicItem
 from nacsos_data.util.annotations.label_transform import get_annotations, annotations_to_sequence
 
-ModelType = (AdaBoostClassifier | DecisionTreeClassifier | RandomForestClassifier | MultinomialNB |
-             GaussianNB | LogisticRegression | RidgeClassifier | SVC)
-FeaturiserType = TransformerMixin | Pipeline
+ModelType: TypeAlias = (
+        AdaBoostClassifier
+        | DecisionTreeClassifier
+        | RandomForestClassifier
+        | MultinomialNB
+        | GaussianNB
+        | LogisticRegression
+        | RidgeClassifier
+        | SVC
+)
+FeaturiserType: TypeAlias = TransformerMixin | Pipeline
 
 Featurisers: dict[str, Callable[[], FeaturiserType]] = {
     'tfidf(ngrams=(1,1), df=(0.01, 0.95))': lambda: (
@@ -90,7 +98,7 @@ class THScores(Scores):
 BinaryPredictions = list[tuple[str, int]]
 # List of tuples of item_id, class (0=exclude, 1=include), and class score
 ProbaPredictions = list[tuple[str, int, float]]
-Predictions = BinaryPredictions | ProbaPredictions
+Predictions: TypeAlias = BinaryPredictions | ProbaPredictions
 
 
 def train_model(texts: list[str], labels: list[int], model: str, features: str) \
@@ -117,7 +125,7 @@ def test_model(pre: FeaturiserType, clf: ModelType, labels: list[int],
     if texts is None and x_test is None:
         raise AttributeError('Need either texts or vectors!')
     if x_test is None and texts is not None:
-        x_train = pre.fit_transform(texts)
+        x_test = pre.fit_transform(texts)
 
     y_pred = clf.predict(x_test)
     prec, rec, f1, supp = precision_recall_fscore_support(labels, y_pred, average='binary', zero_division=0)
@@ -150,30 +158,31 @@ async def get_predictions(session: AsyncSession,
                           features: str,
                           majority_on_conflict: bool = True) \
         -> tuple[Scores, list[THScores] | None, Predictions]:
-    item_ids_seen, texts_seen, labels = get_labelled_texts(session=session,
-                                                           inclusion_rule=inclusion_rule,
-                                                           source_ids=source_ids,
-                                                           majority_on_conflict=majority_on_conflict)
+    item_ids_seen, texts_seen, labels = await get_labelled_texts(session=session,
+                                                                 inclusion_rule=inclusion_rule,
+                                                                 source_ids=source_ids,
+                                                                 majority_on_conflict=majority_on_conflict)
 
     pre, clf = train_model(texts=texts_seen, labels=labels, model=model, features=features)
     scores, th_scores = test_model(pre=pre, clf=clf, texts=texts_seen, labels=labels)
 
-    predictions: Predictions = []
+    predictions: Predictions
+    predictions = []  # type: ignore
 
-    for batch_ids, batch_texts in project_texts_batched(session=session, project_id=project_id,
-                                                        item_ids_skip=set(item_ids_seen)):
+    async for batch_ids, batch_texts in project_texts_batched(session=session, project_id=project_id,
+                                                              item_ids_skip=set(item_ids_seen)):
         X = pre.transform(batch_texts)
         if hasattr(clf, 'predict_proba'):
             y_sft = clf.predict_proba(X)
             y_bin = y_sft.argmax(axis=1)
             predictions += [
-                (bid, int(yb), float(ys))
+                (bid, int(yb), float(ys))  # type: ignore  # FIXME
                 for ys, yb, bid in zip(y_sft, y_bin, batch_ids)
             ]
         else:
             y_bin = clf.predict(X)
             predictions += [
-                (bid, int(yb))
+                (bid, int(yb))  # type: ignore  # FIXME
                 for yb, bid in zip(y_bin, batch_ids)
             ]
     return scores, th_scores, predictions
@@ -193,14 +202,14 @@ async def get_labelled_texts(session: AsyncSession,
     stmt = (select(AcademicItem.item_id, AcademicItem.title, AcademicItem.text)
             .where(AcademicItem.item_id.in_(item_ids)))
     rslt = (await session.execute(stmt)).mappings().all()
-    texts = [(row['title'] or '') + ' ' + (row['text'] or '') for row in rslt]
+    texts: list[str] = [(row['title'] or '') + ' ' + (row['text'] or '') for row in rslt]
 
     return item_ids, texts, labels
 
 
-@ensure_session_async
 async def project_texts_batched(session: AsyncSession, project_id: str, batch_size: int = 500,
-                                item_ids_skip: set[str] | None = None) -> Iterator[tuple[list[str], list[str]]]:
+                                item_ids_skip: set[str] | None = None) \
+        -> AsyncGenerator[tuple[list[str], list[str]], None]:
     stmt = (select(AcademicItem.item_id, AcademicItem.title, AcademicItem.text)
             .where(AcademicItem.project_id == project_id)).execution_options(yield_per=batch_size)
     rslt = (await session.execute(stmt)).mappings().partitions()
@@ -218,15 +227,16 @@ async def compare_models(session: AsyncSession,
                          source_ids: list[str],
                          features: str,
                          n_splits: int = 8,
-                         majority_on_conflict: bool = True):
-    item_ids, texts, labels = get_labelled_texts(session=session,
-                                                 inclusion_rule=inclusion_rule,
-                                                 source_ids=source_ids,
-                                                 majority_on_conflict=majority_on_conflict)
+                         majority_on_conflict: bool = True) \
+        -> dict[str, dict[str, list[tuple[Scores, list[THScores] | None]]]]:
+    item_ids, texts, labels = await get_labelled_texts(session=session,
+                                                       inclusion_rule=inclusion_rule,
+                                                       source_ids=source_ids,
+                                                       majority_on_conflict=majority_on_conflict)
 
     kf = StratifiedKFold(n_splits=n_splits, random_state=None, shuffle=False)
 
-    results = {}
+    results: dict[str, dict[str, list[tuple[Scores, list[THScores] | None]]]] = {}
     for i, (train_index, test_index) in enumerate(kf.split(texts, labels)):
         print(f'=== FOLD {i + 1} ===')
         txt_train = [texts[ti] for ti in train_index]
@@ -260,3 +270,4 @@ async def compare_models(session: AsyncSession,
                     results[pre_k][clf_k].append((scores, th_scores))
                 except Exception:
                     pass
+    return results

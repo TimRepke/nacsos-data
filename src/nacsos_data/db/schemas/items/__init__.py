@@ -7,6 +7,7 @@ class ItemType(str, Enum):
     twitter = 'twitter'
     academic = 'academic'
     patents = 'patents'
+    lexis = 'lexis'
 
 
-ItemTypeLiteral = Literal['generic', 'twitter', 'academic', 'patents']
+ItemTypeLiteral = Literal['generic', 'twitter', 'academic', 'patents', 'lexis']

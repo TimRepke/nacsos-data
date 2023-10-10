@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+
+from nacsos_data.db.schemas import ItemType
+from nacsos_data.models.items.base import ItemModel
 
 
 class NegativeNewsType(str, Enum):
@@ -354,9 +358,53 @@ class NewsSearchResult(BaseModel):
     )
     SourcePath: Optional[str] = Field(None, description='None')
 
+    model_config = ConfigDict(extra='allow')
+
 
 NewsSearchResult.model_rebuild()
 
 
 class LexisNexisObject(NewsSearchResult):
     pass
+
+
+class LexisNexisDocument(BaseModel):
+    title: str | None = None
+    teaser: str | None = None
+    text: str | None = None
+    published: str | None = None
+    updated: str | None = None
+    authors: list[str] | None = None
+    authors_sec: list[str] | None = None
+    section: str | None = None
+    subsection: str | None = None
+
+
+class LexisNexisItemSourceModel(BaseModel):
+    item_source_id: str | uuid.UUID | None = None
+    item_id: str | uuid.UUID | None = None
+
+    name: str | None = None
+    title: str | None = None
+
+    section: str | None = None
+    jurisdiction: str | None = None
+    location: str | None = None
+    content_type: str | None = None
+
+    published_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class LexisNexisItemModel(ItemModel):
+    # ItemModel.project_id
+    # ItemModel.item_id
+    # ItemModel.text
+    type: ItemType = ItemType.lexis
+
+    lexis_id: str
+
+    teaser: str | None = None
+    authors: list[str] | None = None
+
+    sources: list[LexisNexisItemSourceModel] | None = None
