@@ -212,8 +212,8 @@ async def project_texts_batched(session: AsyncSession, project_id: str, batch_si
         -> AsyncGenerator[tuple[list[str], list[str]], None]:
     stmt = (select(AcademicItem.item_id, AcademicItem.title, AcademicItem.text)
             .where(AcademicItem.project_id == project_id)).execution_options(yield_per=batch_size)
-    rslt = (await session.execute(stmt)).mappings().partitions()
-    for batch in rslt:
+    rslt = (await session.stream(stmt)).mappings().partitions()
+    async for batch in rslt:
         if item_ids_skip is not None:
             batch = [ai for ai in batch if str(ai['item_id']) not in item_ids_skip]
         texts = [(row['title'] or '') + ' ' + (row['text'] or '') for row in batch]

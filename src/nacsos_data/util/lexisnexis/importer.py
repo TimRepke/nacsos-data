@@ -48,14 +48,14 @@ async def load_vectors_from_database(session: AsyncSession,
                    Item.text.isnot(None),
                    F.char_length(Item.text) > MIN_TEXT_LEN)
             .execution_options(yield_per=batch_size))
-    rslt = (await session.execute(stmt)).mappings().partitions()
+    rslt = (await session.stream(stmt)).mappings().partitions()
 
-    for batch in rslt:
+    async for batch in rslt:
         logger.debug(f'Received batch with {len(batch)} entries.')
         item_ids = [str(r['item_id']) for r in batch]
         texts = [r['text'].lower() for r in batch]
 
-        if not vectoriser.vocabulary_:
+        if not hasattr(vectoriser, 'vocabulary_'):
             logger.debug('Vectoriser has no vocabulary, fitting it now on the first batch.')
             vectoriser.fit(texts)
 
@@ -121,7 +121,9 @@ async def import_lexis_nexis(session: AsyncSession,
 
     log.info(f'Loading known ids from project {project_id}')
     stmt = (select(LexisNexisItemSource.item_id, LexisNexisItemSource.lexis_id)
-            .where(LexisNexisItemSource.article.project_id == project_id))
+            .join(LexisNexisItem, LexisNexisItem.item_id == LexisNexisItemSource.item_id)
+            .where(LexisNexisItem.project_id == project_id))
+
     known_ids = (await session.execute(stmt)).mappings().all()
 
     ln2id = {row['lexis_id']: str(row['item_id']) for row in known_ids}
@@ -133,6 +135,7 @@ async def import_lexis_nexis(session: AsyncSession,
     item_ids_db_inv = {v: k for k, v in item_ids_db.items()}
 
     offset = len(item_ids_db)
+    log.info(f'Found {offset:,} documents already in the database.')
 
     log.info(f'Loading texts (and vectors) from file: {filename}')
     f_data = list(load_vectors_from_file(filename=filename, fail_on_error=fail_on_parse_error,
@@ -143,13 +146,19 @@ async def import_lexis_nexis(session: AsyncSession,
     item_ids_f = {r: i + offset for i, r in enumerate(bid for _, batch_ids, _ in f_data for bid in batch_ids)}
     item_ids_f_inv = {v: k for k, v in item_ids_f.items()}
 
+    log.info(f'Found {len(item_ids_f):,} documents in the file.')
+
     vectors = vstack([batch_vectors for _, batch_vectors in db_data]
                      + [batch_vectors for _, _, batch_vectors in f_data])
 
+    log.info('Constructing nearest neighbour lookup...')
     # Using Jaccard dissimilarity, defined as: 1 - (token set intersection divided by token set union)
     index = pynndescent.NNDescent(vectors, metric='jaccard')
 
-    for result, item, source in parse_lexis_nexis_file(filename=filename, fail_on_error=fail_on_parse_error):
+    log.info('Going through the file now and importing articles...')
+    for result, item, source in parse_lexis_nexis_file(filename=filename,
+                                                       project_id=project_id,
+                                                       fail_on_error=fail_on_parse_error):
         existing_id: str | None = None
 
         if source.lexis_id is None:
@@ -158,13 +167,15 @@ async def import_lexis_nexis(session: AsyncSession,
         # Naive deduplication: We've already seen the same LexisNexis ID
         if source.lexis_id in ln2id:
             existing_id = ln2id[source.lexis_id]
+            log.debug(f'Duplicate by LN id: {source.lexis_id}')
 
         if item.text is not None and len(item.text) > MIN_TEXT_LEN:
             vector = vectoriser.transform([item.text])
             indices, similarities = index.query(vector, k=5)
-            for index, similarity in zip(indices, similarities):
+            for index, similarity in zip(indices[0], similarities[0]):
                 # Too dissimilar, we can stop right here (note: list is sorted asc)
                 if similarity > max_slop:
+                    log.debug(f'No close text match with >{1 - max_slop} overlap')
                     break
 
                 # Looking at itself, continue
@@ -174,16 +185,19 @@ async def import_lexis_nexis(session: AsyncSession,
                 # See, if we already stored this in the database ahead of time
                 if index in item_ids_db_inv:
                     existing_id = item_ids_db_inv[index]
+                    log.debug(f'Found text match in database')
                     break
                 # See, if we've seen this and saved this already in the process
                 elif index in lexis_ids_f_inv and lexis_ids_f_inv[index] in ln2id:
                     existing_id = ln2id[lexis_ids_f_inv[index]]
+                    log.debug(f'Found text match in file (but we sent it to the database earlier)')
                     break
                 # else: false positive, it's a duplicate and we just saw the first one of them
 
         # This seems to be a novel item we haven't seen before
         if existing_id is None:
             new_id = str(item.item_id)
+            log.debug(f'Creating new item with ID={new_id}')
             ln2id[source.lexis_id] = new_id
             session.add(LexisNexisItem(**item.model_dump()))
             await session.commit()
@@ -202,6 +216,7 @@ async def import_lexis_nexis(session: AsyncSession,
 
         # This seems to be a duplicate of a known item
         else:
+            log.debug(f'Trying to add source to existing item with item_id={existing_id}')
             source.item_id = existing_id
             source_unique = True
             if dedup_source:
@@ -213,9 +228,11 @@ async def import_lexis_nexis(session: AsyncSession,
                     source_unique = False
 
             if source_unique:
+                log.debug(f'Adding source to existing item with source_id={source.item_source_id}')
                 session.add(LexisNexisItemSource(**source.model_dump()))
                 await session.commit()
 
         # Keep track of when we finished importing
         import_orm.time_finished = datetime.now()
         await session.commit()
+        log.info('All done!')

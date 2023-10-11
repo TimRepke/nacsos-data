@@ -84,7 +84,7 @@ async def get_or_create_import(session: AsyncSession,
         if import_id is None:
             import_id = uuid.uuid4()
 
-        import_orm = Import(
+        import_orm: Import = Import(
             project_id=project_id,
             user_id=user_id,
             import_id=import_id,

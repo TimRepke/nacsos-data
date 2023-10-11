@@ -176,7 +176,7 @@ def translate_search_result(result: NewsSearchResult, project_id: str | None = N
     return item, src
 
 
-def parse_lexis_nexis_file(filename: Path | str, fail_on_error: bool = True) \
+def parse_lexis_nexis_file(filename: Path | str, project_id: str | None = None, fail_on_error: bool = True) \
         -> Generator[tuple[NewsSearchResult, LexisNexisItemModel, LexisNexisItemSourceModel], None, None]:
     file_path = Path(filename)
     if file_path.exists():
@@ -184,7 +184,7 @@ def parse_lexis_nexis_file(filename: Path | str, fail_on_error: bool = True) \
             for li, line in enumerate(f_src):
                 try:
                     result = NewsSearchResult.model_validate_json(line)
-                    item, src = translate_search_result(result)
+                    item, src = translate_search_result(result, project_id=project_id)
                     yield result, item, src
                 except Exception as e:
                     logger.warning(f'Problem in line {li + 1}')

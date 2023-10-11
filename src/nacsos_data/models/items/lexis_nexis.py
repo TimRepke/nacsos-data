@@ -408,4 +408,6 @@ class LexisNexisItemModel(ItemModel):
     teaser: str | None = None
     authors: list[str] | None = None
 
+
+class FullLexisNexisItemModel(LexisNexisItemModel):
     sources: list[LexisNexisItemSourceModel] | None = None

@@ -1,6 +1,17 @@
-from typing import Sequence, Generator, TypeVar, Any
+from typing import Sequence, Generator, TypeVar, Any, AsyncIterator, AsyncGenerator
 
 T = TypeVar('T')
+
+
+async def batched_async(lst: AsyncIterator[T] | AsyncGenerator[T, None], batch_size: int) \
+        -> AsyncGenerator[list[T], None]:
+    batch = []
+    async for li in lst:
+        batch.append(li)
+        if len(batch) >= batch_size:
+            yield batch
+            batch = []
+    yield batch
 
 
 def batched(lst: Sequence[T] | Generator[T, None, None], batch_size: int) -> Generator[list[T], None, None]:
