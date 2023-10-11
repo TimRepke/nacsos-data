@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -383,6 +383,7 @@ class LexisNexisDocument(BaseModel):
 class LexisNexisItemSourceModel(BaseModel):
     item_source_id: str | uuid.UUID | None = None
     item_id: str | uuid.UUID | None = None
+    lexis_id: str
 
     name: str | None = None
     title: str | None = None
@@ -395,14 +396,14 @@ class LexisNexisItemSourceModel(BaseModel):
     published_at: datetime | None = None
     updated_at: datetime | None = None
 
+    meta: dict[str, Any] | None = None
+
 
 class LexisNexisItemModel(ItemModel):
     # ItemModel.project_id
     # ItemModel.item_id
     # ItemModel.text
     type: ItemType = ItemType.lexis
-
-    lexis_id: str
 
     teaser: str | None = None
     authors: list[str] | None = None

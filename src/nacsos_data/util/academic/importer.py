@@ -8,8 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 from sqlalchemy.exc import IntegrityError
 from psycopg.errors import UniqueViolation, OperationalError
 
+from ...db.crud.imports import get_or_create_import
 from ...db.engine import DatabaseEngineAsync
-from ...db.schemas import Import, AcademicItem, m2m_import_item_table
+from ...db.schemas import AcademicItem, m2m_import_item_table
 from ...db.schemas.items.academic import AcademicItemVariant
 from ...models.imports import M2MImportItemType
 from ...models.items import AcademicItemModel, AcademicItemVariantModel
@@ -103,43 +104,14 @@ async def import_academic_items(
     item_ids = []
 
     async with db_engine.session() as session:  # type: AsyncSession
-        if import_name is not None:
-            if description is None or user_id is None:
-                raise AttributeError('You need to provide a meaningful description and a user id!')
-
-            if import_id is None:
-                import_id = uuid.uuid4()
-
-            import_orm = Import(
-                project_id=project_id,
-                user_id=user_id,
-                import_id=import_id,
-                name=import_name,
-                description=description,
-                type='script',
-                time_created=datetime.datetime.now()
-            )
-            if dry_run:
-                log.info('I will create a new `Import`!')
-            else:
-                session.add(import_orm)
-                await session.commit()
-                log.info(f'Created new import with ID {import_id}')
-
-        elif import_id is not None:
-            # check that the uuid actually exists...
-            import_orm = await session.get(Import, {'import_id': import_id})  # type: ignore[assignment]
-            if import_orm is None:
-                raise KeyError('No import found for the given ID!')
-            if str(import_orm.project_id) != str(project_id):
-                raise AssertionError(f'The project ID does not match with the `Import` you provided: '
-                                     f'"{import_orm.project_id}" vs "{project_id}"')
-
-            log.info(f'Using existing import with ID {import_id}')
-
-        else:
-            raise AttributeError('Seems like neither provided information for creating '
-                                 'a new import nor the ID to an existing import!')
+        import_orm = await get_or_create_import(session=session,
+                                                project_id=project_id,
+                                                import_id=import_id,
+                                                user_id=user_id,
+                                                import_name=import_name,
+                                                description=description,
+                                                i_type='script')
+        import_id = str(import_orm.import_id)
 
         # Keep track of when we started importing
         import_orm.time_started = datetime.datetime.now()
