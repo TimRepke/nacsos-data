@@ -132,20 +132,23 @@ async def construct_lookup(session: AsyncSession,
             vector = vectoriser.transform([item.text])
             indices, similarities = index.query(vector, k=5)
             for index, similarity in zip(indices, similarities):
+                # Too dissimilar, we can stop right here (note: list is sorted asc)
+                if similarity > max_slop:
+                    break
+
                 # Looking at itself, continue
                 if (item_ids_db_inv.get(index) == item.item_id) or (item_ids_f_inv.get(index) == item.item_id):
                     continue
 
-                if similarity < max_slop:
-                    # See, if we already stored this in the database ahead of time
-                    if index in item_ids_db_inv:
-                        existing_id = item_ids_db_inv[index]
-                        break
-                    # See, if we've seen this and saved this already in the process
-                    elif index in lexis_ids_f_inv and lexis_ids_f_inv[index] in ln2id:
-                        existing_id = ln2id[lexis_ids_f_inv[index]]
-                        break
-                    # else: false positive, it's a duplicate and we just saw the first one of them
+                # See, if we already stored this in the database ahead of time
+                if index in item_ids_db_inv:
+                    existing_id = item_ids_db_inv[index]
+                    break
+                # See, if we've seen this and saved this already in the process
+                elif index in lexis_ids_f_inv and lexis_ids_f_inv[index] in ln2id:
+                    existing_id = ln2id[lexis_ids_f_inv[index]]
+                    break
+                # else: false positive, it's a duplicate and we just saw the first one of them
 
         # This seems to be a novel item we haven't seen before
         if existing_id is None:
