@@ -33,11 +33,11 @@ FeaturiserType: TypeAlias = TransformerMixin | Pipeline
 
 Featurisers: dict[str, Callable[[], FeaturiserType]] = {
     'tfidf(ngrams=(1,1), df=(0.01, 0.95))': lambda: (
-        TfidfVectorizer(ngram_range=(1, 1), min_df=0.01, max_df=0.95)
+        TfidfVectorizer(ngram_range=(1, 1), min_df=5, max_df=0.95)
     ),
     'tfidf(ngrams=(1,1), df=(0.01, 0.95)) + pca(50)': lambda: (
         Pipeline([
-            ('tfidf', TfidfVectorizer(ngram_range=(1, 1), min_df=0.01, max_df=0.95)),
+            ('tfidf', TfidfVectorizer(ngram_range=(1, 1), min_df=5, max_df=0.95)),
             ('pca', TruncatedSVD(n_components=50))
         ])
     ),

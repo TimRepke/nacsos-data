@@ -8,7 +8,7 @@ from json import JSONDecodeError
 from typing import Literal, Generator, Any, TextIO, Callable
 
 import httpx
-from httpx import RemoteProtocolError
+from httpx import RemoteProtocolError, Response
 from pydantic import BaseModel
 
 from nacsos_data.models.items.lexis_nexis import NewsSearchResult
@@ -215,6 +215,7 @@ class LexisNexis:
     def _request(self, link: str, test_count: bool = False) -> dict[str, Any]:
         self.logger.debug(f'Calling: {link}')
         for retry in range(self.max_retries):
+            request: Response | None = None
             try:
                 request = httpx.get(link, timeout=self.timeout, headers={'Authorization': f'Bearer {self.token}'})
 
@@ -236,13 +237,14 @@ class LexisNexis:
                 sleep = SLEEP_TIMES[min(len(SLEEP_TIMES) - 1, retry)]
                 self.logger.debug(f'Encountered error "{e}", sleeping for {sleep}s...')
                 try:
-                    self.logger.warning(request.text)
+                    if request is not None:
+                        self.logger.warning(request.text)
                 except Exception:
                     pass
                 time.sleep(sleep)
             except JSONDecodeError as e:
                 self.logger.exception(e)
-                if 'request' in locals() and request is not None:
+                if request is not None:
                     self.logger.error(f'HTTP {request.status_code}: {request.text}')
                 raise e
         raise RuntimeError('Reached max_retries but did not finish current request!')

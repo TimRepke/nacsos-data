@@ -89,8 +89,10 @@ def s2dt_a(s: str | None) -> datetime | None:
     return None
 
 
-def s2dt_b(s: str | None) -> datetime | None:
+def s2dt_b(s: str | datetime | None) -> datetime | None:
     if s is not None:
+        if isinstance(s, datetime):
+            return s
         try:
             return datetime.strptime(s, '%Y-%m-%d %H:%M:%S%z')
         except ValueError:
@@ -100,6 +102,14 @@ def s2dt_b(s: str | None) -> datetime | None:
 
 def translate_search_result(result: NewsSearchResult, project_id: str | None = None) \
         -> tuple[LexisNexisItemModel, LexisNexisItemSourceModel]:
+
+    if result.Document is None or result.Document.Content is None:
+        raise ValueError('Missing document content')
+
+    ln_id = result.ResultId
+    if ln_id is None:
+        raise ValueError('Missing LexisNexis ID')
+
     doc = parse_document(result.Document.Content)
 
     item = LexisNexisItemModel(
@@ -107,7 +117,7 @@ def translate_search_result(result: NewsSearchResult, project_id: str | None = N
         item_id=str(uuid.uuid4()),
         text=doc.text,
         type=ItemType.lexis,
-        lexis_id=result.ResultId,
+        lexis_id=ln_id,
         teaser=doc.teaser,
         authors=doc.authors or doc.authors_sec,
     )
@@ -119,7 +129,7 @@ def translate_search_result(result: NewsSearchResult, project_id: str | None = N
     src = LexisNexisItemSourceModel(
         item_source_id=str(uuid.uuid4()),
         item_id=item.item_id,
-        name=result.Source.Name or result.Overview,
+        name=(result.Source.Name if result.Source else None) or result.Overview,
         title=doc.title or result.Title,
         section=sections,
         jurisdiction=result.Jurisdiction,
@@ -132,10 +142,9 @@ def translate_search_result(result: NewsSearchResult, project_id: str | None = N
     return item, src
 
 
-def parse_lexis_nexis_file(file_path: Path | str, fail_on_error: bool = True) \
+def parse_lexis_nexis_file(filename: Path | str, fail_on_error: bool = True) \
         -> Generator[tuple[NewsSearchResult, LexisNexisItemModel, LexisNexisItemSourceModel], None, None]:
-    if type(file_path) is str:
-        file_path = Path(file_path)
+    file_path = Path(filename)
     if file_path.exists():
         with open(file_path, 'r') as f_src:
             for li, line in enumerate(f_src):

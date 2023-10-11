@@ -88,6 +88,7 @@ async def import_academic_items(
                     If true, simulate best as possible (note, that duplicates within the `items` are not validated
                                                         and not all constraints can be checked)
     :param db_engine: an async database engine
+    :param log:
     :return: import_id and list of item_ids that were actually used in the end
     """
     if log is None:
@@ -185,10 +186,10 @@ async def import_academic_items(
                                                   trust_new_keywords=trust_new_keywords,
                                                   session=session)
                 else:
+                    item_id = str(uuid.uuid4())
                     if dry_run:
                         log.debug('  -> I will create a new AcademicItem!')
                     else:
-                        item_id = str(uuid.uuid4())
                         log.debug(f' -> Creating new item with ID {item_id}!')
                         item.item_id = item_id
                         session.add(AcademicItem(**item.model_dump()))
