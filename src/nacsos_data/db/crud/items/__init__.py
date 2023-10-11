@@ -5,21 +5,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from nacsos_data.db import DatabaseEngineAsync
-from nacsos_data.db.schemas import \
-    Item, \
-    TwitterItem, \
-    GenericItem, \
-    AcademicItem, \
-    ItemType, \
-    ItemTypeLiteral, \
-    AnyItemType, \
-    AnyItemSchema
-from nacsos_data.models.items import \
-    GenericItemModel, \
-    TwitterItemModel, \
-    AcademicItemModel, \
-    AnyItemModelType, \
-    AnyItemModel
+from nacsos_data.db.schemas import (
+    Item,
+    TwitterItem,
+    GenericItem,
+    AcademicItem,
+    ItemType,
+    ItemTypeLiteral,
+    AnyItemType,
+    AnyItemSchema,
+    LexisNexisItem
+)
+from nacsos_data.models.items import (
+    GenericItemModel,
+    TwitterItemModel,
+    AcademicItemModel,
+    AnyItemModelType,
+    AnyItemModel,
+    LexisNexisItemModel
+)
 
 from .query import query_to_sql, Query
 
@@ -76,6 +80,8 @@ def _get_schema_model_for_type(item_type: ItemType | ItemTypeLiteral) \
         return TwitterItem, TwitterItemModel
     if item_type == 'academic' or item_type == ItemType.academic:
         return AcademicItem, AcademicItemModel
+    if item_type == 'lexis' or item_type == ItemType.lexis:
+        return LexisNexisItem, LexisNexisItemModel
 
     raise ValueError(f'Not implemented for {item_type}')
 

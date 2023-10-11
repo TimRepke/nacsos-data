@@ -11,7 +11,9 @@ from nacsos_data.db.schemas import (
     AcademicItem,
     Annotation,
     BotAnnotation,
-    BotAnnotationMetaData, Assignment, m2m_import_item_table
+    BotAnnotationMetaData,
+    Assignment,
+    m2m_import_item_table
 )
 from nacsos_data.models.items import AcademicItemModel
 from .parse import parse_str
