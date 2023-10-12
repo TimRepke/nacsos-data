@@ -9,7 +9,7 @@ from sklearn.base import TransformerMixin
 
 import pynndescent
 
-from sqlalchemy import select, insert
+from sqlalchemy import select, insert, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 import sqlalchemy.sql.functions as F
@@ -32,6 +32,8 @@ MIN_DF = 5
 MAX_DF = 0.98
 # Max. number of features / vocabulary size (parameter for CountVectorizer)
 MAX_FEATURES = 2000
+# Cutting texts longer than that, no need to compare more than that
+CHAR_LIMIT = 800
 
 
 def has_text(s: str | None) -> bool:
@@ -43,7 +45,7 @@ async def load_vectors_from_database(session: AsyncSession,
                                      vectoriser: CountVectorizer,
                                      batch_size: int = 500) \
         -> AsyncGenerator[tuple[list[str], csr_matrix], None]:
-    stmt = (select(Item.text, Item.item_id)
+    stmt = (select(func.substr(Item.text, 0, CHAR_LIMIT), Item.item_id)
             .where(Item.project_id == project_id,
                    Item.text.isnot(None),
                    F.char_length(Item.text) > MIN_TEXT_LEN)
@@ -76,7 +78,7 @@ def load_vectors_from_file(filename: str,
 
         lexis_ids = [s.lexis_id for _, s in batch_filtered]
         item_ids = [r.item_id for r, _ in batch_filtered]
-        texts = [r.text.lower() for r, _ in batch_filtered]
+        texts = [r.text.lower()[:CHAR_LIMIT] for r, _ in batch_filtered]
 
         if not hasattr(vectoriser, 'vocabulary_'):
             vectoriser.fit(texts)
