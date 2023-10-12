@@ -59,6 +59,10 @@ async def delete_import(import_id: UUID | str,
     and that import only.
     """
     async with engine.session() as session:
+        # Delete m2m relations
+        stmt = delete(m2m_import_item_table).where(m2m_import_item_table.c.import_id == import_id)
+        await session.execute(stmt)
+
         # Delete import
         stmt = delete(Import).where(Import.import_id == import_id)
         await session.execute(stmt)

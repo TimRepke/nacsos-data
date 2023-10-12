@@ -159,45 +159,46 @@ async def import_lexis_nexis(session: AsyncSession,
     for result, item, source in parse_lexis_nexis_file(filename=filename,
                                                        project_id=project_id,
                                                        fail_on_error=fail_on_parse_error):
+        log.debug(f'Importing "{source.title}" ({source.lexis_id})')
         existing_id: str | None = None
 
         if source.lexis_id is None:
-            raise ValueError('Document is missing a LexisNexis ID')
+            raise ValueError(' -> Document is missing a LexisNexis ID')
 
         # Naive deduplication: We've already seen the same LexisNexis ID
         if source.lexis_id in ln2id:
             existing_id = ln2id[source.lexis_id]
-            log.debug(f'Duplicate by LN id: {source.lexis_id}')
+            log.debug(f' -> Duplicate by LN id: {source.lexis_id}')
 
         if item.text is not None and len(item.text) > MIN_TEXT_LEN:
             vector = vectoriser.transform([item.text])
             indices, similarities = index.query(vector, k=5)
-            for index, similarity in zip(indices[0], similarities[0]):
+            for vec_index, similarity in zip(indices[0], similarities[0]):
                 # Too dissimilar, we can stop right here (note: list is sorted asc)
                 if similarity > max_slop:
-                    log.debug(f'No close text match with >{1 - max_slop} overlap')
+                    log.debug(f' -> No close text match with >{1 - max_slop} overlap')
                     break
 
                 # Looking at itself, continue
-                if (item_ids_db_inv.get(index) == item.item_id) or (item_ids_f_inv.get(index) == item.item_id):
+                if (item_ids_db_inv.get(vec_index) == item.item_id) or (item_ids_f_inv.get(vec_index) == item.item_id):
                     continue
 
                 # See, if we already stored this in the database ahead of time
-                if index in item_ids_db_inv:
-                    existing_id = item_ids_db_inv[index]
-                    log.debug(f'Found text match in database')
+                if vec_index in item_ids_db_inv:
+                    existing_id = item_ids_db_inv[vec_index]
+                    log.debug(f' -> Found text match in database')
                     break
                 # See, if we've seen this and saved this already in the process
-                elif index in lexis_ids_f_inv and lexis_ids_f_inv[index] in ln2id:
-                    existing_id = ln2id[lexis_ids_f_inv[index]]
-                    log.debug(f'Found text match in file (but we sent it to the database earlier)')
+                elif vec_index in lexis_ids_f_inv and lexis_ids_f_inv[vec_index] in ln2id:
+                    existing_id = ln2id[lexis_ids_f_inv[vec_index]]
+                    log.debug(f' -> Found text match in file (but we sent it to the database earlier)')
                     break
                 # else: false positive, it's a duplicate and we just saw the first one of them
 
         # This seems to be a novel item we haven't seen before
         if existing_id is None:
             new_id = str(item.item_id)
-            log.debug(f'Creating new item with ID={new_id}')
+            log.debug(f' -> Creating new item with ID={new_id}')
             ln2id[source.lexis_id] = new_id
             session.add(LexisNexisItem(**item.model_dump()))
             await session.commit()
@@ -216,7 +217,7 @@ async def import_lexis_nexis(session: AsyncSession,
 
         # This seems to be a duplicate of a known item
         else:
-            log.debug(f'Trying to add source to existing item with item_id={existing_id}')
+            log.debug(f' -> Trying to add source to existing item with item_id={existing_id}')
             source.item_id = existing_id
             source_unique = True
             if dedup_source:
@@ -228,11 +229,11 @@ async def import_lexis_nexis(session: AsyncSession,
                     source_unique = False
 
             if source_unique:
-                log.debug(f'Adding source to existing item with source_id={source.item_source_id}')
+                log.debug(f' -> Adding source to existing item with source_id={source.item_source_id}')
                 session.add(LexisNexisItemSource(**source.model_dump()))
                 await session.commit()
 
-        # Keep track of when we finished importing
-        import_orm.time_finished = datetime.now()
-        await session.commit()
-        log.info('All done!')
+    # Keep track of when we finished importing
+    import_orm.time_finished = datetime.now()
+    await session.commit()
+    log.info('All done!')
