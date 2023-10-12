@@ -127,17 +127,16 @@ async def import_lexis_nexis(session: AsyncSession,
     from nacsos_data.util.lexisnexis.importer import import_lexis_nexis
     from nacsos_data.db import get_engine_async
 
-    PROJECT_ID = 'c5f11385-b94b-4048-bb7d-247fa1b6b685'
-    USER_ID = '562fc779-3541-4796-a9b8-d4da580892cb'
+    PROJECT_ID = '???'
+    USER_ID = '???'
 
     logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s: %(message)s', level=logging.INFO)
-    logger = logging.getLogger('test')
+    logger = logging.getLogger('LN IMPORT')
     logger.setLevel(logging.DEBUG)
-    logger.debug('first')
 
 
     async def main():
-        db_engine = get_engine_async(conf_file='/home/tim/workspace/nacsos-core/config/local.env')
+        db_engine = get_engine_async(conf_file='/path/to/config.env')
         async with db_engine.session() as session:  # type: AsyncSession
             await import_lexis_nexis(session=session,
                                      project_id=PROJECT_ID,
