@@ -1,28 +1,13 @@
 import logging
-from typing import Type
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
-from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import (
     Item,
-    TwitterItem,
-    GenericItem,
-    AcademicItem,
-    ItemType,
-    ItemTypeLiteral,
-    AnyItemType,
-    AnyItemSchema,
     LexisNexisItem, LexisNexisItemSource
 )
 from nacsos_data.models.items import (
-    GenericItemModel,
-    TwitterItemModel,
-    AcademicItemModel,
-    AnyItemModelType,
-    AnyItemModel,
-    LexisNexisItemModel,
     LexisNexisItemSourceModel,
     FullLexisNexisItemModel
 )
@@ -43,12 +28,14 @@ async def read_lexis_paged_for_project(session: AsyncSession,
     stmt = (select(LexisNexisItem,
                    func.array_agg(
                        func.row_to_json(
-                           LexisNexisItemSource.__table__.table_valued()
+                           LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
                        )
                    ).label('sources'))
             .join(LexisNexisItemSource, LexisNexisItemSource.item_id == LexisNexisItem.item_id)
             .where(LexisNexisItem.project_id == project_id)
-            .group_by(LexisNexisItem.item_id, Item.item_id))
+            .group_by(LexisNexisItem.item_id, Item.item_id)
+            .limit(page_size)
+            .offset(offset))
     rslt = (await session.execute(stmt)).mappings().all()
 
     ret = []

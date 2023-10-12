@@ -252,12 +252,12 @@ async def import_lexis_nexis(session: AsyncSession,
                 # See, if we already stored this in the database ahead of time
                 if vec_index in item_ids_db_inv:
                     existing_id = item_ids_db_inv[vec_index]
-                    log.debug(f' -> Found text match in database')
+                    log.debug(' -> Found text match in database')
                     break
                 # See, if we've seen this and saved this already in the process
                 elif vec_index in lexis_ids_f_inv and lexis_ids_f_inv[vec_index] in ln2id:
                     existing_id = ln2id[lexis_ids_f_inv[vec_index]]
-                    log.debug(f' -> Found text match in file (but we sent it to the database earlier)')
+                    log.debug(' -> Found text match in file (but we sent it to the database earlier)')
                     break
                 # else: false positive, it's a duplicate and we just saw the first one of them
 
