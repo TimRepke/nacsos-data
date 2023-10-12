@@ -101,6 +101,73 @@ async def import_lexis_nexis(session: AsyncSession,
                              dedup_source: bool = True,
                              fail_on_parse_error: bool = True,
                              log: logging.Logger | None = None) -> None:
+    """
+    Imports and deduplicates lexisnexis items.
+
+    - Create import
+    - It first gets all existing data from the database in that project (project_id)
+    - Then reads the full source file (filename)
+    - While doing that, transforms texts into vectors; vocab constructed from first seen batch
+    - Create lookup index (approx. nearest neighbours)
+    - Read source file line by line
+      - check if lexis_id is already known
+      - check if text exists in index (jaccard < max_slop)
+      - add item source (where article was published)
+      - add item if not exists
+      - create m2m relation
+
+    Example usage:
+
+    ```
+    import asyncio
+    import logging
+
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from nacsos_data.util.lexisnexis.importer import import_lexis_nexis
+    from nacsos_data.db import get_engine_async
+
+    PROJECT_ID = 'c5f11385-b94b-4048-bb7d-247fa1b6b685'
+    USER_ID = '562fc779-3541-4796-a9b8-d4da580892cb'
+
+    logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s: %(message)s', level=logging.INFO)
+    logger = logging.getLogger('test')
+    logger.setLevel(logging.DEBUG)
+    logger.debug('first')
+
+
+    async def main():
+        db_engine = get_engine_async(conf_file='/home/tim/workspace/nacsos-core/config/local.env')
+        async with db_engine.session() as session:  # type: AsyncSession
+            await import_lexis_nexis(session=session,
+                                     project_id=PROJECT_ID,
+                                     filename='lexis_sample.jsonl',
+                                     import_name='LN import',
+                                     user_id=USER_ID,
+                                     description='test import',
+                                     log=logger)
+
+
+    if __name__ == '__main__':
+        asyncio.run(main())
+    ```
+
+    :param session:
+    :param project_id:
+    :param filename:
+    :param import_name:
+    :param import_id:
+    :param user_id:
+    :param description:
+    :param vectoriser:
+    :param batch_size_db:
+    :param batch_size_file:
+    :param max_slop:
+    :param dedup_source:
+    :param fail_on_parse_error:
+    :param log:
+    :return:
+    """
     if log is None:
         log = logger
 
