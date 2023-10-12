@@ -57,7 +57,7 @@ async def load_vectors_from_database(session: AsyncSession,
         item_ids = [str(r['item_id']) for r in batch]
         texts = [r['text'].lower() for r in batch]
 
-        if not hasattr(vectoriser, 'vocabulary_'):
+        if not hasattr(vectoriser, 'vocabulary_') and len(texts) > MIN_DF:
             logger.debug('Vectoriser has no vocabulary, fitting it now on the first batch.')
             vectoriser.fit(texts)
 
@@ -196,11 +196,15 @@ async def import_lexis_nexis(session: AsyncSession,
 
     ln2id = {row['lexis_id']: str(row['item_id']) for row in known_ids}
 
-    log.info(f'Loading texts from project {project_id}')
-    db_data = [r async for r in load_vectors_from_database(session=session, project_id=project_id,
-                                                           batch_size=batch_size_db, vectoriser=vectoriser)]
-    item_ids_db = {r: i for i, r in enumerate(bid for batch_ids, _ in db_data for bid in batch_ids)}
-    item_ids_db_inv = {v: k for k, v in item_ids_db.items()}
+    if len(ln2id) > 0:
+        log.info(f'Loading texts from project {project_id}')
+        db_data = [r async for r in load_vectors_from_database(session=session, project_id=project_id,
+                                                               batch_size=batch_size_db, vectoriser=vectoriser)]
+        item_ids_db = {r: i for i, r in enumerate(bid for batch_ids, _ in db_data for bid in batch_ids)}
+        item_ids_db_inv = {v: k for k, v in item_ids_db.items()}
+    else:
+        item_ids_db = {}
+        item_ids_db_inv = {}
 
     offset = len(item_ids_db)
     log.info(f'Found {offset:,} documents already in the database.')
