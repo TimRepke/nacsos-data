@@ -334,10 +334,11 @@ async def get_resolved_item_annotations(session: AsyncSession,
     # If requested, drop items without annotation from the matrix and the order
     if not include_empty:
         items_with_annotation = set([str(anno.item_id) for anno in annotations])
-        item_ids = set([str(o.item_id) for o in item_order])
+        item_id_to_key = {str(o.item_id): o.key for o in item_order}
+        item_ids = set(item_id_to_key.keys())
         empty_items = item_ids - items_with_annotation
         for item_id in empty_items:
-            del annotation_map[item_id]
+            del annotation_map[item_id_to_key[item_id]]
         item_order = [o for o in item_order if str(o.item_id) in items_with_annotation]
 
     return ResolutionProposal(
