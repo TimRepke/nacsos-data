@@ -25,7 +25,7 @@ from nacsos_data.db.schemas.annotations import Annotation, Assignment, Assignmen
 from nacsos_data.db.schemas.bot_annotations import BotAnnotation, BotAnnotationMetaData
 
 from ..errors import NotFoundError
-from ...db.schemas import User, ProjectPermissions, Project, ItemType, AcademicItem, TwitterItem
+from ...db.schemas import User, ProjectPermissions, Project, ItemType, AcademicItem, TwitterItem, LexisNexisItem
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
@@ -265,8 +265,10 @@ async def get_project_labels(project_id: str | uuid.UUID, db_engine: DatabaseEng
     return await get_labels(stmt_labels=stmt_labels, db_engine=db_engine)
 
 
-F2CRetType = tuple[Type[AcademicItem] | Type[TwitterItem], list[Type[Column]]] | tuple[
-    None, None]  # type: ignore[type-arg]
+F2CRetType = (tuple[Type[AcademicItem]
+                    | Type[TwitterItem]
+                    | Type[LexisNexisItem], list[Type[Column]]]  # type: ignore[type-arg]
+              | tuple[None, None])
 
 
 async def fields2col(project_id: str | uuid.UUID,
