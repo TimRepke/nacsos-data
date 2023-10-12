@@ -39,6 +39,7 @@ async def import_tweet(tweet: TwitterItemModel,
     :param engine:
     :return: TwitterItem(Model) that was affected by this operation
     """
+    session: AsyncSession
     async with engine.session() as session:
         orm_tweet = TwitterItem(**tweet.model_dump())
 
@@ -101,7 +102,8 @@ async def read_all_twitter_items_for_project_paged(project_id: str | UUID, page:
 
 
 async def read_twitter_item_by_item_id(item_id: str | UUID, engine: DatabaseEngineAsync) -> TwitterItemModel | None:
-    async with engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with engine.session() as session:
         result = await session.get(TwitterItem, item_id)
         if result is not None:
             return TwitterItemModel.model_validate(result.__dict__)
@@ -110,7 +112,8 @@ async def read_twitter_item_by_item_id(item_id: str | UUID, engine: DatabaseEngi
 
 async def read_twitter_item_by_twitter_id(twitter_id: str, project_id: str,
                                           engine: DatabaseEngineAsync) -> TwitterItemModel | None:
-    async with engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with engine.session() as session:
         stmt = select(TwitterItem).where(TwitterItem.twitter_id == twitter_id,
                                          TwitterItem.project_id == project_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
@@ -121,7 +124,8 @@ async def read_twitter_item_by_twitter_id(twitter_id: str, project_id: str,
 
 async def read_twitter_items_by_author_id(twitter_author_id: str, project_id: str,
                                           engine: DatabaseEngineAsync) -> list[TwitterItemModel]:
-    async with engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with engine.session() as session:
         stmt = select(TwitterItem).where(TwitterItem.twitter_author_id == twitter_author_id,
                                          TwitterItem.project_id == project_id)
         result = (await session.execute(stmt)).scalars().all()

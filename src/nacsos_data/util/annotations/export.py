@@ -41,7 +41,7 @@ class LabelOptions(BaseModel):
     strings: bool | None = None
 
 
-def _bool_label_columns(key: str, repeat: int, cte: CTE) \
+def _bool_label_columns(key: str, repeat: int | None, cte: CTE) \
         -> list[Label]:  # type: ignore[type-arg]
     conditions = [cte.c.key == key]
     label = lambda x: f'{key}|{x}'  # noqa: E731
@@ -184,7 +184,8 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
 
 
 async def get_project_bot_scopes(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[dict[str, str]]:
-    async with db_engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with db_engine.session() as session:
         stmt = select(BotAnnotationMetaData.bot_annotation_metadata_id.cast(type_=String).label('id'),
                       BotAnnotationMetaData.name) \
             .where(BotAnnotationMetaData.project_id == project_id) \
@@ -193,7 +194,8 @@ async def get_project_bot_scopes(project_id: str | uuid.UUID, db_engine: Databas
 
 
 async def get_project_scopes(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[dict[str, str]]:
-    async with db_engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with db_engine.session() as session:
         stmt = select(AssignmentScope.assignment_scope_id.cast(type_=String).label('id'),
                       AssignmentScope.name,
                       AnnotationScheme.annotation_scheme_id.cast(type_=String).label('scheme_id'),
@@ -205,7 +207,8 @@ async def get_project_scopes(project_id: str | uuid.UUID, db_engine: DatabaseEng
 
 
 async def get_project_users(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[dict[str, str]]:
-    async with db_engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with db_engine.session() as session:
         stmt = select(User.user_id.cast(type_=String).label('id'),
                       User.username.label('name')) \
             .join(ProjectPermissions, ProjectPermissions.user_id == User.user_id) \
@@ -236,7 +239,8 @@ async def get_labels(stmt_labels: CTE, db_engine: DatabaseEngineAsync) -> dict[s
         .group_by(stmt_labels_.c.key) \
         .order_by(stmt_labels_.c.key)
 
-    async with db_engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with db_engine.session() as session:
         result = (await session.execute(stmt_options)).mappings().all()
 
         # construct a lookup map of key->options/values/choices
@@ -261,7 +265,8 @@ async def get_project_labels(project_id: str | uuid.UUID, db_engine: DatabaseEng
     return await get_labels(stmt_labels=stmt_labels, db_engine=db_engine)
 
 
-F2CRetType = tuple[Type[AcademicItem] | Type[TwitterItem], list[Type[Column]]] | tuple[None, None]  # type: ignore[type-arg]
+F2CRetType = tuple[Type[AcademicItem] | Type[TwitterItem], list[Type[Column]]] | tuple[
+    None, None]  # type: ignore[type-arg]
 
 
 async def fields2col(project_id: str | uuid.UUID,
@@ -269,8 +274,8 @@ async def fields2col(project_id: str | uuid.UUID,
                      db_engine: DatabaseEngineAsync) -> F2CRetType:
     if fields is None or len(fields) == 0:
         return None, None
-
-    async with db_engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with db_engine.session() as session:
         project = await session.get(Project, project_id)
 
         if project is None:
@@ -280,6 +285,10 @@ async def fields2col(project_id: str | uuid.UUID,
             ItemSchema = AcademicItem  # type: ignore[assignment]
         elif project.type == ItemType.twitter:
             ItemSchema = TwitterItem  # type: ignore[assignment]
+        elif project.type == ItemType.lexis:
+            ItemSchema = LexisNexisItem  # type: ignore[assignment]
+        else:
+            raise ValueError(f'Unknown project type "{project.type}"')
 
         columns = []
         for field in fields:
@@ -308,7 +317,8 @@ async def prepare_export_table(bot_annotation_metadata_ids: list[str] | list[uui
     # Translate the list of strings into table columns (for extra fields from Items)
     ItemSchema, item_columns = await fields2col(project_id=project_id, fields=item_fields, db_engine=db_engine)
 
-    async with db_engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with db_engine.session() as session:
         if ignore_hierarchy:
             # Prepare the CASE expressions to spread label values across binary fields
             label_selects = _get_label_selects(labels=labels_map,

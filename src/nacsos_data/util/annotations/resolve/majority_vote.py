@@ -77,7 +77,9 @@ def naive_majority_vote(annotation_map: ResolutionMatrix,
                         label_map: dict[str, FlatLabel],
                         fix_parent_references: bool = True) -> ResolutionMatrix:
     for row_key, row in annotation_map.items():
-        for label_key, cell in row.items():  # type: str, ResolutionCell
+        cell: ResolutionCell
+        label_key: str
+        for label_key, cell in row.items():
             annotations = [entry.annotation
                            for labels in cell.labels.values()
                            for entry in labels

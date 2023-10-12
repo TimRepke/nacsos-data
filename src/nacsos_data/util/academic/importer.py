@@ -103,7 +103,8 @@ async def import_academic_items(
 
     item_ids = []
 
-    async with db_engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with db_engine.session() as session:
         import_orm = await get_or_create_import(session=session,
                                                 project_id=project_id,
                                                 import_id=import_id,

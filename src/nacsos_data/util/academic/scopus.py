@@ -313,8 +313,9 @@ def read_scopus_ris_file(filepath: str,
         for entry in entries:
 
             scopus_id = None
-            if entry.get('scopus_url') is not None:
-                matches = re.findall(r'\?eid=(.+?)&', entry.get('scopus_url'))
+            scopus_url: str | None = entry.get('scopus_url')
+            if scopus_url is not None:
+                matches = re.findall(r'\?eid=(.+?)&', scopus_url)
                 if len(matches) > 0:
                     scopus_id = matches[0]
 

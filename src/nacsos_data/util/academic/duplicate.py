@@ -178,7 +178,8 @@ async def find_duplicates(item: AcademicItemModel,
     stmt = stmt.where(or_(*checks))
 
     if db_engine is not None:
-        async with db_engine.session() as new_session:  # type: AsyncSession
+        new_session: AsyncSession
+        async with db_engine.session() as new_session:
             candidates = [Candidate.model_validate(r) for r in (await new_session.execute(stmt)).mappings().all()]
     elif session is not None:
         candidates = [Candidate.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]

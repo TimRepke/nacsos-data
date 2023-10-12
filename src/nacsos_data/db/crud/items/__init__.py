@@ -31,7 +31,8 @@ logger = logging.getLogger('nacsos-data.crud.items')
 
 
 async def read_item_count_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) -> int:
-    async with engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with engine.session() as session:
         result: int = (await session.execute(  # type: ignore[assignment] # FIXME: mypy
             select(func.count(Item.item_id)).where(Item.project_id == project_id)
         )).scalar()
@@ -51,6 +52,7 @@ async def read_all_for_project(project_id: str | UUID, Schema: Type[AnyItemSchem
 async def read_paged_for_project(project_id: str | UUID, Schema: Type[AnyItemSchema], Model: Type[AnyItemModelType],
                                  page: int, page_size: int, engine: DatabaseEngineAsync) -> list[AnyItemModelType]:
     # page: count starts at 1
+    session: AsyncSession
     async with engine.session() as session:
         offset = (page - 1) * page_size
         if offset < 0:

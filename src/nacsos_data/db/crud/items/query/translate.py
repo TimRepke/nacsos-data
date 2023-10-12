@@ -84,7 +84,8 @@ class Query:
         stmt = self.stmt.subquery()
         cnt_stmt = func.count(stmt.c.item_id)
         if db_engine is not None:
-            with db_engine.session() as new_session:  # type: Session
+            new_session: Session
+            with db_engine.session() as new_session:
                 return new_session.execute(cnt_stmt).scalar()  # type: ignore[return-value]
         if session is not None:
             return session.execute(cnt_stmt).scalar()  # type: ignore[return-value]
@@ -104,7 +105,8 @@ class Query:
             stmt = stmt.limit(limit)
 
         if db_engine is not None:
-            with db_engine.session() as new_session:  # type: Session
+            new_session: Session
+            with db_engine.session() as new_session:
                 items = new_session.execute(stmt).scalars().all()
         elif session is not None:
             items = session.execute(stmt).scalars().all()
@@ -161,6 +163,8 @@ class Query:
                     return not_(*(recurse(child) for child in subtree.children))
             elif isinstance(subtree, Token):
                 return m2m_import_item_table.c.import_id == subtree.value
+
+            raise ValueError(f'Invalid subtree for import error ({subtree})')
 
         # FIXME: for the AND logic, this probably needs to be extended to using aliases
         self._stmt = self.stmt.join(m2m_import_item_table, m2m_import_item_table.c.item_id == AcademicItem.item_id)

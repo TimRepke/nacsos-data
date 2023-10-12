@@ -206,7 +206,8 @@ async def read_next_assignment_for_scope_for_user(current_assignment_id: str | u
                                                   assignment_scope_id: str | uuid.UUID,
                                                   user_id: str | uuid.UUID,
                                                   db_engine: DatabaseEngineAsync) -> AssignmentModel | None:
-    async with db_engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with db_engine.session() as session:
         stmt = text("""
         WITH tmp as (SELECT assignment_id,
                         LEAD(assignment_id, 1) over (order by "order") as next_assignment_id
@@ -408,7 +409,8 @@ async def upsert_annotations(annotations: list[AnnotationModel],
     logger.debug(f'[upsert_annotations] UPDATING existing annotations with ids: {ids_to_update}')
     logger.debug(f'[upsert_annotations] DELETING existing annotations with ids: {ids_to_remove}')
 
-    async with db_engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with db_engine.session() as session:
         annotation: AnnotationModel | Annotation | None
         # TODO this seems too excessive compared to simply deleting them directly (but has to be done for FK constraint)
         #      session.execute(delete(Annotation).where(Annotation.annotation_id == annotation_id))

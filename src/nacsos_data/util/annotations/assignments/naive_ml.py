@@ -29,7 +29,7 @@ ModelType: TypeAlias = (
         | RidgeClassifier
         | SVC
 )
-FeaturiserType: TypeAlias = TransformerMixin | Pipeline
+FeaturiserType: TypeAlias = TfidfVectorizer | TransformerMixin | Pipeline
 
 Featurisers: dict[str, Callable[[], FeaturiserType]] = {
     'tfidf(ngrams=(1,1), df=(0.01, 0.95))': lambda: (
@@ -66,13 +66,13 @@ Models: dict[str, Callable[[], ModelType]] = {
         RidgeClassifier(class_weight='balanced')
     ),
     'SVM(gamma=2,C=1,balanced)': lambda: (
-        SVC(gamma=2, C=1, probability=True, class_weight='balanced')
+        SVC(gamma=2.0, C=1.0, probability=True, class_weight='balanced')
     ),
     'SVM(gamma=2,balanced)': lambda: (
-        SVC(C=2, probability=True, class_weight='balanced')
+        SVC(C=2.0, probability=True, class_weight='balanced')
     ),
     'SVM(C=1,balanced)': lambda: (
-        SVC(C=1, probability=True, class_weight='balanced')
+        SVC(C=1.0, probability=True, class_weight='balanced')
     ),
     'SVM(gamma=0.25,balanced)': lambda: (
         SVC(C=0.25, probability=True, class_weight='balanced')
@@ -87,7 +87,7 @@ class Scores(BaseModel):
     f1: float
     precision: float
     recall: float
-    support: float
+    support: float | None
 
 
 class THScores(Scores):
@@ -128,7 +128,7 @@ def test_model(pre: FeaturiserType, clf: ModelType, labels: list[int],
         x_test = pre.fit_transform(texts)
 
     y_pred = clf.predict(x_test)
-    prec, rec, f1, supp = precision_recall_fscore_support(labels, y_pred, average='binary', zero_division=0)
+    prec, rec, f1, supp = precision_recall_fscore_support(labels, y_pred, average='binary', zero_division=0.0)
     scores = Scores(precision=prec,
                     recall=rec,
                     f1=f1,
@@ -140,7 +140,8 @@ def test_model(pre: FeaturiserType, clf: ModelType, labels: list[int],
         y_pred = clf.predict_proba(x_test)
         for th in thresholds:
             y_pred_bin = [int(b) for b in y_pred[:, 1] >= th]
-            prec, rec, f1, supp = precision_recall_fscore_support(labels, y_pred_bin, average='binary', zero_division=0)
+            prec, rec, f1, supp = precision_recall_fscore_support(labels, y_pred_bin,
+                                                                  average='binary', zero_division=0.0)
             th_scores.append(THScores(threshold=th,
                                       precision=prec,
                                       recall=rec,

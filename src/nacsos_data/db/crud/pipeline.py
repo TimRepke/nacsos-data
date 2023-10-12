@@ -24,7 +24,8 @@ def query_tasks(engine: DatabaseEngine,
     :param kwargs:
         Each entry in the kwargs dict is assumed to be an `equals ( = )` comparison.
     """
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         stmt = select(Task)
 
         if len(kwargs) > 0:
@@ -54,7 +55,8 @@ def query_tasks(engine: DatabaseEngine,
 
 
 def read_task_by_id(task_id: str | uuid.UUID, engine: DatabaseEngine) -> TaskModel | None:
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         stmt = select(Task).where(Task.task_id == task_id)
         result = session.execute(stmt).scalars().one_or_none()
         if result is not None:
@@ -63,21 +65,24 @@ def read_task_by_id(task_id: str | uuid.UUID, engine: DatabaseEngine) -> TaskMod
 
 
 def read_tasks_by_ids(task_ids: list[str] | list[uuid.UUID], engine: DatabaseEngine) -> list[TaskModel]:
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         stmt = select(Task).where(Task.task_id.in_(task_ids))
         return [TaskModel.model_validate(r.__dict__)
                 for r in session.execute(stmt).scalars().all()]
 
 
 def read_tasks_by_fingerprint(fingerprint: str, engine: DatabaseEngine) -> list[TaskModel]:
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         stmt = select(Task).where(Task.fingerprint == fingerprint)
         return [TaskModel.model_validate(r.__dict__)
                 for r in session.execute(stmt).scalars().all()]
 
 
 def read_num_tasks_for_fingerprint(fingerprint: str, engine: DatabaseEngine) -> int:
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         stmt = select(func.count(Task.task_id)).where(Task.fingerprint == fingerprint)
         result = session.execute(stmt)
         return result.scalar() or 0
@@ -88,7 +93,8 @@ def check_fingerprint_exists(fingerprint: str, engine: DatabaseEngine) -> bool:
 
 
 def check_task_id_exists(task_id: str | uuid.UUID, engine: DatabaseEngine) -> bool:
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         stmt = select(func.count(Task.task_id)).where(Task.task_id == task_id)
         result = session.execute(stmt)
         return (result.scalar() or 0) > 0
@@ -100,40 +106,46 @@ class StatusForTask(BaseModel):
 
 
 def read_task_statuses(task_ids: list[str] | list[uuid.UUID], engine: DatabaseEngine) -> list[StatusForTask]:
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         stmt = select(Task.task_id, Task.status).where(Task.task_id.in_(task_ids))
         return [StatusForTask.model_validate(r.__dict__)
                 for r in session.execute(stmt).scalars().all()]
 
 
 def read_task_status_by_id(task_id: str | uuid.UUID, engine: DatabaseEngine) -> TaskStatus | str | None:
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         stmt = select(Task.status).where(Task.task_id == task_id)
         result: TaskStatus | str | None = session.scalar(stmt)
         return result
 
 
 def delete_task_by_id(task_id: str | uuid.UUID, engine: DatabaseEngine) -> None:
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         stmt = delete(Task).where(Task.task_id == task_id)
         session.execute(stmt)
 
 
 def delete_tasks_by_fingerprint(fingerprint: str, engine: DatabaseEngine) -> None:
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         stmt = delete(Task).where(Task.fingerprint == fingerprint)
         session.execute(stmt)
 
 
 def reset_failed(engine: DatabaseEngine) -> None:
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         stmt = update(Task).where(Task.status == TaskStatus.RUNNING).values(status=TaskStatus.FAILED)
         session.execute(stmt)
 
 
 def upsert_task(task: TaskModel, engine: DatabaseEngine) -> TaskModel:
     from sqlalchemy.dialects.postgresql import insert as pg_insert
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         result = session.scalars(pg_insert(Task)
                                  .values(**task.model_dump())
                                  .on_conflict_do_update(index_elements=[Task.task_id],
@@ -144,7 +156,8 @@ def upsert_task(task: TaskModel, engine: DatabaseEngine) -> TaskModel:
 
 
 def update_status(task_id: str | uuid.UUID, status: TaskStatus, engine: DatabaseEngine) -> None:
-    with engine.session() as session:  # type: Session
+    session: Session
+    with engine.session() as session:
         task: Task | None = session.scalars(select(Task).where(Task.task_id == task_id)).one_or_none()
         if task is None:
             raise MissingIdError(f'No task with ID={task_id} in database!')

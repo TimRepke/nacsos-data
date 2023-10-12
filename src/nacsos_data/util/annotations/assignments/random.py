@@ -15,7 +15,8 @@ if TYPE_CHECKING:
 
 
 async def read_random_items(project_id: str | UUID, num_items: int, engine: DatabaseEngineAsync) -> list[str]:
-    async with engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with engine.session() as session:
         stmt = text("""
             SELECT item.item_id
             FROM item

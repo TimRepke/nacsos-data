@@ -96,7 +96,9 @@ def resolve_bot_annotation_parents(annotation_map: ResolutionMatrix,
     # NOTICE: This does *not* check for validity!
     #         (e.g. the parent might have been resolved to a choice where the current sub-label is not a child)
     for row_key, row in annotation_map.items():
-        for label_key, cell in row.items():  # type: str, ResolutionCell
+        label_key: str
+        cell: ResolutionCell
+        for label_key, cell in row.items():
             if cell.resolution is not None and label_key in row:
                 parent_key = label_map[label_key].parent_key
                 if parent_key is not None and parent_key in row:

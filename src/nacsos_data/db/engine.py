@@ -151,7 +151,8 @@ def ensure_session_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awa
             return await func(*args, session=session, **kwargs)
         if db_engine is not None:
             logger.debug(f'Opening a new session to execute {func}')
-            async with db_engine.session() as fresh_session:  # type: AsyncSession
+            fresh_session: AsyncSession
+            async with db_engine.session() as fresh_session:
                 return await func(*args, session=fresh_session, **kwargs)
 
         raise RuntimeError('I need a session or an engine to get a session!')
@@ -186,7 +187,8 @@ def ensure_session(func):  # type: ignore[no-untyped-def]
             return func(*args, session=session, **kwargs)  # type: ignore[arg-type]
         if db_engine is not None:
             logger.debug(f'Opening a new session to execute {func}')
-            with db_engine.session() as fresh_session:  # type: Session
+            fresh_session: Session
+            with db_engine.session() as fresh_session:
                 return func(*args, session=fresh_session, **kwargs)  # type: ignore[arg-type]
 
         raise RuntimeError('I need a session or an engine to get a session!')

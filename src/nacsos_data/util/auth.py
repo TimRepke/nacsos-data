@@ -67,7 +67,8 @@ class Authentication:
         return user
 
     async def fetch_token_by_user(self, username: str, only_active: bool = True) -> AuthTokenModel:
-        async with self.db_engine.session() as session:  # type: AsyncSession
+        session: AsyncSession
+        async with self.db_engine.session() as session:
             stmt = select(AuthToken).where(AuthToken.username == username)
             if only_active:
                 stmt = stmt.where(or_(AuthToken.valid_till > datetime.datetime.now(),
@@ -79,7 +80,8 @@ class Authentication:
             return AuthTokenModel.model_validate(token.__dict__)
 
     async def fetch_token_by_id(self, token_id: str | uuid.UUID, only_active: bool = True) -> AuthTokenModel:
-        async with self.db_engine.session() as session:  # type: AsyncSession
+        session: AsyncSession
+        async with self.db_engine.session() as session:
             stmt = select(AuthToken).where(AuthToken.token_id == token_id)
             if only_active:
                 stmt = stmt.where(or_(AuthToken.valid_till > datetime.datetime.now(),
@@ -92,19 +94,22 @@ class Authentication:
             return AuthTokenModel.model_validate(token.__dict__)
 
     async def clear_tokens_inactive(self) -> None:
-        async with self.db_engine.session() as session:  # type: AsyncSession
+        session: AsyncSession
+        async with self.db_engine.session() as session:
             stmt = delete(AuthToken).where(AuthToken.valid_till < datetime.datetime.now())
             await session.execute(stmt)
 
     async def clear_tokens_by_user(self, username: str) -> None:
-        async with self.db_engine.session() as session:  # type: AsyncSession
+        session: AsyncSession
+        async with self.db_engine.session() as session:
             stmt = delete(AuthToken).where(AuthToken.username == username)
             await session.execute(stmt)
 
     async def clear_token_by_id(self,
                                 token_id: str | uuid.UUID,
                                 verify_username: str | None = None) -> None:
-        async with self.db_engine.session() as session:  # type: AsyncSession
+        session: AsyncSession
+        async with self.db_engine.session() as session:
             stmt = delete(AuthToken).where(AuthToken.token_id == token_id)
             if verify_username:
                 stmt = stmt.where(AuthToken.username == verify_username)
@@ -119,7 +124,8 @@ class Authentication:
         if token_lifetime_minutes is None:
             token_lifetime_minutes = self.token_lifetime_minutes
 
-        async with self.db_engine.session() as session:  # type: AsyncSession
+        session: AsyncSession
+        async with self.db_engine.session() as session:
             valid_till = datetime.datetime.now() + datetime.timedelta(minutes=token_lifetime_minutes)
             if token_id is not None:
                 stmt = select(AuthToken).where(AuthToken.token_id == token_id)

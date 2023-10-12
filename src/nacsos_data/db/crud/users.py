@@ -24,6 +24,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 async def read_user_by_id(user_id: str | uuid.UUID, engine: DatabaseEngineAsync) -> UserInDBModel | None:
+    session: AsyncSession
     async with engine.session() as session:
         stmt = select(User).filter_by(user_id=user_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
@@ -33,6 +34,7 @@ async def read_user_by_id(user_id: str | uuid.UUID, engine: DatabaseEngineAsync)
 
 
 async def read_users_by_ids(user_ids: list[str], engine: DatabaseEngineAsync) -> list[UserInDBModel] | None:
+    session: AsyncSession
     async with engine.session() as session:
         stmt = select(User).filter(User.user_id.in_(user_ids))
         result = (await session.execute(stmt)).scalars().all()
@@ -43,6 +45,7 @@ async def read_users_by_ids(user_ids: list[str], engine: DatabaseEngineAsync) ->
 
 
 async def read_user_by_name(username: str, engine: DatabaseEngineAsync) -> UserInDBModel | None:
+    session: AsyncSession
     async with engine.session() as session:
         stmt = select(User).filter_by(username=username)
         result = (await session.execute(stmt)).scalars().one_or_none()
@@ -65,6 +68,7 @@ async def read_users(engine: DatabaseEngineAsync,
     :param order_by_username: If true, results will be ordered by username
     :return: List of users or None (if applied filter has no response)
     """
+    session: AsyncSession
     async with engine.session() as session:
         stmt = select(User)
 
@@ -96,7 +100,8 @@ async def create_or_update_user(user: UserModel | UserInDBModel, engine: Databas
     :return: Returns the `user_id` as string.
     """
 
-    async with engine.session() as session:  # type: AsyncSession
+    session: AsyncSession
+    async with engine.session() as session:
         user_db: User | None = (
             await session.execute(select(User).where(User.user_id == user.user_id))
         ).scalars().one_or_none()
