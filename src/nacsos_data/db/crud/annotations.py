@@ -542,6 +542,7 @@ async def read_resolved_bot_annotations_for_meta(session: AsyncSession,
                                                                   include_empty=include_empty,
                                                                   include_new=include_new,
                                                                   update_existing=update_existing,
+                                                                  bot_meta=bot_meta,
                                                                   session=session)
     return ret
 
@@ -613,8 +614,10 @@ async def update_resolved_bot_annotations(session: AsyncSession,
         select(BotAnnotationMetaData)
         .where(BotAnnotationMetaData.bot_annotation_metadata_id == bot_annotation_metadata_id))) \
         .scalars().one_or_none()
+
     if bot_meta is None:
         raise MissingIdError(f'No `BotAnnotationMetaData` object for {bot_annotation_metadata_id}')
+
     resolutions = dehydrate_resolutions(matrix)
     # Update the bot_meta
     bot_meta.name = name
@@ -637,9 +640,12 @@ async def update_resolved_bot_annotations(session: AsyncSession,
     ids_to_update = existing_ids - ids_to_remove
     ids_to_create = submitted_ids - ids_to_update
 
-    logger.debug(f'[upsert_bot_annotations] CREATING new annotations with ids: {ids_to_create}')
-    logger.debug(f'[upsert_bot_annotations] UPDATING existing annotations with ids: {ids_to_update}')
-    logger.debug(f'[upsert_bot_annotations] DELETING existing annotations with ids: {ids_to_remove}')
+    logger.debug(f'[upsert_bot_annotations] CREATING ({len(ids_to_create):,}) '
+                 f'new annotations with ids: {ids_to_create}')
+    logger.debug(f'[upsert_bot_annotations] UPDATING ({len(ids_to_update):,}) '
+                 f'existing annotations with ids: {ids_to_update}')
+    logger.debug(f'[upsert_bot_annotations] DELETING ({len(ids_to_remove):,}) '
+                 f'existing annotations with ids: {ids_to_remove}')
 
     # Delete old bot_annotations
     if len(ids_to_remove) > 0:
@@ -670,6 +676,6 @@ async def update_resolved_bot_annotations(session: AsyncSession,
                         'bot_annotation_metadata_id': bot_annotation_metadata_id
                     }))
     if len(new_bot_annotations) > 0:
+        logger.debug(f'Creating ({len(new_bot_annotations):,} new BotAnnotations.')
         session.add_all(new_bot_annotations)
-
-    await session.commit()
+        await session.commit()

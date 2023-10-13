@@ -34,7 +34,7 @@ def _majority_vote_list(label_annotations: list[ItemAnnotation],
                    for li in la.__dict__[field]
                    if li is not None]
 
-    logger.debug(f'Found {len(flat_values)} annotations for "{label.path_key}" of type "{field}".')
+    # logger.debug(f'Found {len(flat_values)} annotations for "{label.path_key}" of type "{field}".')
 
     if len(flat_values) == 0:
         raise EmptyAnnotationsError(f'No entries for "{label.path_key}" of type "{field}" '
@@ -50,7 +50,7 @@ def _majority_vote_scalar(label_annotations: list[ItemAnnotation],
                    for la in label_annotations
                    if la is not None and la.__dict__[field] is not None]
 
-    logger.debug(f'Found {len(flat_values)} annotations for "{label.path_key}" of type "{field}".')
+    # logger.debug(f'Found {len(flat_values)} annotations for "{label.path_key}" of type "{field}".')
 
     if len(flat_values) == 0:
         raise EmptyAnnotationsError(f'No entries for "{label.path_key}" of type "{field}".')
@@ -65,7 +65,7 @@ def _majority_vote_str(label_annotations: list[ItemAnnotation],
                               for la in label_annotations
                               if la is not None and la.__dict__[field] is not None and len(la.__dict__[field]) > 0]
 
-    logger.debug(f'Found {len(flat_values)} annotations for "{label.path_key}" of type "{field}".')
+    # logger.debug(f'Found {len(flat_values)} annotations for "{label.path_key}" of type "{field}".')
 
     if len(flat_values) == 0:
         raise EmptyAnnotationsError(f'No entries for "{label.path_key}" of type "{field}".')

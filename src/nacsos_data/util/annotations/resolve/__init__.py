@@ -269,8 +269,6 @@ async def get_resolved_item_annotations(session: AsyncSession,
         ignore_repeat=ignore_repeat,
         session=session)
     label_map = {l.path_key: l for l in labels}
-    logger.debug(f'Got {len(labels)} labels, {len(annotators)} annotators, {len(item_order):,} items '
-                 f'and {len(annotations):,} annotations.')
 
     annotation_map: ResolutionMatrix = _empty_matrix(item_order=item_order, labels=labels)
 
@@ -284,6 +282,10 @@ async def get_resolved_item_annotations(session: AsyncSession,
             session=session
         )
         bot_annotations_map = {str(ba.bot_annotation_id): ba for ba in bot_annotations}
+
+        logger.debug(f'Found {len(bot_annotations_map):,} existing BotAnnotations in for the key and '
+                     f'I remembered {len(bot_meta.meta.resolutions):,} of those.')
+
         # Populate existing bot annotations (resolutions)
         # Note: we trust that bot_meta and bot_annotations are in sync and ignore all inconsistencies
         for r_entry in bot_meta.meta.resolutions:
@@ -309,9 +311,9 @@ async def get_resolved_item_annotations(session: AsyncSession,
                         anno.old = AnnotationValue.model_validate(entry)
                         # Note: The NEW case is the default, so we only need to set the other two cases
                         if same_values(entry, anno):
-                            elem.status = ResolutionStatus.CHANGED
-                        else:
                             elem.status = ResolutionStatus.UNCHANGED
+                        else:
+                            elem.status = ResolutionStatus.CHANGED
 
         # Drop items that were not in the previous resolution
         if not include_new:
@@ -321,6 +323,8 @@ async def get_resolved_item_annotations(session: AsyncSession,
             for key in drop_keys:
                 del annotation_map[key]
             item_order = [io for io in item_order if io.key not in drop_keys]
+    else:
+        logger.debug('Did not receive bot_meta.')
 
     if bot_meta is None or (bot_meta is not None and update_existing):
         # FIXME: new items in an existing resolution are currently not resolved
