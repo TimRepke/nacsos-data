@@ -38,8 +38,10 @@ def labels_from_scheme(scheme: AnnotationSchemeModel,
     run = 0
 
     def recurse(labels: list[AnnotationSchemeLabel],
-                prefix: list[Label], parent: int | None = None,
-                parent_key: str | None = None, parent_value: int | None = None) -> list[FlatLabel]:
+                prefix: list[Label],
+                parent: int | None = None,
+                parent_key: str | None = None,
+                parent_value: int | None = None) -> list[FlatLabel]:
         nonlocal run
         ret = []
         for label in labels:
@@ -77,7 +79,7 @@ def labels_from_scheme(scheme: AnnotationSchemeModel,
                                 sublabels = recurse(labels=choice.children,
                                                     prefix=next_prefix + prefix,
                                                     parent=next_parent,
-                                                    parent_key=path_to_string(next_prefix),
+                                                    parent_key=path_to_string(next_prefix + prefix),
                                                     parent_value=choice.value)
                                 ret += sublabels
         return ret

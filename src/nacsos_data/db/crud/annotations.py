@@ -669,5 +669,7 @@ async def update_resolved_bot_annotations(session: AsyncSession,
                         **cell.resolution.model_dump(),
                         'bot_annotation_metadata_id': bot_annotation_metadata_id
                     }))
-    session.add_all(new_bot_annotations)
+    if len(new_bot_annotations) > 0:
+        session.add_all(new_bot_annotations)
+
     await session.commit()

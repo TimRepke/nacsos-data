@@ -337,9 +337,15 @@ async def get_resolved_item_annotations(session: AsyncSession,
         item_id_to_key = {str(o.item_id): o.key for o in item_order}
         item_ids = set(item_id_to_key.keys())
         empty_items = item_ids - items_with_annotation
+
+        logger.debug(f'Saw {len(items_with_annotation):,} items with annotation, '
+                     f'{len(item_ids):,} items in the lookup key, and '
+                     f'removing {len(empty_items):,} items that had no annotation.')
+
         for item_id in empty_items:
             del annotation_map[item_id_to_key[item_id]]
-        item_order = [o for o in item_order if str(o.item_id) in items_with_annotation]
+
+        item_order = [o for o in item_order if str(o.item_id) not in empty_items]
 
     return ResolutionProposal(
         scheme_info=AnnotationSchemeInfo(**scheme.model_dump()),
