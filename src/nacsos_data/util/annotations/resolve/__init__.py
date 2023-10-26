@@ -229,6 +229,32 @@ def _populate_matrix_annotations(annotation_map: ResolutionMatrix,
 
 
 @ensure_session_async
+async def get_annotation_matrix(session: AsyncSession,
+                                filters: AnnotationFilterObject,
+                                ignore_hierarchy: bool = False,
+                                ignore_repeat: bool = False) \
+        -> tuple[AnnotationSchemeModel, list[FlatLabel], list[UserModel],
+        AssignmentMap, list[ItemAnnotation], list[OrderingEntry], ResolutionMatrix]:
+    scheme: AnnotationSchemeModel
+    labels: list[FlatLabel]
+    annotators: list[UserModel]
+    assignments: AssignmentMap
+    annotations: list[ItemAnnotation]
+    item_order: list[OrderingEntry]
+    scheme, labels, annotators, assignments, annotations, item_order = await _get_aux_data(
+        filters=filters,
+        ignore_hierarchy=ignore_hierarchy,
+        ignore_repeat=ignore_repeat,
+        session=session)
+
+    annotation_map: ResolutionMatrix = _empty_matrix(item_order=item_order, labels=labels)
+
+    # FIXME: in the update_existing=False case, we are still loading this (and we may want to wait for existing data)
+    annotation_map = _populate_matrix_annotations(annotation_map, assignments=assignments, annotations=annotations)
+    return scheme, labels, annotators, assignments, annotations, item_order, annotation_map
+
+
+@ensure_session_async
 async def get_resolved_item_annotations(session: AsyncSession,
                                         strategy: ResolutionMethod,
                                         filters: AnnotationFilterObject,
@@ -263,17 +289,13 @@ async def get_resolved_item_annotations(session: AsyncSession,
     assignments: AssignmentMap
     annotations: list[ItemAnnotation]
     item_order: list[OrderingEntry]
-    scheme, labels, annotators, assignments, annotations, item_order = await _get_aux_data(
+    annotation_map: ResolutionMatrix
+    scheme, labels, annotators, assignments, annotations, item_order, annotation_map = await get_annotation_matrix(
         filters=filters,
         ignore_hierarchy=ignore_hierarchy,
         ignore_repeat=ignore_repeat,
         session=session)
     label_map = {l.path_key: l for l in labels}
-
-    annotation_map: ResolutionMatrix = _empty_matrix(item_order=item_order, labels=labels)
-
-    # FIXME: in the update_existing=False case, we are still loading this (and we may want to wait for existing data)
-    annotation_map = _populate_matrix_annotations(annotation_map, assignments=assignments, annotations=annotations)
 
     if bot_meta is not None:
         # Fetch existing bot annotations (resolutions)

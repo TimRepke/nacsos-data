@@ -27,6 +27,7 @@ from .items.base import Item
 
 if TYPE_CHECKING:
     from . import BotAnnotationMetaData
+    from . import AnnotationQuality
 
 
 class AnnotationScheme(Base):
@@ -117,6 +118,8 @@ class AssignmentScope(Base):
 
     # reference to the associated assignments
     assignments: Relationship['Assignment'] = relationship('Assignment', cascade='all, delete')
+    # reference to the associated quality trackers
+    quality: Relationship['AnnotationQuality'] = relationship('AnnotationQuality', cascade='all, delete')
 
 
 class Assignment(Base):
