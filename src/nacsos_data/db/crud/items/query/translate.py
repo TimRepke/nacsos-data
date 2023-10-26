@@ -258,8 +258,9 @@ class Query:
             else:
                 raise ValueError(f'Unexpected mode {user_set_mode}')
         else:
-            self._stmt = self._stmt.join(AnnotationScheme, AcademicItem.item_id == AnnotationScheme.item_id)
-            where = and_(*_inner_where(AnnotationScheme))
+            AnnotationAlias = aliased(AnnotationScheme)
+            self._stmt = self._stmt.join(AnnotationAlias, AcademicItem.item_id == AnnotationAlias.item_id)
+            where = and_(*_inner_where(AnnotationAlias))
 
         return where
 
