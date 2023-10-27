@@ -131,16 +131,31 @@ def compute_cohen(base: list[int], target: list[int]) -> float | None:
     with warnings.catch_warnings():
         warnings.simplefilter('error')
         try:
+            base, target = compress_annotations(base, target)
             return cohen_kappa_score(base, target)  # type: ignore[no-any-return]  # FIXME
         except RuntimeWarning:
             return None
+        except Exception as e:
+
+            print(base)
+            print(target)
+            raise e
+
+
+def compress_annotations(base: list[int], target: list[int]) -> tuple[list[int], list[int]]:
+    # "Compress" the labels that might be all over the place to 0, 1, 2, ...
+    values = {v: i for i, v in enumerate(set(base + target))}
+    base = [values[v] for v in base]
+    target = [values[v] for v in target]
+    return base, target
 
 
 def compute_correlation(base: list[int], target: list[int],
-                        measure: Literal['pearson', 'kendall', 'spearman']) -> tuple[float, float]:
+                        measure: Literal['pearson', 'kendall', 'spearman']) -> tuple[float, float] | tuple[None, None]:
     with warnings.catch_warnings():
         warnings.simplefilter('error')
         try:
+            base, target = compress_annotations(base, target)
             if measure == 'pearson':
                 result = pearsonr(base, target)
                 return result.statistic, result.pvalue
@@ -151,7 +166,9 @@ def compute_correlation(base: list[int], target: list[int],
                 result = spearmanr(base, target)
                 return result.statistic, result.pvalue
         except ConstantInputWarning:
-            return 1., 1.
+            return None, None
+        except ValueError:
+            return None, None
 
 
 T = TypeVar('T')
@@ -232,7 +249,7 @@ def compute_fleiss(annotations: dict[str, list[int | None]],
     n_rat = n_rater.max()
 
     # not fully ranked
-    if n_rat == 1:   # FIXME used to be: n_total != n_sub * n_rat or n_rat == 1
+    if n_rat == 1:  # FIXME used to be: n_total != n_sub * n_rat or n_rat == 1
         return None
 
     # marginal frequency  of categories
@@ -437,12 +454,12 @@ async def compute_irr_scores(session: AsyncSession,
                         fleiss=fleiss if fleiss is not None and not np.isnan(fleiss) else None,
                         randolph=randolph if randolph is not None and not np.isnan(randolph) else None,
                         krippendorff=krippendorff if krippendorff is not None and not np.isnan(krippendorff) else None,
-                        pearson=pearson if not np.isnan(pearson) else None,
-                        pearson_p=pearson_p if not np.isnan(pearson_p) else None,
-                        kendall=kendall if not np.isnan(kendall) else None,
-                        kendall_p=kendall_p if not np.isnan(kendall_p) else None,
-                        spearman=spearman if not np.isnan(spearman) else None,
-                        spearman_p=spearman_p if not np.isnan(spearman_p) else None,
+                        pearson=pearson if pearson is not None and not np.isnan(pearson) else None,
+                        pearson_p=pearson_p if pearson_p is not None and not  np.isnan(pearson_p) else None,
+                        kendall=kendall if kendall is not None and not  np.isnan(kendall) else None,
+                        kendall_p=kendall_p if kendall_p is not None and not  np.isnan(kendall_p) else None,
+                        spearman=spearman if spearman is not None and not  np.isnan(spearman) else None,
+                        spearman_p=spearman_p if spearman_p is not None and not  np.isnan(spearman_p) else None,
                         num_items=len(item_order),
                         num_overlap=len(base),
                         num_agree=len([1 for b, t in zip(base, target) if b == t]),
