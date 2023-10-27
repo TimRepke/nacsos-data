@@ -5,13 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
-# Shared properties
-class UserBaseModel(BaseModel):
-    """
-    User represents a person.
-    Most entries in the database will be (indirectly) linked to user accounts, so this is
-    at the core of access management and ownership.
-    """
+class DehydratedUser(BaseModel):
     # Unique identifier for this user.
     user_id: str | UUID | None = None
 
@@ -19,11 +13,19 @@ class UserBaseModel(BaseModel):
     # -> nicer than using email and allows us to have multiple accounts per email
     username: str | None = None
 
-    # Contact information for that user
-    email: EmailStr | None = None
-
     # Real name of that user (or "descriptor" if this is a bot account)
     full_name: str | None = None
+
+
+# Shared properties
+class UserBaseModel(DehydratedUser):
+    """
+    User represents a person.
+    Most entries in the database will be (indirectly) linked to user accounts, so this is
+    at the core of access management and ownership.
+    """
+    # Contact information for that user
+    email: EmailStr | None = None
 
     # Affiliation of the user, helpful to keep track of external users
     affiliation: str | None = None

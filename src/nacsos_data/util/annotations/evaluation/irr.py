@@ -232,7 +232,7 @@ def compute_fleiss(annotations: dict[str, list[int | None]],
     n_rat = n_rater.max()
 
     # not fully ranked
-    if n_total != n_sub * n_rat or n_rat == 1:
+    if n_rat == 1:   # FIXME used to be: n_total != n_sub * n_rat or n_rat == 1
         return None
 
     # marginal frequency  of categories
@@ -451,28 +451,29 @@ async def compute_irr_scores(session: AsyncSession,
                     qualities.append(quality)
                     label_qualities.append(quality)
 
-        fleiss = compute_fleiss(user_annotations, method='fleiss')
-        randolph = compute_fleiss(user_annotations, method='randolph')
-        krippendorff = compute_krippendorff(user_annotations, 'nominal')
+        if len(label_qualities) > 0:
+            fleiss = compute_fleiss(user_annotations, method='fleiss')
+            randolph = compute_fleiss(user_annotations, method='randolph')
+            krippendorff = compute_krippendorff(user_annotations, 'nominal')
 
-        qualities.append(
-            AnnotationQualityModel(
-                assignment_scope_id=assignment_scope_id,
-                project_id=project_id,
-                label_path_key=label.path_key,
-                label_path=label.path,
-                label_key=label.key,
-                cohen=compute_mean('cohen', label_qualities),
-                fleiss=fleiss if fleiss is not None and not np.isnan(fleiss) else None,
-                randolph=randolph if randolph is not None and not np.isnan(randolph) else None,
-                krippendorff=krippendorff if krippendorff is not None and not np.isnan(krippendorff) else None,
-                pearson=compute_mean('pearson', label_qualities),
-                pearson_p=compute_mean('pearson_p', label_qualities),
-                kendall=compute_mean('kendall', label_qualities),
-                kendall_p=compute_mean('kendall_p', label_qualities),
-                spearman=compute_mean('spearman', label_qualities),
-                spearman_p=compute_mean('spearman_p', label_qualities)
+            qualities.append(
+                AnnotationQualityModel(
+                    assignment_scope_id=assignment_scope_id,
+                    project_id=project_id,
+                    label_path_key=label.path_key,
+                    label_path=label.path,
+                    label_key=label.key,
+                    cohen=compute_mean('cohen', label_qualities),
+                    fleiss=fleiss if fleiss is not None and not np.isnan(fleiss) else None,
+                    randolph=randolph if randolph is not None and not np.isnan(randolph) else None,
+                    krippendorff=krippendorff if krippendorff is not None and not np.isnan(krippendorff) else None,
+                    pearson=compute_mean('pearson', label_qualities),
+                    pearson_p=compute_mean('pearson_p', label_qualities),
+                    kendall=compute_mean('kendall', label_qualities),
+                    kendall_p=compute_mean('kendall_p', label_qualities),
+                    spearman=compute_mean('spearman', label_qualities),
+                    spearman_p=compute_mean('spearman_p', label_qualities)
+                )
             )
-        )
 
     return qualities
