@@ -95,7 +95,7 @@ async def read_any_item_by_item_id(item_id: str | UUID, item_type: ItemType | It
                                    engine: DatabaseEngineAsync) -> AnyItemModel | None:
     if item_type == ItemType.lexis or item_type == 'lexis':
         async with engine.session() as session:
-            stmt = (
+            lexis_stmt = (
                 select(LexisNexisItem,
                        func.array_agg(
                            func.row_to_json(
@@ -106,7 +106,7 @@ async def read_any_item_by_item_id(item_id: str | UUID, item_type: ItemType | It
                 .where(LexisNexisItem.item_id == item_id)
                 .group_by(LexisNexisItem.item_id, Item.item_id)
             )
-            rslt = (await session.execute(stmt)).mappings().one_or_none()
+            rslt = (await session.execute(lexis_stmt)).mappings().one_or_none()
             if rslt is not None:
                 sources = [LexisNexisItemSourceModel.model_validate(src) for src in rslt['sources']]
                 item = FullLexisNexisItemModel(**rslt['LexisNexisItem'].__dict__)
