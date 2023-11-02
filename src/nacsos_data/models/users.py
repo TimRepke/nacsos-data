@@ -47,7 +47,7 @@ class UserBaseModel(DehydratedUser):
 class UserCreateModel(UserBaseModel):
     email: EmailStr
     username: str
-    plain_password: str
+    plain_password: str | None = None
 
 
 # Properties to receive via API on update
@@ -70,7 +70,7 @@ class UserModel(UserInDBBaseModel):
 class UserInDBModel(UserInDBBaseModel):
     # Hashed password
     # via CryptContext(schemes=["bcrypt"], deprecated="auto").hash(plaintext_password)
-    password: str
+    password: str | None = None
 
 
 # SON Web Token for user authentication.

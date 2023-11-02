@@ -14,7 +14,8 @@ from nacsos_data.db.schemas import (
     ItemTypeLiteral,
     AnyItemType,
     AnyItemSchema,
-    LexisNexisItem
+    LexisNexisItem,
+    LexisNexisItemSource
 )
 from nacsos_data.models.items import (
     GenericItemModel,
@@ -22,7 +23,9 @@ from nacsos_data.models.items import (
     AcademicItemModel,
     AnyItemModelType,
     AnyItemModel,
-    LexisNexisItemModel
+    LexisNexisItemModel,
+    LexisNexisItemSourceModel,
+    FullLexisNexisItemModel
 )
 
 from .query import query_to_sql, Query
@@ -90,12 +93,32 @@ def _get_schema_model_for_type(item_type: ItemType | ItemTypeLiteral) \
 
 async def read_any_item_by_item_id(item_id: str | UUID, item_type: ItemType | ItemTypeLiteral,
                                    engine: DatabaseEngineAsync) -> AnyItemModel | None:
-    Schema, Model = _get_schema_model_for_type(item_type=item_type)
-    async with engine.session() as session:
-        stmt = select(Schema).filter_by(item_id=item_id)
-        result = (await session.execute(stmt)).scalars().one_or_none()
-        if result is not None:
-            return Model.model_validate(result.__dict__)
+    if item_type == ItemType.lexis or item_type == 'lexis':
+        async with engine.session() as session:
+            stmt = (
+                select(LexisNexisItem,
+                       func.array_agg(
+                           func.row_to_json(
+                               LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
+                           )
+                       ).label('sources'))
+                .join(LexisNexisItemSource, LexisNexisItemSource.item_id == LexisNexisItem.item_id)
+                .where(LexisNexisItem.item_id == item_id)
+                .group_by(LexisNexisItem.item_id, Item.item_id)
+            )
+            rslt = (await session.execute(stmt)).mappings().one_or_none()
+            if rslt is not None:
+                sources = [LexisNexisItemSourceModel.model_validate(src) for src in rslt['sources']]
+                item = FullLexisNexisItemModel(**rslt['LexisNexisItem'].__dict__)
+                item.sources = sources
+                return item
+    else:
+        Schema, Model = _get_schema_model_for_type(item_type=item_type)
+        async with engine.session() as session:
+            stmt = select(Schema).filter_by(item_id=item_id)
+            result = (await session.execute(stmt)).scalars().one_or_none()
+            if result is not None:
+                return Model.model_validate(result.__dict__)
     return None
 
 

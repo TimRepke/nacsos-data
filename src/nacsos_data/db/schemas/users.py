@@ -38,7 +38,7 @@ class User(Base):
 
     # Hashed password
     # via CryptContext(schemes=["bcrypt"], deprecated="auto").hash(plaintext_password)
-    password = mapped_column(String, nullable=False)
+    password = mapped_column(String, nullable=True)
 
     # Set this flag if this account has root access to the database
     is_superuser = mapped_column(Boolean, nullable=False, default=False)
