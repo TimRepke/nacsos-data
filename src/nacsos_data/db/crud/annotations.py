@@ -525,6 +525,8 @@ async def read_resolved_bot_annotation_meta(session: AsyncSession,
     rslt = (await session.execute(stmt)).scalars().one_or_none()
     if rslt is None:
         raise NotFoundError(f'No bot_annotation with id={bot_annotation_metadata_id}')
+    for r in rslt.meta['resolutions']:
+        logger.debug(r)
     return BotAnnotationResolution.model_validate(rslt.__dict__)
 
 
@@ -606,10 +608,8 @@ async def store_resolved_bot_annotations(session: AsyncSession,
 
 
 @ensure_session_async
-async def update_resolved_bot_annotations(session: AsyncSession,
-                                          bot_annotation_metadata_id: str,
-                                          name: str,
-                                          matrix: ResolutionMatrix) -> None:
+async def read_bot_annotation_metadata(session: AsyncSession,
+                                       bot_annotation_metadata_id: str) -> BotAnnotationMetaData:
     bot_meta: BotAnnotationMetaData | None = (await session.execute(
         select(BotAnnotationMetaData)
         .where(BotAnnotationMetaData.bot_annotation_metadata_id == bot_annotation_metadata_id))) \
@@ -617,14 +617,14 @@ async def update_resolved_bot_annotations(session: AsyncSession,
 
     if bot_meta is None:
         raise MissingIdError(f'No `BotAnnotationMetaData` object for {bot_annotation_metadata_id}')
+    return bot_meta
 
-    resolutions = dehydrate_resolutions(matrix)
-    # Update the bot_meta
-    bot_meta.name = name
-    bot_meta.meta.snapshot = dehydrate_user_annotations(matrix)
-    bot_meta.meta.resolutions = resolutions
-    await session.commit()
 
+@ensure_session_async
+async def update_resolved_bot_annotations(session: AsyncSession,
+                                          bot_annotation_metadata_id: str,
+                                          name: str,
+                                          matrix: ResolutionMatrix) -> None:
     # Get ids of existing annotations in for this resolution
     existing_ids_uuid: list[uuid.UUID] = list(
         (await session.execute(
@@ -634,7 +634,10 @@ async def update_resolved_bot_annotations(session: AsyncSession,
 
     # Figure out which ones we have to delete, update, and create
     existing_ids = set([str(ba) for ba in existing_ids_uuid])
-    submitted_ids = set([str(res.ba_id) for res in resolutions])
+    submitted_ids = set([str(cell.resolution.bot_annotation_id)
+                         for row_key, row in matrix.items()
+                         for col_key, cell in row.items()
+                         if has_values(cell.resolution)])
 
     ids_to_remove = existing_ids - submitted_ids
     ids_to_update = existing_ids - ids_to_remove
@@ -658,6 +661,7 @@ async def update_resolved_bot_annotations(session: AsyncSession,
         for cell in row.values():
             if cell.resolution:
                 if str(cell.resolution.bot_annotation_id) in ids_to_update:
+                    logger.debug(f'update: {cell.resolution}')
                     ba_orm: BotAnnotation = (await session.execute(
                         select(BotAnnotation)
                         .where(BotAnnotation.bot_annotation_id == cell.resolution.bot_annotation_id))).scalars().one()
@@ -670,12 +674,31 @@ async def update_resolved_bot_annotations(session: AsyncSession,
                     ba_orm.multi_int = cell.resolution.multi_int
                     ba_orm.order = cell.resolution.order
                     await session.commit()
-                else:
+                elif str(cell.resolution.bot_annotation_id) in ids_to_create:
+                    logger.debug(f'new: {cell.resolution}')
                     new_bot_annotations.append(BotAnnotation(**{
                         **cell.resolution.model_dump(),
                         'bot_annotation_metadata_id': bot_annotation_metadata_id
                     }))
+
     if len(new_bot_annotations) > 0:
-        logger.debug(f'Creating ({len(new_bot_annotations):,} new BotAnnotations.')
+        logger.debug(f'Creating {len(new_bot_annotations):,} new BotAnnotations.')
         session.add_all(new_bot_annotations)
         await session.commit()
+
+    # Update the bot_meta
+    bot_meta = await read_bot_annotation_metadata(session=session,
+                                                  bot_annotation_metadata_id=bot_annotation_metadata_id)
+
+    resolutions = dehydrate_resolutions(matrix)
+    resolutions_filtered = [res for res in resolutions if res.ba_id in ids_to_update or res.ba_id in ids_to_create]
+    bot_meta.name = name
+    bot_meta.meta['snapshot'] = dehydrate_user_annotations(matrix)
+    bot_meta.meta['resolutions'] = resolutions_filtered
+
+    for r in resolutions_filtered:
+        logger.debug(f'f {r}')
+    for r in bot_meta.meta['resolutions']:
+        logger.debug(f'm {r}')
+
+    await session.commit()
