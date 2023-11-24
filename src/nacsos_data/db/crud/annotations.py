@@ -525,8 +525,6 @@ async def read_resolved_bot_annotation_meta(session: AsyncSession,
     rslt = (await session.execute(stmt)).scalars().one_or_none()
     if rslt is None:
         raise NotFoundError(f'No bot_annotation with id={bot_annotation_metadata_id}')
-    for r in rslt.meta['resolutions']:
-        logger.debug(r)
     return BotAnnotationResolution.model_validate(rslt.__dict__)
 
 
@@ -693,12 +691,7 @@ async def update_resolved_bot_annotations(session: AsyncSession,
     resolutions = dehydrate_resolutions(matrix)
     resolutions_filtered = [res for res in resolutions if res.ba_id in ids_to_update or res.ba_id in ids_to_create]
     bot_meta.name = name
-    bot_meta.meta['snapshot'] = dehydrate_user_annotations(matrix)
-    bot_meta.meta['resolutions'] = resolutions_filtered
-
-    for r in resolutions_filtered:
-        logger.debug(f'f {r}')
-    for r in bot_meta.meta['resolutions']:
-        logger.debug(f'm {r}')
+    bot_meta.meta['snapshot'] = dehydrate_user_annotations(matrix)  # type: ignore[index]
+    bot_meta.meta['resolutions'] = resolutions_filtered  # type: ignore[index]
 
     await session.commit()
