@@ -250,7 +250,7 @@ def has_annotation(label: AnnotationSchemeLabel) -> bool:
              or label.annotation.value_str is not None
              or label.annotation.value_bool is not None
              or label.annotation.value_float is not None
-             or label.annotation.multi_int is not None)
+             or (label.annotation.multi_int is not None and len(label.annotation.multi_int) > 0))
 
 
 def has_values(anno: AnnotationValue) -> bool:
@@ -258,7 +258,7 @@ def has_values(anno: AnnotationValue) -> bool:
             or anno.value_bool is not None
             or anno.value_float is not None
             or anno.value_str is not None
-            or anno.multi_int is not None)
+            or (anno.multi_int is not None and len(anno.multi_int) > 0))
 
 
 def same_values(anno_a: AnnotationValue, anno_b: AnnotationValue) -> bool:

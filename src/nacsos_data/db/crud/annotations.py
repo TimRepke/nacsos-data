@@ -2,7 +2,7 @@ import uuid
 import logging
 
 from pydantic import BaseModel
-from sqlalchemy import select, delete, asc, desc
+from sqlalchemy import select, insert, update, delete, asc, desc
 from sqlalchemy.sql import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,10 +31,13 @@ from nacsos_data.models.bot_annotations import (
     ResolutionProposal,
     ResolutionMatrix
 )
-from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_scheme_and_annotations, \
+from nacsos_data.util.annotations.validation import (
+    validate_annotated_assignment,
+    merge_scheme_and_annotations,
     has_values
+)
 
-from . import upsert_orm, MissingIdError
+from . import upsert_orm, MissingIdError, sentinel_uuid
 from ..engine import ensure_session_async
 from ...util.annotations import (
     dehydrate_user_annotations,
@@ -44,7 +47,7 @@ from ...util.annotations.resolve import (
     AnnotationFilterObject,
     get_resolved_item_annotations,
 )
-from ...util.errors import NotFoundError
+from ...util.errors import NotFoundError, InvalidResolutionError
 
 logger = logging.getLogger('nacsos_data.crud.annotations')
 
@@ -648,41 +651,48 @@ async def update_resolved_bot_annotations(session: AsyncSession,
     logger.debug(f'[upsert_bot_annotations] DELETING ({len(ids_to_remove):,}) '
                  f'existing annotations with ids: {ids_to_remove}')
 
-    # Delete old bot_annotations
-    if len(ids_to_remove) > 0:
-        stmt = delete(BotAnnotation).where(BotAnnotation.bot_annotation_id.in_(list(ids_to_remove)))
-        await session.execute(stmt)
-
     # Create new or update existing bot_annotations
-    new_bot_annotations = []
+    bot_annotations_create = []
+    bot_annotations_update = []
     for row in matrix.values():
         for cell in row.values():
             if cell.resolution:
                 if str(cell.resolution.bot_annotation_id) in ids_to_update:
                     logger.debug(f'update: {cell.resolution}')
-                    ba_orm: BotAnnotation = (await session.execute(
-                        select(BotAnnotation)
-                        .where(BotAnnotation.bot_annotation_id == cell.resolution.bot_annotation_id))).scalars().one()
-                    ba_orm.repeat = cell.resolution.repeat
-                    ba_orm.parent = cell.resolution.parent
-                    ba_orm.value_bool = cell.resolution.value_bool
-                    ba_orm.value_str = cell.resolution.value_str
-                    ba_orm.value_int = cell.resolution.value_int
-                    ba_orm.value_float = cell.resolution.value_float
-                    ba_orm.multi_int = cell.resolution.multi_int
-                    ba_orm.order = cell.resolution.order
-                    await session.commit()
+                    bot_annotations_update.append(
+                        sentinel_uuid(cell.resolution.model_dump(),
+                                      ['bot_annotation_id', 'bot_annotation_metadata_id', 'item_id', 'parent'])
+                    )
+                    if cell.resolution.parent is not None and cell.resolution.parent in ids_to_remove:
+                        raise InvalidResolutionError(f'There appears to be no parent for this label '
+                                                     f'(key: {cell.resolution.key}, item: {cell.resolution.item_id})!')
+
                 elif str(cell.resolution.bot_annotation_id) in ids_to_create:
                     logger.debug(f'new: {cell.resolution}')
-                    new_bot_annotations.append(BotAnnotation(**{
-                        **cell.resolution.model_dump(),
-                        'bot_annotation_metadata_id': bot_annotation_metadata_id
-                    }))
+                    resolution = cell.resolution
+                    resolution.bot_annotation_metadata_id = uuid.UUID(bot_annotation_metadata_id)
+                    bot_annotations_create.append(
+                        sentinel_uuid(resolution.model_dump(),
+                                      ['bot_annotation_id', 'bot_annotation_metadata_id', 'item_id', 'parent'])
+                    )
 
-    if len(new_bot_annotations) > 0:
-        logger.debug(f'Creating {len(new_bot_annotations):,} new BotAnnotations.')
-        session.add_all(new_bot_annotations)
-        await session.commit()
+    # Open transaction
+    session.begin_nested()
+
+    # Delete old bot_annotations
+    if len(ids_to_remove) > 0:
+        await session.execute(delete(BotAnnotation)
+                              .where(BotAnnotation.bot_annotation_id.in_(list(ids_to_remove))))
+
+    # Create new bot_annotations
+    if len(bot_annotations_create) > 0:
+        logger.debug(f'Creating {len(bot_annotations_create):,} new BotAnnotations.')
+        await session.execute(insert(BotAnnotation), bot_annotations_create)
+
+    # Update existing bot_annotations
+    if len(bot_annotations_update) > 0:
+        logger.debug(f'Updating {len(bot_annotations_update):,} BotAnnotations.')
+        await session.execute(update(BotAnnotation), bot_annotations_update)
 
     # Update the bot_meta
     bot_meta = await read_bot_annotation_metadata(session=session,

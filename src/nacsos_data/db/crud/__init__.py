@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import Any, Type, TypeVar
 from sqlalchemy import select
 from uuid import UUID, uuid4
@@ -38,6 +39,7 @@ class MissingIdError(KeyError):
     pass
 
 
+T = TypeVar('T')
 S = TypeVar('S', bound=Base)
 M = TypeVar('M', bound=BaseModel)
 
@@ -100,3 +102,11 @@ async def upsert_orm(upsert_model: BaseModel, Schema: Type[S], primary_key: str,
         await session.commit()
 
         return p_key
+
+
+def sentinel_uuid(obj: T, keys: list[str]) -> T:
+    for key in keys:
+        value = getattr(obj, key) if hasattr(obj, key) else None
+        if value is not None:
+            setattr(obj, key, uuid.UUID(value))
+    return obj

@@ -14,6 +14,14 @@ class InvalidFilterError(AssertionError):
     pass
 
 
+class InvalidResolutionError(ValueError):
+    """
+    Used in `nacsos_data.util.annotations.resolve` to indicate that the resolution
+    seems to be invalid. For example when a parent was deleted but not explicitly its children.
+    """
+    pass
+
+
 class EmptyAnnotationsError(ValueError):
     """
     Used in `nacsos_data.util.annotations.resolve` to indicate that collected
