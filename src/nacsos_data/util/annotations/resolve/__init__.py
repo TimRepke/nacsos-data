@@ -166,8 +166,7 @@ async def _get_aux_data(session: AsyncSession,
     labels = labels_from_scheme(scheme,
                                 ignore_hierarchy=ignore_hierarchy,
                                 ignore_repeat=ignore_repeat,
-                                keys=filters.keys,
-                                repeats=filters.repeats)
+                                keys=filters.keys)
     if filters.scope_ids is None:
         filter_scopes = scopes
     else:

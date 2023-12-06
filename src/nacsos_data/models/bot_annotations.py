@@ -34,11 +34,12 @@ class AnnotationFilters(BaseModel):
     :param key: if not None: annotation has to be for this AnnotationSchemeLabel.key (or list/tuple of keys)
     :param repeat: if not None: annotation has to be primary/secondary/...
     """
+    model_config = ConfigDict(extra='ignore')
+
     scheme_id: str
     scope_id: str | list[str] | None = None
     user_id: str | list[str] | None = None
     key: str | list[str] | None = None
-    repeat: int | list[int] | None = None
 
     @property
     def user_ids(self) -> list[str] | None:
@@ -57,12 +58,6 @@ class AnnotationFilters(BaseModel):
         if self.key is None:
             return None
         return [self.key] if type(self.key) is str else self.key  # type: ignore[return-value]
-
-    @property
-    def repeats(self) -> list[int] | None:
-        if self.repeat is None:
-            return None
-        return [self.repeat] if type(self.repeat) is int else self.repeat  # type: ignore[return-value]
 
 
 class SnapshotEntry(AnnotationValue):

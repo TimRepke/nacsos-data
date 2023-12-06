@@ -23,8 +23,7 @@ class AnnotationFilterObject(AnnotationFilters):
         for db_col, key in [('ass.assignment_scope_id', 'scope_id'),
                             ('a.annotation_scheme_id', 'scheme_id'),
                             ('a.user_id', 'user_id'),
-                            ('a.key', 'key'),
-                            ('a.repeat', 'repeat')]:
+                            ('a.key', 'key')]:
             if filters.get(key) is not None:
                 if type(filters[key]) == list:
                     where.append(f' {db_col} = ANY(:{key}) ')
