@@ -1,5 +1,6 @@
 import re
 import csv
+import sys
 import uuid
 import logging
 from typing import Generator
@@ -108,6 +109,7 @@ def read_scopus_csv_file(filepath: str,
     """
 
     with open(filepath, mode='r', newline='') as csvfile:
+        csv.field_size_limit(sys.maxsize)
         reader = csv.DictReader(csvfile)
         for row in reader:
             doi: str | None = _get(row, 'DOI')
