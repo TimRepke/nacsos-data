@@ -37,7 +37,11 @@ async def read_lexis_paged_for_project(session: AsyncSession,
             .limit(page_size)
             .offset(offset))
     rslt = (await session.execute(stmt)).mappings().all()
+    return lexis_orm_to_model(rslt)
 
+
+def lexis_orm_to_model(rslt):
+    print(type(rslt))
     ret = []
     for res in rslt:
         try:

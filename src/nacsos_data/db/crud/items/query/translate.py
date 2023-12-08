@@ -1,10 +1,10 @@
-from typing import Literal, Type, Sequence
+from typing import Literal, Type, Sequence, List
 from uuid import UUID
 
 from lark import Tree, Token
-from sqlalchemy import select, and_, or_, not_, Select, ColumnExpressionArgument
+from sqlalchemy import select, and_, or_, not_, Select, ColumnExpressionArgument, func
 from sqlalchemy.orm import MappedColumn, aliased, Session
-import sqlalchemy.sql.functions as func
+
 
 from nacsos_data.db import DatabaseEngine
 from nacsos_data.db.schemas import (
@@ -13,9 +13,9 @@ from nacsos_data.db.schemas import (
     BotAnnotation,
     BotAnnotationMetaData,
     Assignment,
-    m2m_import_item_table
+    m2m_import_item_table, ItemType, LexisNexisItem, Item, LexisNexisItemSource
 )
-from nacsos_data.models.items import AcademicItemModel
+from nacsos_data.models.items import AcademicItemModel, LexisNexisItemModel
 from .parse import parse_str
 
 
@@ -60,13 +60,39 @@ def _field_cmp_clause(clause: Tree | Token, Field: MappedColumn,  # type: ignore
 
 
 class Query:
-    def __init__(self, query: str, project_id: str | UUID | None = None):
+    def __init__(self, query: str, project_id: str | UUID | None = None,
+                 project_type: ItemType | str = ItemType.academic):
         self.project_id = project_id
+        self.project_type = project_type
+
+        if project_type == ItemType.academic:
+            self.Schema = AcademicItem
+            self.Model = AcademicItemModel
+        elif project_type == ItemType.lexis:
+            self.Schema = LexisNexisItem
+            self.Model = LexisNexisItemModel
+        else:
+            raise NotImplementedError()
 
         self.query = query
         self.query_tree: Tree = parse_str(query)  # type: ignore[type-arg]
 
-        self._stmt = select(AcademicItem).distinct(AcademicItem.item_id)
+        if project_type == ItemType.academic:
+            self._stmt = select(AcademicItem).distinct(AcademicItem.item_id)
+        elif project_type == ItemType.lexis:
+            self._stmt = (
+                select(LexisNexisItem,
+                       func.array_agg(
+                           func.row_to_json(
+                               LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
+                           )
+                       ).label('sources'))
+                .join(LexisNexisItemSource, LexisNexisItemSource.item_id == LexisNexisItem.item_id)
+                .where(LexisNexisItem.project_id == project_id)
+                .group_by(LexisNexisItem.item_id, Item.item_id)
+            )
+        else:
+            raise NotImplementedError()
         self._stmt = self._to_sql()
 
     def __str__(self) -> str:
@@ -92,7 +118,7 @@ class Query:
         raise RuntimeError('No connection to database.')
 
     def results(self, db_engine: DatabaseEngine | None = None, session: Session | None = None,
-                limit: int | None = 20) -> list[AcademicItemModel]:
+                limit: int | None = 20) -> list[LexisNexisItemModel] | list[AcademicItemModel]:
         """
         Query the database for results (mappings) either from an existing `session` or connected `db_engine`.
         :param db_engine:
@@ -112,21 +138,23 @@ class Query:
             items = session.execute(stmt).scalars().all()
         else:
             raise RuntimeError('No connection to database.')
-        return [AcademicItemModel.model_validate(item.__dict__) for item in items]
+        return [self.Model.model_validate(item.__dict__) for item in items]
 
     def _to_sql(self) -> Select:  # type: ignore[type-arg]
         filters = self._assemble_filters(self.query_tree)
         if self.project_id is not None:
-            filters = and_(AcademicItem.project_id == self.project_id, filters)
+            filters = and_(self.Schema.project_id == self.project_id, filters)
         self._stmt = self._stmt.where(filters)
         return self._stmt
 
     def _assemble_filters(self, subtree: Tree | Token) -> ColumnExpressionArgument:  # type: ignore[type-arg]
         if isinstance(subtree, Tree):
             if subtree.data == 'title_filter':
-                return _fulltext_filter(subtree.children[0], AcademicItem.title)  # type: ignore[arg-type]
+                if self.project_type == ItemType.academic:
+                    return _fulltext_filter(subtree.children[0], self.AcademiItem.title)  # type: ignore[arg-type]
+                raise NotImplementedError()
             if subtree.data == 'abstract_filter':
-                return _fulltext_filter(subtree.children[0], AcademicItem.text)  # type: ignore[arg-type]
+                return _fulltext_filter(subtree.children[0], self.Schema.text)  # type: ignore[arg-type]
             if subtree.data == 'py_filter':
                 return self._year_filter(subtree.children[0])
             if subtree.data == 'doi_filter':
@@ -144,11 +172,13 @@ class Query:
         raise ValueError(f'Unexpected {subtree.type} token: "{subtree.value}"!')
 
     def _year_filter(self, clause: Tree | Token) -> ColumnExpressionArgument:  # type: ignore[type-arg]
-        return _field_cmp_clause(clause, Field=AcademicItem.publication_year,  # type: ignore[arg-type]
-                                 value_clause='uint_clause')
+        if self.project_type == ItemType.academic:
+            return _field_cmp_clause(clause, Field=AcademicItem.publication_year,  # type: ignore[arg-type]
+                                     value_clause='uint_clause')
+        raise NotImplementedError()
 
     def _doi_filter(self, clause: Tree | Token) -> ColumnExpressionArgument:  # type: ignore[type-arg]
-        if isinstance(clause, Token) and clause.type == 'ESCAPED_STRING':
+        if isinstance(clause, Token) and clause.type == 'ESCAPED_STRING' and self.project_type == ItemType.academic:
             return AcademicItem.doi == clause.value[1:-1]  # type: ignore[no-any-return]
         raise NotImplementedError(f'Encountered invalid DOI filter {clause}.')
 
@@ -167,7 +197,7 @@ class Query:
             raise ValueError(f'Invalid subtree for import error ({subtree})')
 
         # FIXME: for the AND logic, this probably needs to be extended to using aliases
-        self._stmt = self.stmt.join(m2m_import_item_table, m2m_import_item_table.c.item_id == AcademicItem.item_id)
+        self._stmt = self.stmt.join(m2m_import_item_table, m2m_import_item_table.c.item_id == self.Schema.item_id)
         return recurse(clause)  # type: ignore[no-any-return]
 
     def _annotation_filter(self, clause: Tree) -> ColumnExpressionArgument:  # type: ignore[type-arg]
@@ -246,7 +276,7 @@ class Query:
                 AnnotationAlias = aliased(AnnotationScheme)
                 self._stmt = self._stmt.join(
                     AnnotationAlias,
-                    AcademicItem.item_id == AnnotationAlias.item_id)  # type: ignore[attr-defined]
+                    self.Schema.item_id == AnnotationAlias.item_id)  # type: ignore[attr-defined]
                 _wheres = _inner_where(AnnotationAlias)
                 _wheres += (AnnotationAlias.user_id == user,)  # type: ignore[attr-defined, operator]
                 wheres.append(and_(*_wheres))
@@ -260,7 +290,7 @@ class Query:
         else:
             AnnotationAlias = aliased(AnnotationScheme)
             self._stmt = self._stmt.join(AnnotationAlias,
-                                         AcademicItem.item_id == AnnotationAlias.item_id)  # type: ignore[attr-defined]
+                                         self.Schema.item_id == AnnotationAlias.item_id)  # type: ignore[attr-defined]
             where = and_(*_inner_where(AnnotationAlias))
 
         return where
