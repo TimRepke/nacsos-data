@@ -50,7 +50,7 @@ def _field_cmp_clause(clause: Tree | Token, Field: MappedColumn,  # type: ignore
     if isinstance(clause, Tree):
         if clause.data == value_clause:
             cmp: str = clause.children[0]  # type: ignore[assignment]
-            val: int | float = clause.children[1]  # type: ignore[assignment]
+            val: int | float = clause.children[1].value  # type: ignore[assignment]
             return _field_cmp(cmp, val, Field)
         elif clause.data == 'and':
             return and_(*(_field_cmp_clause(child, Field, value_clause) for child in clause.children))
