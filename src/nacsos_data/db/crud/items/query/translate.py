@@ -151,7 +151,7 @@ class Query:
         if isinstance(subtree, Tree):
             if subtree.data == 'title_filter':
                 if self.project_type == ItemType.academic:
-                    return _fulltext_filter(subtree.children[0], self.AcademiItem.title)  # type: ignore[arg-type]
+                    return _fulltext_filter(subtree.children[0], AcademiItem.title)  # type: ignore[arg-type]
                 raise NotImplementedError()
             if subtree.data == 'abstract_filter':
                 return _fulltext_filter(subtree.children[0], self.Schema.text)  # type: ignore[arg-type]
