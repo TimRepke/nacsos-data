@@ -1,5 +1,7 @@
 import logging
-from sqlalchemy import select, func
+from typing import Sequence
+
+from sqlalchemy import select, func, RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
@@ -40,8 +42,7 @@ async def read_lexis_paged_for_project(session: AsyncSession,
     return lexis_orm_to_model(rslt)
 
 
-def lexis_orm_to_model(rslt):
-    print(type(rslt))
+def lexis_orm_to_model(rslt: Sequence[RowMapping]) -> list[FullLexisNexisItemModel]:
     ret = []
     for res in rslt:
         try:

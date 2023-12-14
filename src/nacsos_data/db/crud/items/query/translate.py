@@ -1,4 +1,4 @@
-from typing import Literal, Type, Sequence, List
+from typing import Literal, Type, Sequence
 from uuid import UUID
 
 from lark import Tree, Token
@@ -50,7 +50,7 @@ def _field_cmp_clause(clause: Tree | Token, Field: MappedColumn,  # type: ignore
     if isinstance(clause, Tree):
         if clause.data == value_clause:
             cmp: str = clause.children[0]  # type: ignore[assignment]
-            val: int | float = clause.children[1].value  # type: ignore[assignment]
+            val: int | float = clause.children[1].value  # type: ignore[assignment, union-attr]
             return _field_cmp(cmp, val, Field)
         elif clause.data == 'and':
             return and_(*(_field_cmp_clause(child, Field, value_clause) for child in clause.children))
@@ -69,8 +69,8 @@ class Query:
             self.Schema = AcademicItem
             self.Model = AcademicItemModel
         elif project_type == ItemType.lexis:
-            self.Schema = LexisNexisItem
-            self.Model = LexisNexisItemModel
+            self.Schema = LexisNexisItem  # type: ignore[assignment]
+            self.Model = LexisNexisItemModel  # type: ignore[assignment]
         else:
             raise NotImplementedError()
 
@@ -81,7 +81,7 @@ class Query:
             self._stmt = select(AcademicItem).distinct(AcademicItem.item_id)
         elif project_type == ItemType.lexis:
             self._stmt = (
-                select(LexisNexisItem,
+                select(LexisNexisItem,  # type: ignore[assignment]
                        func.array_agg(
                            func.row_to_json(
                                LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
@@ -151,7 +151,7 @@ class Query:
         if isinstance(subtree, Tree):
             if subtree.data == 'title_filter':
                 if self.project_type == ItemType.academic:
-                    return _fulltext_filter(subtree.children[0], AcademiItem.title)  # type: ignore[arg-type]
+                    return _fulltext_filter(subtree.children[0], AcademicItem.title)  # type: ignore[arg-type]
                 raise NotImplementedError()
             if subtree.data == 'abstract_filter':
                 return _fulltext_filter(subtree.children[0], self.Schema.text)  # type: ignore[arg-type]
