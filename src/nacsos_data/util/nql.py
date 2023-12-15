@@ -56,7 +56,7 @@ def _field_cmp(cmp: ComparatorExt, value: int | float | bool | str,
     if cmp == '!=':
         return field != value  # type: ignore[no-any-return]
     if cmp == 'LIKE':
-        return field.ilike(f'{value}')
+        return field.ilike(f'{value}%')
     if cmp == 'SIMILAR':
         raise NotImplementedError('Unfortunately, "SIMILAR" is not implemented yet.')
 
@@ -169,6 +169,8 @@ class NQLQuery:
         raise InvalidNQLError(f'Field "{field}" in {self.project_type} is not valid.')
 
     def _assemble_filters(self, subquery: NQLFilter) -> ColumnExpressionArgument:  # type: ignore[type-arg]
+        print(type(subquery))
+        print(subquery)
         if isinstance(subquery, SubQuery):
             if subquery.and_ is not None:
                 return and_(*(self._assemble_filters(child) for child in subquery.and_))
@@ -178,7 +180,17 @@ class NQLQuery:
 
         elif isinstance(subquery, FieldFilter):
             col = self._get_column(subquery.field)
-            return _field_cmp(subquery.comp, subquery.value, col)
+            comp = None
+            if subquery.field == 'title':
+                comp = 'LIKE'
+            elif subquery.field == 'abstract':
+                comp = 'LIKE'
+            else:
+                comp = subquery.comp
+            if comp is None:
+                raise InvalidNQLError(f'Missing comparator: {subquery}!')
+
+            return _field_cmp(comp, subquery.value, col)
         elif isinstance(subquery, FieldFilters):
             col = self._get_column(subquery.field)
             return col.in_(subquery.values)

@@ -20,7 +20,7 @@ class IEUUID(BaseModel):
 class FieldFilter(BaseModel):
     field: FieldA
     value: str | int
-    comp: ComparatorExt
+    comp: ComparatorExt | None = None
 
 
 class FieldFilters(BaseModel):
