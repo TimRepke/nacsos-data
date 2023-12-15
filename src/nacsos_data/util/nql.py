@@ -1,5 +1,5 @@
 from typing import Type, Sequence
-from sqlalchemy import select, and_, not_, Select, ColumnExpressionArgument, func, Function
+from sqlalchemy import select, and_, not_, Select, ColumnExpressionArgument, func, Function, RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import MappedColumn, aliased, InstrumentedAttribute, Session
 
@@ -324,8 +324,9 @@ class NQLQuery:
         cnt_stmt = func.count(stmt.c.item_id)
         return session.execute(cnt_stmt).scalar()  # type: ignore[return-value]
 
-    def _transform_results(self, rslt: Sequence[RowMapping]) \
-            -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
+    def _transform_results(self,
+                           rslt: Sequence[RowMapping]  # type: ignore[type-arg,no-untyped-def]
+                           ) -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
         if self.project_type == ItemType.lexis:
             return lexis_orm_to_model(rslt)
         elif self.project_type == ItemType.academic:
