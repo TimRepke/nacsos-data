@@ -323,17 +323,21 @@ class NQLQuery:
         cnt_stmt = func.count(stmt.c.item_id)
         return session.execute(cnt_stmt).scalar()  # type: ignore[return-value]
 
-    def results(self, session: Session, limit: int | None = 20) \
+    def results(self, session: Session, limit: int | None = 20, offset: int | None = None) \
             -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
         """
         Query the database for results (mappings) either from an existing `session`.
         :param session:
-        :param limit:
+        :param limit: how many results to return
+        :param offset:
         :return:
         """
         stmt = self.stmt
         if limit is not None:
             stmt = stmt.limit(limit)
+
+        if offset is not None:
+            stmt = stmt.offset(offset)
 
         rslt = session.execute(stmt).scalars().all()
 
