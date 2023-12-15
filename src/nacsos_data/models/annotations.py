@@ -8,6 +8,8 @@ from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel, ConfigDict
 
+from .nql import NQLFilter
+
 # Types of Labels:
 #   - bool: stored in `Annotation.value_bool`, used for binary labels (no children)
 #   - int: stored in `Annotation.value_int`, used for extracted numbers (no children)
@@ -169,6 +171,11 @@ class AssignmentScopeRandomConfig(AssignmentScopeBaseConfig):
 class AssignmentScopeRandomWithExclusionConfig(AssignmentScopeRandomConfig):
     config_type: AssignmentScopeBaseConfigTypes = 'random_exclusion'
     excluded_scopes: list[str] | list[UUID]
+
+
+class AssignmentScopeRandomWithNQLConfig(AssignmentScopeRandomConfig):
+    config_type: AssignmentScopeBaseConfigTypes = 'random_nql'
+    query: NQLFilter
 
 
 AssignmentScopeConfig = AssignmentScopeRandomWithExclusionConfig | AssignmentScopeRandomConfig

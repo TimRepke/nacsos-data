@@ -1,10 +1,6 @@
-from __future__ import annotations
-from typing import ForwardRef, TypeAlias
-
-from pydantic import BaseModel
-from typing import Literal, Type, Sequence
+from typing import Type, Sequence
 from sqlalchemy import select, and_, not_, Select, ColumnExpressionArgument, func, Function
-from sqlalchemy.orm import MappedColumn, aliased, InstrumentedAttribute
+from sqlalchemy.orm import MappedColumn, aliased, InstrumentedAttribute, Session
 
 from nacsos_data.db.schemas import (
     AcademicItem,
@@ -19,106 +15,25 @@ from nacsos_data.db.schemas import (
     LexisNexisItemSource,
     GenericItem
 )
-from nacsos_data.models.items import AcademicItemModel, LexisNexisItemModel, GenericItemModel
-
-Comparator = str  # Literal['=', '>=', '<=', '<', '>', '!=']
-ComparatorExt = str  # Literal['=', '>=', '<=', '<', '>', '!=', 'LIKE', 'SIMILAR']
-SetComparator = str  # Literal['==', '@>', '!>', '&&']
-
-FieldA = Literal['title', 'abstract', 'pub_year', 'date', 'source']
-FieldB = Literal['doi', 'item_id', 'openalex_id']
-Field = FieldA | FieldB | Literal['meta']
-
-
-class IEUUID(BaseModel):
-    incl: bool
-    uuid: str
-
-
-class FieldFilter(BaseModel):
-    field: FieldA
-    value: str | int
-    comp: ComparatorExt
-
-
-class FieldFilters(BaseModel):
-    field: FieldB
-    values: list[str]
-
-
-class MetaFilter(BaseModel):
-    filter: Literal['meta'] = 'meta'
-    field: str
-    comp: ComparatorExt
-    value: str | int | bool
-
-
-class ImportFilter(BaseModel):
-    filter: Literal['import'] = 'import'
-    import_ids: list[IEUUID]
-
-
-class UsersFilter(BaseModel):
-    user_ids: list[str]
-    mode: Literal['ALL', 'ANY']
-
-
-class _LabelFilter(BaseModel):
-    filter: Literal['label'] = 'label'
-    scopes: list[str] | None = None
-    users: UsersFilter | None = None
-    repeats: list[int] | None = None
-    key: str
-    type: Literal['user', 'bot', 'resolved']
-
-
-class LabelFilterInt(_LabelFilter):
-    value_int: int | None = None
-    comp: Comparator
-
-
-class LabelFilterBool(_LabelFilter):
-    comp: Literal['='] = '='
-    value_bool: bool | None = None
-
-
-class LabelFilterMulti(_LabelFilter):
-    multi_int: list[int] | None = None
-    comp: SetComparator
-
-
-class AssignmentFilter(BaseModel):
-    filter: Literal['assignment']
-    mode: int
-    scopes: list[str] | None = None
-
-
-class AnnotationFilter(BaseModel):
-    filter: Literal['annotation']
-    incl: bool
-    scopes: list[str] | None
-
-
-Filter: TypeAlias = ForwardRef('Filter')  # type: ignore[valid-type]
-
-
-class SubQuery(BaseModel):
-    and_: list[Filter] | None = None
-    or_: list[Filter] | None = None
-
-
-Filter = (FieldFilter
-          | FieldFilters
-          | LabelFilterMulti
-          | LabelFilterBool
-          | LabelFilterInt
-          | AssignmentFilter
-          | AnnotationFilter
-          | ImportFilter
-          | MetaFilter
-          | SubQuery)
-
-SubQuery.model_rebuild()
+from nacsos_data.models.items import AcademicItemModel, LexisNexisItemModel, GenericItemModel, FullLexisNexisItemModel
+from nacsos_data.models.nql import (
+    NQLFilter,
+    SetComparator,
+    ComparatorExt,
+    ImportFilter,
+    AssignmentFilter,
+    MetaFilter,
+    FieldFilter,
+    FieldFilters,
+    SubQuery,
+    LabelFilterMulti,
+    LabelFilterInt,
+    LabelFilterBool,
+    AnnotationFilter,
+    Field,
+    NQLFilterParser
+)
+from nacsos_data.db.crud.items.lexis_nexis import lexis_orm_to_model
 
 
 class InvalidNQLError(Exception):
@@ -161,8 +76,8 @@ def _field_cmp_lst(cmp: SetComparator, values: list[int],
     raise InvalidNQLError(f'Unexpected comparator "{cmp}".')
 
 
-class Query:
-    def __init__(self, query: Filter, project_id: str,
+class NQLQuery:
+    def __init__(self, query: NQLFilter, project_id: str,
                  project_type: ItemType | str = ItemType.academic):
         self.project_id = project_id
         self.project_type = project_type
@@ -252,7 +167,7 @@ class Query:
 
         raise InvalidNQLError(f'Field "{field}" in {self.project_type} is not valid.')
 
-    def _assemble_filters(self, subquery: Filter) -> ColumnExpressionArgument:  # type: ignore[type-arg]
+    def _assemble_filters(self, subquery: NQLFilter) -> ColumnExpressionArgument:  # type: ignore[type-arg]
         if isinstance(subquery, SubQuery):
             if subquery.and_ is not None:
                 return and_(*(self._assemble_filters(child) for child in subquery.and_))
@@ -403,7 +318,42 @@ class Query:
                                          self.Schema.item_id == AnnotationAlias.item_id)  # type: ignore[attr-defined]
             return and_(*_inner_where(AnnotationAlias))
 
+    def count(self, session: Session) -> int:
+        stmt = self.stmt.subquery()
+        cnt_stmt = func.count(stmt.c.item_id)
+        return session.execute(cnt_stmt).scalar()  # type: ignore[return-value]
 
-def query_to_sql(query: Filter, project_id: str) -> Select:  # type: ignore[type-arg]
-    query_object = Query(query=query, project_id=project_id)
+    def results(self, session: Session, limit: int | None = 20) \
+            -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
+        """
+        Query the database for results (mappings) either from an existing `session`.
+        :param session:
+        :param limit:
+        :return:
+        """
+        stmt = self.stmt
+        if limit is not None:
+            stmt = stmt.limit(limit)
+
+        rslt = session.execute(stmt).scalars().all()
+
+        if self.project_type == ItemType.lexis:
+            return lexis_orm_to_model(rslt)
+        elif self.project_type == ItemType.academic:
+            return [AcademicItemModel.model_validate(item.__dict__) for item in rslt]
+        elif self.project_type == ItemType.generic:
+            return [GenericItemModel.model_validate(item.__dict__) for item in rslt]
+        else:
+            raise NotImplementedError(f'Unexpected project type: {self.project_type}')
+
+
+def query_to_sql(query: NQLFilter, project_id: str) -> Select:  # type: ignore[type-arg]
+    query_object = NQLQuery(query=query, project_id=project_id)
     return query_object.stmt
+
+
+def nql_to_sql(query: NQLFilter, project_id: str) -> Select:  # type: ignore[type-arg]
+    return query_to_sql(query=query, project_id=project_id)
+
+
+__all__ = ['query_to_sql', 'nql_to_sql', 'NQLFilter', 'NQLFilterParser', 'InvalidNQLError', 'NQLQuery']
