@@ -178,7 +178,11 @@ class AssignmentScopeRandomWithNQLConfig(AssignmentScopeRandomConfig):
     query: NQLFilter
 
 
-AssignmentScopeConfig = AssignmentScopeRandomWithExclusionConfig | AssignmentScopeRandomConfig
+AssignmentScopeConfig = (
+        AssignmentScopeRandomWithExclusionConfig
+        | AssignmentScopeRandomConfig
+        | AssignmentScopeRandomWithNQLConfig
+)
 
 
 class AssignmentScopeModel(BaseModel):
