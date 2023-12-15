@@ -28,8 +28,6 @@ from nacsos_data.models.items import (
     FullLexisNexisItemModel
 )
 
-from .query import query_to_sql, Query
-
 logger = logging.getLogger('nacsos-data.crud.items')
 
 
@@ -122,6 +120,5 @@ async def read_any_item_by_item_id(item_id: str | UUID, item_type: ItemType | It
     return None
 
 
-__all__ = ['Query', 'query_to_sql',
-           'read_all_for_project', 'read_paged_for_project',
+__all__ = ['read_all_for_project', 'read_paged_for_project',
            'read_item_count_for_project', 'read_any_item_by_item_id']

@@ -42,7 +42,7 @@ async def random_assignments_with_exclusion(assignment_scope_id: str | UUID,
     # select random sample to receive annotations
     session: AsyncSession
     async with engine.session() as session:
-        stmt_query = query_to_sql(config.query, project_id=project_id).cte('nql')
+        stmt_query = query_to_sql(config.query, project_id=str(project_id)).cte('nql')
         stmt = select(stmt_query.c.item_id).order_by(text('random()')).limit(config.num_items)
         rslt = (await session.execute(stmt)).mappings().all()
         item_ids = [str(res['item_id']) for res in rslt]

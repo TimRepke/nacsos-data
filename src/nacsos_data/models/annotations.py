@@ -150,7 +150,7 @@ class AnnotationSchemeModelFlat(AnnotationSchemeInfo):
     labels: list[FlattenedAnnotationSchemeLabel]
 
 
-AssignmentScopeBaseConfigTypes = Literal['random', 'random_exclusion']
+AssignmentScopeBaseConfigTypes = Literal['random', 'random_exclusion', 'random_nql']
 
 
 class AssignmentScopeBaseConfig(BaseModel):
