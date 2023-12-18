@@ -160,13 +160,16 @@ class AssignmentScopeBaseConfig(BaseModel):
     users: list[str] | list[UUID] | None = None
 
 
-class AssignmentScopeRandomConfig(AssignmentScopeBaseConfig):
-    config_type: Literal['random'] = 'random'
+class _AssignmentScopeRandomConfig(AssignmentScopeBaseConfig):
     num_items: int
     min_assignments_per_item: int
     max_assignments_per_item: int
     num_multi_coded_items: int
     random_seed: int
+
+
+class AssignmentScopeRandomConfig(_AssignmentScopeRandomConfig):
+    config_type: Literal['random'] = 'random'
 
 
 class AssignmentScopeRandomWithExclusionConfig(AssignmentScopeRandomConfig):
