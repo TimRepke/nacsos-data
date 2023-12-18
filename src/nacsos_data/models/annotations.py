@@ -172,12 +172,12 @@ class AssignmentScopeRandomConfig(_AssignmentScopeRandomConfig):
     config_type: Literal['random'] = 'random'
 
 
-class AssignmentScopeRandomWithExclusionConfig(AssignmentScopeRandomConfig):
+class AssignmentScopeRandomWithExclusionConfig(_AssignmentScopeRandomConfig):
     config_type: Literal['random_exclusion'] = 'random_exclusion'
     excluded_scopes: list[str] | list[UUID]
 
 
-class AssignmentScopeRandomWithNQLConfig(AssignmentScopeRandomConfig):
+class AssignmentScopeRandomWithNQLConfig(_AssignmentScopeRandomConfig):
     config_type: Literal['random_nql'] = 'random_nql'
     query_parsed: NQLFilter
     query_str: str
