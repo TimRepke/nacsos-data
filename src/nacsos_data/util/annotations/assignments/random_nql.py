@@ -16,17 +16,17 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 
 
-async def random_assignments_with_exclusion(assignment_scope_id: str | UUID,
-                                            annotation_scheme_id: str | UUID,
-                                            project_id: str | UUID,
-                                            config: AssignmentScopeRandomWithNQLConfig,
-                                            engine: DatabaseEngineAsync) -> list[AssignmentModel]:
+async def random_assignments_with_nql(assignment_scope_id: str | UUID,
+                                      annotation_scheme_id: str | UUID,
+                                      project_id: str | UUID,
+                                      config: AssignmentScopeRandomWithNQLConfig,
+                                      engine: DatabaseEngineAsync) -> list[AssignmentModel]:
     """
     :return: * None if config is invalid or cannot be satisfied,
              * Empty list if it led to no result,
              * List of AnnotationModel with "suggestions" how to make assignments
     """
-    if config is None or config.config_type != 'random_exclusion':
+    if config is None or config.config_type != 'random_nql':
         raise ValueError('Empty or mismatching config.')
 
     user_ids = config.users
@@ -42,7 +42,7 @@ async def random_assignments_with_exclusion(assignment_scope_id: str | UUID,
     # select random sample to receive annotations
     session: AsyncSession
     async with engine.session() as session:
-        stmt_query = query_to_sql(config.query, project_id=str(project_id)).cte('nql')
+        stmt_query = query_to_sql(config.query_parsed, project_id=str(project_id)).cte('nql')
         stmt = select(stmt_query.c.item_id).order_by(text('random()')).limit(config.num_items)
         rslt = (await session.execute(stmt)).mappings().all()
         item_ids = [str(res['item_id']) for res in rslt]

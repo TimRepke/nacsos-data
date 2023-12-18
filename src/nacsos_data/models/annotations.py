@@ -6,7 +6,8 @@ from typing import Literal, Optional, Union
 from datetime import datetime
 from uuid import UUID
 from enum import Enum
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+from typing_extensions import Annotated
 
 from .nql import NQLFilter
 
@@ -160,7 +161,7 @@ class AssignmentScopeBaseConfig(BaseModel):
 
 
 class AssignmentScopeRandomConfig(AssignmentScopeBaseConfig):
-    config_type: AssignmentScopeBaseConfigTypes = 'random'
+    config_type: Literal['random'] = 'random'
     num_items: int
     min_assignments_per_item: int
     max_assignments_per_item: int
@@ -169,20 +170,19 @@ class AssignmentScopeRandomConfig(AssignmentScopeBaseConfig):
 
 
 class AssignmentScopeRandomWithExclusionConfig(AssignmentScopeRandomConfig):
-    config_type: AssignmentScopeBaseConfigTypes = 'random_exclusion'
+    config_type: Literal['random_exclusion'] = 'random_exclusion'
     excluded_scopes: list[str] | list[UUID]
 
 
 class AssignmentScopeRandomWithNQLConfig(AssignmentScopeRandomConfig):
-    config_type: AssignmentScopeBaseConfigTypes = 'random_nql'
-    query: NQLFilter
+    config_type: Literal['random_nql'] = 'random_nql'
+    query_parsed: NQLFilter
+    query_str: str
 
 
-AssignmentScopeConfig = (
-        AssignmentScopeRandomWithExclusionConfig
-        | AssignmentScopeRandomConfig
-        | AssignmentScopeRandomWithNQLConfig
-)
+AssignmentScopeConfig = Annotated[AssignmentScopeRandomWithExclusionConfig
+                                  | AssignmentScopeRandomWithNQLConfig
+                                  | AssignmentScopeRandomConfig, Field(discriminator='config_type')]
 
 
 class AssignmentScopeModel(BaseModel):
