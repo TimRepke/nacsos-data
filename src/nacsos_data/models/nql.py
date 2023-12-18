@@ -1,7 +1,9 @@
 from typing import ForwardRef, TypeAlias
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, TypeAdapter, Field as PField
 from typing import Literal
+
+from typing_extensions import Annotated
 
 Comparator = str  # Literal['=', '>=', '<=', '<', '>', '!=']
 ComparatorExt = str  # Literal['=', '>=', '<=', '<', '>', '!=', 'LIKE', 'SIMILAR']
@@ -18,12 +20,14 @@ class IEUUID(BaseModel):
 
 
 class FieldFilter(BaseModel):
+    filter: Literal['field'] = 'field'
     field: FieldA
     value: str | int
     comp: ComparatorExt | None = None
 
 
 class FieldFilters(BaseModel):
+    filter: Literal['field_mul'] = 'field_mul'
     field: FieldB
     values: list[str]
 
@@ -55,18 +59,26 @@ class _LabelFilter(BaseModel):
 
 
 class LabelFilterInt(_LabelFilter):
+    value_type: Literal['int'] = 'int'
     value_int: int | None = None
     comp: Comparator
 
 
 class LabelFilterBool(_LabelFilter):
+    value_type: Literal['bool'] = 'bool'
     comp: Literal['='] = '='
     value_bool: bool | None = None
 
 
 class LabelFilterMulti(_LabelFilter):
+    value_type: Literal['multi'] = 'multi'
     multi_int: list[int] | None = None
     comp: SetComparator
+
+
+LabelFilter = Annotated[LabelFilterInt
+                        | LabelFilterBool
+                        | LabelFilterMulti, PField(discriminator='value_type')]
 
 
 class AssignmentFilter(BaseModel):
@@ -85,20 +97,19 @@ NQLFilter: TypeAlias = ForwardRef('NQLFilter')  # type: ignore[valid-type]
 
 
 class SubQuery(BaseModel):
+    filter: Literal['sub']
     and_: list[NQLFilter] | None = None
     or_: list[NQLFilter] | None = None
 
 
-NQLFilter = (FieldFilter
-             | FieldFilters
-             | LabelFilterMulti
-             | LabelFilterBool
-             | LabelFilterInt
-             | AssignmentFilter
-             | AnnotationFilter
-             | ImportFilter
-             | MetaFilter
-             | SubQuery)
+NQLFilter = Annotated[FieldFilter
+                      | FieldFilters
+                      | LabelFilter
+                      | AssignmentFilter
+                      | AnnotationFilter
+                      | ImportFilter
+                      | MetaFilter
+                      | SubQuery, PField(discriminator='filter')]
 
 SubQuery.model_rebuild()
 

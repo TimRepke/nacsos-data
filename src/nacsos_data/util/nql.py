@@ -169,8 +169,6 @@ class NQLQuery:
         raise InvalidNQLError(f'Field "{field}" in {self.project_type} is not valid.')
 
     def _assemble_filters(self, subquery: NQLFilter) -> ColumnExpressionArgument:  # type: ignore[type-arg]
-        print(type(subquery))
-        print(subquery)
         if isinstance(subquery, SubQuery):
             if subquery.and_ is not None:
                 return and_(*(self._assemble_filters(child) for child in subquery.and_))
