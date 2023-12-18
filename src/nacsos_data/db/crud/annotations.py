@@ -658,6 +658,7 @@ async def update_resolved_bot_annotations(session: AsyncSession,
     for row in matrix.values():
         for cell in row.values():
             if cell.resolution:
+                cell.resolution.bot_annotation_metadata_id = uuid.UUID(bot_annotation_metadata_id)
                 if str(cell.resolution.bot_annotation_id) in ids_to_update:
                     logger.debug(f'update: {cell.resolution}')
                     bot_annotations_update.append(
@@ -670,10 +671,8 @@ async def update_resolved_bot_annotations(session: AsyncSession,
 
                 elif str(cell.resolution.bot_annotation_id) in ids_to_create:
                     logger.debug(f'new: {cell.resolution}')
-                    resolution = cell.resolution
-                    resolution.bot_annotation_metadata_id = uuid.UUID(bot_annotation_metadata_id)
                     bot_annotations_create.append(
-                        sentinel_uuid(resolution.model_dump(),
+                        sentinel_uuid(cell.resolution.model_dump(),
                                       ['bot_annotation_id', 'bot_annotation_metadata_id', 'item_id', 'parent'])
                     )
 
