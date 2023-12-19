@@ -32,7 +32,7 @@ async def read_lexis_paged_for_project(session: AsyncSession,
                        func.row_to_json(
                            LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
                        )
-                   ).label('sources'))
+                   ).label('sources_grp'))
             .join(LexisNexisItemSource, LexisNexisItemSource.item_id == LexisNexisItem.item_id)
             .where(LexisNexisItem.project_id == project_id)
             .group_by(LexisNexisItem.item_id, Item.item_id)
@@ -46,8 +46,8 @@ def lexis_orm_to_model(rslt: Sequence[RowMapping]) -> list[FullLexisNexisItemMod
     ret = []
     for res in rslt:
         try:
-            sources = [LexisNexisItemSourceModel.model_validate(src) for src in res['sources']]
-            item = FullLexisNexisItemModel(**res['LexisNexisItem'].__dict__)
+            sources = [LexisNexisItemSourceModel.model_validate(src) for src in getattr(res, 'sources_grp')]
+            item = FullLexisNexisItemModel.model_validate(res['LexisNexisItem'].__dict__)
             item.sources = sources
             ret.append(item)
         except Exception as e:

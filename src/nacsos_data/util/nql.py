@@ -44,19 +44,19 @@ class InvalidNQLError(Exception):
 def _field_cmp(cmp: ComparatorExt, value: int | float | bool | str,
                field: InstrumentedAttribute | Function) -> ColumnExpressionArgument:  # type: ignore[type-arg]
     if cmp == '>':
-        return field > value  # type: ignore[no-any-return]
+        return and_(field > value, field.isnot(None))  # type: ignore[no-any-return]
     if cmp == '>=':
-        return field >= value  # type: ignore[no-any-return]
+        return and_(field >= value, field.isnot(None))  # type: ignore[no-any-return]
     if cmp == '=':
-        return field == value  # type: ignore[no-any-return]
+        return and_(field == value, field.isnot(None))  # type: ignore[no-any-return]
     if cmp == '<':
-        return field < value  # type: ignore[no-any-return]
+        return and_(field < value, field.isnot(None))  # type: ignore[no-any-return]
     if cmp == '<=':
-        return field <= value  # type: ignore[no-any-return]
+        return and_(field <= value, field.isnot(None))  # type: ignore[no-any-return]
     if cmp == '!=':
-        return field != value  # type: ignore[no-any-return]
+        return and_(field != value, field.isnot(None))  # type: ignore[no-any-return]
     if cmp == 'LIKE':
-        return field.ilike(f'{value}%')
+        return and_(field.ilike(f'{value}'), field.isnot(None))
     if cmp == 'SIMILAR':
         raise NotImplementedError('Unfortunately, "SIMILAR" is not implemented yet.')
 
@@ -66,13 +66,13 @@ def _field_cmp(cmp: ComparatorExt, value: int | float | bool | str,
 def _field_cmp_lst(cmp: SetComparator, values: list[int],
                    field: MappedColumn) -> ColumnExpressionArgument:  # type: ignore[type-arg]
     if cmp == '==':
-        return field == values  # type: ignore[no-any-return]
+        return and_(field == values, field.isnot(None))  # type: ignore[no-any-return]
     if cmp == '@>':
-        return field.contains(values)  # type: ignore[no-any-return]
+        return and_(field.contains(values), field.isnot(None))  # type: ignore[no-any-return]
     if cmp == '!>':
-        return not_(field.overlap(values))  # type: ignore[no-any-return,attr-defined]
+        return and_(not_(field.overlap(values)), field.isnot(None))  # type: ignore[no-any-return,attr-defined]
     if cmp == '&&':
-        return field.overlap(values)  # type: ignore[no-any-return,attr-defined]
+        return and_(field.overlap(values), field.isnot(None))  # type: ignore[no-any-return,attr-defined]
 
     raise InvalidNQLError(f'Unexpected comparator "{cmp}".')
 
@@ -101,7 +101,7 @@ class NQLQuery:
                            func.row_to_json(
                                LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
                            )
-                       ).label('sources'))
+                       ).label('sources_grp'))
                 .join(LexisNexisItemSource, LexisNexisItemSource.item_id == LexisNexisItem.item_id)
                 .group_by(LexisNexisItem.item_id, Item.item_id)
             )
@@ -116,7 +116,7 @@ class NQLQuery:
             raise NotImplementedError(f"Can't use NQL for {project_type} yet.")
 
         filters = self._assemble_filters(self.query)
-        filters = and_(self.Schema.project_id == self.project_id, filters)
+        filters = and_(Item.project_id == self.project_id, filters)
         self._stmt = self._stmt.where(filters)
 
     def __str__(self) -> str:
@@ -270,29 +270,41 @@ class NQLQuery:
                 Schema.repeats.in_(subquery.repeats)
 
             if subquery.type == 'resolved':
+                BAMAlias = aliased(BotAnnotationMetaData)
+                self._stmt = self.stmt.join(BAMAlias,
+                                            BAMAlias.bot_annotation_metadata_id == Schema.bot_annotation_metadata_id)
                 if subquery.scopes is not None:
-                    inner_wheres += (and_(  # type: ignore[assignment]
-                        Schema.bot_annotation_metadata_id.in_(subquery.scopes),
-                        Schema.bot_annotation_metadata_id == BotAnnotationMetaData.bot_annotation_metadata_id,
-                        BotAnnotationMetaData.kind == 'RESOLVE'),)
+                    inner_wheres += (
+                        and_(  # type: ignore[assignment]
+                            Schema.bot_annotation_metadata_id.in_(subquery.scopes),
+                            BAMAlias.kind == 'RESOLVE'
+                        ),
+                    )
                 else:
-                    inner_wheres += (and_(  # type: ignore[unreachable]
-                        Schema.bot_annotation_metadata_id == BotAnnotationMetaData.bot_annotation_metadata_id,
-                        BotAnnotationMetaData.kind == 'RESOLVE'),)
+                    inner_wheres += (  # type: ignore[unreachable]
+                        BAMAlias.kind == 'RESOLVE',
+                    )
             elif subquery.type == 'bot':
+                BAMAlias = aliased(BotAnnotationMetaData)
+                self._stmt = self.stmt.join(BAMAlias,
+                                            BAMAlias.bot_annotation_metadata_id == Schema.bot_annotation_metadata_id)
                 if subquery.scopes is not None:
-                    inner_wheres += (and_(  # type: ignore[assignment]
-                        BotAnnotation.bot_annotation_metadata_id.in_(subquery.scopes),
-                        Schema.bot_annotation_metadata_id == BotAnnotationMetaData.bot_annotation_metadata_id,
-                        BotAnnotationMetaData.kind != 'RESOLVE'),)
+                    inner_wheres += (
+                        and_(  # type: ignore[assignment]
+                            BotAnnotation.bot_annotation_metadata_id.in_(subquery.scopes),
+                            BAMAlias.kind != 'RESOLVE'
+                        ),
+                    )
                 else:
-                    inner_wheres += (and_(  # type: ignore[unreachable]
-                        Schema.bot_annotation_metadata_id == BotAnnotationMetaData.bot_annotation_metadata_id,
-                        BotAnnotationMetaData.kind != 'RESOLVE'),)
+                    inner_wheres += (  # type: ignore[unreachable]
+                        BAMAlias.kind != 'RESOLVE',
+                    )
             elif subquery.type == 'user':
                 if subquery.scopes is not None:
                     self._stmt = self.stmt.join(Assignment, Assignment.assignment_id == Schema.assignment_id)
-                    inner_wheres += (Assignment.assignment_scope_id.in_(subquery.scopes),)  # type: ignore[assignment]
+                    inner_wheres += (  # type: ignore[assignment]
+                        Assignment.assignment_scope_id.in_(subquery.scopes),
+                    )
 
             return inner_wheres
 
@@ -340,9 +352,9 @@ class NQLQuery:
         if self.project_type == ItemType.lexis:
             return lexis_orm_to_model(rslt)
         elif self.project_type == ItemType.academic:
-            return [AcademicItemModel.model_validate(item.__dict__) for item in rslt]
+            return [AcademicItemModel.model_validate(item['AcademicItem'].__dict__) for item in rslt]
         elif self.project_type == ItemType.generic:
-            return [GenericItemModel.model_validate(item.__dict__) for item in rslt]
+            return [GenericItemModel.model_validate(item['GenericItem'].__dict__) for item in rslt]
         else:
             raise NotImplementedError(f'Unexpected project type: {self.project_type}')
 
@@ -362,7 +374,7 @@ class NQLQuery:
         if offset is not None:
             stmt = stmt.offset(offset)
 
-        rslt = session.execute(stmt).scalars().all()
+        rslt = session.execute(stmt).mappings().all()
         return self._transform_results(rslt)
 
     async def results_async(self, session: AsyncSession, limit: int | None = 20, offset: int | None = None) \
@@ -374,7 +386,7 @@ class NQLQuery:
         if offset is not None:
             stmt = stmt.offset(offset)
 
-        rslt = (await session.execute(stmt)).scalars().all()
+        rslt = (await session.execute(stmt)).mappings().all()
         return self._transform_results(rslt)
 
 
