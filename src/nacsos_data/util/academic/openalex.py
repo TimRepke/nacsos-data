@@ -284,12 +284,12 @@ def generate_items_from_openalex(query: str,
         yield translate_work(translate_doc(doc))
 
 
-def download_openalex_query(target_file: str | Path,
-                            query: str,
-                            openalex_endpoint: str,
-                            export_fields: list[str] | None = None,
-                            batch_size: int = 10000,
-                            log: logging.Logger | None = None) -> None:
+def download_openalex_query_raw(target_file: str | Path,
+                                query: str,
+                                openalex_endpoint: str,
+                                export_fields: list[str] | None = None,
+                                batch_size: int = 10000,
+                                log: logging.Logger | None = None) -> None:
     """
     This executes a `query` in solr at the specified `openalex_endpoint` (collection's select endpoint)
     and writes each document as one json string per line into `target_file`.
@@ -313,11 +313,45 @@ def download_openalex_query(target_file: str | Path,
     log.info(f'Writing results to: {target_file}')
 
     with open(target_file, 'w') as f_out:
-        [f_out.write(json.dumps(doc) + '\n') for doc in generate_items_from_openalex(
+        [f_out.write(doc.model_dump_json() + '\n') for doc in generate_docs_from_openalex(
             query=query,
             openalex_endpoint=openalex_endpoint,
             batch_size=batch_size,
             export_fields=export_fields,
+            log=log)]
+
+
+def download_openalex_query_items(target_file: str | Path,
+                                  query: str,
+                                  openalex_endpoint: str,
+                                  batch_size: int = 10000,
+                                  log: logging.Logger | None = None) -> None:
+    """
+    This executes a `query` in solr at the specified `openalex_endpoint` (collection's select endpoint)
+    and writes each document (translated to AcademicItemModel) as one json string per line into `target_file`.
+
+    You can specify the `batch_size` (how many documents per request)
+    and which `export_fields` from the collection to get.
+
+    :param log:
+    :param query: solr query
+    :param target_file:
+    :param batch_size: Maximum number of documents to return per request
+    :param openalex_endpoint: sth like "http://[IP]:8983/solr/openalex"
+    :return:
+    """
+    if log is None:
+        log = logger
+    # ensure the path to that file exists
+    target_file = Path(target_file)
+    target_file.parent.mkdir(exist_ok=True, parents=True)
+    log.info(f'Writing results to: {target_file}')
+
+    with open(target_file, 'w') as f_out:
+        [f_out.write(doc.model_dump_json() + '\n') for doc in generate_items_from_openalex(
+            query=query,
+            openalex_endpoint=openalex_endpoint,
+            batch_size=batch_size,
             log=log)]
 
 
