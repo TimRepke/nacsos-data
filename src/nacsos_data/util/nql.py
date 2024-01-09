@@ -291,7 +291,7 @@ class NQLQuery:
                 if subquery.scopes is not None:
                     inner_wheres += (
                         and_(  # type: ignore[assignment]
-                            BotAnnotation.bot_annotation_metadata_id.in_(subquery.scopes),
+                            Schema.bot_annotation_metadata_id.in_(subquery.scopes),
                             BAMAlias.kind != 'RESOLVE'
                         ),
                     )
@@ -338,7 +338,8 @@ class NQLQuery:
         else:
             AnnotationAlias = aliased(Annotation_)  # type: ignore[unreachable]
             self._stmt = self._stmt.join(AnnotationAlias,
-                                         self.Schema.item_id == AnnotationAlias.item_id)  # type: ignore[attr-defined]
+                                         self.Schema.item_id == AnnotationAlias.item_id,  # type: ignore[attr-defined]
+                                         isouter=True)
             return and_(*_inner_where(AnnotationAlias))
 
     def count(self, session: Session) -> int:
