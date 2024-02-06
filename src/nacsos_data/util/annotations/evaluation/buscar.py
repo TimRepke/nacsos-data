@@ -104,8 +104,10 @@ def calculate_h0s_for_batches(labels: list[list[int]],
     :return:
     """
     pos = 0
+    seen_labels = []
     for batch_labels in labels:
-        p_h0: float | None = calculate_h0(batch_labels, n_docs=n_docs, recall_target=recall_target)
+        seen_labels += batch_labels
+        p_h0: float | None = calculate_h0(seen_labels, n_docs=n_docs, recall_target=recall_target)
 
         pos += len(batch_labels)
         yield pos, p_h0
