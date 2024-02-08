@@ -50,7 +50,7 @@ class UsersFilter(BaseModel):
 
 
 class _LabelFilter(BaseModel):
-    filter: Literal['label'] = 'label'
+    # filter: Literal['label'] = 'label'
     scopes: list[str] | None = None
     users: UsersFilter | None = None
     repeats: list[int] | None = None
@@ -59,18 +59,21 @@ class _LabelFilter(BaseModel):
 
 
 class LabelFilterInt(_LabelFilter):
+    filter: Literal['label_int'] = 'label_int'
     value_type: Literal['int'] = 'int'
     value_int: int | None = None
     comp: Comparator
 
 
 class LabelFilterBool(_LabelFilter):
+    filter: Literal['label_bool'] = 'label_bool'
     value_type: Literal['bool'] = 'bool'
     comp: Literal['='] = '='
     value_bool: bool | None = None
 
 
 class LabelFilterMulti(_LabelFilter):
+    filter: Literal['label_multi'] = 'label_multi'
     value_type: Literal['multi'] = 'multi'
     multi_int: list[int] | None = None
     comp: SetComparator
@@ -82,13 +85,13 @@ LabelFilter = Annotated[LabelFilterInt
 
 
 class AssignmentFilter(BaseModel):
-    filter: Literal['assignment']
+    filter: Literal['assignment'] = 'assignment'
     mode: int
     scopes: list[str] | None = None
 
 
 class AnnotationFilter(BaseModel):
-    filter: Literal['annotation']
+    filter: Literal['annotation'] = 'annotation'
     incl: bool
     scopes: list[str] | None
 
@@ -97,14 +100,16 @@ NQLFilter: TypeAlias = ForwardRef('NQLFilter')  # type: ignore[valid-type]
 
 
 class SubQuery(BaseModel):
-    filter: Literal['sub']
+    filter: Literal['sub'] = 'sub'
     and_: list[NQLFilter] | None = None
     or_: list[NQLFilter] | None = None
 
 
 NQLFilter = Annotated[FieldFilter
                       | FieldFilters
-                      | LabelFilter
+                      | LabelFilterMulti
+                      | LabelFilterBool
+                      | LabelFilterInt
                       | AssignmentFilter
                       | AnnotationFilter
                       | ImportFilter

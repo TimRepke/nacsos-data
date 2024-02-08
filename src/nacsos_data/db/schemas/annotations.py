@@ -26,8 +26,8 @@ from .users import User
 from .items.base import Item
 
 if TYPE_CHECKING:
-    from . import BotAnnotationMetaData
-    from . import AnnotationQuality
+    from .annotation_quality import AnnotationQuality
+    from .bot_annotations import BotAnnotationMetaData
 
 
 class AnnotationScheme(Base):
@@ -172,6 +172,32 @@ class Assignment(Base):
     # TODO figure out how to nicely resolve in-text annotations here
 
 
+class Snippet(Base):
+    """
+    This enables in-text annotations.
+    It is used both for `BotAnnotation`s and for `Annotation`s.
+    It refers to a snippet of text with a specific offset in the text string if an item.
+    It also contains a copy of that excerpt.
+    """
+    __tablename__ = 'snippet'
+
+    # Unique identifier for this text snippet
+    snippet_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+                               nullable=False, unique=True, index=True)
+
+    # The Item this assigment refers to (redundant to implicit information from Assignment)
+    item_id = mapped_column(UUID(as_uuid=True),
+                            ForeignKey(Item.item_id, ondelete='CASCADE'),
+                            nullable=False, index=True)
+
+    # The following fields should be set with the string offset within the respective Item.text
+    offset_start = mapped_column(Integer, nullable=False)
+    offset_stop = mapped_column(Integer, nullable=False)
+
+    # Just in case Item.text changes, here's a copy of the text snippet
+    snippet = mapped_column(String, nullable=False)
+
+
 class Annotation(Base):
     """
     Annotation holds the judgement of a User for a specific Item in the context of an AnnotationScheme
@@ -217,10 +243,15 @@ class Annotation(Base):
                             ForeignKey(User.user_id, ondelete='CASCADE'),
                             nullable=False, index=True)
 
-    # The Item this assigment refers to (redundant to implicit information from Assignment)
+    # The Item this annotation refers to (redundant to implicit information from Assignment)
     item_id = mapped_column(UUID(as_uuid=True),
                             ForeignKey(Item.item_id, ondelete='CASCADE'),
                             nullable=False, index=True)
+
+    # When this annotation refers to an in-text excerpt, this refers to the respective snippet
+    snippet_id = mapped_column(UUID(as_uuid=True),
+                               ForeignKey(Snippet.snippet_id),
+                               nullable=True, index=True)
 
     # The AnnotationScheme defining the annotation scheme to be used for this assignment
     # (redundant to implicit information from Assignment)
@@ -249,11 +280,6 @@ class Annotation(Base):
     value_float = mapped_column(Float, nullable=True)
     value_str = mapped_column(String, nullable=True)
     multi_int = mapped_column(ARRAY(Integer), nullable=True)
-
-    # When the Annotation does not refer to an entire Item, but a sub-string (in-text annotation)
-    # of that Item, the following fields should be set with the respective string offset.
-    text_offset_start = mapped_column(Integer, nullable=True)
-    text_offset_stop = mapped_column(Integer, nullable=True)
 
     sub_annotations: Relationship['Annotation'] = relationship('Annotation', cascade='all, delete')
     item: Mapped['Item'] = relationship(back_populates='annotations')

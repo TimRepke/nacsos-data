@@ -18,7 +18,6 @@ from nacsos_data.models.annotations import AnnotationSchemeModel, FlatLabel, Ite
 from nacsos_data.models.bot_annotations import AssignmentMap, OrderingEntry, ResolutionMatrix, ResolutionCell, \
     ResolutionUserEntry
 from nacsos_data.models.users import UserModel
-from nacsos_data.util.annotations import AnnotationFilterObject
 from nacsos_data.util.annotations.resolve import get_annotation_matrix
 from nacsos_data.util.errors import NotFoundError
 
@@ -383,9 +382,7 @@ async def compute_irr_scores(session: AsyncSession,
     item_order: list[OrderingEntry]
     annotation_map: ResolutionMatrix
     scheme, labels, annotators, assignments, annotations, item_order, annotation_map = await get_annotation_matrix(
-        filters=AnnotationFilterObject(scheme_id=str(scheme_id),
-                                       scope_id=str(assignment_scope_id),
-                                       user_id=[str(uid) for uid in user_ids]),
+        assignment_scope_id=str(assignment_scope_id),
         ignore_hierarchy=False,
         ignore_repeat=False,
         session=session

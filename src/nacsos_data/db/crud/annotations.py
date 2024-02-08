@@ -2,7 +2,7 @@ import uuid
 import logging
 
 from pydantic import BaseModel
-from sqlalchemy import select, insert, update, delete, asc, desc
+from sqlalchemy import select, delete, asc, desc
 from sqlalchemy.sql import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +23,6 @@ from nacsos_data.models.annotations import (
     AssignmentStatus
 )
 from nacsos_data.models.bot_annotations import (
-    AnnotationFilters,
     BotMetaResolve,
     ResolutionMethod,
     BotKind,
@@ -31,23 +30,17 @@ from nacsos_data.models.bot_annotations import (
     ResolutionProposal,
     ResolutionMatrix
 )
-from nacsos_data.util.annotations.validation import (
-    validate_annotated_assignment,
-    merge_scheme_and_annotations,
+from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_scheme_and_annotations, \
     has_values
-)
 
-from . import upsert_orm, MissingIdError, sentinel_uuid
+from . import upsert_orm, MissingIdError
 from ..engine import ensure_session_async
 from ...util.annotations import (
     dehydrate_user_annotations,
     dehydrate_resolutions
 )
-from ...util.annotations.resolve import (
-    AnnotationFilterObject,
-    get_resolved_item_annotations,
-)
-from ...util.errors import NotFoundError, InvalidResolutionError
+from ...util.annotations.resolve import get_resolved_item_annotations
+from ...util.errors import NotFoundError
 
 logger = logging.getLogger('nacsos_data.crud.annotations')
 
@@ -91,8 +84,7 @@ async def read_assignment_scopes_for_project_for_user(session: AsyncSession,
                 assignment_scope_id=res['assignment_scope_id'],
                 annotation_scheme_id=res['annotation_scheme_id'],
                 name=res['name'],
-                description=res['description'],
-                time_created=res['time_created']
+                description=res['description']
             ),
             scheme_name=res['scheme_name'],
             scheme_description=res['scheme_description'],
@@ -294,12 +286,18 @@ async def read_assignment_scope(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_annotation_scheme_for_assignment(session: AsyncSession,
-                                                assignment_id: str | uuid.UUID) -> AnnotationSchemeModel | None:
+async def read_annotation_scheme(session: AsyncSession,
+                                 assignment_id: str | uuid.UUID | None = None,
+                                 assignment_scope_id: str | uuid.UUID | None = None) -> AnnotationSchemeModel | None:
     stmt = (select(AnnotationScheme)
-            .join(Assignment,
-                  AnnotationScheme.annotation_scheme_id == Assignment.annotation_scheme_id)
-            .where(Assignment.assignment_id == assignment_id))
+            .join(Assignment, AnnotationScheme.annotation_scheme_id == Assignment.annotation_scheme_id))
+
+    if assignment_id is not None:
+        stmt = stmt.where(Assignment.assignment_id == assignment_id)
+    elif assignment_scope_id is not None:
+        stmt = stmt.where(AssignmentScope.assignment_scope_id == assignment_scope_id)
+    else:
+        raise AssertionError('Both, assignment_id and assignment_scope_id are empty.')
     result = (await session.execute(stmt)).scalars().one_or_none()
     if result is not None:
         return AnnotationSchemeModel(**result.__dict__)
@@ -307,16 +305,15 @@ async def read_annotation_scheme_for_assignment(session: AsyncSession,
 
 
 @ensure_session_async
+async def read_annotation_scheme_for_assignment(session: AsyncSession,
+                                                assignment_id: str | uuid.UUID) -> AnnotationSchemeModel | None:
+    return await read_annotation_scheme(session=session, assignment_id=assignment_id)
+
+
+@ensure_session_async
 async def read_annotation_scheme_for_scope(session: AsyncSession,
                                            assignment_scope_id: str | uuid.UUID) -> AnnotationSchemeModel | None:
-    stmt = (select(AnnotationScheme)
-            .join(AssignmentScope,
-                  AssignmentScope.annotation_scheme_id == AnnotationScheme.annotation_scheme_id)
-            .where(AssignmentScope.assignment_scope_id == assignment_scope_id))
-    result = (await session.execute(stmt)).scalars().one_or_none()
-    if result is not None:
-        return AnnotationSchemeModel(**result.__dict__)
-    return None
+    return await read_annotation_scheme(session=session, assignment_scope_id=assignment_scope_id)
 
 
 @ensure_session_async
@@ -538,9 +535,8 @@ async def read_resolved_bot_annotations_for_meta(session: AsyncSession,
                                                  include_empty: bool = True,
                                                  include_new: bool = False,
                                                  update_existing: bool = False) -> ResolutionProposal:
-    filters = AnnotationFilterObject.model_validate(bot_meta.meta.filters.model_dump())
     ret: ResolutionProposal = await get_resolved_item_annotations(strategy=bot_meta.meta.algorithm,
-                                                                  filters=filters,
+                                                                  assignment_scope_id=bot_meta.assignment_scope_id,
                                                                   ignore_hierarchy=bot_meta.meta.ignore_hierarchy,
                                                                   ignore_repeat=bot_meta.meta.ignore_repeat,
                                                                   include_empty=include_empty,
@@ -570,15 +566,15 @@ async def read_resolved_bot_annotations(session: AsyncSession,
 async def store_resolved_bot_annotations(session: AsyncSession,
                                          project_id: str,
                                          name: str,
+                                         assignment_scope_id: str | uuid.UUID,
+                                         annotation_scheme_id: str | uuid.UUID,
                                          algorithm: ResolutionMethod,
-                                         filters: AnnotationFilters,
                                          ignore_hierarchy: bool,
                                          ignore_repeat: bool,
                                          matrix: ResolutionMatrix) -> str:
     snapshot = dehydrate_user_annotations(matrix)
     resolutions = dehydrate_resolutions(matrix)
     meta = BotMetaResolve(algorithm=algorithm,
-                          filters=filters,
                           ignore_hierarchy=ignore_hierarchy,
                           ignore_repeat=ignore_repeat,
                           snapshot=snapshot,
@@ -588,7 +584,8 @@ async def store_resolved_bot_annotations(session: AsyncSession,
                                      project_id=project_id,
                                      name=name,
                                      kind=BotKind.RESOLVE,
-                                     annotation_scheme_id=filters.scheme_id,
+                                     annotation_scheme_id=annotation_scheme_id,
+                                     assignment_scope_id=assignment_scope_id,
                                      meta=meta.model_dump())
     session.add(metadata)
     await session.commit()
@@ -610,8 +607,10 @@ async def store_resolved_bot_annotations(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_bot_annotation_metadata(session: AsyncSession,
-                                       bot_annotation_metadata_id: str) -> BotAnnotationMetaData:
+async def update_resolved_bot_annotations(session: AsyncSession,
+                                          bot_annotation_metadata_id: str,
+                                          name: str,
+                                          matrix: ResolutionMatrix) -> None:
     bot_meta: BotAnnotationMetaData | None = (await session.execute(
         select(BotAnnotationMetaData)
         .where(BotAnnotationMetaData.bot_annotation_metadata_id == bot_annotation_metadata_id))) \
@@ -619,14 +618,14 @@ async def read_bot_annotation_metadata(session: AsyncSession,
 
     if bot_meta is None:
         raise MissingIdError(f'No `BotAnnotationMetaData` object for {bot_annotation_metadata_id}')
-    return bot_meta
 
+    resolutions = dehydrate_resolutions(matrix)
+    # Update the bot_meta
+    bot_meta.name = name
+    bot_meta.meta.snapshot = dehydrate_user_annotations(matrix)
+    bot_meta.meta.resolutions = resolutions
+    await session.commit()
 
-@ensure_session_async
-async def update_resolved_bot_annotations(session: AsyncSession,
-                                          bot_annotation_metadata_id: str,
-                                          name: str,
-                                          matrix: ResolutionMatrix) -> None:
     # Get ids of existing annotations in for this resolution
     existing_ids_uuid: list[uuid.UUID] = list(
         (await session.execute(
@@ -636,10 +635,7 @@ async def update_resolved_bot_annotations(session: AsyncSession,
 
     # Figure out which ones we have to delete, update, and create
     existing_ids = set([str(ba) for ba in existing_ids_uuid])
-    submitted_ids = set([str(cell.resolution.bot_annotation_id)
-                         for row_key, row in matrix.items()
-                         for col_key, cell in row.items()
-                         if has_values(cell.resolution)])
+    submitted_ids = set([str(res.ba_id) for res in resolutions])
 
     ids_to_remove = existing_ids - submitted_ids
     ids_to_update = existing_ids - ids_to_remove
@@ -652,56 +648,35 @@ async def update_resolved_bot_annotations(session: AsyncSession,
     logger.debug(f'[upsert_bot_annotations] DELETING ({len(ids_to_remove):,}) '
                  f'existing annotations with ids: {ids_to_remove}')
 
+    # Delete old bot_annotations
+    if len(ids_to_remove) > 0:
+        stmt = delete(BotAnnotation).where(BotAnnotation.bot_annotation_id.in_(list(ids_to_remove)))
+        await session.execute(stmt)
+
     # Create new or update existing bot_annotations
-    bot_annotations_create = []
-    bot_annotations_update = []
+    new_bot_annotations = []
     for row in matrix.values():
         for cell in row.values():
             if cell.resolution:
-                cell.resolution.bot_annotation_metadata_id = uuid.UUID(bot_annotation_metadata_id)
                 if str(cell.resolution.bot_annotation_id) in ids_to_update:
-                    logger.debug(f'update: {cell.resolution}')
-                    bot_annotations_update.append(
-                        sentinel_uuid(cell.resolution.model_dump(),
-                                      ['bot_annotation_id', 'bot_annotation_metadata_id', 'item_id', 'parent'])
-                    )
-                    if cell.resolution.parent is not None and cell.resolution.parent in ids_to_remove:
-                        raise InvalidResolutionError(f'There appears to be no parent for this label '
-                                                     f'(key: {cell.resolution.key}, item: {cell.resolution.item_id})!')
-
-                elif str(cell.resolution.bot_annotation_id) in ids_to_create:
-                    logger.debug(f'new: {cell.resolution}')
-                    bot_annotations_create.append(
-                        sentinel_uuid(cell.resolution.model_dump(),
-                                      ['bot_annotation_id', 'bot_annotation_metadata_id', 'item_id', 'parent'])
-                    )
-
-    # Open transaction
-    session.begin_nested()
-
-    # Delete old bot_annotations
-    if len(ids_to_remove) > 0:
-        await session.execute(delete(BotAnnotation)
-                              .where(BotAnnotation.bot_annotation_id.in_(list(ids_to_remove))))
-
-    # Create new bot_annotations
-    if len(bot_annotations_create) > 0:
-        logger.debug(f'Creating {len(bot_annotations_create):,} new BotAnnotations.')
-        await session.execute(insert(BotAnnotation), bot_annotations_create)
-
-    # Update existing bot_annotations
-    if len(bot_annotations_update) > 0:
-        logger.debug(f'Updating {len(bot_annotations_update):,} BotAnnotations.')
-        await session.execute(update(BotAnnotation), bot_annotations_update)
-
-    # Update the bot_meta
-    bot_meta = await read_bot_annotation_metadata(session=session,
-                                                  bot_annotation_metadata_id=bot_annotation_metadata_id)
-
-    resolutions = dehydrate_resolutions(matrix)
-    resolutions_filtered = [res for res in resolutions if res.ba_id in ids_to_update or res.ba_id in ids_to_create]
-    bot_meta.name = name
-    bot_meta.meta['snapshot'] = dehydrate_user_annotations(matrix)  # type: ignore[index]
-    bot_meta.meta['resolutions'] = resolutions_filtered  # type: ignore[index]
-
-    await session.commit()
+                    ba_orm: BotAnnotation = (await session.execute(
+                        select(BotAnnotation)
+                        .where(BotAnnotation.bot_annotation_id == cell.resolution.bot_annotation_id))).scalars().one()
+                    ba_orm.repeat = cell.resolution.repeat
+                    ba_orm.parent = cell.resolution.parent
+                    ba_orm.value_bool = cell.resolution.value_bool
+                    ba_orm.value_str = cell.resolution.value_str
+                    ba_orm.value_int = cell.resolution.value_int
+                    ba_orm.value_float = cell.resolution.value_float
+                    ba_orm.multi_int = cell.resolution.multi_int
+                    ba_orm.order = cell.resolution.order
+                    await session.commit()
+                else:
+                    new_bot_annotations.append(BotAnnotation(**{
+                        **cell.resolution.model_dump(),
+                        'bot_annotation_metadata_id': bot_annotation_metadata_id
+                    }))
+    if len(new_bot_annotations) > 0:
+        logger.debug(f'Creating ({len(new_bot_annotations):,} new BotAnnotations.')
+        session.add_all(new_bot_annotations)
+        await session.commit()

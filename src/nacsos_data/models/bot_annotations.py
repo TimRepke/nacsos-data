@@ -15,49 +15,7 @@ from .annotations import (
     ItemAnnotation)
 from .users import UserModel
 
-AnnotationFiltersType = dict[str, str | list[str] | int | list[int] | None]
-
 ResolutionMethod = Literal['majority', 'first', 'last', 'trust']
-
-
-class AnnotationFilters(BaseModel):
-    """
-    Filter rules for fetching all annotations that match these conditions
-    It is up to the user of this function to make sure to provide sensible filters!
-    All filters are conjunctive (connected with "AND"); if None, they are not included
-
-    There are no "exclude" filters by design. If needed, they should be simulated in the interface.
-
-    :param scheme_id: if not None: annotation has to be part of this annotation scheme
-    :param scope_id: if not None: annotation has to be part of this assignment scope
-    :param user_id: if not None: annotation has to be by this user
-    :param key: if not None: annotation has to be for this AnnotationSchemeLabel.key (or list/tuple of keys)
-    :param repeat: if not None: annotation has to be primary/secondary/...
-    """
-    model_config = ConfigDict(extra='ignore')
-
-    scheme_id: str
-    scope_id: str | list[str] | None = None
-    user_id: str | list[str] | None = None
-    key: str | list[str] | None = None
-
-    @property
-    def user_ids(self) -> list[str] | None:
-        if self.user_id is None:
-            return None
-        return [self.user_id] if type(self.user_id) is str else self.user_id  # type: ignore[return-value]
-
-    @property
-    def scope_ids(self) -> list[str] | None:
-        if self.scope_id is None:
-            return None
-        return [self.scope_id] if type(self.scope_id) is str else self.scope_id  # type: ignore[return-value]
-
-    @property
-    def keys(self) -> list[str] | None:
-        if self.key is None:
-            return None
-        return [self.key] if type(self.key) is str else self.key  # type: ignore[return-value]
 
 
 class SnapshotEntry(AnnotationValue):
@@ -76,14 +34,9 @@ class ResolutionSnapshotEntry(BaseModel):
 
 
 class BotMetaResolveBase(BaseModel):
-    # the algorithm used to (auto-)resolve conflicting annotations
     algorithm: ResolutionMethod
-    # defines the "scope" of labels to include for the resolver
-    filters: AnnotationFilters
     ignore_hierarchy: bool
     ignore_repeat: bool
-    # (optional) dictionary of user UUID -> float weights (i.e. trust in the user for weighted majority votes)
-    trust: dict[str, float] | None = None
 
 
 class BotMetaResolve(BotMetaResolveBase):
@@ -128,6 +81,8 @@ class BotAnnotationMetaDataBaseModel(BaseModel):
 class BotAnnotationResolution(BotAnnotationMetaDataBaseModel):
     # Additional information for this Bot for future reference
     meta: BotMetaResolve
+    assignment_scope_id: str | UUID
+    annotation_scheme_id: str | UUID
 
 
 class BotAnnotationMetaDataModel(BotAnnotationMetaDataBaseModel):
@@ -179,8 +134,6 @@ class ResolutionOrdering(BaseModel):
     identifier: int
     first_occurrence: int
     item_id: str
-    scope_id: str
-    key: str
 
 
 class OrderingEntry(ResolutionOrdering):

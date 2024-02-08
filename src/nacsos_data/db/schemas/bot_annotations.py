@@ -1,14 +1,16 @@
 import uuid
-from sqlalchemy import \
-    Integer, \
-    Float, \
-    String, \
-    Boolean, \
-    DateTime, \
-    Enum as SAEnum, \
-    ForeignKey, \
-    UniqueConstraint, \
-    CheckConstraint, Identity
+from sqlalchemy import (
+    Integer,
+    Float,
+    String,
+    Boolean,
+    DateTime,
+    Enum as SAEnum,
+    ForeignKey,
+    UniqueConstraint,
+    CheckConstraint,
+    Identity
+)
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column, relationship, Relationship
 from sqlalchemy.dialects.postgresql import JSONB, UUID, ARRAY
@@ -18,7 +20,6 @@ from ...models.bot_annotations import BotKind, BotMeta
 from ...db.base_class import Base
 from .projects import Project
 from .items.base import Item
-from . import AnnotationScheme, AssignmentScope
 
 
 class BotAnnotationMetaData(Base):
@@ -48,11 +49,11 @@ class BotAnnotationMetaData(Base):
 
     # (Optional) reference to an assignment scope
     assignment_scope_id = mapped_column(UUID(as_uuid=True),
-                                        ForeignKey(AssignmentScope.assignment_scope_id),
+                                        ForeignKey('assignment_scope.assignment_scope_id'),
                                         nullable=True, index=True)
     # (Optional) reference to an annotation scheme used here
     annotation_scheme_id = mapped_column(UUID(as_uuid=True),
-                                         ForeignKey(AnnotationScheme.annotation_scheme_id, ondelete='CASCADE'),
+                                         ForeignKey('annotation_scheme.annotation_scheme_id', ondelete='CASCADE'),
                                          nullable=True, index=True)
     # Additional information for this Bot for future reference
     meta: Mapped[BotMeta] = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True),

@@ -5,52 +5,19 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.engine import ensure_session_async
-from nacsos_data.models.annotations import AnnotationSchemeModel, AnnotationSchemeLabel, Label, ItemAnnotation
+from nacsos_data.models.annotations import (
+    AnnotationSchemeModel,
+    AnnotationSchemeLabel,
+    Label,
+    ItemAnnotation
+)
 from nacsos_data.models.bot_annotations import (
     ResolutionSnapshotEntry,
     ResolutionMatrix,
     SnapshotEntry,
     OrderingEntry,
-    BotItemAnnotation, AnnotationFiltersType, AnnotationFilters
+    BotItemAnnotation
 )
-from nacsos_data.util.errors import InvalidFilterError
-
-
-class AnnotationFilterObject(AnnotationFilters):
-    def get_subquery(self) -> tuple[str, str, AnnotationFiltersType]:
-        where = []
-        filters = self.get_filters()
-        for db_col, key in [('ass.assignment_scope_id', 'scope_id'),
-                            ('a.annotation_scheme_id', 'scheme_id'),
-                            ('a.user_id', 'user_id'),
-                            ('a.key', 'key')]:
-            if filters.get(key) is not None:
-                if type(filters[key]) == list:
-                    where.append(f' {db_col} = ANY(:{key}) ')
-                else:
-                    where.append(f' {db_col} = :{key} ')
-
-        if len(where) == 0:
-            raise InvalidFilterError('You did not specify any valid filter.')
-
-        join = f''
-        if filters.get('scope_id') is not None:
-            join = f' JOIN assignment ass on ass.assignment_id = a.assignment_id '
-
-        return join, ' AND '.join(where), filters
-
-    def get_filters(self) -> AnnotationFiltersType:
-        ret = {}
-        for key, value in self.model_dump().items():
-            if value is not None:
-                if type(value) == list:
-                    if len(value) == 1:
-                        ret[key] = value[0]
-                    else:
-                        ret[key] = list(value)
-                else:
-                    ret[key] = value
-        return ret
 
 
 def unravel_annotation_scheme_keys(scheme: AnnotationSchemeModel) -> list[str]:
@@ -71,13 +38,13 @@ def unravel_annotation_scheme_keys(scheme: AnnotationSchemeModel) -> list[str]:
 
 
 @ensure_session_async
-async def get_ordering(session: AsyncSession, scope_id: str | uuid.UUID) -> list[OrderingEntry]:
+async def get_ordering(session: AsyncSession, assignment_scope_id: str | uuid.UUID) -> list[OrderingEntry]:
     """
     Retrieve all items from this assignment scope, order them by the order of assignments and attach some
     basic information about the state of the assignment.
 
     :param session:
-    :param scope_id: assignment_scope_id
+    :param assignment_scope_id: assignment_scope_id
     :return:
     """
     stmt = text('''
@@ -98,9 +65,9 @@ async def get_ordering(session: AsyncSession, scope_id: str | uuid.UUID) -> list
               GROUP BY ass.item_id
               ORDER BY first_occurrence) as sub;
     ''')
-    res = (await session.execute(stmt, {'scope_id': scope_id})).mappings().all()
+    res = (await session.execute(stmt, {'scope_id': assignment_scope_id})).mappings().all()
 
-    return [OrderingEntry(**{**r, 'key': f'{scope_id}|{r.item_id}', 'scope_id': str(scope_id)}) for r in res]
+    return [OrderingEntry(**r) for r in res]
 
 
 def dehydrate_user_annotations(matrix: ResolutionMatrix) -> list[SnapshotEntry]:
@@ -131,19 +98,18 @@ def dehydrate_resolutions(matrix: ResolutionMatrix) -> list[ResolutionSnapshotEn
 
 @ensure_session_async
 async def read_item_annotations(session: AsyncSession,
-                                filters: AnnotationFilterObject,
+                                assignment_scope_id: str | uuid.UUID,
                                 ignore_hierarchy: bool = False,
                                 ignore_repeat: bool = False) -> list[ItemAnnotation]:
     """
     asd
     :param session: Connection to the database
-    :param filters:
+    :param assignment_scope_id:
     :param ignore_hierarchy: if False, looking at keys linearly (ignoring parents)
     :param ignore_repeat: if False, the order is ignored and e.g. single-choice with secondary category
                            virtually becomes multi-choice of two categories
     :return: dictionary (keys are item_ids) of all annotations per item that match the filters.
     """
-    filter_join, filter_where, filter_data = filters.get_subquery()
 
     repeat = 'a.repeat'
     if ignore_repeat:  # if repeat is ignored, always forcing it to 1
@@ -153,26 +119,24 @@ async def read_item_annotations(session: AsyncSession,
             SELECT array_to_json(ARRAY[(a.key, {repeat})::annotation_label]) as label, 
                    a.*
             FROM annotation AS a 
-                     {filter_join} 
-            WHERE {filter_where};
+                     JOIN assignment ass ON a.assignment_id = ass.assignment_id 
+            WHERE ass.assignment_scope_id = :scope_id;
         ''')
     else:
         stmt = text(f'''
             WITH RECURSIVE ctename AS ( 
                   SELECT a.annotation_id, a.time_created, a.time_updated, a.assignment_id, a.user_id, a.item_id, 
                          a.annotation_scheme_id, a.key, a.repeat,  a.value_bool, a.value_int,a.value_float, 
-                         a.value_str, a.text_offset_start, a.text_offset_stop, a.multi_int, 
-                         a.parent, a.parent as recurse_join, 
+                         a.value_str, a.multi_int, a.parent, a.parent as recurse_join, 
                         ARRAY[(a.key, {repeat})::annotation_label] as path 
                   FROM annotation AS a 
-                     {filter_join} 
-                  WHERE {filter_where} 
+                           JOIN assignment ass ON a.assignment_id = ass.assignment_id 
+                  WHERE ass.assignment_scope_id = :scope_id
                UNION ALL 
                   SELECT ctename.annotation_id, ctename.time_created, ctename.time_updated,ctename.assignment_id,
                          ctename.user_id, ctename.item_id, ctename.annotation_scheme_id, ctename.key, 
                          ctename.repeat, ctename.value_bool, ctename.value_int,ctename.value_float, 
-                         ctename.value_str, ctename.text_offset_start, ctename.text_offset_stop, 
-                         ctename.multi_int, ctename.parent, a.parent as recurse_join, 
+                         ctename.value_str, ctename.multi_int, ctename.parent, a.parent as recurse_join, 
                         array_append(ctename.path, ((a.key, {repeat})::annotation_label)) 
                   FROM annotation a 
                      JOIN ctename ON a.annotation_id = ctename.recurse_join 
@@ -182,7 +146,7 @@ async def read_item_annotations(session: AsyncSession,
             WHERE recurse_join is NULL;
         ''')
 
-    res = (await session.execute(stmt, filter_data)).mappings().all()
+    res = (await session.execute(stmt, {'scope_id': assignment_scope_id})).mappings().all()
     ret = []
     for r in res:
         path = [Label.model_validate(label) for label in r['label']]

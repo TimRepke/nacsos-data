@@ -281,7 +281,7 @@ class NQLQuery:
                         ),
                     )
                 else:
-                    inner_wheres += (  # type: ignore[unreachable]
+                    inner_wheres += (  # type: ignore[unreachable, assignment]
                         BAMAlias.kind == 'RESOLVE',
                     )
             elif subquery.type == 'bot':
@@ -296,7 +296,7 @@ class NQLQuery:
                         ),
                     )
                 else:
-                    inner_wheres += (  # type: ignore[unreachable]
+                    inner_wheres += (  # type: ignore[unreachable, assignment]
                         BAMAlias.kind != 'RESOLVE',
                     )
             elif subquery.type == 'user':
