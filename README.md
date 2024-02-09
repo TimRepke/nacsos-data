@@ -39,6 +39,47 @@ We count versions starting at zero and always include all three numbers prefixed
 The current version is defined in `setup.py` and the respective commit is tagged via git.
 This can be done either via `git tag ...` or [PIK GitLab](https://gitlab.pik-potsdam.de/mcc-apsis/nacsos/nacsos-data/-/tags)
 
+## Create staging copy of the database
+```bash
+
+# Dump database
+# See https://www.postgresql.org/docs/current/app-pgdump.html
+pg_dump -C -Fd -Z 9 -j 12 -p 5432 -f pgstash -d nacsos_core -h 0.0.0.0
+
+# Spin up staging cluster
+sudo pg_createcluster 15 nacsos_staging --start
+
+sudo vim /etc/postgresql/15/nacsos_staging/pg_hba.conf
+# add following line:
+# host    all             all              10.10.13.45/0           scram-sha-256
+sudo vim /etc/postgresql/15/nacsos_staging/postgresql.conf
+# add following line:
+# listen_addresses = '0.0.0.0'
+# change:
+# port = 8010  
+sudo pg_ctlcluster 15 nacsos_staging restart
+
+pg_lsclusters
+
+# Import database (adjust port if necessary)
+sudo mv pgstash /var/lib/postgresql
+sudo chmod -R ug+x /var/lib/postgresql/pgstash
+sudo chown -R postgres:postgres /var/lib/postgresql/pgstash
+sudo -u postgres bash
+cd /var/lib/postgresql
+createdb -p 8010 -U postgres nacsos_core
+createuser -p 8010 -s nacsos -P
+createuser -p 8010 nacsos_read
+createuser -p 8010 nacsos_user
+/usr/lib/postgresql/16/bin/pg_restore -F d -j 12 -p 8010 -C -d nacsos_core pgstash/
+
+# Remove dump, not needed anymore
+rm -r pgstash
+
+# If you don't need it anymore, free up space via
+sudo pg_dropcluster 15 nacsos_staging --stop
+```
+
 ## Testing
 
 ```bash
