@@ -19,12 +19,14 @@ class AnnotationQualityModel(BaseModel):
 
     # The assignment scope this quality tracker is referring to
     assignment_scope_id: uuid.UUID | str | None = None
+    # The resolution this quality tracker is referring to
+    bot_annotation_metadata_id: uuid.UUID | str | None = None
 
     # Some metrics are computed for pairs of users,
     # in this case both foreign keys should be set, otherwise both shall be NULL
-    user_base: uuid.UUID | str | None = None
+    user_base: str | None = None
     annotations_base: list[bool | None] | list[int] | list[int | None] | list[list[int] | None] | None = None
-    user_target: uuid.UUID | str | None = None
+    user_target: str | None = None
     annotations_target: list[bool | None] | list[int] | list[int | None] | list[list[int] | None] | None = None
 
     # The label this quality tracker is referring to
@@ -54,13 +56,13 @@ class AnnotationQualityModel(BaseModel):
     multi_overlap_std: float | None = None
 
     # Number of annotated items
-    num_items: int | None = None
+    num_items: float | None = None
     # Number of items with more than one annotation
-    num_overlap: int | None = None
+    num_overlap: float | None = None
     # Number of items where all users agree
-    num_agree: int | None = None
+    num_agree: float | None = None
     # Number of items where not all users agree
-    num_disagree: int | None = None
+    num_disagree: float | None = None
     # Percentage of (num_agree / num_overlap) * 100
     perc_agree: float | None = None
 

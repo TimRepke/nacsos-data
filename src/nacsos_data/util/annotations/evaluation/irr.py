@@ -6,106 +6,47 @@ from typing import TypeAlias, Literal, TypeVar, Any
 
 import numpy as np
 from scipy.stats import pearsonr, kendalltau, spearmanr, ConstantInputWarning
-from sklearn.metrics import cohen_kappa_score
+from sklearn.exceptions import UndefinedMetricWarning
+from sklearn.metrics import cohen_kappa_score, precision_recall_fscore_support
 
-from sqlalchemy import select, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from nacsos_data.db.crud.annotations import read_annotation_scheme_for_scope
+from nacsos_data.db.crud.users import user_ids_to_names
 from nacsos_data.db.engine import ensure_session_async
-from nacsos_data.db.schemas import AssignmentScope, Assignment
 from nacsos_data.models.annotation_quality import AnnotationQualityModel
-from nacsos_data.models.annotations import AnnotationSchemeModel, FlatLabel, ItemAnnotation, FlatLabelChoice
-from nacsos_data.models.bot_annotations import AssignmentMap, OrderingEntry, ResolutionMatrix, ResolutionCell, \
-    ResolutionUserEntry
-from nacsos_data.models.users import UserModel
-from nacsos_data.util.annotations.resolve import get_annotation_matrix
+from nacsos_data.models.annotations import AnnotationSchemeModel, FlatLabel
+from nacsos_data.util.annotations.label_transform import get_annotations, annotations_to_sequence, SortedAnnotationLabel
+from nacsos_data.util.annotations.validation import labels_from_scheme
 from nacsos_data.util.errors import NotFoundError
 
 logger = logging.getLogger('nacsos_data.util.annotations.evaluation.irr')
 
-AnnotationRaw: TypeAlias = int | list[int] | str | float | bool | None
-AnnotationsRaw: TypeAlias = (list[int | None]
-                             | list[list[int] | None]
-                             | list[str | None]
-                             | list[bool | None]
-                             | list[float | None])
+AnnotationRaw: TypeAlias = int | list[int] | None
+AnnotationsRaw: TypeAlias = list[int | None] | list[list[int] | None]
+Annotation: TypeAlias = int | list[int]
+Annotations: TypeAlias = list[int] | list[list[int]]
 
 
-def get_value_raw(annotation: ItemAnnotation | None, label: FlatLabel) -> AnnotationRaw:
+def get_value_raw(annotation: SortedAnnotationLabel | None, label: FlatLabel) -> AnnotationRaw:
     if annotation is None:
         return None
     if label.kind == 'bool':
-        return annotation.value_bool
-    elif label.kind == 'str':
-        return annotation.value_str
-    elif label.kind == 'float':
-        return annotation.value_float
+        return int(annotation.value_bool)
     elif label.kind == 'int':
         return annotation.value_int
     elif label.kind == 'single':
         return annotation.value_int
     elif label.kind == 'multi':
-        return annotation.multi_int
+        return annotation.multis
     else:
         return None
 
 
-def get_value(annotation: ItemAnnotation | None, label: FlatLabel) -> int | list[int] | None:
-    if annotation is None:
-        return None
-    if label.kind == 'bool':
-        return int(annotation.value_bool) if annotation.value_bool is not None else None
-    elif label.kind == 'int':
-        return annotation.value_int
-    elif label.kind == 'single':
-        return annotation.value_int
-    elif label.kind == 'multi':
-        return annotation.multi_int
-    else:
-        return None
-
-
-def translate_multi(annotations: list[list[int] | None], choices: list[FlatLabelChoice]) -> list[int | None]:
-    values = {choice.value: idx for idx, choice in enumerate(choices)}
-    annotations_translated: list[int | None] = []
-    for annotation in annotations:
-        if annotation is None:
-            annotations_translated.append(None)
-        else:
-            tmp = ['0'] * len(values)
-            for choice in annotation:
-                tmp[values[choice]] = '1'
-            annotations_translated.append(int(''.join(reversed(tmp)), 2))
-    return annotations_translated
-
-
-def pluck_annotations(label: FlatLabel, user: UserModel,
-                      item_order: list[OrderingEntry], annotation_map: ResolutionMatrix) \
-        -> list[list[int] | None] | list[int | None]:
-    annotations: list[list[int] | None] | list[int | None] = []  # type: ignore[assignment]
-    for item in item_order:
-        item_annotations: dict[str, ResolutionCell] = annotation_map.get(item.key, {})
-        label_item_annotations: ResolutionCell | None = item_annotations.get(label.path_key)
-        if label_item_annotations is not None:
-            user_annotations: list[ResolutionUserEntry] | None = label_item_annotations.labels.get(str(user.user_id))
-            # No annotation for this label for this item by this user
-            if user_annotations is None or len(user_annotations) == 0:
-                annotations.append(None)
-            else:
-                user_annotation = user_annotations[0].annotation
-                user_value = get_value(user_annotation, label)
-                annotations.append(user_value)  # type: ignore[arg-type]
-        else:
-            # No annotation for this label for this item
-            annotations.append(None)
-
-    return annotations
-
-
-def get_overlap(annotations_base: list[int | None], annotations_target: list[int | None]) \
-        -> tuple[list[int], list[int]]:
-    base: list[int] = []  # type: ignore[assignment]
-    target: list[int] = []  # type: ignore[assignment]
+def get_overlap(annotations_base: AnnotationsRaw, annotations_target: AnnotationsRaw) \
+        -> tuple[Annotations, Annotations]:
+    base: Annotations = []  # type: ignore[assignment]
+    target: Annotations = []  # type: ignore[assignment]
     for annotation_base, annotation_target in zip(annotations_base, annotations_target):
         if annotation_base is not None and annotation_target is not None:
             base.append(annotation_base)
@@ -113,12 +54,12 @@ def get_overlap(annotations_base: list[int | None], annotations_target: list[int
     return base, target
 
 
-def get_partial_overlap(annotations: dict[str, list[int | None]], users: list[str] | None = None) \
-        -> dict[str, list[int | None]]:
+def get_partial_overlap(annotations: dict[str, AnnotationsRaw], users: list[str] | None = None) \
+        -> dict[str, list[AnnotationsRaw]]:
     if users is None:
         users = list(annotations.keys())
 
-    annotations_filtered: dict[str, list[int | None]] = {user: [] for user in users}
+    annotations_filtered: dict[str, AnnotationsRaw] = {user: [] for user in users}
     for row in zip(*[annotations[user] for user in users]):
         if len([1 for v in row if v is not None]) > 0:
             for user, v in zip(users, row):
@@ -131,13 +72,17 @@ def compute_cohen(base: list[int], target: list[int]) -> float | None:
         warnings.simplefilter('error')
         try:
             base, target = compress_annotations(base, target)
-            return cohen_kappa_score(base, target)  # type: ignore[no-any-return]  # FIXME
-        except RuntimeWarning:
+            return fix(cohen_kappa_score(base, target))  # type: ignore[no-any-return]  # FIXME
+        except RuntimeWarning as e:
+            logger.error(e)
+            return None
+        except UserWarning as e:
+            logger.error(e)
             return None
         except Exception as e:
-
-            print(base)
-            print(target)
+            logger.error(e)
+            logger.error(base)
+            logger.error(target)
             raise e
 
 
@@ -157,13 +102,13 @@ def compute_correlation(base: list[int], target: list[int],
             base, target = compress_annotations(base, target)
             if measure == 'pearson':
                 result = pearsonr(base, target)
-                return result.statistic, result.pvalue
+                return fix(result.statistic), fix(result.pvalue)
             elif measure == 'kendall':
                 result = kendalltau(base, target)
-                return result.statistic, result.pvalue
+                return fix(result.statistic), fix(result.pvalue)
             elif measure == 'spearman':
                 result = spearmanr(base, target)
-                return result.statistic, result.pvalue
+                return fix(result.statistic), fix(result.pvalue)
         except ConstantInputWarning:
             return None, None
         except ValueError:
@@ -266,10 +211,10 @@ def compute_fleiss(annotations: dict[str, list[int | None]],
         p_mean_exp = 0  # type: ignore[unreachable]
 
     if p_mean_exp == 1:
-        return 1
+        return 1.
 
     kappa: float = (p_mean - p_mean_exp) / (1 - p_mean_exp)
-    return kappa
+    return fix(kappa)
 
 
 def compute_krippendorff(annotations: dict[str, list[int | None]],
@@ -348,145 +293,248 @@ def compute_krippendorff(annotations: dict[str, list[int | None]],
     n_total = sum(coincidence_matrix_sum)
 
     result: float = 1. - (n_total - 1.) * (observed_disagreement / expected_disagreement)
-    return result
+    return fix(result)
+
+
+def compute_multi_overlap(base: list[list[int]], target: list[list[int]]) -> tuple[float, float, float]:
+    overlaps = []
+    for b, t in zip(base, target):
+        bs = set(b)
+        ts = set(t)
+        overlaps.append(len(bs & ts) / len(bs | ts))
+    arr = np.array(overlaps)
+    return fix(np.mean(arr)), fix(np.median(arr)), fix(np.std(arr))
+
+
+def compute_agreement(base: Annotations, target: Annotations) -> tuple[int, int, float]:
+    num_agree = len([1 for b, t in zip(base, target) if b == t])
+    num_disagree = len([1 for b, t in zip(base, target) if b != t])
+
+    return num_agree, num_disagree, fix((num_agree / len(base)) * 100)
 
 
 def compute_mean(metric: str, label_qualities: list[AnnotationQualityModel]) -> float | None:
     values = [getattr(lq, metric) for lq in label_qualities if getattr(lq, metric) is not None]
     if len(values) > 0:
         result: float = sum(values) / len(values)
-        return result
+        return fix(result)
     return None
+
+
+def precision_recall_f1(base, target, average: str) -> tuple[float | None, float | None, float | None]:
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        try:
+            p, r, f, _ = precision_recall_fscore_support(base, target, average=average)
+            return fix(p), fix(r), fix(f)
+        except UndefinedMetricWarning:
+            return None, None, None
+
+
+def fix(val: float | None) -> float | None:
+    return float(val) if val is not None and not np.isnan(val) else None  # type: ignore[call-overload]
 
 
 @ensure_session_async
 async def compute_irr_scores(session: AsyncSession,
                              assignment_scope_id: str | uuid.UUID,
-                             project_id: str | uuid.UUID | None = None) -> list[AnnotationQualityModel]:
-    scheme_id = (await session.scalar(select(AssignmentScope.annotation_scheme_id)
-                                      .where(AssignmentScope.assignment_scope_id == assignment_scope_id)))
+                             resolution_id: str | uuid.UUID | None = None,
+                             project_id: str | uuid.UUID | None = None,
+                             include_key: str = '-[include]-') -> list[AnnotationQualityModel]:
+    scheme: AnnotationSchemeModel | None = await read_annotation_scheme_for_scope(
+        assignment_scope_id=assignment_scope_id,
+        session=session)
+    if not scheme:
+        raise NotFoundError(f'No annotation scheme for scope {assignment_scope_id}')
+    labels = labels_from_scheme(scheme, ignore_hierarchy=False, ignore_repeat=False)
 
-    if scheme_id is None:
-        raise NotFoundError(f'No assignment scope with id {assignment_scope_id}')
+    source_ids = [assignment_scope_id]
+    if resolution_id is not None:
+        source_ids.append(resolution_id)
 
-    user_ids: list[uuid.UUID] = (await session.execute(  # type: ignore[assignment]
-        select(distinct(Assignment.user_id))
-        .where(Assignment.assignment_scope_id == assignment_scope_id)
-    )).scalars().all()
+    user_map = await user_ids_to_names(session=session)
+    annotations = await get_annotations(session=session, source_ids=source_ids)
 
-    scheme: AnnotationSchemeModel
-    labels: list[FlatLabel]
-    annotators: list[UserModel]
-    assignments: AssignmentMap
-    annotations: list[ItemAnnotation]
-    item_order: list[OrderingEntry]
-    annotation_map: ResolutionMatrix
-    scheme, labels, annotators, assignments, annotations, item_order, annotation_map = await get_annotation_matrix(
-        assignment_scope_id=str(assignment_scope_id),
-        ignore_hierarchy=False,
-        ignore_repeat=False,
-        session=session
-    )
+    inclusions: list[int] | None = None
+    if scheme.inclusion_rule:
+        inclusions = annotations_to_sequence(inclusion_rule=scheme.inclusion_rule, annotations=annotations)
+        labels.append(FlatLabel(path=[], repeat=1, path_key=f'{include_key}|1', name='Inclusion Rule', key=include_key,
+                                required=True, max_repeat=1, kind='bool'))
+    annotation_map = {}
+    annotators = []
+    item_order = []
+    for ai, annotation in enumerate(annotations):
+        item_id = str(annotation.item_id)
+        user_key = str(annotation.user_id)
+        if user_key in user_map:
+            user_key = user_map[user_key]
+        annotators.append(user_key)
+        item_order.append(item_id)
+
+        if item_id not in annotation_map:
+            annotation_map[item_id] = {}
+        if user_key not in annotation_map[item_id]:
+            annotation_map[item_id][user_key] = {}
+
+        annotation_map[item_id][user_key] = annotation.labels
+        if inclusions:
+            annotation_map[item_id][user_key][include_key] = SortedAnnotationLabel(value_bool=bool(inclusions[ai]),
+                                                                                   values_bool=[bool(inclusions[ai])])
+
+    annotators = list(set(annotators))
+    item_order = list(dict.fromkeys(item_order).keys())
+
+    logger.debug(annotators)
 
     qualities: list[AnnotationQualityModel] = []
-
     for label in labels:
+        logger.debug(f'Computing IRR for label {label.path_key}')
         if label.kind == 'str' or label.kind == 'float':
             logger.info(f'Skipping label {label.path_key} for scope {assignment_scope_id} '
                         f'because "{label.kind}" is not supported!')
             continue
 
+        label_qualities = []
+
         user_annotations_raw = {
-            str(annotator.user_id): pluck_annotations(label=label, user=annotator,
-                                                      item_order=item_order, annotation_map=annotation_map)
+            annotator: [
+                get_value_raw(annotation_map[item_id].get(annotator, {}).get(label.key), label)
+                for item_id in item_order
+            ]
             for annotator in annotators
         }
 
-        user_annotations: dict[str, list[int | None]]
-        if label.kind == 'multi':
-            if label.choices is None:
-                raise AssertionError('Choices for multi label are missing; this should never happen!')
-            user_annotations = {
-                k: translate_multi(v, choices=label.choices)  # type: ignore[arg-type]
-                for k, v in user_annotations_raw.items()
-            }
-        else:
-            user_annotations = user_annotations_raw  # type: ignore[assignment]
-
-        label_qualities = []
-
-        for ai, annotator_base in enumerate(annotators):
-            user_base = str(annotator_base.user_id)
-            for annotator_target in annotators[ai + 1:]:
-                user_target = str(annotator_target.user_id)
-                annotations_base = user_annotations[user_base]
-                annotations_target = user_annotations[user_target]
+        for ui, user_base in enumerate(annotators):
+            for user_target in annotators[ui + 1:]:
+                annotations_base = user_annotations_raw[user_base]
+                annotations_target = user_annotations_raw[user_target]
                 base, target = get_overlap(annotations_base, annotations_target)
 
-                if len(base) == 0 or len(target) == 0:
+                if len(base) == 0 or len(target) == 0 or len(base) != len(target):
                     logger.warning(f'There is no annotation overlap between '
-                                   f'{annotator_base.username} and {annotator_target.username} '
-                                   f'for label {label.path_key}.')
+                                   f'{user_base} and {user_target} for label {label.path_key}.')
                 else:
-                    pearson, pearson_p = compute_correlation(base, target, 'pearson')
-                    kendall, kendall_p = compute_correlation(base, target, 'kendall')
-                    spearman, spearman_p = compute_correlation(base, target, 'spearman')
-                    cohen = compute_cohen(base, target)
-                    fleiss = compute_fleiss(user_annotations, method='fleiss', users=[user_base, user_target])
-                    randolph = compute_fleiss(user_annotations, method='randolph', users=[user_base, user_target])
-                    krippendorff = compute_krippendorff(user_annotations, 'nominal',
-                                                        users=[user_base, user_target])
-
+                    num_agree, num_disagree, perc_agree = compute_agreement(base, target)
                     quality = AnnotationQualityModel(
                         assignment_scope_id=assignment_scope_id,
+                        bot_annotation_metadata_id=resolution_id,
                         project_id=project_id,
                         user_base=user_base,
                         annotations_base=user_annotations_raw[user_base],
                         user_target=user_target,
                         annotations_target=user_annotations_raw[user_target],
-                        label_path_key=label.path_key,
-                        label_path=label.path,
                         label_key=label.key,
-                        cohen=cohen if cohen is not None and not np.isnan(cohen) else None,
-                        fleiss=fleiss if fleiss is not None and not np.isnan(fleiss) else None,
-                        randolph=randolph if randolph is not None and not np.isnan(randolph) else None,
-                        krippendorff=krippendorff if krippendorff is not None and not np.isnan(krippendorff) else None,
-                        pearson=pearson if pearson is not None and not np.isnan(pearson) else None,
-                        pearson_p=pearson_p if pearson_p is not None and not np.isnan(pearson_p) else None,
-                        kendall=kendall if kendall is not None and not np.isnan(kendall) else None,
-                        kendall_p=kendall_p if kendall_p is not None and not np.isnan(kendall_p) else None,
-                        spearman=spearman if spearman is not None and not np.isnan(spearman) else None,
-                        spearman_p=spearman_p if spearman_p is not None and not np.isnan(spearman_p) else None,
+                        label_value=None,
                         num_items=len(item_order),
                         num_overlap=len(base),
-                        num_agree=len([1 for b, t in zip(base, target) if b == t]),
-                        num_disagree=len([1 for b, t in zip(base, target) if b != t])
+                        num_agree=num_agree,
+                        num_disagree=num_disagree,
+                        perc_agree=perc_agree
                     )
+                    if label.kind == 'multi':
+                        quality.multi_overlap_mean, quality.multi_overlap_median, quality.multi_overlap_std = \
+                            compute_multi_overlap(base, target)
+                    else:
+                        quality.precision, quality.recall, quality.f1 = precision_recall_f1(base, target,
+                                                                                            average='macro')
+                        quality.pearson, quality.pearson_p = compute_correlation(base, target, 'pearson')
+                        quality.kendall, quality.kendall_p = compute_correlation(base, target, 'kendall')
+                        quality.spearman, quality.spearman_p = compute_correlation(base, target, 'spearman')
+                        quality.cohen = compute_cohen(base, target)
+                        quality.fleiss = compute_fleiss(user_annotations_raw, method='fleiss',
+                                                        users=[user_base, user_target])
+                        quality.randolph = compute_fleiss(user_annotations_raw, method='randolph',
+                                                          users=[user_base, user_target])
+                        quality.krippendorff = compute_krippendorff(user_annotations_raw, 'nominal',
+                                                                    users=[user_base, user_target])
+
                     qualities.append(quality)
                     label_qualities.append(quality)
+                    logger.debug(f'nq: {len(qualities)}, nlq: {len(label_qualities)}')
+                    if label.choices:
+                        for choice in label.choices:
+                            logger.debug(f'IRR for {label.path_key} = {choice.value} ({choice.name})')
+                            if label.kind == 'multi':
+                                base_ = [int(choice.value in bi) for bi in base]
+                                target_ = [int(choice.value in ti) for ti in target]
+                            else:
+                                base_ = [int(int(bi) == int(choice.value)) for bi in base]
+                                target_ = [int(int(ti) == int(choice.value)) for ti in target]
+
+                            num_agree, num_disagree, perc_agree = compute_agreement(base_, target_)
+                            pearson, pearson_p = compute_correlation(base_, target_, 'pearson')
+                            kendall, kendall_p = compute_correlation(base_, target_, 'kendall')
+                            spearman, spearman_p = compute_correlation(base_, target_, 'spearman')
+                            cohen = compute_cohen(base_, target_)
+                            precision, recall, f1 = precision_recall_f1(base_, target_, average='binary')
+
+                            qualities.append(
+                                AnnotationQualityModel(
+                                    assignment_scope_id=assignment_scope_id,
+                                    bot_annotation_metadata_id=resolution_id,
+                                    project_id=project_id,
+                                    user_base=user_base,
+                                    annotations_base=user_annotations_raw[user_base],
+                                    user_target=user_target,
+                                    annotations_target=user_annotations_raw[user_target],
+                                    label_key=label.key,
+                                    label_value=int(choice.value),
+                                    pearson=pearson,
+                                    pearson_p=pearson_p,
+                                    kendall=kendall,
+                                    kendall_p=kendall_p,
+                                    spearman=spearman,
+                                    spearman_p=spearman_p,
+                                    cohen=cohen,
+                                    num_items=len(item_order),
+                                    num_overlap=len(base_),
+                                    num_agree=num_agree,
+                                    num_disagree=num_disagree,
+                                    perc_agree=perc_agree,
+                                    precision=fix(precision),
+                                    recall=fix(recall),
+                                    f1=fix(f1)
+                                )
+                            )
 
         if len(label_qualities) > 0:
-            fleiss = compute_fleiss(user_annotations, method='fleiss')
-            randolph = compute_fleiss(user_annotations, method='randolph')
-            krippendorff = compute_krippendorff(user_annotations, 'nominal')
+            if label.kind == 'multi':
+                fleiss = None
+                randolph = None
+                krippendorff = None
+            else:
+                fleiss = compute_fleiss(user_annotations_raw, method='fleiss')
+                randolph = compute_fleiss(user_annotations_raw, method='randolph')
+                krippendorff = compute_krippendorff(user_annotations_raw, 'nominal')
 
             qualities.append(
                 AnnotationQualityModel(
                     assignment_scope_id=assignment_scope_id,
+                    bot_annotation_metadata_id=resolution_id,
                     project_id=project_id,
-                    label_path_key=label.path_key,
-                    label_path=label.path,
                     label_key=label.key,
+                    label_value=None,
                     cohen=compute_mean('cohen', label_qualities),
-                    fleiss=fleiss if fleiss is not None and not np.isnan(fleiss) else None,
-                    randolph=randolph if randolph is not None and not np.isnan(randolph) else None,
-                    krippendorff=krippendorff if krippendorff is not None and not np.isnan(krippendorff) else None,
+                    fleiss=fix(fleiss),
+                    randolph=fix(randolph),
+                    krippendorff=fix(krippendorff),
                     pearson=compute_mean('pearson', label_qualities),
                     pearson_p=compute_mean('pearson_p', label_qualities),
                     kendall=compute_mean('kendall', label_qualities),
                     kendall_p=compute_mean('kendall_p', label_qualities),
                     spearman=compute_mean('spearman', label_qualities),
-                    spearman_p=compute_mean('spearman_p', label_qualities)
+                    spearman_p=compute_mean('spearman_p', label_qualities),
+                    precision=compute_mean('precision', label_qualities),
+                    recall=compute_mean('recall', label_qualities),
+                    f1=compute_mean('f1', label_qualities),
+                    num_overlap=compute_mean('num_overlap', label_qualities),
+                    num_items=compute_mean('num_items', label_qualities),
+                    num_agree=compute_mean('num_agree', label_qualities),
+                    num_disagree=compute_mean('num_disagree', label_qualities),
+                    perc_agree=compute_mean('perc_agree', label_qualities),
+                    multi_overlap_mean=compute_mean('multi_overlap_mean', label_qualities),
+                    multi_overlap_median=compute_mean('multi_overlap_median', label_qualities),
+                    multi_overlap_std=compute_mean('multi_overlap_std', label_qualities)
                 )
             )
 

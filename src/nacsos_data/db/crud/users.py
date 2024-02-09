@@ -1,16 +1,14 @@
 import uuid
 from uuid import uuid4
-from typing import TYPE_CHECKING
 
 from sqlalchemy import select, asc
 from passlib.context import CryptContext
 
 from nacsos_data.db import DatabaseEngineAsync
+from nacsos_data.db.engine import ensure_session_async
 from nacsos_data.db.schemas import User, ProjectPermissions
 from nacsos_data.models.users import UserInDBModel, UserModel
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
+from sqlalchemy.ext.asyncio import AsyncSession
 
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
@@ -86,6 +84,16 @@ async def read_users(engine: DatabaseEngineAsync,
             return [UserInDBModel(**res.__dict__) for res in result]
 
     return None
+
+
+@ensure_session_async
+async def user_ids_to_names(session: AsyncSession) -> dict[str, str]:
+    stmt = select(User.user_id, User.username)
+    result = (await session.execute(stmt)).mappings().all()
+    return {
+        str(user.user_id): str(user.username)
+        for user in result
+    }
 
 
 async def create_or_update_user(user: UserModel | UserInDBModel, engine: DatabaseEngineAsync) -> str:

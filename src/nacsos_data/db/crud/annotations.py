@@ -289,13 +289,14 @@ async def read_assignment_scope(session: AsyncSession,
 async def read_annotation_scheme(session: AsyncSession,
                                  assignment_id: str | uuid.UUID | None = None,
                                  assignment_scope_id: str | uuid.UUID | None = None) -> AnnotationSchemeModel | None:
-    stmt = (select(AnnotationScheme)
-            .join(Assignment, AnnotationScheme.annotation_scheme_id == Assignment.annotation_scheme_id))
-
     if assignment_id is not None:
-        stmt = stmt.where(Assignment.assignment_id == assignment_id)
+        stmt = (select(AnnotationScheme)
+                .join(Assignment, AnnotationScheme.annotation_scheme_id == Assignment.annotation_scheme_id)
+                .where(Assignment.assignment_id == assignment_id))
     elif assignment_scope_id is not None:
-        stmt = stmt.where(AssignmentScope.assignment_scope_id == assignment_scope_id)
+        stmt = (select(AnnotationScheme)
+                .join(AssignmentScope, AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id)
+                .where(AssignmentScope.assignment_scope_id == assignment_scope_id))
     else:
         raise AssertionError('Both, assignment_id and assignment_scope_id are empty.')
     result = (await session.execute(stmt)).scalars().one_or_none()
