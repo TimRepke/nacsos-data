@@ -120,6 +120,9 @@ class AnnotationSchemeInfo(BaseModel):
     # Text should be formatted using Markdown.
     description: str | None = None
 
+    # NQL-like rule for implicit include/exclude annotation
+    inclusion_rule: str | None = None
+
     # Date and time when this annotation scheme was created (or last changed)
     time_created: datetime | None = None
     time_updated: datetime | None = None

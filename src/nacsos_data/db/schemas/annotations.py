@@ -60,6 +60,9 @@ class AnnotationScheme(Base):
     # Text should be formatted using Markdown.
     description = mapped_column(String, nullable=True)
 
+    # NQL-like rule for implicit include/exclude annotation
+    inclusion_rule = mapped_column(String, nullable=True)
+
     # The definition of the annotation scheme for this AnnotationScheme is stored here.
     # For more information on how an annotation scheme is defined, check out schemas.annotations.AnnotationSchemeLabel
     # Note, this is always a list of labels!
