@@ -46,14 +46,10 @@ class AnnotationQuality(Base):
 
     # Some metrics are computed for pairs of users,
     # in this case both foreign keys should be set, otherwise both shall be NULL
-    user_base = mapped_column(String,
-                              ForeignKey(User.username, ondelete='CASCADE'),
-                              nullable=True, index=False, primary_key=False)
+    user_base = mapped_column(String, nullable=True, index=False, primary_key=False)
     annotations_base = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True),
                                      nullable=True, index=False)
-    user_target = mapped_column(String,
-                                ForeignKey(User.username, ondelete='CASCADE'),
-                                nullable=True, index=False, primary_key=False)
+    user_target = mapped_column(String, nullable=True, index=False, primary_key=False)
     annotations_target = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True),
                                        nullable=True, index=False)
 

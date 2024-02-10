@@ -15,7 +15,7 @@ from nacsos_data.db.crud.annotations import read_annotation_scheme_for_scope
 from nacsos_data.db.crud.users import user_ids_to_names
 from nacsos_data.db.engine import ensure_session_async
 from nacsos_data.models.annotation_quality import AnnotationQualityModel
-from nacsos_data.models.annotations import AnnotationSchemeModel, FlatLabel
+from nacsos_data.models.annotations import AnnotationSchemeModel, FlatLabel, AnnotationSchemeLabelTypes
 from nacsos_data.util.annotations.label_transform import get_annotations, annotations_to_sequence, SortedAnnotationLabel
 from nacsos_data.util.annotations.validation import labels_from_scheme
 from nacsos_data.util.errors import NotFoundError
@@ -38,7 +38,9 @@ def get_value_raw(annotation: SortedAnnotationLabel | None, label: FlatLabel) ->
     elif label.kind == 'single':
         return annotation.value_int
     elif label.kind == 'multi':
-        return annotation.multis
+        if annotation.multis is not None and len(annotation.multis) > 0:
+            return annotation.multis[0]
+        return None
     else:
         return None
 
@@ -77,7 +79,7 @@ def compute_cohen(base: list[int], target: list[int]) -> float | None:
             logger.error(e)
             return None
         except UserWarning as e:
-            logger.error(e)
+            # logger.error(e)
             return None
         except Exception as e:
             logger.error(e)
@@ -315,10 +317,57 @@ def compute_agreement(base: Annotations, target: Annotations) -> tuple[int, int,
 
 def compute_mean(metric: str, label_qualities: list[AnnotationQualityModel]) -> float | None:
     values = [getattr(lq, metric) for lq in label_qualities if getattr(lq, metric) is not None]
+    logger.debug(f'Compute mean for {metric} from {values}')
     if len(values) > 0:
         result: float = sum(values) / len(values)
         return fix(result)
     return None
+
+
+def aggregate_qualities(qualities: list[AnnotationQualityModel],
+                        label_kind: AnnotationSchemeLabelTypes,
+                        label_key: str,
+                        label_value: int | None,
+                        assignment_scope_id: str,
+                        resolution_id: str | None,
+                        project_id: str,
+                        user_annotations_raw: dict[str, list[int | None]] | None = None) -> AnnotationQualityModel:
+    fleiss = None
+    randolph = None
+    krippendorff = None
+    if label_kind != 'multi' and user_annotations_raw is not None:
+        fleiss = compute_fleiss(user_annotations_raw, method='fleiss')
+        randolph = compute_fleiss(user_annotations_raw, method='randolph')
+        krippendorff = compute_krippendorff(user_annotations_raw, 'nominal')
+    logger.debug(f'Aggregating for {label_key}={label_value} ({label_kind}')
+    return AnnotationQualityModel(
+        assignment_scope_id=assignment_scope_id,
+        bot_annotation_metadata_id=resolution_id,
+        project_id=project_id,
+        label_key=label_key,
+        label_value=label_value,
+        cohen=compute_mean('cohen', qualities),
+        fleiss=fix(fleiss),
+        randolph=fix(randolph),
+        krippendorff=fix(krippendorff),
+        pearson=compute_mean('pearson', qualities),
+        pearson_p=compute_mean('pearson_p', qualities),
+        kendall=compute_mean('kendall', qualities),
+        kendall_p=compute_mean('kendall_p', qualities),
+        spearman=compute_mean('spearman', qualities),
+        spearman_p=compute_mean('spearman_p', qualities),
+        precision=compute_mean('precision', qualities),
+        recall=compute_mean('recall', qualities),
+        f1=compute_mean('f1', qualities),
+        num_overlap=compute_mean('num_overlap', qualities),
+        num_items=compute_mean('num_items', qualities),
+        num_agree=compute_mean('num_agree', qualities),
+        num_disagree=compute_mean('num_disagree', qualities),
+        perc_agree=compute_mean('perc_agree', qualities),
+        multi_overlap_mean=compute_mean('multi_overlap_mean', qualities),
+        multi_overlap_median=compute_mean('multi_overlap_median', qualities),
+        multi_overlap_std=compute_mean('multi_overlap_std', qualities)
+    )
 
 
 def precision_recall_f1(base, target, average: str) -> tuple[float | None, float | None, float | None]:
@@ -346,7 +395,7 @@ async def compute_irr_scores(session: AsyncSession,
         session=session)
     if not scheme:
         raise NotFoundError(f'No annotation scheme for scope {assignment_scope_id}')
-    labels = labels_from_scheme(scheme, ignore_hierarchy=False, ignore_repeat=False)
+    labels = labels_from_scheme(scheme, ignore_hierarchy=True, ignore_repeat=True)
 
     source_ids = [assignment_scope_id]
     if resolution_id is not None:
@@ -381,7 +430,7 @@ async def compute_irr_scores(session: AsyncSession,
             annotation_map[item_id][user_key][include_key] = SortedAnnotationLabel(value_bool=bool(inclusions[ai]),
                                                                                    values_bool=[bool(inclusions[ai])])
 
-    annotators = list(set(annotators))
+    annotators = list(sorted(set(annotators)))
     item_order = list(dict.fromkeys(item_order).keys())
 
     logger.debug(annotators)
@@ -394,7 +443,8 @@ async def compute_irr_scores(session: AsyncSession,
                         f'because "{label.kind}" is not supported!')
             continue
 
-        label_qualities = []
+        label_qualities: list[AnnotationQualityModel] = []
+        choice_qualities: dict[int, list[AnnotationQualityModel]] = {}
 
         user_annotations_raw = {
             annotator: [
@@ -411,9 +461,10 @@ async def compute_irr_scores(session: AsyncSession,
                 base, target = get_overlap(annotations_base, annotations_target)
 
                 if len(base) == 0 or len(target) == 0 or len(base) != len(target):
-                    logger.warning(f'There is no annotation overlap between '
-                                   f'{user_base} and {user_target} for label {label.path_key}.')
+                    logger.debug(f'There is no annotation overlap between '
+                                 f'{user_base} and {user_target} for label {label.path_key}.')
                 else:
+                    logger.debug(f'{user_base} -> {user_target}')
                     num_agree, num_disagree, perc_agree = compute_agreement(base, target)
                     quality = AnnotationQualityModel(
                         assignment_scope_id=assignment_scope_id,
@@ -450,10 +501,9 @@ async def compute_irr_scores(session: AsyncSession,
 
                     qualities.append(quality)
                     label_qualities.append(quality)
-                    logger.debug(f'nq: {len(qualities)}, nlq: {len(label_qualities)}')
+
                     if label.choices:
                         for choice in label.choices:
-                            logger.debug(f'IRR for {label.path_key} = {choice.value} ({choice.name})')
                             if label.kind == 'multi':
                                 base_ = [int(choice.value in bi) for bi in base]
                                 target_ = [int(choice.value in ti) for ti in target]
@@ -467,75 +517,54 @@ async def compute_irr_scores(session: AsyncSession,
                             spearman, spearman_p = compute_correlation(base_, target_, 'spearman')
                             cohen = compute_cohen(base_, target_)
                             precision, recall, f1 = precision_recall_f1(base_, target_, average='binary')
-
-                            qualities.append(
-                                AnnotationQualityModel(
-                                    assignment_scope_id=assignment_scope_id,
-                                    bot_annotation_metadata_id=resolution_id,
-                                    project_id=project_id,
-                                    user_base=user_base,
-                                    annotations_base=user_annotations_raw[user_base],
-                                    user_target=user_target,
-                                    annotations_target=user_annotations_raw[user_target],
-                                    label_key=label.key,
-                                    label_value=int(choice.value),
-                                    pearson=pearson,
-                                    pearson_p=pearson_p,
-                                    kendall=kendall,
-                                    kendall_p=kendall_p,
-                                    spearman=spearman,
-                                    spearman_p=spearman_p,
-                                    cohen=cohen,
-                                    num_items=len(item_order),
-                                    num_overlap=len(base_),
-                                    num_agree=num_agree,
-                                    num_disagree=num_disagree,
-                                    perc_agree=perc_agree,
-                                    precision=fix(precision),
-                                    recall=fix(recall),
-                                    f1=fix(f1)
-                                )
+                            choice_quality = AnnotationQualityModel(
+                                assignment_scope_id=assignment_scope_id,
+                                bot_annotation_metadata_id=resolution_id,
+                                project_id=project_id,
+                                user_base=user_base,
+                                annotations_base=user_annotations_raw[user_base],
+                                user_target=user_target,
+                                annotations_target=user_annotations_raw[user_target],
+                                label_key=label.key,
+                                label_value=int(choice.value),
+                                pearson=pearson,
+                                pearson_p=pearson_p,
+                                kendall=kendall,
+                                kendall_p=kendall_p,
+                                spearman=spearman,
+                                spearman_p=spearman_p,
+                                cohen=cohen,
+                                num_items=len(item_order),
+                                num_overlap=len(base_),
+                                num_agree=num_agree,
+                                num_disagree=num_disagree,
+                                perc_agree=perc_agree,
+                                precision=fix(precision),
+                                recall=fix(recall),
+                                f1=fix(f1)
                             )
+                            qualities.append(choice_quality)
+                            if choice.value not in choice_qualities:
+                                choice_qualities[choice.value] = []
+                            choice_qualities[choice.value].append(choice_quality)
 
         if len(label_qualities) > 0:
-            if label.kind == 'multi':
-                fleiss = None
-                randolph = None
-                krippendorff = None
-            else:
-                fleiss = compute_fleiss(user_annotations_raw, method='fleiss')
-                randolph = compute_fleiss(user_annotations_raw, method='randolph')
-                krippendorff = compute_krippendorff(user_annotations_raw, 'nominal')
-
-            qualities.append(
-                AnnotationQualityModel(
-                    assignment_scope_id=assignment_scope_id,
-                    bot_annotation_metadata_id=resolution_id,
-                    project_id=project_id,
-                    label_key=label.key,
-                    label_value=None,
-                    cohen=compute_mean('cohen', label_qualities),
-                    fleiss=fix(fleiss),
-                    randolph=fix(randolph),
-                    krippendorff=fix(krippendorff),
-                    pearson=compute_mean('pearson', label_qualities),
-                    pearson_p=compute_mean('pearson_p', label_qualities),
-                    kendall=compute_mean('kendall', label_qualities),
-                    kendall_p=compute_mean('kendall_p', label_qualities),
-                    spearman=compute_mean('spearman', label_qualities),
-                    spearman_p=compute_mean('spearman_p', label_qualities),
-                    precision=compute_mean('precision', label_qualities),
-                    recall=compute_mean('recall', label_qualities),
-                    f1=compute_mean('f1', label_qualities),
-                    num_overlap=compute_mean('num_overlap', label_qualities),
-                    num_items=compute_mean('num_items', label_qualities),
-                    num_agree=compute_mean('num_agree', label_qualities),
-                    num_disagree=compute_mean('num_disagree', label_qualities),
-                    perc_agree=compute_mean('perc_agree', label_qualities),
-                    multi_overlap_mean=compute_mean('multi_overlap_mean', label_qualities),
-                    multi_overlap_median=compute_mean('multi_overlap_median', label_qualities),
-                    multi_overlap_std=compute_mean('multi_overlap_std', label_qualities)
-                )
-            )
+            qualities.append(aggregate_qualities(label_qualities,
+                                                 label_kind=label.kind,
+                                                 label_key=label.key,
+                                                 label_value=None,
+                                                 project_id=project_id,
+                                                 resolution_id=resolution_id,
+                                                 assignment_scope_id=assignment_scope_id,
+                                                 user_annotations_raw=user_annotations_raw))
+        for label_value, label_choice_qualities in choice_qualities.items():
+            qualities.append(aggregate_qualities(label_choice_qualities,
+                                                 label_kind=label.kind,
+                                                 label_key=label.key,
+                                                 label_value=label_value,
+                                                 project_id=project_id,
+                                                 resolution_id=resolution_id,
+                                                 assignment_scope_id=assignment_scope_id,
+                                                 user_annotations_raw=user_annotations_raw))
 
     return qualities

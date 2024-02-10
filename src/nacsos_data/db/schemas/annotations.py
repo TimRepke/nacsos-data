@@ -214,9 +214,6 @@ class Annotation(Base):
     If the scheme allows the user to make repeated annotations for the same Label (`key`),
     an offset is defined in `repeat` (e.g. for primary technology is "natural tech", secondary is "forests").
 
-    Furthermore, in-text annotations refer to a substring in the Item text, for which the optional fields
-    `text_offset_start` and `text_offset_end` can be used.
-
     Note, that there is no database constraints on the completeness of an Assignment/AnnotationScheme.
     The interface/backend code should be used to make sure, to either not allow partial fulfillment of an
     AnnotationScheme or not display an Assignment as complete.

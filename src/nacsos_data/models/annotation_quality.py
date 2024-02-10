@@ -25,9 +25,9 @@ class AnnotationQualityModel(BaseModel):
     # Some metrics are computed for pairs of users,
     # in this case both foreign keys should be set, otherwise both shall be NULL
     user_base: str | None = None
-    annotations_base: list[bool | None] | list[int] | list[int | None] | list[list[int] | None] | None = None
+    annotations_base: list[list[int] | None] | list[bool | None] | list[int | None] | None = None
     user_target: str | None = None
-    annotations_target: list[bool | None] | list[int] | list[int | None] | list[list[int] | None] | None = None
+    annotations_target: list[bool | None] | list[int | None] | list[list[int] | None] | None = None
 
     # The label this quality tracker is referring to
     label_key: str | None = None

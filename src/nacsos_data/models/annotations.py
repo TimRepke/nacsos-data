@@ -289,9 +289,6 @@ class AnnotationModel(AnnotationValue):
     If the scheme allows the user to make repeated annotations for the same Label (`key`),
     an offset is defined in `repeat` (e.g. for primary technology is "natural tech", secondary is "forests").
 
-    Furthermore, in-text annotations refer to a substring in the Item text, for which the optional fields
-    `text_offset_start` and `text_offset_end` can be used.
-
     Note, that there is no database constraints on the completeness of an Assignment/AnnotationScheme.
     The interface/backend code should be used to make sure, to either not allow partial fulfillment of an
     AnnotationScheme or not display an Assignment as complete.
@@ -316,6 +313,9 @@ class AnnotationModel(AnnotationValue):
     # (redundant to implicit information from Assignment)
     annotation_scheme_id: str | UUID
 
+    # When this annotation refers to an in-text excerpt, this refers to the respective snippet
+    snippet_id: str | UUID | None = None
+
     # Defines which AnnotationSchemeLabel.key this Annotation refers to.
     # Note, that there is no correctness constraint, the frontend should make sure to send correct data!!
     key: str
@@ -327,11 +327,6 @@ class AnnotationModel(AnnotationValue):
 
     # Reference to the parent labels' annotation.
     parent: str | UUID | None = None
-
-    # When the Annotation does not refer to an entire Item, but a sub-string (in-text annotation)
-    # of that Item, the following fields should be set with the respective string offset.
-    text_offset_start: int | None = None
-    text_offset_stop: int | None = None
 
 
 class ItemAnnotation(AnnotationModel):
