@@ -9,7 +9,6 @@ from . import BotAnnotationMetaData
 from ..base_class import Base
 from .projects import Project
 from .annotations import AssignmentScope
-from .users import User
 
 
 class AnnotationQuality(Base):

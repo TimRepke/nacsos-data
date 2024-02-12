@@ -112,7 +112,7 @@ async def get_annotations(session: AsyncSession, source_ids: list[str] | None = 
                                mode() WITHIN GROUP ( ORDER BY ann.value_int )                        as value_int,
                                array_agg(ann.value_bool) FILTER ( WHERE ann.value_bool is not null ) as values_bool,
                                mode() WITHIN GROUP ( ORDER BY ann.value_bool )                       as value_bool,
-                               array_agg(ann.multi_int) FILTER ( WHERE ann.multi_int is not null 
+                               array_agg(ann.multi_int) FILTER ( WHERE ann.multi_int is not null
                                                                    AND array_length(ann.multi_int, 1) > 0 ) as multis
                         FROM sources
                                  LEFT JOIN assignment ass ON ass.assignment_scope_id = source_id::uuid
@@ -133,7 +133,7 @@ async def get_annotations(session: AsyncSession, source_ids: list[str] | None = 
                                mode() WITHIN GROUP ( ORDER BY ba.value_int )                       as value_int,
                                array_agg(ba.value_bool) FILTER ( WHERE ba.value_bool is not null ) as values_bool,
                                mode() WITHIN GROUP ( ORDER BY ba.value_bool )                      as value_bool,
-                               array_agg(ba.multi_int) FILTER ( WHERE ba.multi_int is not null 
+                               array_agg(ba.multi_int) FILTER ( WHERE ba.multi_int is not null
                                                                   AND array_length(ba.multi_int, 1) > 0 ) as multis
                         FROM sources
                                  LEFT JOIN bot_annotation ba ON ba.bot_annotation_metadata_id = source_id::uuid

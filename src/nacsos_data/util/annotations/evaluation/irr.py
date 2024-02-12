@@ -78,7 +78,7 @@ def compute_cohen(base: list[int], target: list[int]) -> float | None:
         except RuntimeWarning as e:
             logger.error(e)
             return None
-        except UserWarning as e:
+        except UserWarning:
             # logger.error(e)
             return None
         except Exception as e:
