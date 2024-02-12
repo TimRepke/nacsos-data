@@ -32,15 +32,13 @@ def get_value_raw(annotation: SortedAnnotationLabel | None, label: FlatLabel) ->
     if annotation is None:
         return None
     if label.kind == 'bool':
-        return int(annotation.value_bool)
+        return int(annotation.value_bool) if annotation.value_bool is not None else None
     elif label.kind == 'int':
         return annotation.value_int
     elif label.kind == 'single':
         return annotation.value_int
     elif label.kind == 'multi':
-        if annotation.multis is not None and len(annotation.multis) > 0:
-            return annotation.multis[0]
-        return None
+        return annotation.multis[0] if annotation.multis is not None and len(annotation.multis) > 0 else None
     else:
         return None
 
@@ -51,8 +49,8 @@ def get_overlap(annotations_base: AnnotationsRaw, annotations_target: Annotation
     target: Annotations = []  # type: ignore[assignment]
     for annotation_base, annotation_target in zip(annotations_base, annotations_target):
         if annotation_base is not None and annotation_target is not None:
-            base.append(annotation_base)
-            target.append(annotation_target)
+            base.append(annotation_base)  # type: ignore[arg-type] # FIXME
+            target.append(annotation_target)  # type: ignore[arg-type] # FIXME
     return base, target
 
 
@@ -66,7 +64,7 @@ def get_partial_overlap(annotations: dict[str, AnnotationsRaw], users: list[str]
         if len([1 for v in row if v is not None]) > 0:
             for user, v in zip(users, row):
                 annotations_filtered[user].append(v)
-    return annotations_filtered
+    return annotations_filtered  # type: ignore[return-value] # FIXME
 
 
 def compute_cohen(base: list[int], target: list[int]) -> float | None:
@@ -104,13 +102,13 @@ def compute_correlation(base: list[int], target: list[int],
             base, target = compress_annotations(base, target)
             if measure == 'pearson':
                 result = pearsonr(base, target)
-                return fix(result.statistic), fix(result.pvalue)
+                return fix(result.statistic), fix(result.pvalue)  # type: ignore[return-value] # FIXME
             elif measure == 'kendall':
                 result = kendalltau(base, target)
-                return fix(result.statistic), fix(result.pvalue)
+                return fix(result.statistic), fix(result.pvalue)  # type: ignore[return-value] # FIXME
             elif measure == 'spearman':
                 result = spearmanr(base, target)
-                return fix(result.statistic), fix(result.pvalue)
+                return fix(result.statistic), fix(result.pvalue)  # type: ignore[return-value] # FIXME
         except ConstantInputWarning:
             return None, None
         except ValueError:
@@ -175,7 +173,7 @@ def compute_fleiss(annotations: dict[str, list[int | None]],
         users = list(annotations.keys())
 
     # Drop unwanted users and items without any annotation from the list
-    annotations = get_partial_overlap(annotations, users)
+    annotations = get_partial_overlap(annotations, users)  # type: ignore[arg-type, assignment] # FIXME
 
     n_items = len(annotations[users[0]])
     values = get_values(annotations, users)
@@ -234,7 +232,7 @@ def compute_krippendorff(annotations: dict[str, list[int | None]],
         users = list(annotations.keys())
 
     # Drop unwanted users and items without any annotation from the list
-    annotations = get_partial_overlap(annotations, users)
+    annotations = get_partial_overlap(annotations, users)  # type: ignore[assignment, arg-type] # FIXME
 
     values, coincidence_matrix = get_coincidence_matrix(annotations, users=users)
     coincidence_matrix_sum = coincidence_matrix.sum(axis=0)
@@ -305,14 +303,14 @@ def compute_multi_overlap(base: list[list[int]], target: list[list[int]]) -> tup
         ts = set(t)
         overlaps.append(len(bs & ts) / len(bs | ts))
     arr = np.array(overlaps)
-    return fix(np.mean(arr)), fix(np.median(arr)), fix(np.std(arr))
+    return fix(np.mean(arr)), fix(np.median(arr)), fix(np.std(arr))  # type: ignore[return-value] # FIXME
 
 
 def compute_agreement(base: Annotations, target: Annotations) -> tuple[int, int, float]:
     num_agree = len([1 for b, t in zip(base, target) if b == t])
     num_disagree = len([1 for b, t in zip(base, target) if b != t])
 
-    return num_agree, num_disagree, fix((num_agree / len(base)) * 100)
+    return num_agree, num_disagree, fix((num_agree / len(base)) * 100)  # type: ignore[return-value] # FIXME
 
 
 def compute_mean(metric: str, label_qualities: list[AnnotationQualityModel]) -> float | None:
@@ -328,9 +326,9 @@ def aggregate_qualities(qualities: list[AnnotationQualityModel],
                         label_kind: AnnotationSchemeLabelTypes,
                         label_key: str,
                         label_value: int | None,
-                        assignment_scope_id: str,
-                        resolution_id: str | None,
-                        project_id: str,
+                        assignment_scope_id: str | uuid.UUID,
+                        resolution_id: str | uuid.UUID | None,
+                        project_id: str | uuid.UUID | None,
                         user_annotations_raw: dict[str, list[int | None]] | None = None) -> AnnotationQualityModel:
     fleiss = None
     randolph = None
@@ -370,7 +368,8 @@ def aggregate_qualities(qualities: list[AnnotationQualityModel],
     )
 
 
-def precision_recall_f1(base, target, average: str) -> tuple[float | None, float | None, float | None]:
+def precision_recall_f1(base: list[int], target: list[int], average: str) \
+        -> tuple[float | None, float | None, float | None]:
     with warnings.catch_warnings():
         warnings.simplefilter('error')
         try:
@@ -409,7 +408,7 @@ async def compute_irr_scores(session: AsyncSession,
         inclusions = annotations_to_sequence(inclusion_rule=scheme.inclusion_rule, annotations=annotations)
         labels.append(FlatLabel(path=[], repeat=1, path_key=f'{include_key}|1', name='Inclusion Rule', key=include_key,
                                 required=True, max_repeat=1, kind='bool'))
-    annotation_map = {}
+    annotation_map: dict[str, dict[str, dict[str, SortedAnnotationLabel]]] = {}
     annotators = []
     item_order = []
     for ai, annotation in enumerate(annotations):
@@ -448,7 +447,9 @@ async def compute_irr_scores(session: AsyncSession,
 
         user_annotations_raw = {
             annotator: [
-                get_value_raw(annotation_map[item_id].get(annotator, {}).get(label.key), label)
+                get_value_raw(annotation_map[item_id]
+                              .get(annotator, {})
+                              .get(label.key), label)  # type: ignore[call-overload]
                 for item_id in item_order
             ]
             for annotator in annotators
@@ -458,7 +459,7 @@ async def compute_irr_scores(session: AsyncSession,
             for user_target in annotators[ui + 1:]:
                 annotations_base = user_annotations_raw[user_base]
                 annotations_target = user_annotations_raw[user_target]
-                base, target = get_overlap(annotations_base, annotations_target)
+                base, target = get_overlap(annotations_base, annotations_target)  # type: ignore[arg-type] # FIXME
 
                 if len(base) == 0 or len(target) == 0 or len(base) != len(target):
                     logger.debug(f'There is no annotation overlap between '
@@ -471,9 +472,9 @@ async def compute_irr_scores(session: AsyncSession,
                         bot_annotation_metadata_id=resolution_id,
                         project_id=project_id,
                         user_base=user_base,
-                        annotations_base=user_annotations_raw[user_base],
+                        annotations_base=user_annotations_raw[user_base],  # type: ignore[arg-type] # FIXME
                         user_target=user_target,
-                        annotations_target=user_annotations_raw[user_target],
+                        annotations_target=user_annotations_raw[user_target],  # type: ignore[arg-type] # FIXME
                         label_key=label.key,
                         label_value=None,
                         num_items=len(item_order),
@@ -484,19 +485,26 @@ async def compute_irr_scores(session: AsyncSession,
                     )
                     if label.kind == 'multi':
                         quality.multi_overlap_mean, quality.multi_overlap_median, quality.multi_overlap_std = \
-                            compute_multi_overlap(base, target)
+                            compute_multi_overlap(base, target)  # type: ignore[arg-type] # FIXME
                     else:
-                        quality.precision, quality.recall, quality.f1 = precision_recall_f1(base, target,
-                                                                                            average='macro')
-                        quality.pearson, quality.pearson_p = compute_correlation(base, target, 'pearson')
-                        quality.kendall, quality.kendall_p = compute_correlation(base, target, 'kendall')
-                        quality.spearman, quality.spearman_p = compute_correlation(base, target, 'spearman')
-                        quality.cohen = compute_cohen(base, target)
-                        quality.fleiss = compute_fleiss(user_annotations_raw, method='fleiss',
+                        quality.precision, quality.recall, quality.f1 = precision_recall_f1(
+                            base, target, average='macro')  # type: ignore[arg-type] # FIXME
+                        quality.pearson, quality.pearson_p = compute_correlation(
+                            base, target, 'pearson')  # type: ignore[arg-type] # FIXME
+                        quality.kendall, quality.kendall_p = compute_correlation(
+                            base, target, 'kendall')  # type: ignore[arg-type] # FIXME
+                        quality.spearman, quality.spearman_p = compute_correlation(
+                            base, target, 'spearman')  # type: ignore[arg-type] # FIXME
+
+                        quality.cohen = compute_cohen(base, target)  # type: ignore[arg-type] # FIXME
+                        quality.fleiss = compute_fleiss(user_annotations_raw,  # type: ignore[arg-type] # FIXME
+                                                        method='fleiss',
                                                         users=[user_base, user_target])
-                        quality.randolph = compute_fleiss(user_annotations_raw, method='randolph',
+                        quality.randolph = compute_fleiss(user_annotations_raw,  # type: ignore[arg-type] # FIXME
+                                                          method='randolph',
                                                           users=[user_base, user_target])
-                        quality.krippendorff = compute_krippendorff(user_annotations_raw, 'nominal',
+                        quality.krippendorff = compute_krippendorff(user_annotations_raw,  # type: ignore[arg-type]
+                                                                    'nominal',
                                                                     users=[user_base, user_target])
 
                     qualities.append(quality)
@@ -505,11 +513,15 @@ async def compute_irr_scores(session: AsyncSession,
                     if label.choices:
                         for choice in label.choices:
                             if label.kind == 'multi':
-                                base_ = [int(choice.value in bi) for bi in base]
-                                target_ = [int(choice.value in ti) for ti in target]
+                                base_ = [int(choice.value in bi)  # type: ignore[operator, arg-type] # FIXME
+                                         for bi in base]  # type: ignore[operator, arg-type] # FIXME
+                                target_ = [int(choice.value in ti)  # type: ignore[operator, arg-type] # FIXME
+                                           for ti in target]  # type: ignore[operator, arg-type] # FIXME
                             else:
-                                base_ = [int(int(bi) == int(choice.value)) for bi in base]
-                                target_ = [int(int(ti) == int(choice.value)) for ti in target]
+                                base_ = [int(int(bi) == int(choice.value))  # type: ignore[operator, arg-type] # FIXME
+                                         for bi in base]  # type: ignore[operator, arg-type] # FIXME
+                                target_ = [int(int(ti) == int(choice.value))  # type: ignore[operator, arg-type] # FIXME
+                                           for ti in target]  # type: ignore[operator, arg-type] # FIXME
 
                             num_agree, num_disagree, perc_agree = compute_agreement(base_, target_)
                             pearson, pearson_p = compute_correlation(base_, target_, 'pearson')
@@ -522,9 +534,9 @@ async def compute_irr_scores(session: AsyncSession,
                                 bot_annotation_metadata_id=resolution_id,
                                 project_id=project_id,
                                 user_base=user_base,
-                                annotations_base=user_annotations_raw[user_base],
+                                annotations_base=user_annotations_raw[user_base],  # type: ignore[arg-type] # FIXME
                                 user_target=user_target,
-                                annotations_target=user_annotations_raw[user_target],
+                                annotations_target=user_annotations_raw[user_target],  # type: ignore[arg-type] # FIXME
                                 label_key=label.key,
                                 label_value=int(choice.value),
                                 pearson=pearson,
@@ -556,7 +568,7 @@ async def compute_irr_scores(session: AsyncSession,
                                                  project_id=project_id,
                                                  resolution_id=resolution_id,
                                                  assignment_scope_id=assignment_scope_id,
-                                                 user_annotations_raw=user_annotations_raw))
+                                                 user_annotations_raw=user_annotations_raw))  # type: ignore[arg-type] # FIXME
         for label_value, label_choice_qualities in choice_qualities.items():
             qualities.append(aggregate_qualities(label_choice_qualities,
                                                  label_kind=label.kind,
@@ -565,6 +577,6 @@ async def compute_irr_scores(session: AsyncSession,
                                                  project_id=project_id,
                                                  resolution_id=resolution_id,
                                                  assignment_scope_id=assignment_scope_id,
-                                                 user_annotations_raw=user_annotations_raw))
+                                                 user_annotations_raw=user_annotations_raw))  # type: ignore[arg-type] # FIXME
 
     return qualities

@@ -346,8 +346,6 @@ def read_nacsos1_annotations(
                             value_float=None,
                             value_str=None,
                             multi_int=None,
-                            text_offset_start=None,
-                            text_offset_stop=None
                         )
                     )
 
@@ -369,8 +367,6 @@ def read_nacsos1_annotations(
                             value_float=None,
                             value_str=None,
                             multi_int=None,
-                            text_offset_start=None,
-                            text_offset_stop=None
                         )
                     )
                 for neg_cat in neg_categories:
@@ -392,8 +388,6 @@ def read_nacsos1_annotations(
                             value_float=None,
                             value_str=None,
                             multi_int=None,
-                            text_offset_start=None,
-                            text_offset_stop=None
                         )
                     )
     return assignments_new, annotations_new
