@@ -30,8 +30,11 @@ from nacsos_data.models.bot_annotations import (
     ResolutionProposal,
     ResolutionMatrix
 )
-from nacsos_data.util.annotations.validation import validate_annotated_assignment, merge_scheme_and_annotations, \
+from nacsos_data.util.annotations.validation import (
+    validate_annotated_assignment,
+    merge_scheme_and_annotations,
     has_values
+)
 
 from . import upsert_orm, MissingIdError
 from ..engine import ensure_session_async
