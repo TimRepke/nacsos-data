@@ -625,7 +625,7 @@ async def update_resolved_bot_annotations(session: AsyncSession,
     bot_meta.name = name
     bot_meta.meta.snapshot = dehydrate_user_annotations(matrix)
     bot_meta.meta.resolutions = resolutions
-    await session.commit()
+    await session.flush()
 
     # Get ids of existing annotations in for this resolution
     existing_ids_uuid: list[uuid.UUID] = list(
@@ -660,24 +660,34 @@ async def update_resolved_bot_annotations(session: AsyncSession,
         for cell in row.values():
             if cell.resolution:
                 if str(cell.resolution.bot_annotation_id) in ids_to_update:
-                    ba_orm: BotAnnotation = (await session.execute(
-                        select(BotAnnotation)
-                        .where(BotAnnotation.bot_annotation_id == cell.resolution.bot_annotation_id))).scalars().one()
-                    ba_orm.repeat = cell.resolution.repeat
-                    ba_orm.parent = cell.resolution.parent
-                    ba_orm.value_bool = cell.resolution.value_bool
-                    ba_orm.value_str = cell.resolution.value_str
-                    ba_orm.value_int = cell.resolution.value_int
-                    ba_orm.value_float = cell.resolution.value_float
-                    ba_orm.multi_int = cell.resolution.multi_int
-                    ba_orm.order = cell.resolution.order
-                    await session.commit()
+                    if has_values(cell.resolution):
+                        ba_orm: BotAnnotation = (await session.execute(
+                            select(BotAnnotation)
+                            .where(
+                                BotAnnotation.bot_annotation_id == cell.resolution.bot_annotation_id))).scalars().one()
+                        ba_orm.repeat = cell.resolution.repeat
+                        ba_orm.parent = cell.resolution.parent
+                        ba_orm.value_bool = cell.resolution.value_bool
+                        ba_orm.value_str = cell.resolution.value_str
+                        ba_orm.value_int = cell.resolution.value_int
+                        ba_orm.value_float = cell.resolution.value_float
+                        ba_orm.multi_int = cell.resolution.multi_int
+                        ba_orm.order = cell.resolution.order
+                        await session.flush()
+                    else:
+                        await session.execute(
+                            delete(BotAnnotation)
+                            .where(BotAnnotation.bot_annotation_id == cell.resolution.bot_annotation_id)
+                        )
                 else:
-                    new_bot_annotations.append(BotAnnotation(**{
-                        **cell.resolution.model_dump(),
-                        'bot_annotation_metadata_id': bot_annotation_metadata_id
-                    }))
+                    if has_values(cell.resolution):
+                        new_bot_annotations.append(BotAnnotation(**{
+                            **cell.resolution.model_dump(),
+                            'bot_annotation_metadata_id': bot_annotation_metadata_id
+                        }))
     if len(new_bot_annotations) > 0:
         logger.debug(f'Creating ({len(new_bot_annotations):,} new BotAnnotations.')
         session.add_all(new_bot_annotations)
-        await session.commit()
+        await session.flush()
+
+    await session.commit()
