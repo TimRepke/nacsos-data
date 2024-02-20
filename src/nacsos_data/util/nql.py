@@ -56,7 +56,7 @@ def _field_cmp(cmp: ComparatorExt, value: int | float | bool | str,
     if cmp == '!=':
         return and_(field != value, field.isnot(None))  # type: ignore[no-any-return]
     if cmp == 'LIKE':
-        return and_(field.ilike(f'{value}'), field.isnot(None))
+        return and_(field.ilike(f'%{value}%'), field.isnot(None))
     if cmp == 'SIMILAR':
         raise NotImplementedError('Unfortunately, "SIMILAR" is not implemented yet.')
 
