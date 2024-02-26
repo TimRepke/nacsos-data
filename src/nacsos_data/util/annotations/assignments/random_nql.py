@@ -15,6 +15,7 @@ from nacsos_data.util.nql import query_to_sql
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
+    from nacsos_data.db.schemas.items import ItemType
 
 
 async def random_assignments_with_nql(assignment_scope_id: str | UUID,
@@ -43,7 +44,10 @@ async def random_assignments_with_nql(assignment_scope_id: str | UUID,
     # select random sample to receive annotations
     session: AsyncSession
     async with engine.session() as session:
-        project_type = await session.scalar(select(Project.type).where(Project.project_id == project_id))
+        project_type: ItemType | None = await session.scalar(select(Project.type)
+                                                             .where(Project.project_id == project_id))
+        if project_type is None:
+            raise ValueError(f'No project exists for "{project_id}". This error should never occur.')
         stmt_query = query_to_sql(config.query_parsed, project_id=str(project_id), project_type=project_type).cte('nql')
         stmt = select(stmt_query.c.item_id).order_by(text('random()')).limit(config.num_items)
         rslt = (await session.execute(stmt)).mappings().all()
