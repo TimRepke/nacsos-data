@@ -26,6 +26,7 @@ from nacsos_data.models.bot_annotations import (
     BotMetaResolve,
     ResolutionMethod,
     BotKind,
+    BotAnnotationModel,
     BotAnnotationResolution,
     ResolutionProposal,
     ResolutionMatrix
@@ -593,7 +594,7 @@ async def store_resolved_bot_annotations(session: AsyncSession,
                                      assignment_scope_id=assignment_scope_id,
                                      meta=meta.model_dump())
     session.add(metadata)
-    await session.commit()
+    await session.flush()
 
     # We are assuming, that the parent linkages are already done!
     for row in matrix.values():
@@ -609,6 +610,17 @@ async def store_resolved_bot_annotations(session: AsyncSession,
     await session.commit()
 
     return str(meta_uuid)
+
+
+def has_changed(orm: BotAnnotation, resolution: BotAnnotationModel):
+    return (orm.repeat != resolution.repeat
+            or str(orm.parent or 'None') != str(resolution.parent or 'None')
+            or orm.order != resolution.order
+            or orm.value_bool != resolution.value_bool
+            or orm.value_str != resolution.value_str
+            or orm.value_int != resolution.value_int
+            or orm.value_float != resolution.value_float
+            or orm.multi_int != resolution.multi_int)
 
 
 @ensure_session_async
@@ -669,15 +681,16 @@ async def update_resolved_bot_annotations(session: AsyncSession,
                             select(BotAnnotation)
                             .where(
                                 BotAnnotation.bot_annotation_id == cell.resolution.bot_annotation_id))).scalars().one()
-                        ba_orm.repeat = cell.resolution.repeat
-                        ba_orm.parent = cell.resolution.parent
-                        ba_orm.value_bool = cell.resolution.value_bool
-                        ba_orm.value_str = cell.resolution.value_str
-                        ba_orm.value_int = cell.resolution.value_int
-                        ba_orm.value_float = cell.resolution.value_float
-                        ba_orm.multi_int = cell.resolution.multi_int
-                        ba_orm.order = cell.resolution.order
-                        await session.flush()
+                        if has_changed(ba_orm, cell.resolution):
+                            ba_orm.repeat = cell.resolution.repeat
+                            ba_orm.parent = cell.resolution.parent
+                            ba_orm.value_bool = cell.resolution.value_bool
+                            ba_orm.value_str = cell.resolution.value_str
+                            ba_orm.value_int = cell.resolution.value_int
+                            ba_orm.value_float = cell.resolution.value_float
+                            ba_orm.multi_int = cell.resolution.multi_int
+                            ba_orm.order = cell.resolution.order
+                            await session.flush()
                     else:
                         await session.execute(
                             delete(BotAnnotation)
@@ -685,10 +698,15 @@ async def update_resolved_bot_annotations(session: AsyncSession,
                         )
                 else:
                     if has_values(cell.resolution):
-                        new_bot_annotations.append(BotAnnotation(**{
+                        new_orm = BotAnnotation(**{
                             **cell.resolution.model_dump(),
-                            'bot_annotation_metadata_id': bot_annotation_metadata_id
-                        }))
+                            'bot_annotation_metadata_id': uuid.UUID(bot_annotation_metadata_id)
+                        })
+                        new_orm.item_id = uuid.UUID(new_orm.item_id)
+                        new_orm.bot_annotation_id = uuid.UUID(new_orm.bot_annotation_id)
+                        if new_orm.parent:
+                            new_orm.parent = uuid.UUID(new_orm.parent)
+                        new_bot_annotations.append(new_orm)
     if len(new_bot_annotations) > 0:
         logger.debug(f'Creating ({len(new_bot_annotations):,} new BotAnnotations.')
         session.add_all(new_bot_annotations)
