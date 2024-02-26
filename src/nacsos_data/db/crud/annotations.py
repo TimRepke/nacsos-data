@@ -87,7 +87,8 @@ async def read_assignment_scopes_for_project_for_user(session: AsyncSession,
                 assignment_scope_id=res['assignment_scope_id'],
                 annotation_scheme_id=res['annotation_scheme_id'],
                 name=res['name'],
-                description=res['description']
+                description=res['description'],
+                time_created=res['time_created']
             ),
             scheme_name=res['scheme_name'],
             scheme_description=res['scheme_description'],
