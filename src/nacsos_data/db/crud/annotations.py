@@ -612,7 +612,7 @@ async def store_resolved_bot_annotations(session: AsyncSession,
     return str(meta_uuid)
 
 
-def has_changed(orm: BotAnnotation, resolution: BotAnnotationModel):
+def has_changed(orm: BotAnnotation, resolution: BotAnnotationModel) -> bool:
     return (orm.repeat != resolution.repeat
             or str(orm.parent or 'None') != str(resolution.parent or 'None')
             or orm.order != resolution.order

@@ -262,11 +262,11 @@ def has_values(anno: AnnotationValue) -> bool:
 
 
 def same_values(anno_a: AnnotationValue, anno_b: AnnotationValue) -> bool:
-    return not (anno_a.value_int != anno_b.value_int
-                or anno_a.value_str != anno_b.value_str
-                or anno_a.value_float != anno_b.value_float
-                or anno_a.value_bool != anno_b.value_bool
-                or (set(anno_a.multi_int or []) != set(anno_b.multi_int or [])))
+    return (anno_a.value_int == anno_b.value_int
+            and anno_a.value_str == anno_b.value_str
+            and anno_a.value_float == anno_b.value_float
+            and anno_a.value_bool == anno_b.value_bool
+            and (set(anno_a.multi_int or []) == set(anno_b.multi_int or [])))
 
 
 def annotated_scheme_to_annotations(scheme: AnnotationSchemeModel) -> list[AnnotationModel]:

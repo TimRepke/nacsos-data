@@ -105,18 +105,18 @@ def naive_majority_vote(annotation_map: ResolutionMatrix,
                     raise NotImplementedError(f'Majority vote for {kind} not implemented ({label})')
 
                 if same_values(value, cell.resolution):
-                    pass
+                    cell.status = ResolutionStatus.UNCHANGED
                 else:
-                    if not has_values(cell.resolution):
-                        cell.status = ResolutionStatus.NEW
-                    else:
-                        cell.status = ResolutionStatus.CHANGED
-
                     cell.resolution.value_bool = value.value_bool  # type: ignore[assignment]
                     cell.resolution.value_int = value.value_int  # type: ignore[assignment]
                     cell.resolution.value_str = value.value_str  # type: ignore[assignment]
                     cell.resolution.value_float = value.value_float  # type: ignore[assignment]
                     cell.resolution.multi_int = value.multi_int  # type: ignore[assignment]
+
+                    if not has_values(cell.resolution):
+                        cell.status = ResolutionStatus.NEW
+                    else:
+                        cell.status = ResolutionStatus.CHANGED
             except EmptyAnnotationsError as e:
                 logger.debug(e)
 
