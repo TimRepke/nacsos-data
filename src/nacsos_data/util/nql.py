@@ -78,7 +78,9 @@ def _field_cmp_lst(cmp: SetComparator, values: list[int],
 
 
 class NQLQuery:
-    def __init__(self, query: NQLFilter, project_id: str,
+    def __init__(self,
+                 query: NQLFilter,
+                 project_id: str,
                  project_type: ItemType | str = ItemType.academic):
         self.project_id = project_id
         self.project_type = project_type
@@ -391,13 +393,15 @@ class NQLQuery:
         return self._transform_results(rslt)
 
 
-def query_to_sql(query: NQLFilter, project_id: str) -> Select:  # type: ignore[type-arg]
-    query_object = NQLQuery(query=query, project_id=project_id)
+def query_to_sql(query: NQLFilter, project_id: str,
+                 project_type: ItemType | str = ItemType.academic) -> Select:  # type: ignore[type-arg]
+    query_object = NQLQuery(query=query, project_id=project_id, project_type=project_type)
     return query_object.stmt
 
 
-def nql_to_sql(query: NQLFilter, project_id: str) -> Select:  # type: ignore[type-arg]
-    return query_to_sql(query=query, project_id=project_id)
+def nql_to_sql(query: NQLFilter, project_id: str,
+               project_type: ItemType | str = ItemType.academic) -> Select:  # type: ignore[type-arg]
+    return query_to_sql(query=query, project_id=project_id, project_type=project_type)
 
 
 __all__ = ['query_to_sql', 'nql_to_sql', 'NQLFilter', 'NQLFilterParser', 'InvalidNQLError', 'NQLQuery']
