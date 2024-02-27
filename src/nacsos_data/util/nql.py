@@ -253,7 +253,37 @@ class NQLQuery:
             raise InvalidNQLError(f'Invalid mode in {subquery}')
 
         elif isinstance(subquery, AnnotationFilter):
-            raise NotImplementedError('"HAS ANNOTATION ..." filter not implemented yet')
+            AssignmentAlias = aliased(Assignment)
+            AnnotationAlias = aliased(Annotation)
+            if subquery.scheme is not None:
+                self._stmt = (
+                    self.stmt
+                    .join(AssignmentAlias,
+                          and_(AssignmentAlias.item_id == self.Schema.item_id,
+                               AssignmentAlias.annotation_scheme_id == subquery.scheme),
+                          isouter=not subquery.incl)
+                    .join(AnnotationAlias,
+                          AssignmentAlias.assignment_id == AnnotationAlias.assignment_id,
+                          isouter=not subquery.incl)
+                )
+            elif subquery.scopes is not None:
+                self._stmt = (
+                    self.stmt
+                    .join(AssignmentAlias,
+                          and_(AssignmentAlias.item_id == self.Schema.item_id,
+                               AssignmentAlias.assignment_scope_id.in_(subquery.scopes)),
+                          isouter=not subquery.incl)
+                    .join(AnnotationAlias,
+                          AssignmentAlias.assignment_id == AnnotationAlias.assignment_id,
+                          isouter=not subquery.incl)
+                )
+            else:
+                self._stmt = self.stmt.join(AnnotationAlias,
+                                            AnnotationAlias.item_id == self.Schema.item_id,
+                                            isouter=not subquery.incl)
+            if subquery.incl:
+                return AnnotationAlias.item_id != None  # noqa: E711
+            return AnnotationAlias.item_id == None  # noqa: E711
 
         elif isinstance(subquery, ImportFilter):
             self._stmt = self.stmt.join(m2m_import_item_table, m2m_import_item_table.c.item_id == Item.item_id)
@@ -304,6 +334,13 @@ class NQLQuery:
                             BAMAlias.kind == 'RESOLVE'
                         ),
                     )
+                elif subquery.scheme is not None:
+                    inner_wheres += (
+                        and_(  # type: ignore[assignment]
+                            BAMAlias.annotation_scheme_id == subquery.scheme,
+                            BAMAlias.kind == 'RESOLVE'
+                        ),
+                    )
                 else:
                     inner_wheres += (  # type: ignore[unreachable, assignment]
                         BAMAlias.kind == 'RESOLVE',
@@ -319,15 +356,29 @@ class NQLQuery:
                             BAMAlias.kind != 'RESOLVE'
                         ),
                     )
+                if subquery.scheme is not None:
+                    inner_wheres += (
+                        and_(  # type: ignore[assignment]
+                            BAMAlias.annotation_scheme_id == subquery.scheme,
+                            BAMAlias.kind != 'RESOLVE'
+                        ),
+                    )
                 else:
                     inner_wheres += (  # type: ignore[unreachable, assignment]
                         BAMAlias.kind != 'RESOLVE',
                     )
             elif subquery.type == 'user':
                 if subquery.scopes is not None:
+                    AssignmentAlias = aliased(Assignment)
+                    self._stmt = self.stmt.join(AssignmentAlias, AssignmentAlias.assignment_id == Schema.assignment_id)
+                    inner_wheres += (  # type: ignore[assignment]
+                        AssignmentAlias.assignment_scope_id.in_(subquery.scopes),
+                    )
+                elif subquery.scheme is not None:
+                    AssignmentAlias = aliased(Assignment)
                     self._stmt = self.stmt.join(Assignment, Assignment.assignment_id == Schema.assignment_id)
                     inner_wheres += (  # type: ignore[assignment]
-                        Assignment.assignment_scope_id.in_(subquery.scopes),
+                        AssignmentAlias.annotation_scheme_id == subquery.scheme,
                     )
 
             return inner_wheres

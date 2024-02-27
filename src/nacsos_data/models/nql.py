@@ -95,7 +95,7 @@ class AssignmentFilter(BaseModel):
 class AnnotationFilter(BaseModel):
     filter: Literal['annotation'] = 'annotation'
     incl: bool
-    scopes: list[str] | None
+    scopes: list[str] | None = None
     scheme: str | None = None
 
 
