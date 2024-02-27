@@ -35,7 +35,7 @@ class DatabaseConfig(BaseSettings):
             path=f'{info.data.get("DATABASE", "")}',
         )
 
-    model_config = SettingsConfigDict(env_prefix='NACSOS_DB__')
+    model_config = SettingsConfigDict(env_prefix='NACSOS_DB__', extra='allow')
 
 
 def _get_settings(conf_file: str | None = None) -> DatabaseConfig:

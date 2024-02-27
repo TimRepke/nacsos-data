@@ -275,15 +275,15 @@ async def import_lexis_nexis(session: AsyncSession,
             log.debug(f' -> Creating new item with ID={new_id}')
             ln2id[source.lexis_id] = new_id
             session.add(LexisNexisItem(**item.model_dump()))
-            await session.commit()
+            await session.flush()
             session.add(LexisNexisItemSource(**source.model_dump()))
-            await session.commit()
+            await session.flush()
 
             stmt_m2m = (insert(m2m_import_item_table)
                         .values(item_id=new_id, import_id=import_id, type=M2MImportItemType.explicit))
             try:
                 await session.execute(stmt_m2m)
-                await session.commit()
+                await session.flush()
                 log.debug(' -> Added many-to-many relationship for import/item')
             except IntegrityError:
                 log.debug(f' -> M2M_i2i already exists, ignoring {import_id} <-> {new_id}')
@@ -305,9 +305,9 @@ async def import_lexis_nexis(session: AsyncSession,
             if source_unique:
                 log.debug(f' -> Adding source to existing item with source_id={source.item_source_id}')
                 session.add(LexisNexisItemSource(**source.model_dump()))
-                await session.commit()
+                await session.flush()
 
     # Keep track of when we finished importing
     import_orm.time_finished = datetime.now()
-    await session.commit()
+    await session.flush()
     log.info('All done!')

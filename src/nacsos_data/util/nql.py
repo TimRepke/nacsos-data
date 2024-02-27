@@ -14,7 +14,7 @@ from nacsos_data.db.schemas import (
     LexisNexisItem,
     Item,
     LexisNexisItemSource,
-    GenericItem, AnnotationScheme
+    GenericItem
 )
 from nacsos_data.models.items import AcademicItemModel, LexisNexisItemModel, GenericItemModel, FullLexisNexisItemModel
 from nacsos_data.models.nql import (
