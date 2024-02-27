@@ -52,6 +52,7 @@ class UsersFilter(BaseModel):
 class _LabelFilter(BaseModel):
     # filter: Literal['label'] = 'label'
     scopes: list[str] | None = None
+    scheme: str | None = None
     users: UsersFilter | None = None
     repeats: list[int] | None = None
     key: str
@@ -88,12 +89,14 @@ class AssignmentFilter(BaseModel):
     filter: Literal['assignment'] = 'assignment'
     mode: int
     scopes: list[str] | None = None
+    scheme: str | None = None
 
 
 class AnnotationFilter(BaseModel):
     filter: Literal['annotation'] = 'annotation'
     incl: bool
     scopes: list[str] | None
+    scheme: str | None = None
 
 
 NQLFilter: TypeAlias = ForwardRef('NQLFilter')  # type: ignore[valid-type]

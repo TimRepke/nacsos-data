@@ -14,7 +14,7 @@ from nacsos_data.db.schemas import (
     LexisNexisItem,
     Item,
     LexisNexisItemSource,
-    GenericItem
+    GenericItem, AnnotationScheme
 )
 from nacsos_data.models.items import AcademicItemModel, LexisNexisItemModel, GenericItemModel, FullLexisNexisItemModel
 from nacsos_data.models.nql import (
@@ -205,29 +205,51 @@ class NQLQuery:
             return self._label_filter(subquery)
 
         elif isinstance(subquery, AssignmentFilter):
+            AssignmentAlias = aliased(Assignment)
             if subquery.mode == 1:
-                self._stmt = self.stmt.join(Assignment, Assignment.item_id == self.Schema.item_id)
-                return Assignment.item_id != None  # noqa: E711
+                self._stmt = self.stmt.join(AssignmentAlias, AssignmentAlias.item_id == self.Schema.item_id)
+                return AssignmentAlias.item_id != None  # noqa: E711
             if subquery.mode == 2:
                 if subquery.scopes is None:
                     raise InvalidNQLError('No scopes defined!')
-                self._stmt = self.stmt.join(Assignment, and_(Assignment.item_id == self.Schema.item_id,
-                                                             Assignment.assignment_scope_id.in_(subquery.scopes)))
-                return Assignment.item_id != None  # noqa: E711
+                self._stmt = self.stmt.join(AssignmentAlias, and_(AssignmentAlias.item_id == self.Schema.item_id,
+                                                                  AssignmentAlias.assignment_scope_id.in_(
+                                                                      subquery.scopes)))
+                return AssignmentAlias.item_id != None  # noqa: E711
             if subquery.mode == 3:
                 if subquery.scopes is None:
                     raise InvalidNQLError('No scopes defined!')
                 raise NotImplementedError('"IS ASSIGNED BUT NOT IN" filter not implemented yet')
             if subquery.mode == 4:
-                self._stmt = self.stmt.join(Assignment, Assignment.item_id == self.Schema.item_id, isouter=True)
-                return Assignment.item_id == None  # noqa: E711
+                self._stmt = self.stmt.join(AssignmentAlias, AssignmentAlias.item_id == self.Schema.item_id,
+                                            isouter=True)
+                return AssignmentAlias.item_id == None  # noqa: E711
             if subquery.mode == 5:
                 if subquery.scopes is None:
                     raise InvalidNQLError('No scopes defined!')
-                self._stmt = self.stmt.join(Assignment, and_(Assignment.item_id == self.Schema.item_id,
-                                                             Assignment.assignment_scope_id.in_(subquery.scopes)),
+                self._stmt = self.stmt.join(AssignmentAlias, and_(AssignmentAlias.item_id == self.Schema.item_id,
+                                                                  AssignmentAlias.assignment_scope_id.in_(
+                                                                      subquery.scopes)),
                                             isouter=True)
-                return Assignment.item_id == None  # noqa: E711
+                return AssignmentAlias.item_id == None  # noqa: E711
+            if subquery.mode == 6:
+                if subquery.scheme is None:
+                    raise InvalidNQLError('No scheme defined!')
+                self._stmt = (
+                    self.stmt
+                    .join(AssignmentAlias, and_(AssignmentAlias.item_id == self.Schema.item_id,
+                                                AssignmentAlias.annotation_scheme_id == subquery.scheme))
+                )
+                return AssignmentAlias.item_id != None  # noqa: E711
+            if subquery.mode == 7:
+                if subquery.scheme is None:
+                    raise InvalidNQLError('No scheme defined!')
+                self._stmt = (
+                    self.stmt
+                    .join(AssignmentAlias, and_(AssignmentAlias.item_id == self.Schema.item_id,
+                                                AssignmentAlias.annotation_scheme_id != subquery.scheme))
+                )
+                return AssignmentAlias.item_id != None  # noqa: E711
             raise InvalidNQLError(f'Invalid mode in {subquery}')
 
         elif isinstance(subquery, AnnotationFilter):
