@@ -1,6 +1,7 @@
 import logging
 import uuid
 from datetime import datetime
+from io import StringIO
 from pathlib import Path
 from typing import Generator
 
@@ -30,7 +31,7 @@ def parse_document(document: str) -> LexisNexisDocument:
     }
 
     parser = etree.XMLParser(remove_blank_text=True, strip_cdata=False)
-    tree = etree.parse(document, parser)
+    tree = etree.parse(StringIO(document), parser)
 
     def get_texts(xpath: str) -> list[str] | None:
         lst = [t.trim() for t in tree.xpath(f'{xpath}//text()', namespaces=prefix_map)]
