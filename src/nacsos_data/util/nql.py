@@ -32,7 +32,7 @@ from nacsos_data.models.nql import (
     LabelFilterBool,
     AnnotationFilter,
     Field,
-    NQLFilterParser
+    NQLFilterParser, MetaFilterBool, MetaFilterInt, MetaFilterStr
 )
 from nacsos_data.db.crud.items.lexis_nexis import lexis_orm_to_model
 
@@ -194,8 +194,17 @@ class NQLQuery:
         elif isinstance(subquery, FieldFilters):
             col = self._get_column(subquery.field)
             return col.in_(subquery.values)
-        elif isinstance(subquery, MetaFilter):
-            raise NotImplementedError('Meta fields cannot be filtered yet.')
+
+        elif isinstance(subquery, MetaFilterBool):
+            col = self._get_column('meta')
+            return col[subquery.field].as_boolean() == bool(subquery.value)
+        elif isinstance(subquery, MetaFilterInt):
+            col = self._get_column('meta')
+            return col[subquery.field].as_integer() == subquery.value
+        elif isinstance(subquery, MetaFilterStr):
+            col = self._get_column('meta')
+            field = col[subquery.field].as_string()
+            return and_(field.ilike(f'%{subquery.value}%'), field.isnot(None))
 
         elif isinstance(subquery, LabelFilterMulti):
             return self._label_filter(subquery)

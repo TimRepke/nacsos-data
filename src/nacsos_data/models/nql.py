@@ -32,11 +32,35 @@ class FieldFilters(BaseModel):
     values: list[str]
 
 
-class MetaFilter(BaseModel):
-    filter: Literal['meta'] = 'meta'
+class _MetaFilter(BaseModel):
+    # filter: Literal['meta'] = 'meta'
     field: str
-    comp: ComparatorExt
-    value: str | int | bool
+
+
+class MetaFilterBool(_MetaFilter):
+    filter: Literal['meta_bool'] = 'meta_bool'
+    value_type: Literal['bool'] = 'bool'
+    comp: Literal['='] = '='
+    value: bool
+
+
+class MetaFilterInt(_MetaFilter):
+    filter: Literal['meta_int'] = 'meta_int'
+    value_type: Literal['int'] = 'int'
+    comp: Comparator
+    value: int
+
+
+class MetaFilterStr(_MetaFilter):
+    filter: Literal['meta_str'] = 'meta_str'
+    value_type: Literal['str'] = 'str'
+    comp: Literal['LIKE'] = 'LIKE'
+    value: str
+
+
+MetaFilter = Annotated[MetaFilterBool
+                       | MetaFilterInt
+                       | MetaFilterStr, PField(discriminator='value_type')]
 
 
 class ImportFilter(BaseModel):
@@ -116,7 +140,9 @@ NQLFilter = Annotated[FieldFilter
                       | AssignmentFilter
                       | AnnotationFilter
                       | ImportFilter
-                      | MetaFilter
+                      | MetaFilterBool
+                      | MetaFilterInt
+                      | MetaFilterStr
                       | SubQuery, PField(discriminator='filter')]
 
 SubQuery.model_rebuild()
