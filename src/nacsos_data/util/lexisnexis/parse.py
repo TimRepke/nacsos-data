@@ -3,7 +3,9 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Generator
-from xml.etree import ElementTree
+
+from lxml import etree
+from markdownify import markdownify as md
 
 from nacsos_data.db.schemas import ItemType
 from nacsos_data.models.items.lexis_nexis import (
@@ -16,68 +18,61 @@ from nacsos_data.util import clear_empty
 
 logger = logging.getLogger('nacsos_data.util.LexisNexis.parse')
 
-prefix_map = {
-    # '': 'http://www.w3.org/2005/Atom',
-    'atom': 'http://www.w3.org/2005/Atom',
-    'nitf': 'http://iptc.org/std/NITF/2006-10-18',
-    'dc': 'http://purl.org/dc/elements/1.1/',
-    'xsi': 'http://www.w3.org/2001/XMLSchema-instance',
-    'noNamespaceSchemaLocation': 'http://www.lexisnexis.com/xmlschemas/content/public/articledoc/1/'
-}
-
-
-def find_text(root: ElementTree.Element, xpath: str) -> str | None:
-    elem = root.find(xpath, namespaces=prefix_map)
-    if elem is not None:
-        return elem.text
-    return None
-
-
-def find_texts(root: ElementTree.Element, xpath: str) -> list[str] | None:
-    elem = root.find(xpath, namespaces=prefix_map)
-    if elem is not None:
-        return list(elem.itertext())
-    return None
-
-
-def joined_texts(root: ElementTree.Element, xpath: str, join: str = ' ') -> str | None:
-    texts = find_texts(root=root, xpath=xpath)
-    if texts is not None:
-        return join.join(texts)
-    return None
-
-
-def lst_texts(root: ElementTree.Element, xpath: str) -> list[str] | None:
-    elems = root.findall('./atom:content/articleDoc/articleDocHead//author', namespaces=prefix_map)
-    if elems and len(elems) > 0:
-        return [' '.join(e.itertext()).strip() for e in elems]
-    return None
-
 
 def parse_document(document: str) -> LexisNexisDocument:
-    root = ElementTree.fromstring(document)
+    prefix_map = {
+        # '': 'http://www.w3.org/2005/Atom',
+        'atom': 'http://www.w3.org/2005/Atom',
+        'nitf': 'http://iptc.org/std/NITF/2006-10-18/',
+        'dc': 'http://purl.org/dc/elements/1.1/',
+        'xsi': 'http://www.w3.org/2001/XMLSchema-instance',
+        'noNamespaceSchemaLocation': 'http://www.lexisnexis.com/xmlschemas/content/public/articledoc/1/'
+    }
+
+    parser = etree.XMLParser(remove_blank_text=True, strip_cdata=False)
+    tree = etree.parse(document, parser)
+
+    def get_texts(xpath: str) -> list[str] | None:
+        lst = [t.trim() for t in tree.xpath(f'{xpath}//text()', namespaces=prefix_map)]
+        lst = [li for li in lst if len(li) > 0]
+        if len(lst) > 0:
+            return lst
+        return None
+
+    def get_text(xpath: str, join: str = ' ') -> str | None:
+        texts = get_texts(xpath)
+        if texts is not None:
+            return join.join(texts)
+        return None
+
+    def get_md(xpath: str) -> str | None:
+        base = tree.xpath(xpath, namespaces=prefix_map)
+        if len(base) > 0:
+            return md(etree.tostring(base[0]))  # type: ignore[no-any-return]
+        return None
+
+    def fuse_lsts(lst1: list[str] | None, lst2: list[str] | None) -> list[str] | None:
+        if lst1 is not None and lst2 is not None:
+            return lst1 + lst2
+        if lst1 is not None:
+            return lst1
+        if lst2 is not None:
+            return lst2
+        return None
 
     return LexisNexisDocument(
-        title=find_text(root, './/{http://www.w3.org/2005/Atom}title'),
-        published=find_text(root, './/{http://www.w3.org/2005/Atom}published'),
-        updated=find_text(root, './/{http://www.w3.org/2005/Atom}updated'),
+        title=get_text('.//atom:title'),
+        published=get_text('.//atom:published'),
+        updated=get_text('.//atom:updated'),
         # (Alternative) title and teaser text
-        teaser=joined_texts(root, './atom:content/articleDoc'
-                                  '/{http://iptc.org/std/NITF/2006-10-18/}body'
-                                  '/{http://iptc.org/std/NITF/2006-10-18/}body.head', '\n'),
-
+        teaser=get_md('./atom:content/articleDoc/nitf:body/nitf:body.head'),
         # Actual content
-        text=joined_texts(root, './atom:content/articleDoc'
-                                '/{http://iptc.org/std/NITF/2006-10-18/}body'
-                                '/{http://iptc.org/std/NITF/2006-10-18/}body.content', '\n'),
-        authors=[' '.join(a.itertext()).strip()
-                 for a in root.findall('./atom:content/articleDoc/articleDocHead//author', namespaces=prefix_map)],
-        authors_sec=[' '.join(a.itertext()).strip()
-                     for a in root.findall('./atom:author/atom:name', namespaces=prefix_map)],
-        section=find_text(root, './atom:content/articleDoc/articleDocHead'
-                                '/itemInfo/sourceSectionInfo/positionSection'),
-        subsection=find_text(root, './atom:content/articleDoc/articleDocHead'
-                                   '/itemInfo/sourceSectionInfo/positionSubsection')
+        text=get_md('./atom:content/articleDoc/nitf:body/nitf:body.content'),
+        authors=fuse_lsts(get_texts('./atom:content/articleDoc/articleDocHead//author'),
+                          get_texts('./atom:content//nitf:byline')),
+        authors_sec=get_texts('./atom:author/atom:name'),
+        section=get_text('./atom:content/articleDoc/articleDocHead/itemInfo/sourceSectionInfo/positionSection'),
+        subsection=get_text('./atom:content/articleDoc/articleDocHead/itemInfo/sourceSectionInfo/positionSubsection')
     )
 
 
