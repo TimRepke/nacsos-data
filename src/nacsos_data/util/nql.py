@@ -23,7 +23,6 @@ from nacsos_data.models.nql import (
     ComparatorExt,
     ImportFilter,
     AssignmentFilter,
-    MetaFilter,
     FieldFilter,
     FieldFilters,
     SubQuery,
@@ -32,7 +31,10 @@ from nacsos_data.models.nql import (
     LabelFilterBool,
     AnnotationFilter,
     Field,
-    NQLFilterParser, MetaFilterBool, MetaFilterInt, MetaFilterStr
+    NQLFilterParser,
+    MetaFilterBool,
+    MetaFilterInt,
+    MetaFilterStr
 )
 from nacsos_data.db.crud.items.lexis_nexis import lexis_orm_to_model
 
@@ -199,10 +201,10 @@ class NQLQuery:
 
         elif isinstance(subquery, MetaFilterBool):
             col = self._get_column('meta')
-            return col[subquery.field].as_boolean() == bool(subquery.value)
+            return col[subquery.field].as_boolean() == bool(subquery.value)  # type: ignore[no-any-return]
         elif isinstance(subquery, MetaFilterInt):
             col = self._get_column('meta')
-            return col[subquery.field].as_integer() == subquery.value
+            return col[subquery.field].as_integer() == subquery.value  # type: ignore[no-any-return]
         elif isinstance(subquery, MetaFilterStr):
             col = self._get_column('meta')
             field = col[subquery.field].as_string()

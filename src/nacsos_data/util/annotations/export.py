@@ -290,34 +290,34 @@ async def prepare_export_table(session: AsyncSession,
         raise NotFoundError(f'No project with id={project_id}!')
 
     nql_query = NQLQuery(query=nql_filter,
-                         project_id=project_id,
+                         project_id=str(project_id),
                          project_type=project_type)
 
     labels_map = {lab.key: lab for lab in labels}
-    stmt_labels = _labels_subquery(bot_annotation_metadata_ids=bot_annotation_metadata_ids,
-                                   assignment_scope_ids=assignment_scope_ids,
-                                   user_ids=user_ids,
-                                   labels=labels_map,
-                                   ignore_repeat=ignore_repeat)
+    stmt_labels_base = _labels_subquery(bot_annotation_metadata_ids=bot_annotation_metadata_ids,
+                                        assignment_scope_ids=assignment_scope_ids,
+                                        user_ids=user_ids,
+                                        labels=labels_map,
+                                        ignore_repeat=ignore_repeat)
 
     if ignore_hierarchy:
         # Prepare the CASE expressions to spread label values across binary fields
         label_selects = _get_label_selects(labels=labels_map,
                                            repeats=None if ignore_repeat else list(range(12)),
-                                           cte=stmt_labels)
+                                           cte=stmt_labels_base)
 
         # Finally construct the main query
         stmt_labels = (
-            select(stmt_labels.c.item_id,
-                   stmt_labels.c.user_id,
+            select(stmt_labels_base.c.item_id,
+                   stmt_labels_base.c.user_id,
                    *label_selects)
-            .group_by(stmt_labels.c.item_id, stmt_labels.c.user_id)
+            .group_by(stmt_labels_base.c.item_id, stmt_labels_base.c.user_id)
             .subquery('labels')
         )
         stmt_items = nql_query.stmt.subquery('items')
 
         stmt = (
-            select(*stmt_items.columns,
+            select(stmt_items.columns,  # type: ignore[call-overload]
                    stmt_labels.columns,
                    F.coalesce(User.username, 'RESOLVED').label('username'))
             .select_from(stmt_items)
