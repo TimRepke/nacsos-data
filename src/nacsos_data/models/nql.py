@@ -130,6 +130,7 @@ class SubQuery(BaseModel):
     filter: Literal['sub'] = 'sub'
     and_: list[NQLFilter] | None = None
     or_: list[NQLFilter] | None = None
+    not_: NQLFilter | None = None
 
 
 NQLFilter = Annotated[FieldFilter

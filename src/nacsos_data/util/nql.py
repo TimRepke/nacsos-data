@@ -176,6 +176,8 @@ class NQLQuery:
                 return and_(*(self._assemble_filters(child) for child in subquery.and_))
             if subquery.or_ is not None:
                 return and_(*(self._assemble_filters(child) for child in subquery.or_))
+            if subquery.not_ is not None:
+                return not_(self._assemble_filters(subquery.not_))
             raise InvalidNQLError('Missing subquery!')
 
         elif isinstance(subquery, FieldFilter):
