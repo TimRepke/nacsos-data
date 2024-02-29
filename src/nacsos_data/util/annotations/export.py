@@ -1,34 +1,37 @@
 import uuid
 import logging
-from typing import Type, TYPE_CHECKING
+from typing import Type
 
 from pydantic import BaseModel
-from sqlalchemy import select, \
-    func as F, \
-    union, \
-    distinct, \
-    case, \
-    and_, \
-    or_, \
-    any_, \
-    literal, \
-    String, \
-    Integer, \
-    Column, \
-    ColumnElement, \
-    CTE, \
+from sqlalchemy import (
+    select,
+    func as F,
+    union,
+    distinct,
+    case,
+    and_,
+    or_,
+    any_,
+    literal,
+    String,
+    Integer,
+    Column,
+    ColumnElement,
+    CTE,
     Label
+)
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.connection import DatabaseEngineAsync
 from nacsos_data.db.schemas.annotations import Annotation, Assignment, AssignmentScope, AnnotationScheme
 from nacsos_data.db.schemas.bot_annotations import BotAnnotation, BotAnnotationMetaData
 
 from ..errors import NotFoundError
-from ...db.schemas import User, ProjectPermissions, Project, ItemType, AcademicItem, TwitterItem, LexisNexisItem
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
+from ..nql import NQLQuery
+from ...db.engine import ensure_session_async
+from ...db.schemas import User, ProjectPermissions, Project, AcademicItem, TwitterItem, LexisNexisItem
+from ...models.nql import NQLFilter
 
 logger = logging.getLogger('nacsos_data.util.annotations.export')
 
@@ -271,44 +274,25 @@ F2CRetType = (tuple[Type[AcademicItem]
               | tuple[None, None])
 
 
-async def fields2col(project_id: str | uuid.UUID,
-                     fields: list[str] | None,
-                     db_engine: DatabaseEngineAsync) -> F2CRetType:
-    if fields is None or len(fields) == 0:
-        return None, None
-    session: AsyncSession
-    async with db_engine.session() as session:
-        project = await session.get(Project, project_id)
-
-        if project is None:
-            raise NotFoundError(f'No project with id={project_id}!')
-
-        if project.type == ItemType.academic:
-            ItemSchema = AcademicItem  # type: ignore[assignment]
-        elif project.type == ItemType.twitter:
-            ItemSchema = TwitterItem  # type: ignore[assignment]
-        elif project.type == ItemType.lexis:
-            ItemSchema = LexisNexisItem  # type: ignore[assignment]
-        else:
-            raise ValueError(f'Unknown project type "{project.type}"')
-
-        columns = []
-        for field in fields:
-            if hasattr(ItemSchema, field):
-                columns.append(getattr(ItemSchema, field))
-
-        return ItemSchema, columns
-
-
-async def prepare_export_table(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
+@ensure_session_async
+async def prepare_export_table(session: AsyncSession,
+                               nql_filter: NQLFilter | None,
+                               bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
                                assignment_scope_ids: list[str] | list[uuid.UUID] | None,
                                user_ids: list[str] | list[uuid.UUID] | None,
                                project_id: str | uuid.UUID,
                                labels: list[LabelOptions],
-                               item_fields: list[str] | None,
                                ignore_hierarchy: bool,
-                               ignore_repeat: bool,
-                               db_engine: DatabaseEngineAsync) -> list[dict[str, bool | int | str | None]]:
+                               ignore_repeat: bool) -> list[dict[str, bool | int | str | None]]:
+    project_type = await session.scalar(select(Project.type).where(Project.project_id == project_id))
+
+    if project_type is None:
+        raise NotFoundError(f'No project with id={project_id}!')
+
+    nql_query = NQLQuery(query=nql_filter,
+                         project_id=project_id,
+                         project_type=project_type)
+
     labels_map = {lab.key: lab for lab in labels}
     stmt_labels = _labels_subquery(bot_annotation_metadata_ids=bot_annotation_metadata_ids,
                                    assignment_scope_ids=assignment_scope_ids,
@@ -316,42 +300,34 @@ async def prepare_export_table(bot_annotation_metadata_ids: list[str] | list[uui
                                    labels=labels_map,
                                    ignore_repeat=ignore_repeat)
 
-    # Translate the list of strings into table columns (for extra fields from Items)
-    ItemSchema, item_columns = await fields2col(project_id=project_id, fields=item_fields, db_engine=db_engine)
+    if ignore_hierarchy:
+        # Prepare the CASE expressions to spread label values across binary fields
+        label_selects = _get_label_selects(labels=labels_map,
+                                           repeats=None if ignore_repeat else list(range(12)),
+                                           cte=stmt_labels)
 
-    session: AsyncSession
-    async with db_engine.session() as session:
-        if ignore_hierarchy:
-            # Prepare the CASE expressions to spread label values across binary fields
-            label_selects = _get_label_selects(labels=labels_map,
-                                               repeats=None if ignore_repeat else [1, 2, 3, 4],
-                                               cte=stmt_labels)
+        # Finally construct the main query
+        stmt_labels = (
+            select(stmt_labels.c.item_id,
+                   stmt_labels.c.user_id,
+                   *label_selects)
+            .group_by(stmt_labels.c.item_id, stmt_labels.c.user_id)
+            .subquery('labels')
+        )
+        stmt_items = nql_query.stmt.subquery('items')
 
-            # Finally construct the main query
-            stmt_item_labels = (
-                select(stmt_labels.c.item_id,
-                       stmt_labels.c.user_id,
-                       *label_selects)
-                .group_by(stmt_labels.c.item_id, stmt_labels.c.user_id)
-                .subquery()
-            )
+        stmt = (
+            select(*stmt_items.columns,
+                   stmt_labels.columns,
+                   F.coalesce(User.username, 'RESOLVED').label('username'))
+            .select_from(stmt_items)
+            .join(stmt_labels, stmt_labels.c.item_id == stmt_items.c.item_id, isouter=True)
+            .join(User, User.user_id == stmt_labels.c.user_id, isouter=True)
+            .order_by(stmt_labels.c.item_id, User.username)
+        )
+    else:
+        raise NotImplementedError('This is a bit more tricky, coming up soon.')
 
-            # add additional information, such as Item fields and username
-            if item_columns is None:
-                stmt = select(F.coalesce(User.username, 'RESOLVED').label('username'),
-                              stmt_item_labels) \
-                    .join(User, User.user_id == stmt_item_labels.c.user_id, isouter=True) \
-                    .order_by(stmt_item_labels.c.item_id, User.username)
-            else:
-                stmt = (select(F.coalesce(User.username, 'RESOLVED').label('username'),
-                               stmt_item_labels,
-                               *item_columns)
-                        .join(ItemSchema)  # type: ignore[arg-type]
-                        .join(User, User.user_id == stmt_item_labels.c.user_id, isouter=True)
-                        .order_by(stmt_item_labels.c.item_id, User.username))
-        else:
-            raise NotImplementedError('This is a bit more tricky, coming up soon.')
+    result = (await session.execute(stmt)).mappings().all()
 
-        result = (await session.execute(stmt)).mappings().all()
-
-        return [dict(r) for r in result]
+    return [dict(r) for r in result]
