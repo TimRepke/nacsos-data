@@ -34,7 +34,7 @@ def parse_document(document: str) -> LexisNexisDocument:
     tree = etree.parse(StringIO(document), parser)
 
     def get_texts(xpath: str) -> list[str] | None:
-        lst = [t.trim() for t in tree.xpath(f'{xpath}//text()', namespaces=prefix_map)]
+        lst = [str(t).trim() for t in tree.xpath(f'{xpath}//text()', namespaces=prefix_map)]
         lst = [li for li in lst if len(li) > 0]
         if len(lst) > 0:
             return lst
