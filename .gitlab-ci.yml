@@ -53,6 +53,22 @@ test-job2:
     - source venv/bin/activate
     - mypy --config-file=pyproject.toml src/nacsos_data --show-traceback --no-incremental
 
+sync-staging:
+  script:
+    - pg_dump -C -Fd -Z 9 -j 12 -p 5432 -f pgstash -d nacsos_core -h 0.0.0.0
+    - pg_lsclusters
+    - sudo mv pgstash /var/lib/postgresql
+    - sudo chmod -R ug+x /var/lib/postgresql/pgstash
+    - sudo chown -R postgres:postgres /var/lib/postgresql/pgstash
+    - sudo -u postgres bash
+    - cd /var/lib/postgresql
+    #- createdb -p 8010 -U postgres nacsos_core
+    # TODO: clear old staging db
+    - /usr/lib/postgresql/16/bin/pg_restore -F d -j 12 -p 8010 -C -d nacsos_core pgstash/
+  when: manual
+  tags:
+    - vm,bare-metal
+
 backup-nacsos:
   only:
     - schedules
