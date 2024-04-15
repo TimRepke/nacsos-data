@@ -1,5 +1,5 @@
 from typing import Type, Sequence
-from sqlalchemy import select, and_, not_, Select, ColumnExpressionArgument, func, Function, RowMapping
+from sqlalchemy import select, and_, or_, not_, Select, ColumnExpressionArgument, func, Function, RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import MappedColumn, aliased, InstrumentedAttribute, Session
 
@@ -177,7 +177,7 @@ class NQLQuery:
             if subquery.and_ is not None:
                 return and_(*(self._assemble_filters(child) for child in subquery.and_))
             if subquery.or_ is not None:
-                return and_(*(self._assemble_filters(child) for child in subquery.or_))
+                return or_(*(self._assemble_filters(child) for child in subquery.or_))
             if subquery.not_ is not None:
                 return not_(self._assemble_filters(subquery.not_))
             raise InvalidNQLError('Missing subquery!')

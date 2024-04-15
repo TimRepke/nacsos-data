@@ -313,7 +313,7 @@ def download_openalex_query_raw(target_file: str | Path,
     log.info(f'Writing results to: {target_file}')
 
     with open(target_file, 'w') as f_out:
-        [f_out.write(doc.model_dump_json() + '\n') for doc in generate_docs_from_openalex(
+        [f_out.write(doc.model_dump_json(exclude_none=True, exclude_unset=True) + '\n') for doc in generate_docs_from_openalex(
             query=query,
             openalex_endpoint=openalex_endpoint,
             batch_size=batch_size,
