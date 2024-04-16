@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import String, Integer, ForeignKey, DateTime, func, Enum, ARRAY
+from sqlalchemy import String, ForeignKey, DateTime, func, Enum
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy_json import mutable_json_type
@@ -8,7 +8,7 @@ from sqlalchemy_json import mutable_json_type
 from ..base_class import Base
 from .users import User
 from .projects import Project
-from ...models.pipeline.enums import CPULoadClassification, TaskStatus, ExecutionLocation
+from ...models.pipelines import TaskStatus
 
 
 class Task(Base):
@@ -39,17 +39,9 @@ class Task(Base):
     # name of the pipeline function (incl full package path)
     function_name = mapped_column(String, nullable=False, unique=False, index=True)
 
-    # indicates the tasks (referenced by task_id) this task depends on (or None if no dependencies exist)
-    dependencies = mapped_column(ARRAY(UUID(as_uuid=True)),  # ForeignKey(Task.task_id),
-                                 nullable=True, index=False)
-
     # current status of the task
     status = mapped_column(Enum(TaskStatus), nullable=False,
                            server_default=TaskStatus.PENDING)
-
-    # where this task is running
-    location = mapped_column(Enum(ExecutionLocation), nullable=False,
-                             server_default=ExecutionLocation.LOCAL)
 
     # json-encoded dict of the call parameters (or the dict unpacked)
     params = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True))
@@ -61,14 +53,6 @@ class Task(Base):
     time_created = mapped_column(DateTime(timezone=True), server_default=func.now())
     time_started = mapped_column(DateTime(timezone=True), nullable=True)
     time_finished = mapped_column(DateTime(timezone=True), nullable=True)
-
-    # (optional) estimated runtime (in seconds) for this task
-    est_runtime = mapped_column(Integer, nullable=True, unique=False, index=False)
-    # (optional) estimated memory (in bytes) for this task
-    est_memory = mapped_column(Integer, nullable=True, unique=False, index=False)
-    # (optional) estimated load on CPU for this task
-    est_cpu_load = mapped_column(Enum(CPULoadClassification), nullable=False,
-                                 server_default=CPULoadClassification.MEDIUM)
 
     # (optional) recommended time to schedule cleanup (e.g. deletion) of artefacts
     # leave `None` to never schedule a cleanup

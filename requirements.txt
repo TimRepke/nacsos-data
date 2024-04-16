@@ -1,20 +1,36 @@
-pydantic==2.6.4
+# requirements
+pydantic==2.7.0
 pydantic-settings==2.2.1
 python-dotenv==1.0.1
 email-validator==2.1.1
-setuptools==69.2.0
+setuptools==69.5.1
 psycopg[binary]==3.1.18
 psycopg2-binary==2.9.9
 SQLAlchemy==2.0.29
 sqlalchemy-json==0.7.0
+lark==1.1.9
+
+# utils
 httpx[http2]==0.27.0
 passlib==1.7.4
 rispy==0.9.0
-lark==1.1.9
-scipy==1.12.0
+scipy==1.13.0
 numpy==1.25.2  # 10. Oct 2023: Needs to be 1.25 for number (for pynndescent)
-scikit-learn==1.4.1.post1
-pynndescent==0.5.11
+scikit-learn==1.4.2
+pynndescent==0.5.12
 markdownify==0.11.6
 lxml==5.1.0
 bibtexparser==2.0.0b7
+
+# scripts
+typer==0.9.0
+alembic==1.13.1
+
+# testing
+flake8==7.0.0
+tox==4.13.0
+pytest==8.0.2
+pytest-cov==4.1.0
+mypy==1.8.0
+types-passlib==1.7.7.20240106
+types-requests==2.31.0.20240218

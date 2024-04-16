@@ -1,9 +1,8 @@
 from datetime import datetime
 from enum import Enum
+from typing import Any
 from uuid import UUID
 from pydantic import BaseModel
-
-from nacsos_data.models.pipeline.lib import ImportConfig
 
 
 class ImportModel(BaseModel):
@@ -32,7 +31,7 @@ class ImportModel(BaseModel):
     time_finished: datetime | None = None
 
     # This stores the configuration of the respective import method
-    config: ImportConfig | None = None
+    config: dict[str, Any] | None = None
 
 
 class M2MImportItemType(str, Enum):
@@ -49,4 +48,4 @@ class M2MImportItemType(str, Enum):
     implicit = 'implicit'
 
 
-__all__ = ['M2MImportItemType', 'ImportModel', 'ImportConfig']
+__all__ = ['M2MImportItemType', 'ImportModel']
