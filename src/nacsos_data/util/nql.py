@@ -347,7 +347,7 @@ class NQLQuery:
                             BAMAlias.kind == 'RESOLVE'
                         ),
                     )
-                elif subquery.scheme is not None:
+                elif subquery.scheme is not None:  # type: ignore[unreachable]
                     inner_wheres += (
                         and_(  # type: ignore[assignment]
                             BAMAlias.annotation_scheme_id == subquery.scheme,
@@ -387,7 +387,7 @@ class NQLQuery:
                     inner_wheres += (  # type: ignore[assignment]
                         AssignmentAlias.assignment_scope_id.in_(subquery.scopes),
                     )
-                elif subquery.scheme is not None:
+                elif subquery.scheme is not None:  # type: ignore[unreachable]
                     AssignmentAlias = aliased(Assignment)
                     self._stmt = self.stmt.join(Assignment, Assignment.assignment_id == Schema.assignment_id)
                     inner_wheres += (  # type: ignore[assignment]

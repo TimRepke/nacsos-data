@@ -1,14 +1,14 @@
 import logging
 from typing import TYPE_CHECKING, Generator, AsyncGenerator, NamedTuple
-from scipy.sparse import vstack, csr_matrix
+from scipy.sparse import vstack
 from sklearn.feature_extraction.text import CountVectorizer
-
-import pynndescent
+from scipy.sparse import csr_matrix
 
 from .. import batched
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
+    from pynndescent import NNDescent
 
 logger = logging.getLogger('nacsos_data.util.deduplicate.index')
 
@@ -48,7 +48,7 @@ class DuplicateIndex:
         else:
             self.vectoriser = vectoriser
 
-        self.index: pynndescent.NNDescent | None = None
+        self.index: NNDescent | None = None
         self.item_ids_db: dict[str, int] | None = None
         self.item_ids_db_inv: dict[int, str] | None = None
         self.item_ids_nw: dict[str, int] | None = None
@@ -87,6 +87,8 @@ class DuplicateIndex:
             yield item_ids, vectors
 
     async def init(self) -> None:
+        import pynndescent
+
         logger.info('Loading items from database...')
         db_data = [r async for r in self._load_vectors_batched_async(self.existing_items)]
 

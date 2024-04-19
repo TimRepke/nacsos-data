@@ -6,11 +6,10 @@ from pydantic import BaseModel
 from sqlalchemy import func, select, asc, desc, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nacsos_data.db import DatabaseEngine
 from nacsos_data.db.crud import MissingIdError
 from nacsos_data.db.engine import ensure_session_async
 from nacsos_data.db.schemas import Task
-from nacsos_data.models.pipeline.task import TaskStatus, TaskModel
+from nacsos_data.models.pipeline import TaskStatus, TaskModel
 
 
 @ensure_session_async

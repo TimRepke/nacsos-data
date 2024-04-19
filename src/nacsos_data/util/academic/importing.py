@@ -19,7 +19,7 @@ async def _import(from_sources: Callable[[], Generator[AcademicItemModel, None, 
                   db_config: Path,
                   logger: logging.Logger,
                   project_id: str | None = None,
-                  import_id: str | None = None):
+                  import_id: str | None = None) -> None:
     if import_id is None:
         raise ValueError('Import ID is not set!')
     if project_id is None:
@@ -48,7 +48,8 @@ async def _import(from_sources: Callable[[], Generator[AcademicItemModel, None, 
 async def import_wos_files(sources: list[Path],
                            db_config: Path,
                            project_id: str | None = None,
-                           import_id: str | None = None) -> None:
+                           import_id: str | None = None,
+                           logger: logging.Logger | None = None) -> None:
     """
     Import Web of Science files in ISI format.
     Each record will be checked for duplicates within the project.
@@ -67,7 +68,7 @@ async def import_wos_files(sources: list[Path],
     if len(sources) == 0:
         raise ValueError('Missing source files!')
 
-    logger = logging.getLogger('import_wos_file')
+    logger = logging.getLogger('import_wos_file') if logger is None else logger
 
     def from_sources() -> Generator[AcademicItemModel, None, None]:
         for source in sources:
@@ -82,7 +83,8 @@ async def import_wos_files(sources: list[Path],
 async def import_scopus_csv_file(sources: list[Path],
                                  db_config: Path,
                                  project_id: str | None = None,
-                                 import_id: str | None = None) -> None:
+                                 import_id: str | None = None,
+                                 logger: logging.Logger | None = None) -> None:
     """
     Import Scopus files in CSV format.
     Consult the [documentation](https://apsis.mcc-berlin.net/nacsos-docs/user/import/) before continuing!
@@ -102,7 +104,7 @@ async def import_scopus_csv_file(sources: list[Path],
     if len(sources) == 0:
         raise ValueError('Missing source files!')
 
-    logger = logging.getLogger('import_scopus_csv')
+    logger = logging.getLogger('import_scopus_csv') if logger is None else logger
 
     def from_sources() -> Generator[AcademicItemModel, None, None]:
         for source in sources:
@@ -117,7 +119,8 @@ async def import_scopus_csv_file(sources: list[Path],
 async def import_academic_db(sources: list[Path],
                              db_config: Path,
                              project_id: str | None = None,
-                             import_id: str | None = None) -> None:
+                             import_id: str | None = None,
+                             logger: logging.Logger | None = None) -> None:
     """
     Import articles that are in the exact format of how AcademicItems are stored in the database.
     We assume one JSON-encoded AcademicItemModel per line.
@@ -136,7 +139,7 @@ async def import_academic_db(sources: list[Path],
     if len(sources) == 0:
         raise ValueError('Missing source files!')
 
-    logger = logging.getLogger('import_academic_file')
+    logger = logging.getLogger('import_academic_file') if logger is None else logger
 
     def from_sources() -> Generator[AcademicItemModel, None, None]:
         for source in sources:
@@ -157,7 +160,8 @@ async def import_openalex(query: str,
                           field: SearchField = 'title_abstract',
                           op: OpType = 'AND',
                           project_id: str | None = None,
-                          import_id: str | None = None) -> None:
+                          import_id: str | None = None,
+                          logger: logging.Logger | None = None) -> None:
     """
     Import items from our self-hosted Solr database.
     Each record will be checked for duplicates within the project.
@@ -179,7 +183,7 @@ async def import_openalex(query: str,
         The import_id to connect these items to (required)
     """
 
-    logger = logging.getLogger('import_openalex')
+    logger = logging.getLogger('import_openalex') if logger is None else logger
 
     def from_source() -> Generator[AcademicItemModel, None, None]:
         for itm in generate_items_from_openalex(
@@ -194,14 +198,15 @@ async def import_openalex(query: str,
             itm.item_id = uuid.uuid4()
             yield itm
 
-    logger.info(f'Importing articles from OpenAlex-solr')
+    logger.info('Importing articles from OpenAlex-solr')
     await _import(from_source, db_config=db_config, project_id=project_id, import_id=import_id, logger=logger)
 
 
 async def import_openalex_files(sources: list[Path],
                                 db_config: Path,
                                 project_id: str | None = None,
-                                import_id: str | None = None) -> None:
+                                import_id: str | None = None,
+                                logger: logging.Logger | None = None) -> None:
     """
     Import articles that are in the OpenAlex format used in our solr database.
     We assume one JSON-encoded WorkSolr object per line.
@@ -217,7 +222,7 @@ async def import_openalex_files(sources: list[Path],
         The import_id to connect these tweets to
     """
 
-    logger = logging.getLogger('import_openalex_files')
+    logger = logging.getLogger('import_openalex_files') if logger is None else logger
 
     def from_sources() -> Generator[AcademicItemModel, None, None]:
         for source in sources:

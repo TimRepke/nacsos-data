@@ -122,10 +122,14 @@ async def import_academic_items(
       2) Create a new Import by setting `user_id`, `import_name`, and `description`; optionally set `import_id`.
          In this way, a new Import will be created and all items will be associated with that.
 
-
+    :param session
     :param trust_new_authors:
     :param trust_new_keywords:
-    :param items: A list (or generator) of AcademicItems
+    :param new_items: A list (or generator) of AcademicItems
+    :param vectoriser
+    :param max_slop
+    :param min_text_len
+    :param batch_size
     :param project_id: ID of the project the items should be added to
     :param import_id: (optional) ID to existing Import
     :param user_id: (your) user_id, which this import will be associated with

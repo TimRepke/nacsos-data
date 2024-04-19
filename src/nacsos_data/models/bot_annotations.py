@@ -15,7 +15,12 @@ from .annotations import (
     ItemAnnotation)
 from .users import UserModel
 
-ResolutionMethod = Literal['majority', 'first', 'last', 'trust']
+
+class ResolutionMethod(str, Enum):
+    majority = 'majority'
+    first = 'first'
+    last = 'first'
+    trust = 'first'
 
 
 class SnapshotEntry(AnnotationValue):

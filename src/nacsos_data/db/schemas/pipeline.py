@@ -5,10 +5,11 @@ from sqlalchemy.orm import mapped_column
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy_json import mutable_json_type
 
+from nacsos_data.models.pipeline import TaskStatus
+
 from ..base_class import Base
-from .users import User
 from .projects import Project
-from ...models.pipelines import TaskStatus
+from .users import User
 
 
 class Task(Base):
@@ -32,6 +33,9 @@ class Task(Base):
     project_id = mapped_column(UUID(as_uuid=True),
                                ForeignKey(Project.project_id, ondelete='CASCADE'),
                                nullable=False, index=True, primary_key=False)
+
+    # Celery task ID
+    celery_id = mapped_column(String, nullable=True, unique=False, index=False)
 
     # fingerprint based on the parameters for this task
     fingerprint = mapped_column(String, nullable=False, unique=False, index=True)

@@ -1,8 +1,46 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from pathlib import Path
+from typing import Literal, Annotated
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, Field as PField
+
+from nacsos_data.models.openalex.solr import DefType, SearchField, OpType
+
+
+class _FileImport(BaseModel):
+    sources: list[Path]
+
+
+class WoSImport(_FileImport):
+    kind: Literal['wos'] = 'wos'
+
+
+class ScopusImport(_FileImport):
+    kind: Literal['scopus'] = 'scopus'
+
+
+class AcademicItemImport(_FileImport):
+    kind: Literal['academic'] = 'academic'
+
+
+class OpenAlexFileImport(_FileImport):
+    kind: Literal['oa-file'] = 'oa-file'
+
+
+class OpenAlexSolrImport(BaseModel):
+    kind: Literal['oa-solr'] = 'oa-solr'
+    query: str
+    def_type: DefType = 'lucene'
+    field: SearchField = 'title_abstract'
+    op: OpType = 'AND'
+
+
+ImportConfig = Annotated[ScopusImport
+                         | AcademicItemImport
+                         | OpenAlexFileImport
+                         | OpenAlexSolrImport
+                         | WoSImport, PField(discriminator='kind')]
 
 
 class ImportModel(BaseModel):
@@ -31,7 +69,7 @@ class ImportModel(BaseModel):
     time_finished: datetime | None = None
 
     # This stores the configuration of the respective import method
-    config: dict[str, Any] | None = None
+    config: ImportConfig | None = None
 
 
 class M2MImportItemType(str, Enum):
@@ -48,4 +86,4 @@ class M2MImportItemType(str, Enum):
     implicit = 'implicit'
 
 
-__all__ = ['M2MImportItemType', 'ImportModel']
+# __all__ = ['M2MImportItemType', 'ImportModel']

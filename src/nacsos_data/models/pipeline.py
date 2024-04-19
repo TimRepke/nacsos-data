@@ -24,6 +24,8 @@ class _BaseTask(BaseModel):
     user_id: str | uuid.UUID | None = None
     # project_id (from nacsos-core) as context where task was triggered
     project_id: str | uuid.UUID | None = None
+    # celery task id
+    celery_id: str | uuid.UUID | None = None
     # user comment to keep notes
     comment: str | None = None
 

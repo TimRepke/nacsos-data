@@ -154,7 +154,10 @@ class AnnotationSchemeModelFlat(AnnotationSchemeInfo):
     labels: list[FlattenedAnnotationSchemeLabel]
 
 
-AssignmentScopeBaseConfigTypes = Literal['random', 'random_exclusion', 'random_nql']
+class AssignmentScopeBaseConfigTypes(str, Enum):
+    RANDOM = 'random'
+    RANDOM_EXCLUSION = 'random_exclusion'
+    RANDOM_NQL = 'random_nql'
 
 
 class AssignmentScopeBaseConfig(BaseModel):
@@ -172,16 +175,16 @@ class _AssignmentScopeRandomConfig(AssignmentScopeBaseConfig):
 
 
 class AssignmentScopeRandomConfig(_AssignmentScopeRandomConfig):
-    config_type: Literal['random'] = 'random'
+    config_type: Literal['random'] = AssignmentScopeBaseConfigTypes.RANDOM
 
 
 class AssignmentScopeRandomWithExclusionConfig(_AssignmentScopeRandomConfig):
-    config_type: Literal['random_exclusion'] = 'random_exclusion'
+    config_type: Literal['random_exclusion'] = AssignmentScopeBaseConfigTypes.RANDOM_EXCLUSION
     excluded_scopes: list[str] | list[UUID]
 
 
 class AssignmentScopeRandomWithNQLConfig(_AssignmentScopeRandomConfig):
-    config_type: Literal['random_nql'] = 'random_nql'
+    config_type: Literal['random_nql'] = AssignmentScopeBaseConfigTypes.RANDOM_NQL
     query_parsed: NQLFilter
     query_str: str
 

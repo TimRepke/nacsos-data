@@ -54,3 +54,22 @@ def clear_empty(obj: Any | None) -> Any | None:
         return None
 
     return obj
+
+
+def ensure_values(o: Any, *attrs: str | tuple[str, Any]) -> tuple[Any, ...]:
+    ret = []
+    for attr_ in attrs:
+        if type(attr_) is tuple:
+            attr, default = attr_
+        else:
+            attr, default = attr_, None
+        if type(o) is dict:
+            v = o.get(attr, None)
+        else:
+            v = getattr(o, attr)
+        if v is None:
+            if default is None:
+                raise KeyError(f'Attribute "{attr}" is missing or empty and has no default!')
+            v = default
+        ret.append(v)
+    return tuple(ret)

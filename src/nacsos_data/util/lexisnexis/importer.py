@@ -1,12 +1,7 @@
 import logging
 import uuid
 from datetime import datetime
-from typing import Generator, AsyncGenerator
-
-from scipy.sparse import vstack, csr_matrix
-from sklearn.feature_extraction.text import CountVectorizer
-
-import pynndescent
+from typing import Generator, AsyncGenerator, TYPE_CHECKING
 
 from sqlalchemy import select, insert, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +15,10 @@ from .parse import parse_lexis_nexis_file
 from .. import batched
 from ...db.crud.imports import get_or_create_import
 from ...models.imports import M2MImportItemType
+
+if TYPE_CHECKING:
+    from scipy.sparse import csr_matrix
+    from sklearn.feature_extraction.text import CountVectorizer
 
 logger = logging.getLogger('nacsos_data.util.LexisNexis')
 
@@ -170,6 +169,9 @@ async def import_lexis_nexis(session: AsyncSession,
     :param log:
     :return:
     """
+    import pynndescent
+    from scipy.sparse import vstack
+
     if log is None:
         log = logger
 
@@ -186,6 +188,7 @@ async def import_lexis_nexis(session: AsyncSession,
     import_orm.time_started = datetime.now()
 
     if vectoriser is None:
+        from sklearn.feature_extraction.text import CountVectorizer
         vectoriser = CountVectorizer(min_df=MIN_DF, max_df=MAX_DF, max_features=MAX_FEATURES)
 
     log.info(f'Loading known ids from project {project_id}')

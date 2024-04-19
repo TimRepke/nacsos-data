@@ -1,6 +1,4 @@
 import logging
-from sklearn.feature_extraction.text import CountVectorizer
-import pynndescent
 
 logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger('deduplicate')
@@ -21,16 +19,19 @@ N_CANDIDATES = 5
 # Maximum proportion of dissimilar words
 MAX_SLOP = 0.02
 
+
 # FIXME: This is untested and should be considered work in progress
 # TODO: use .index for indexing
 # TODO: do full cross-join incl self deduplication
 # TODO: go beyond text matching; also use other checks
 
-
 # Datasets to match
 # Assuming you have some sort of index (first entry in each tuple) and text (second entry in tuple)
 def left_join(data_a: list[tuple[str, str]],
-              data_b: list[tuple[str, str]]):
+              data_b: list[tuple[str, str]]) -> tuple[dict[str, list[str]], list[str], list[str]]:
+    from sklearn.feature_extraction.text import CountVectorizer
+    import pynndescent
+
     logger.info('Preparing texts...')
     _texts_a = [(t or '').lower()[:CHAR_LIMIT] for _, t in data_a]
     _texts_b = [(t or '').lower()[:CHAR_LIMIT] for _, t in data_b]
@@ -46,10 +47,10 @@ def left_join(data_a: list[tuple[str, str]],
     ignored_ids_b = [i for (i, _), t in zip(data_b, _texts_b) if len(t) < MIN_TEXT_LEN]
 
     logger.info('Building ID lookup maps...')
-    id_lookup_a = {idx: i for idx, i in enumerate(ids_a)}
-    id_lookup_b = {idx: i for idx, i in enumerate(ids_b)}
-    id_lookup_a_inv = {i: idx for idx, i in id_lookup_a.items()}
-    id_lookup_b_inv = {i: idx for idx, i in id_lookup_b.items()}
+    id_lookup_a = {i: idx for idx, i in enumerate(ids_a)}
+    # id_lookup_b = {idx: i for idx, i in enumerate(ids_b)}
+    id_lookup_a_inv = {idx: i for i, idx in id_lookup_a.items()}
+    # id_lookup_b_inv = {i: idx for idx, i in id_lookup_b.items()}
 
     logger.info('Fitting vocabulary...')
     vectoriser = CountVectorizer(min_df=MIN_DF, max_df=MAX_DF, max_features=MAX_FEATURES)
@@ -67,7 +68,7 @@ def left_join(data_a: list[tuple[str, str]],
     indices, similarities = index.query(vectors_b, k=N_CANDIDATES)
 
     logger.info('Proceeding with post-processing...')
-    matches = {}
+    matches: dict[str, list[str]] = {}
     for i, near_idxs, near_similarities in zip(ids_b, indices, similarities):
         logger.debug(f'Checking match for {i}: {near_similarities}')
         for idx, similarity in zip(near_idxs, near_similarities):
