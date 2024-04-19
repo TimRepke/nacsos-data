@@ -58,11 +58,16 @@ def clear_empty(obj: Any | None) -> Any | None:
 
 def ensure_values(o: Any, *attrs: str | tuple[str, Any]) -> tuple[Any, ...]:
     ret = []
+    attr: str
+    default: Any | None
     for attr_ in attrs:
-        if type(attr_) is tuple:
+        if type(attr_) is str:
+            attr, default = attr_, None
+        elif type(attr_) is tuple:
             attr, default = attr_
         else:
-            attr, default = attr_, None
+            raise TypeError()
+
         if type(o) is dict:
             v = o.get(attr, None)
         else:
