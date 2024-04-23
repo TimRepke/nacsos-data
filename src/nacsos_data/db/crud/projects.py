@@ -75,7 +75,7 @@ async def create_project(project: ProjectModel, engine: DatabaseEngineAsync) -> 
 
 
 async def update_project(project: ProjectModel, engine: DatabaseEngineAsync) -> ProjectModel:
-    return await update_orm(updated_model=project,
+    return await update_orm(updated_model=project,  # type: ignore[no-any-return]
                             Schema=Project, Model=ProjectModel,
                             filter_by={'project_id': project.project_id},
                             skip_update=['project_id'], db_engine=engine)
@@ -94,7 +94,7 @@ async def create_project_permissions(permissions: ProjectPermissionsModel,
 
 async def update_project_permissions(permissions: ProjectPermissionsModel,
                                      engine: DatabaseEngineAsync) -> ProjectPermissionsModel:
-    return await update_orm(updated_model=permissions,
+    return await update_orm(updated_model=permissions,  # type: ignore[no-any-return]
                             Schema=ProjectPermissions, Model=ProjectPermissionsModel,
                             filter_by={'project_permission_id': permissions.project_permission_id},
                             skip_update=['project_id', 'user_id', 'project_permission_id'], db_engine=engine)

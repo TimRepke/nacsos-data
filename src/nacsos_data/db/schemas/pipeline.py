@@ -34,8 +34,8 @@ class Task(Base):
                                ForeignKey(Project.project_id, ondelete='CASCADE'),
                                nullable=False, index=True, primary_key=False)
 
-    # Celery task ID
-    celery_id = mapped_column(String, nullable=True, unique=False, index=False)
+    # dramatiq task ID
+    message_id = mapped_column(String, nullable=True, unique=False, index=False)
 
     # fingerprint based on the parameters for this task
     fingerprint = mapped_column(String, nullable=False, unique=False, index=True)

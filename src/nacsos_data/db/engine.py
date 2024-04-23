@@ -1,6 +1,7 @@
 import json
 import logging
 from functools import wraps
+from pathlib import Path
 from typing import AsyncIterator, Iterator, Any, TypeVar, Callable, Awaitable
 from json import JSONEncoder
 
@@ -23,6 +24,10 @@ class DictLikeEncoder(JSONEncoder):
         # Translate datetime into a string
         if isinstance(o, datetime):
             return o.strftime('%Y-%m-%dT%H:%M:%S')
+
+        # Translate Path into a string
+        if isinstance(o, Path):
+            return str(o)
 
         # Translate pydantic models into dict
         if isinstance(o, BaseModel):
@@ -146,9 +151,12 @@ def ensure_session_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awa
     async def wrapper(*args: Any,
                       session: AsyncSession | None = None,
                       db_engine: DatabaseEngineAsync | None = None,
+                      engine: DatabaseEngineAsync | None = None,
                       **kwargs: dict[str, Any]) -> R:
         if session is not None:
             return await func(*args, session=session, **kwargs)
+        if engine is not None:
+            db_engine = engine  # alias; fall through and use the other branch to ensure session
         if db_engine is not None:
             logger.debug(f'Opening a new session to execute {func}')
             fresh_session: AsyncSession

@@ -81,6 +81,8 @@ def get_engine(conf_file: str | None = None,
     Fore more details on how to query data with sqlalchemy, see https://docs.sqlalchemy.org/en/20/orm/quickstart.html#simple-select
     """
     if settings is None:
+        if conf_file is None:
+            raise AssertionError('Neither `settings` not `conf_file` specified.')
         settings = _get_settings(conf_file)
 
     return DatabaseEngine(host=settings.HOST, port=settings.PORT, user=settings.USER, password=settings.PASSWORD,
@@ -88,6 +90,7 @@ def get_engine(conf_file: str | None = None,
 
 
 def get_engine_async(conf_file: str | None = None,
+                     settings: DatabaseConfig | None = None,
                      debug: bool = False) -> DatabaseEngineAsync:
     """
     Same as `get_engine()`, but returns async db engine.
@@ -100,6 +103,10 @@ def get_engine_async(conf_file: str | None = None,
         result = await session.execute(stmt)
     ```
     """
-    settings = _get_settings(conf_file)
+    if settings is None:
+        if conf_file is None:
+            raise AssertionError('Neither `settings` not `conf_file` specified.')
+        settings = _get_settings(conf_file)
+
     return DatabaseEngineAsync(host=settings.HOST, port=settings.PORT, user=settings.USER, password=settings.PASSWORD,
                                database=settings.DATABASE, debug=debug)
