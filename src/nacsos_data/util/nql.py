@@ -1,5 +1,6 @@
 from typing import Type, Sequence
 from sqlalchemy import select, and_, or_, not_, Select, ColumnExpressionArgument, func, Function, RowMapping
+from sqlalchemy.sql import extract
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import MappedColumn, aliased, InstrumentedAttribute, Session
 
@@ -157,7 +158,7 @@ class NQLQuery:
             if field == 'date':
                 return LexisNexisItemSource.published_at
             if field == 'pub_year':
-                return func.year(LexisNexisItemSource.published_at)
+                return extract('year', LexisNexisItemSource.published_at)
             if field == 'source':
                 return LexisNexisItemSource.name
             if field == 'item_id':
