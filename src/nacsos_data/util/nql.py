@@ -158,7 +158,7 @@ class NQLQuery:
             if field == 'date':
                 return LexisNexisItemSource.published_at
             if field == 'pub_year':
-                return extract('year', LexisNexisItemSource.published_at)
+                return extract('year', LexisNexisItemSource.published_at)  # type: ignore[return-value]
             if field == 'source':
                 return LexisNexisItemSource.name
             if field == 'item_id':
