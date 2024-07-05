@@ -61,9 +61,9 @@ async def delete_import(session: AsyncSession, import_id: UUID | str) -> None:
     await session.execute(stmt)
 
     # Delete related tasks
-    stmt = select(Import).where(Import.import_id == import_id)
+    stmt = select(Import).where(Import.import_id == import_id)  # type: ignore[assignment]
     imp = (await session.execute(stmt)).scalars().first()
-    if imp.pipeline_task_id is not None:
+    if imp and imp.pipeline_task_id is not None:
         stmt = delete(Task).where(Task.task_id == imp.pipeline_task_id)
         await session.execute(stmt)
     # TODO rm -r .tasks/user_data/{imp.config.sources}
