@@ -26,23 +26,22 @@ async def _import(from_sources: Callable[[], Generator[AcademicItemModel, None, 
         raise ValueError('Project ID is not set!')
     db_engine = get_engine_async(conf_file=str(db_config))
 
-    async with db_engine.session() as session:
-        await import_academic_items(
-            session=session,
-            project_id=project_id,
-            new_items=from_sources,
-            import_name=None,
-            description=None,
-            user_id=None,
-            import_id=import_id,
-            vectoriser=None,
-            max_slop=0.05,
-            batch_size=5000,
-            dry_run=False,
-            trust_new_authors=False,
-            trust_new_keywords=False,
-            log=logger
-        )
+    await import_academic_items(
+        db_engine=db_engine,
+        project_id=project_id,
+        new_items=from_sources,
+        import_name=None,
+        description=None,
+        user_id=None,
+        import_id=import_id,
+        vectoriser=None,
+        max_slop=0.05,
+        batch_size=5000,
+        dry_run=False,
+        trust_new_authors=False,
+        trust_new_keywords=False,
+        log=logger
+    )
 
 
 async def import_wos_files(sources: list[Path],

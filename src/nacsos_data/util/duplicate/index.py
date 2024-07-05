@@ -73,12 +73,18 @@ class DuplicateIndex:
 
     def _load_vectors_sync(self, generator: Generator[ItemEntry, None, None]) \
             -> Generator[tuple[list[str], csr_matrix], None, None]:
-        for batch in batched(generator, batch_size=self.batch_size):
+        for bi, batch in enumerate(batched(generator, batch_size=self.batch_size)):
             logger.debug(f'Received batch with {len(batch)} entries.')
             item_ids = [r.item_id for r in batch]
             texts = [r.text.lower() for r in batch]
 
-            if not hasattr(self.vectoriser, 'vocabulary_') and len(texts) > self.MIN_DF:
+            if bi == 0 and len(texts) <= self.MIN_DF:
+                self.MIN_DF = 1
+                self.MAX_DF = 1
+                self.vectoriser.max_df = self.MAX_DF
+                self.vectoriser.min_df = self.MIN_DF
+
+            if not hasattr(self.vectoriser, 'vocabulary_') and len(texts) >= self.MIN_DF:
                 logger.debug('Vectoriser has no vocabulary, fitting it now on the first batch.')
                 self.vectoriser.fit(texts)
 
@@ -103,7 +109,7 @@ class DuplicateIndex:
         self.item_ids_nw = {r: i + offset for i, r in
                             enumerate(bid for batch_ids, _ in nw_data for bid in batch_ids)}
         self.item_ids_nw_inv = {v: k for k, v in self.item_ids_nw.items()}
-        logger.info(f'Found {len(self.item_ids_nw):,} documents in the file.')
+        logger.info(f'Found {len(self.item_ids_nw):,} ({len(nw_data):,}) documents in the file.')
 
         logger.info('Constructing nearest neighbour lookup...')
         vectors = vstack([batch_vectors for _, batch_vectors in db_data]

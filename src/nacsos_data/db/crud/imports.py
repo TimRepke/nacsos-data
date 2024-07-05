@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.crud import upsert_orm
 from nacsos_data.db.engine import ensure_session_async
-from nacsos_data.db.schemas import Import, m2m_import_item_table
+from nacsos_data.db.schemas import Import, m2m_import_item_table, Task
 from nacsos_data.db.schemas.items.base import Item
 from nacsos_data.models.imports import ImportModel
 
@@ -59,6 +59,15 @@ async def delete_import(session: AsyncSession, import_id: UUID | str) -> None:
     # Delete m2m relations
     stmt = delete(m2m_import_item_table).where(m2m_import_item_table.c.import_id == import_id)
     await session.execute(stmt)
+
+    # Delete related tasks
+    stmt = select(Import).where(Import.import_id == import_id)
+    imp = (await session.execute(stmt)).scalars().first()
+    if imp.pipeline_task_id is not None:
+        stmt = delete(Task).where(Task.task_id == imp.pipeline_task_id)
+        await session.execute(stmt)
+    # TODO rm -r .tasks/user_data/{imp.config.sources}
+    # TODO rm -r .tasks/artefacts/{task.task_id}
 
     # Delete import
     stmt = delete(Import).where(Import.import_id == import_id)

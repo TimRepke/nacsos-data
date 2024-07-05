@@ -12,7 +12,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 from ..duplicate import ItemEntry, DuplicateIndex
 from ...db.crud.imports import get_or_create_import
-from ...db.engine import ensure_session_async
+from ...db import DatabaseEngineAsync
 from ...db.schemas import AcademicItem, m2m_import_item_table
 from ...db.schemas.items.academic import AcademicItemVariant
 from ...models.imports import M2MImportItemType
@@ -63,9 +63,8 @@ def _gen_entries(it: Generator[AcademicItemModel, None, None]) -> Generator[Item
         yield ItemEntry(item_id=str(itm.item_id), text=itm2txt(itm))
 
 
-@ensure_session_async
 async def import_academic_items(
-        session: AsyncSession,
+        db_engine: DatabaseEngineAsync,
         project_id: str | uuid.UUID,
         new_items: AcademicItemGenerator,
         import_name: str | None = None,
@@ -122,7 +121,7 @@ async def import_academic_items(
       2) Create a new Import by setting `user_id`, `import_name`, and `description`; optionally set `import_id`.
          In this way, a new Import will be created and all items will be associated with that.
 
-    :param session
+    :param db_engine
     :param trust_new_authors:
     :param trust_new_keywords:
     :param new_items: A list (or generator) of AcademicItems
@@ -149,32 +148,33 @@ async def import_academic_items(
         raise AttributeError('You have to provide a project ID!')
 
     item_ids: list[str] = []
+    async with db_engine.session() as session:
+        import_orm = await get_or_create_import(session=session,
+                                                project_id=project_id,
+                                                import_id=import_id,
+                                                user_id=user_id,
+                                                import_name=import_name,
+                                                description=description,
+                                                i_type='script')
+        import_id = str(import_orm.import_id)
 
-    import_orm = await get_or_create_import(session=session,
-                                            project_id=project_id,
-                                            import_id=import_id,
-                                            user_id=user_id,
-                                            import_name=import_name,
-                                            description=description,
-                                            i_type='script')
-    import_id = str(import_orm.import_id)
+        # Keep track of when we started importing
+        import_orm.time_started = datetime.datetime.now()
+        await session.flush()
 
-    # Keep track of when we started importing
-    import_orm.time_started = datetime.datetime.now()
-
-    log.info('Creating abstract duplicate detection index')
-    index = DuplicateIndex(
-        existing_items=_read_item_entries_from_db(
-            session=session,
-            batch_size=batch_size,
-            project_id=project_id,
-            min_text_len=min_text_len,
-            log=log
-        ),
-        new_items=_gen_entries(new_items()),
-        vectoriser=vectoriser,
-        max_slop=max_slop,
-        batch_size=batch_size)
+        log.info('Creating abstract duplicate detection index')
+        index = DuplicateIndex(
+            existing_items=_read_item_entries_from_db(
+                session=session,
+                batch_size=batch_size,
+                project_id=project_id,
+                min_text_len=min_text_len,
+                log=log
+            ),
+            new_items=_gen_entries(new_items()),
+            vectoriser=vectoriser,
+            max_slop=max_slop,
+            batch_size=batch_size)
 
     log.debug('  -> initialising duplicate detection index...')
     await index.init()
