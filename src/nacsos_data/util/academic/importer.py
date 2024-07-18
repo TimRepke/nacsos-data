@@ -13,7 +13,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from ..duplicate import ItemEntry, DuplicateIndex
 from ...db.crud.imports import get_or_create_import
 from ...db import DatabaseEngineAsync
-from ...db.schemas import AcademicItem, m2m_import_item_table
+from ...db.schemas import AcademicItem, m2m_import_item_table, Import
 from ...db.schemas.items.academic import AcademicItemVariant
 from ...models.imports import M2MImportItemType
 from ...models.items import AcademicItemModel, AcademicItemVariantModel
@@ -259,8 +259,16 @@ async def import_academic_items(
             await session.rollback()
 
     # Keep track of when we finished importing
-    import_orm.time_finished = datetime.datetime.now()
-    await session.commit()
+    async with db_engine.session() as session:
+        if import_id is None:
+            raise ValueError('import_id is required here.')
+
+        stmt = select(Import).where(Import.import_id == import_id)
+        result = (await session.execute(stmt)).scalars().one_or_none()
+        if result is not None:
+            result.time_finished = datetime.datetime.now()
+            await session.commit()
+            log.info('Noted import finishing time in database!')
 
     return import_id, item_ids
 

@@ -13,7 +13,7 @@ REGEX_C1 = re.compile(r'\[([^\]]+)\] (.*), (.*).')
 def read_wos_file(filepath: str,
                   project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
     for record in records_from([filepath]):
-        item = AcademicItemModel(project_id=project_id)
+        item = AcademicItemModel(item_id=uuid.uuid4(), project_id=project_id)
 
         title = record.get('TI')
         if title and len(title) > 0:

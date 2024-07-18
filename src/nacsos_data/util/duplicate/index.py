@@ -60,7 +60,7 @@ class DuplicateIndex:
             -> AsyncGenerator[tuple[list[str], csr_matrix], None]:
         async for batch in generator:
             logger.debug(f'Received batch with {len(batch)} entries.')
-            item_ids = [r.item_id for r in batch]
+            item_ids = [str(r.item_id) for r in batch]
             texts = [r.text.lower() for r in batch]
 
             if not hasattr(self.vectoriser, 'vocabulary_') and len(texts) > self.MIN_DF:
@@ -75,7 +75,7 @@ class DuplicateIndex:
             -> Generator[tuple[list[str], csr_matrix], None, None]:
         for bi, batch in enumerate(batched(generator, batch_size=self.batch_size)):
             logger.debug(f'Received batch with {len(batch)} entries.')
-            item_ids = [r.item_id for r in batch]
+            item_ids = [str(r.item_id) for r in batch]
             texts = [r.text.lower() for r in batch]
 
             if bi == 0 and len(texts) <= self.MIN_DF:
