@@ -16,7 +16,7 @@ httpx[http2]==0.27.0
 passlib==1.7.4
 rispy==0.9.0
 scipy==1.14.0
-#numpy==1.25.2  # 10. Oct 2023: Needs to be 1.25 for number (for pynndescent)
+numpy==2.0.1
 scikit-learn==1.5.1
 pynndescent==0.5.13
 markdownify==0.13.1
