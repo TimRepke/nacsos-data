@@ -1,10 +1,10 @@
-import re
 import uuid
 import logging
 import datetime
-from typing import Generator, Callable, TypeAlias, AsyncGenerator, Any
+from pathlib import Path
+from typing import Generator
 
-from sqlalchemy import insert, select, func
+from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 from sqlalchemy.exc import IntegrityError
 from psycopg.errors import UniqueViolation, OperationalError
@@ -12,55 +12,14 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 from ..duplicate import ItemEntry, DuplicateIndex
 from ...db.crud.imports import get_or_create_import
-from ...db import DatabaseEngineAsync
+from ...db import DatabaseEngineAsync, get_engine_async
+from ...db.crud.items.academic import AcademicItemGenerator, read_item_entries_from_db, gen_academic_entries, itm2txt
 from ...db.schemas import AcademicItem, m2m_import_item_table, Import
-from ...db.schemas.items.academic import AcademicItemVariant
 from ...models.imports import M2MImportItemType
-from ...models.items import AcademicItemModel, AcademicItemVariantModel
-from ..errors import NotFoundError
 from .clean import get_cleaned_meta_field
-from .duplicate import str_to_title_slug, find_duplicates, are_abstracts_duplicate, fuse_items
-
-logger = logging.getLogger('nacsos_data.util.academic.import')
-
-AcademicItemGenerator: TypeAlias = Callable[[], Generator[AcademicItemModel, None, None]]
-
-REG_CLEAN = re.compile(r'[^a-z ]+', flags=re.IGNORECASE)
-
-
-def itm2txt(r: Any) -> str:  # FIXME typing
-    # Abstract *has* to exist, otherwise do not continue
-    if getattr(r, 'text') is None:
-        return ''
-    return REG_CLEAN.sub(' ', f'{getattr(r, "title", "")} {getattr(r, "text", "")}'.lower()).strip()
-
-
-async def _read_item_entries_from_db(session: AsyncSession,
-                                     project_id: str | uuid.UUID,
-                                     log: logging.Logger,
-                                     batch_size: int = 500,
-                                     min_text_len: int = 250) -> AsyncGenerator[list[ItemEntry], None]:
-    stmt = (select(AcademicItem.item_id, AcademicItem.title, AcademicItem.text)
-            .where(AcademicItem.project_id == project_id,
-                   AcademicItem.text.isnot(None),
-                   func.char_length(AcademicItem.text) > min_text_len)
-            .execution_options(yield_per=batch_size))
-    rslt = (await session.stream(stmt)).mappings().partitions()
-
-    async for batch in rslt:
-        log.debug(f'Received batch with {len(batch)} entries.')
-        prepared = [(str(r['item_id']), itm2txt(r)) for r in batch]
-
-        yield [
-            ItemEntry(item_id=item_id, text=text)
-            for item_id, text in prepared
-            if text and len(text) > min_text_len
-        ]
-
-
-def _gen_entries(it: Generator[AcademicItemModel, None, None]) -> Generator[ItemEntry, None, None]:
-    for itm in it:
-        yield ItemEntry(item_id=str(itm.item_id), text=itm2txt(itm))
+from .duplicate import str_to_title_slug, find_duplicates, duplicate_insertion
+from ...models.items import AcademicItemModel
+from ...models.openalex.solr import DefType, SearchField, OpType
 
 
 async def import_academic_items(
@@ -78,7 +37,7 @@ async def import_academic_items(
         dry_run: bool = True,
         trust_new_authors: bool = False,
         trust_new_keywords: bool = False,
-        log: logging.Logger | None = None
+        logger: logging.Logger | None = None
 ) -> tuple[str, list[str]]:
     """
     Helper function for programmatically importing `AcademicItem`s into the platform.
@@ -138,11 +97,11 @@ async def import_academic_items(
     :param dry_run: If false, actually write data to the database;
                     If true, simulate best as possible (note, that duplicates within the `items` are not validated
                                                         and not all constraints can be checked)
-    :param log:
+    :param logger:
     :return: import_id and list of item_ids that were actually used in the end
     """
-    if log is None:
-        log = logger
+    if logger is None:
+        logger = logging.getLogger('nacsos_data.util.academic.import')
 
     if project_id is None:
         raise AttributeError('You have to provide a project ID!')
@@ -162,27 +121,27 @@ async def import_academic_items(
         import_orm.time_started = datetime.datetime.now()
         await session.flush()
 
-        log.info('Creating abstract duplicate detection index')
+        logger.info('Creating abstract duplicate detection index')
         index = DuplicateIndex(
-            existing_items=_read_item_entries_from_db(
+            existing_items=read_item_entries_from_db(
                 session=session,
                 batch_size=batch_size,
                 project_id=project_id,
                 min_text_len=min_text_len,
-                log=log
+                log=logger
             ),
-            new_items=_gen_entries(new_items()),
+            new_items=gen_academic_entries(new_items()),
             vectoriser=vectoriser,
             max_slop=max_slop,
             batch_size=batch_size)
 
-    log.debug('  -> initialising duplicate detection index...')
+    logger.debug('  -> initialising duplicate detection index...')
     await index.init()
 
-    log.info('Done building the index! Next, I\'m going through new items and adding them!')
+    logger.info('Done building the index! Next, I\'m going through new items and adding them!')
 
     for item in new_items():
-        log.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
+        logger.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
 
         # remove empty entries from the meta-data field
         item.meta = get_cleaned_meta_field(item)
@@ -216,7 +175,7 @@ async def import_academic_items(
                                                session=session)
             if duplicates is not None and len(duplicates):
                 existing_id = str(duplicates[0].item_id)
-                log.debug(f'  -> There are at least {len(duplicates)}; I will probably use {existing_id}')
+                logger.debug(f'  -> There are at least {len(duplicates)}; I will probably use {existing_id}')
 
         try:
             if existing_id is not None:
@@ -233,15 +192,15 @@ async def import_academic_items(
             else:
                 item_id = str(uuid.uuid4())
                 if dry_run:
-                    log.debug('  -> I will create a new AcademicItem!')
+                    logger.debug('  -> I will create a new AcademicItem!')
                 else:
-                    log.debug(f' -> Creating new item with ID {item_id}!')
+                    logger.debug(f' -> Creating new item with ID {item_id}!')
                     item.item_id = item_id
                     session.add(AcademicItem(**item.model_dump()))
                     await session.commit()
 
             if dry_run:
-                log.debug('  -> I will create an m2m entry.')
+                logger.debug('  -> I will create an m2m entry.')
             else:
                 item_ids.append(item_id)
                 stmt_m2m = insert(m2m_import_item_table) \
@@ -249,13 +208,13 @@ async def import_academic_items(
                 try:
                     await session.execute(stmt_m2m)
                     await session.commit()
-                    log.debug(' -> Added many-to-many relationship for import/item')
+                    logger.debug(' -> Added many-to-many relationship for import/item')
                 except IntegrityError:
-                    log.debug(f' -> M2M_i2i already exists, ignoring {import_id} <-> {item_id}')
+                    logger.debug(f' -> M2M_i2i already exists, ignoring {import_id} <-> {item_id}')
                     await session.rollback()
 
         except (UniqueViolation, IntegrityError, OperationalError) as e:
-            log.exception(e)
+            logger.exception(e)
             await session.rollback()
 
     # Keep track of when we finished importing
@@ -268,184 +227,307 @@ async def import_academic_items(
         if result is not None:
             result.time_finished = datetime.datetime.now()
             await session.commit()
-            log.info('Noted import finishing time in database!')
+            logger.info('Noted import finishing time in database!')
 
     return import_id, item_ids
 
 
-def _safe_lower(s: str | None) -> str | None:
-    if s is not None:
-        return s.lower().strip()
-    return None
-
-
-async def duplicate_insertion(new_item: AcademicItemModel,
-                              orig_item_id: str | uuid.UUID,
-                              import_id: str | uuid.UUID | None,
-                              trust_new_authors: bool,
-                              trust_new_keywords: bool,
-                              session: AsyncSession,
-                              log: logging.Logger | None = None) -> None:
+async def import_wos_files(sources: list[Path],
+                           db_config: Path,
+                           project_id: str | None = None,
+                           import_id: str | None = None,
+                           logger: logging.Logger | None = None) -> None:
     """
-    This method handles insertion of an item for which we found a duplicate in the database with `item_id`
+    Import Web of Science files in ISI format.
+    Each record will be checked for duplicates within the project.
 
-    :param log:
-    :param trust_new_keywords: if True, won't try to fuse list of keywords but just take them from `new_item` instead
-    :param trust_new_authors: if True, won't try to fuse list of authors but just take them from `new_item` instead
-    :param import_id:
-    :param session:
-    :param new_item:
-    :param orig_item_id: id in academic_item of which the `new_item` is a duplicate
-    :return:
+    `project_id` and `import_id` can be set to automatically populate the many-to-many tables
+    and link the data to an import or project.
+
+    **sources**
+        WoS isi filenames (absolute paths)
+    **project_id**
+        The project_id to connect these items to (required)
+    **import_id**
+        The import_id to connect these items to (required)
     """
-    if log is None:
-        log = logger
 
-    # Fetch the original item from the database
-    orig_item_orm = await session.get(AcademicItem, {'item_id': orig_item_id})
+    from nacsos_data.util.academic.readers.wos import read_wos_file
+    if len(sources) == 0:
+        raise ValueError('Missing source files!')
 
-    # This should never happen, but let's check just in case
-    if orig_item_orm is None:
-        raise NotFoundError(f'No item found for {orig_item_id}')
+    logger = logging.getLogger('import_wos_file') if logger is None else logger
 
-    orig_item = AcademicItemModel.model_validate(orig_item_orm.__dict__)
+    def from_sources() -> Generator[AcademicItemModel, None, None]:
+        for source in sources:
+            for itm in read_wos_file(filepath=str(source), project_id=project_id):
+                itm.item_id = uuid.uuid4()
+                yield itm
 
-    # Get prior variants of that AcademicItem
-    variants = (await session.scalars(select(AcademicItemVariant)
-                                      .where(AcademicItemVariant.item_id == orig_item_id))).all()
+    logger.info(f'Importing articles from web of science files: {sources}')
+    if import_id is None:
+        raise ValueError('Import ID is not set!')
+    if project_id is None:
+        raise ValueError('Project ID is not set!')
+    db_engine = get_engine_async(conf_file=str(db_config))
 
-    # If we have no prior variant, we need to create one
-    if len(variants) == 0:
-        # For the first variant, we need to fetch the original import_id
-        orig_import_id = await session.scalar(select(m2m_import_item_table.c.import_id)
-                                              .where(m2m_import_item_table.c.item_id == orig_item_id))
-        # Note, we are not checking for "not None", because it might be a valid case where no import_id exists
-
-        variant = AcademicItemVariantModel(
-            item_variant_id=uuid.uuid4(),
-            item_id=orig_item_id,
-            import_id=orig_import_id,
-            doi=orig_item.doi,
-            wos_id=orig_item.wos_id,
-            scopus_id=orig_item.scopus_id,
-            openalex_id=orig_item.openalex_id,
-            s2_id=orig_item.s2_id,
-            pubmed_id=orig_item.pubmed_id,
-            dimensions_id=orig_item.dimensions_id,
-            title=orig_item.title,
-            publication_year=orig_item.publication_year,
-            source=orig_item.source,
-            keywords=orig_item.keywords,
-            authors=orig_item.authors,
-            abstract=orig_item.text,
-            meta=orig_item.meta)
-
-        # add to database
-        session.add(AcademicItemVariant(**variant.model_dump()))
-        await session.commit()
-
-        log.debug(f'Created first variant of item {orig_item_id} at {variant.item_variant_id}')
-        # use this new variant for further value thinning
-        variants = [variant]  # type: ignore[list-item]
-
-    new_variant = AcademicItemVariantModel(
-        item_variant_id=uuid.uuid4(),
-        item_id=orig_item_id,
+    await import_academic_items(
+        db_engine=db_engine,
+        project_id=project_id,
+        new_items=from_sources,
+        import_name=None,
+        description=None,
+        user_id=None,
         import_id=import_id,
-        doi=new_item.doi,
-        wos_id=new_item.wos_id,
-        scopus_id=new_item.scopus_id,
-        openalex_id=new_item.openalex_id,
-        s2_id=new_item.s2_id,
-        pubmed_id=new_item.pubmed_id,
-        dimensions_id=new_item.dimensions_id,
-        title=new_item.title,
-        publication_year=new_item.publication_year,
-        source=new_item.source,
-        keywords=new_item.keywords,
-        authors=new_item.authors,
-        abstract=new_item.text,
-        meta=new_item.meta)
+        vectoriser=None,
+        max_slop=0.05,
+        batch_size=5000,
+        dry_run=False,
+        trust_new_authors=False,
+        trust_new_keywords=False,
+        logger=logger
+    )
 
-    # if we've seen this abstract before, drop it to save memory
-    if any([are_abstracts_duplicate(new_item.text, var.abstract) for var in variants]):
-        new_variant.abstract = None
-    # if we've seen this doi before, drop it
-    if any([new_item.doi == var.doi for var in variants]):
-        new_variant.doi = None
-    # if we've seen this wos_id before, drop it
-    if any([new_item.wos_id == var.wos_id for var in variants]):
-        new_variant.wos_id = None
-    # if we've seen this scopus_id before, drop it
-    if any([new_item.scopus_id == var.scopus_id for var in variants]):
-        new_variant.scopus_id = None
-    # if we've seen this openalex_id before, drop it
-    if any([new_item.openalex_id == var.openalex_id for var in variants]):
-        new_variant.openalex_id = None
-    # if we've seen this s2_id before, drop it
-    if any([new_item.s2_id == var.s2_id for var in variants]):
-        new_variant.s2_id = None
-    # if we've seen this pubmed_id before, drop it
-    if any([new_item.pubmed_id == var.pubmed_id for var in variants]):
-        new_variant.pubmed_id = None
-    # if we've seen this dimensions_id before, drop it
-    if any([new_item.dimensions_id == var.dimensions_id for var in variants]):
-        new_variant.dimensions_id = None
-    # if we've seen this title before, drop it
-    if any([_safe_lower(new_item.title) == _safe_lower(var.title) for var in variants]):
-        new_variant.title = None
-    # if we've seen this publication_year before, drop it
-    if any([new_item.publication_year == var.publication_year for var in variants]):
-        new_variant.publication_year = None
-    # if we've seen this source before, drop it
-    if any([new_item.source == var.source for var in variants]):
-        new_variant.source = None
 
-    log.debug(f'Found {len(variants or [])} variants and adding one more.')
+async def import_scopus_csv_file(sources: list[Path],
+                                 db_config: Path,
+                                 project_id: str | None = None,
+                                 import_id: str | None = None,
+                                 logger: logging.Logger | None = None) -> None:
+    """
+    Import Scopus files in CSV format.
+    Consult the [documentation](https://apsis.mcc-berlin.net/nacsos-docs/user/import/) before continuing!
+    Each record will be checked for duplicates within the project.
 
-    session.add(AcademicItemVariant(**new_variant.model_dump()))
-    await session.commit()
+    `project_id` and `import_id` can be set to automatically populate the many-to-many tables
+    and link the data to an import or project.
 
-    # Fuse all the fields from both, the existing and new variant into a new item
-    fused_item = fuse_items(item1=new_item,
-                            item2=orig_item,
-                            fuse_authors=not trust_new_authors,
-                            fuse_keywords=not trust_new_keywords)
+    **records**
+        An Artefact with scopus csv filenames.
+    **project_id**
+        The project_id to connect these items to (required)
+    **import_id**
+        The import_id to connect these items to (required)
+    """
 
-    # Python seems to drop the ORM for some reason, so fetch us a fresh copy of the original item
-    orig_item_orm = await session.get(AcademicItem, {'item_id': orig_item_id})
-    if orig_item_orm is None:  # if this happens, something went horribly wrong. But at least mypy is happy.
-        raise RuntimeError(f'No item found for {orig_item_id}')
+    from nacsos_data.util.academic.readers.scopus import read_scopus_csv_file
+    if len(sources) == 0:
+        raise ValueError('Missing source files!')
 
-    # Partially update the fields in the database that changed after fusion
-    if fused_item.doi != orig_item_orm.doi:
-        orig_item_orm.doi = fused_item.doi
-    if fused_item.wos_id != orig_item_orm.wos_id:
-        orig_item_orm.wos_id = fused_item.wos_id
-    if fused_item.scopus_id != orig_item_orm.scopus_id:
-        orig_item_orm.scopus_id = fused_item.scopus_id
-    if fused_item.openalex_id != orig_item_orm.openalex_id:
-        orig_item_orm.openalex_id = fused_item.openalex_id
-    if fused_item.s2_id != orig_item_orm.s2_id:
-        orig_item_orm.s2_id = fused_item.s2_id
-    if fused_item.pubmed_id != orig_item_orm.pubmed_id:
-        orig_item_orm.pubmed_id = fused_item.pubmed_id
-    if fused_item.dimensions_id != orig_item_orm.dimensions_id:
-        orig_item_orm.dimensions_id = fused_item.dimensions_id
-    if fused_item.title != orig_item_orm.title:
-        orig_item_orm.title = fused_item.title
-    if fused_item.title_slug != orig_item_orm.title_slug:
-        orig_item_orm.title_slug = fused_item.title_slug
-    if fused_item.publication_year != orig_item_orm.publication_year:
-        orig_item_orm.publication_year = fused_item.publication_year
-    if fused_item.source != orig_item_orm.source:
-        orig_item_orm.source = fused_item.source
-    if fused_item.text != orig_item_orm.text:
-        orig_item_orm.text = fused_item.text
-    # here we don't check and just do
-    orig_item_orm.meta = fused_item.meta
-    orig_item_orm.keywords = fused_item.keywords
-    orig_item_orm.authors = fused_item.authors
+    logger = logging.getLogger('import_scopus_csv') if logger is None else logger
 
-    # commit the changes
-    await session.commit()
+    def from_sources() -> Generator[AcademicItemModel, None, None]:
+        for source in sources:
+            for itm in read_scopus_csv_file(filepath=str(source), project_id=project_id):
+                itm.item_id = uuid.uuid4()
+                yield itm
+
+    logger.info(f'Importing articles from scopus CSV files: {sources}')
+    if import_id is None:
+        raise ValueError('Import ID is not set!')
+    if project_id is None:
+        raise ValueError('Project ID is not set!')
+    db_engine = get_engine_async(conf_file=str(db_config))
+
+    await import_academic_items(
+        db_engine=db_engine,
+        project_id=project_id,
+        new_items=from_sources,
+        import_name=None,
+        description=None,
+        user_id=None,
+        import_id=import_id,
+        vectoriser=None,
+        max_slop=0.05,
+        batch_size=5000,
+        dry_run=False,
+        trust_new_authors=False,
+        trust_new_keywords=False,
+        logger=logger
+    )
+
+
+async def import_academic_db(sources: list[Path],
+                             db_config: Path,
+                             project_id: str | None = None,
+                             import_id: str | None = None,
+                             logger: logging.Logger | None = None) -> None:
+    """
+    Import articles that are in the exact format of how AcademicItems are stored in the database.
+    We assume one JSON-encoded AcademicItemModel per line.
+
+    `project_id` and `import_id` can be set to automatically populate the M2M tables
+    and link the data to an import or project.
+
+    **sources**
+        An Artefact of a AcademicItems
+    **project_id**
+        The project_id to connect these tweets to
+    **import_id**
+        The import_id to connect these tweets to
+    """
+
+    if len(sources) == 0:
+        raise ValueError('Missing source files!')
+
+    logger = logging.getLogger('import_academic_file') if logger is None else logger
+
+    def from_sources() -> Generator[AcademicItemModel, None, None]:
+        for source in sources:
+            with open(source, 'r') as f:
+                for line in f:
+                    itm = AcademicItemModel.model_validate_json(line)
+                    itm.item_id = uuid.uuid4()
+                    yield itm
+
+    logger.info(f'Importing articles (AcademicItemModel-formatted) from file: {sources}')
+    if import_id is None:
+        raise ValueError('Import ID is not set!')
+    if project_id is None:
+        raise ValueError('Project ID is not set!')
+    db_engine = get_engine_async(conf_file=str(db_config))
+
+    await import_academic_items(
+        db_engine=db_engine,
+        project_id=project_id,
+        new_items=from_sources,
+        import_name=None,
+        description=None,
+        user_id=None,
+        import_id=import_id,
+        vectoriser=None,
+        max_slop=0.05,
+        batch_size=5000,
+        dry_run=False,
+        trust_new_authors=False,
+        trust_new_keywords=False,
+        logger=logger
+    )
+
+
+async def import_openalex(query: str,
+                          openalex_url: str,
+                          db_config: Path,
+                          def_type: DefType = 'lucene',
+                          field: SearchField = 'title_abstract',
+                          op: OpType = 'AND',
+                          project_id: str | None = None,
+                          import_id: str | None = None,
+                          logger: logging.Logger | None = None) -> None:
+    """
+    Import items from our self-hosted Solr database.
+    Each record will be checked for duplicates within the project.
+
+    `project_id` and `import_id` can be set to automatically populate the many-to-many tables
+    and link the data to an import or project.
+
+    **query**
+        The solr query to run
+    **def_type**
+        The solr parser to use, typically this is 'lucene'
+    **field**
+        The field the search is executed on, often this is set to title & abstract
+    **op**
+        Usually you want this to be set to 'AND'
+    **project_id**
+        The project_id to connect these items to (required)
+    **import_id**
+        The import_id to connect these items to (required)
+    """
+    from nacsos_data.util.academic.readers.openalex import generate_items_from_openalex
+    logger = logging.getLogger('import_openalex') if logger is None else logger
+
+    def from_source() -> Generator[AcademicItemModel, None, None]:
+
+        for itm in generate_items_from_openalex(
+                query=query,
+                openalex_endpoint=openalex_url,
+                def_type=def_type,
+                field=field,
+                op=op,
+                batch_size=1000,
+                log=logger
+        ):
+            itm.item_id = uuid.uuid4()
+            yield itm
+
+    logger.info('Importing articles from OpenAlex-solr')
+    if import_id is None:
+        raise ValueError('Import ID is not set!')
+    if project_id is None:
+        raise ValueError('Project ID is not set!')
+    db_engine = get_engine_async(conf_file=str(db_config))
+
+    await import_academic_items(
+        db_engine=db_engine,
+        project_id=project_id,
+        new_items=from_source,
+        import_name=None,
+        description=None,
+        user_id=None,
+        import_id=import_id,
+        vectoriser=None,
+        max_slop=0.05,
+        batch_size=5000,
+        dry_run=False,
+        trust_new_authors=False,
+        trust_new_keywords=False,
+        logger=logger
+    )
+
+
+async def import_openalex_files(sources: list[Path],
+                                db_config: Path,
+                                project_id: str | None = None,
+                                import_id: str | None = None,
+                                logger: logging.Logger | None = None) -> None:
+    """
+    Import articles that are in the OpenAlex format used in our solr database.
+    We assume one JSON-encoded WorkSolr object per line.
+
+    `project_id` and `import_id` can be set to automatically populate the M2M tables
+    and link the data to an import or project.
+
+    **articles**
+        An Artefact of a solr export
+    **project_id**
+        The project_id to connect these tweets to
+    **import_id**
+        The import_id to connect these tweets to
+    """
+    from nacsos_data.models.openalex.solr import WorkSolr
+    from nacsos_data.util.academic.readers.openalex import translate_doc, translate_work
+
+    logger = logging.getLogger('import_openalex_files') if logger is None else logger
+
+    def from_sources() -> Generator[AcademicItemModel, None, None]:
+        for source in sources:
+            with open(source, 'r') as f:
+                for line in f:
+                    itm = translate_work(translate_doc(WorkSolr.model_validate_json(line)))
+                    itm.item_id = uuid.uuid4()
+                    yield itm
+
+    logger.info(f'Importing articles (WorkSolr-formatted) from files: {sources}')
+    if import_id is None:
+        raise ValueError('Import ID is not set!')
+    if project_id is None:
+        raise ValueError('Project ID is not set!')
+    db_engine = get_engine_async(conf_file=str(db_config))
+
+    await import_academic_items(
+        db_engine=db_engine,
+        project_id=project_id,
+        new_items=from_sources,
+        import_name=None,
+        description=None,
+        user_id=None,
+        import_id=import_id,
+        vectoriser=None,
+        max_slop=0.05,
+        batch_size=5000,
+        dry_run=False,
+        trust_new_authors=False,
+        trust_new_keywords=False,
+        logger=logger
+    )

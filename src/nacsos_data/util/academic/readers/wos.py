@@ -2,10 +2,11 @@ import re
 import uuid
 from typing import Generator
 
+from nacsos_data.models.items import AcademicItemModel
+from nacsos_data.models.items.academic import AcademicAuthorModel, AffiliationModel
+
 from .wosfile.record import records_from
 
-from ...models.items import AcademicItemModel
-from ...models.items.academic import AcademicAuthorModel, AffiliationModel
 
 REGEX_C1 = re.compile(r'\[([^\]]+)\] (.*), (.*).')
 
