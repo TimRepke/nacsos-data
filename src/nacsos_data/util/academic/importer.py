@@ -106,6 +106,15 @@ async def import_academic_items(
     if project_id is None:
         raise AttributeError('You have to provide a project ID!')
 
+    # @Max TODO
+    # get sets of identifiers (e.g. using read_ids_from_db)
+    # run some performance tests (esp. RAM usage at scale)
+    # define wrapper, sth like
+    # def filter_known_ids(dict of ids, generator):
+    #   for e in generator:
+    #     if not any([e[k] in ids for k, ids in dict.items()]):
+    #       yield e
+
     item_ids: list[str] = []
     async with db_engine.session() as session:
         import_orm = await get_or_create_import(session=session,

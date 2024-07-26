@@ -1,3 +1,4 @@
+import logging
 from typing import Sequence, Generator, TypeVar, Any, AsyncIterator, AsyncGenerator
 
 T = TypeVar('T')
@@ -78,3 +79,31 @@ def ensure_values(o: Any, *attrs: str | tuple[str, Any]) -> tuple[Any, ...]:
             v = default
         ret.append(v)
     return tuple(ret)
+
+
+def ensure_logger_async(fallback_logger: logging.Logger):  # type: ignore[no-untyped-def]
+    def decorator(func):  # type: ignore[no-untyped-def]
+        async def wrapper(*args,
+                          log: logging.Logger | None = None,
+                          **kwargs):
+            if log is None:
+                log = fallback_logger
+            return await func(*args, logger=log, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def ensure_logger(fallback_logger: logging.Logger):  # type: ignore[no-untyped-def]
+    def decorator(func):  # type: ignore[no-untyped-def]
+        def wrapper(*args,
+                    log: logging.Logger | None = None,
+                    **kwargs):
+            if log is None:
+                log = fallback_logger
+            return func(*args, log=log, **kwargs)
+
+        return wrapper
+
+    return decorator
