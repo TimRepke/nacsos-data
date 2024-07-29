@@ -27,6 +27,12 @@ $ alembic upgrade head
 # revert uncommenting in alembic.ini
 ```
 
+```bash
+# Running without installing
+$ export PYTHONPATH=/home/user/workspace/nacsos_data/src
+$ python -m src.nacsos_data.scripts.migrations:run revision --autogenerate --root-path src/nacsos_data/ --ini-file alembic.ini --message "drop times"
+```
+
 ## Semantic versioning
 The general rule of thumb is to
   - increment the third number on every change that is worth deploying into nacsos_core

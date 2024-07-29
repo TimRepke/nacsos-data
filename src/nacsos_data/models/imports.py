@@ -5,7 +5,7 @@ from typing import Literal, Annotated
 from uuid import UUID
 from pydantic import BaseModel, Field as PField
 
-from nacsos_data.models.openalex.solr import DefType, SearchField, OpType
+from .openalex.solr import DefType, SearchField, OpType
 
 
 class _FileImport(BaseModel):

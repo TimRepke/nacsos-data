@@ -5,8 +5,7 @@ from sqlalchemy.orm import mapped_column
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy_json import mutable_json_type
 
-from nacsos_data.models.pipeline import TaskStatus
-
+from ...models.pipeline import TaskStatus
 from ..base_class import Base
 from .projects import Project
 from .users import User
