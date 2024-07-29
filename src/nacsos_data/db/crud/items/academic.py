@@ -10,15 +10,11 @@ from ...engine import ensure_session_async
 from ...schemas import AcademicItem
 from ....models.items import AcademicItemModel
 from ....util import ensure_logger_async
+from ....util.duplicate import ItemEntry
 
 logger = logging.getLogger('nacsos_data.crud.items.academic')
 
 AcademicItemGenerator: TypeAlias = Callable[[], Generator[AcademicItemModel, None, None]]
-
-
-class ItemEntry(NamedTuple):
-    item_id: str
-    text: str
 
 
 REG_CLEAN = re.compile(r'[^a-z ]+', flags=re.IGNORECASE)

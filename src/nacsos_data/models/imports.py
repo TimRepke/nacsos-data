@@ -65,8 +65,6 @@ class ImportModel(BaseModel):
 
     # Date and time when this import was created and when the actual import was triggered
     time_created: datetime | None = None
-    time_started: datetime | None = None
-    time_finished: datetime | None = None
 
     # This stores the configuration of the respective import method
     config: ImportConfig | None = None

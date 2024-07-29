@@ -126,10 +126,6 @@ async def import_academic_items(
                                                 i_type='script')
         import_id = str(import_orm.import_id)
 
-        # Keep track of when we started importing
-        import_orm.time_started = datetime.datetime.now()
-        await session.flush()
-
         logger.info('Creating abstract duplicate detection index')
         index = DuplicateIndex(
             existing_items=read_item_entries_from_db(
@@ -225,18 +221,6 @@ async def import_academic_items(
         except (UniqueViolation, IntegrityError, OperationalError) as e:
             logger.exception(e)
             await session.rollback()
-
-    # Keep track of when we finished importing
-    async with db_engine.session() as session:
-        if import_id is None:
-            raise ValueError('import_id is required here.')
-
-        stmt = select(Import).where(Import.import_id == import_id)
-        result = (await session.execute(stmt)).scalars().one_or_none()
-        if result is not None:
-            result.time_finished = datetime.datetime.now()
-            await session.commit()
-            logger.info('Noted import finishing time in database!')
 
     return import_id, item_ids
 

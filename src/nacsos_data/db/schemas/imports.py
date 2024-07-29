@@ -71,8 +71,6 @@ class Import(Base):
 
     # Date and time when this import was created and when the actual import was triggered
     time_created = mapped_column(DateTime(timezone=True), server_default=func.now())
-    time_started = mapped_column(DateTime(timezone=True), nullable=True)
-    time_finished = mapped_column(DateTime(timezone=True), nullable=True)
 
     # This stores the configuration of the respective import method
     config = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True))
