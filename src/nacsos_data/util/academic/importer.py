@@ -188,17 +188,17 @@ async def _insert_item(session: AsyncSession,
         item.item_id = uuid.uuid4()
 
     if dry_run:
-        logger.debug(f'  [DRY-RUN] -> Creating variant for new item with ID {item.item_id}!')
-        return str(item.item_id)
+        logger.debug(f'  [DRY-RUN] -> Creating variant for item_id {existing_id} with variant_id {item.item_id}!')
+        return existing_id
 
-    logger.debug(f'  -> Creating variant for new item with ID {item.item_id}!')
+    logger.debug(f'  -> Creating variant for item_id {existing_id} with variant_id {item.item_id}!')
     await duplicate_insertion(orig_item_id=existing_id,
                               import_id=import_id,
                               new_item=item,
                               trust_new_authors=trust_new_authors,
                               trust_new_keywords=trust_new_keywords,
                               session=session)
-    return str(item.item_id)
+    return existing_id
 
 
 async def import_academic_items(

@@ -424,7 +424,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
 
         # add to database
         session.add(AcademicItemVariant(**variant.model_dump()))
-        await session.commit()
+        await session.flush()
 
         log.debug(f'Created first variant of item {orig_item_id} at {variant.item_variant_id}')
         # use this new variant for further value thinning
@@ -486,7 +486,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     log.debug(f'Found {len(variants or [])} variants and adding one more.')
 
     session.add(AcademicItemVariant(**new_variant.model_dump()))
-    await session.commit()
+    await session.flush()
 
     # Fuse all the fields from both, the existing and new variant into a new item
     fused_item = fuse_items(item1=new_item,
@@ -530,4 +530,4 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     orig_item_orm.authors = fused_item.authors
 
     # commit the changes
-    await session.commit()
+    await session.flush()
