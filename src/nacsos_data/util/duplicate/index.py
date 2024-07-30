@@ -63,7 +63,7 @@ class DuplicateIndex:
             item_ids = [str(r.item_id) for r in batch]
             texts = [r.text.lower() for r in batch]
 
-            if not hasattr(self.vectoriser, 'vocabulary') and not hasattr(self.vectoriser,'vocabulary_') and len(texts) > self.MIN_DF:
+            if not hasattr(self.vectoriser, 'vocabulary') and not hasattr(self.vectoriser, 'vocabulary_') and len(texts) > self.MIN_DF:
                 logger.debug('Vectoriser has no vocabulary, fitting it now on the first batch.')
                 self.vectoriser.fit(texts)
 

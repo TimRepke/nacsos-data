@@ -25,6 +25,10 @@ def batched(lst: Sequence[T] | Generator[T, None, None], batch_size: int) -> Gen
     yield batch
 
 
+async def gather_async(lst: AsyncIterator[T] | AsyncGenerator[T, None]) -> list[T]:
+    return [li async for li in lst]
+
+
 def clear_empty(obj: Any | None) -> Any | None:
     """
     Recursively checks the object for empty-like things and explicitly sets them to None (or drops keys)
