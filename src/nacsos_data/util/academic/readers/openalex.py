@@ -9,11 +9,11 @@ from typing import Generator
 import httpx
 from pydantic import BaseModel
 
-from .duplicate import str_to_title_slug
-from ...models.items import AcademicItemModel
-from ...models.items.academic import AcademicAuthorModel, AffiliationModel
-from ...models.openalex.solr import WorkSolr, Work, Location, Authorship, Biblio, DefType, SearchField, OpType
-from .clean import clear_empty
+from ....models.items import AcademicItemModel
+from ....models.items.academic import AcademicAuthorModel, AffiliationModel
+from ....models.openalex.solr import WorkSolr, Work, Location, Authorship, Biblio, DefType, SearchField, OpType
+from ..clean import clear_empty
+from ..duplicate import str_to_title_slug
 
 logger = logging.getLogger('nacsos_data.util.academic.openalex')
 

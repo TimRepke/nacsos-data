@@ -1,6 +1,5 @@
 import datetime
 import uuid
-from uuid import UUID
 
 from sqlalchemy import select, delete, func
 from sqlalchemy.exc import NoResultFound
@@ -14,14 +13,14 @@ from nacsos_data.models.imports import ImportModel
 
 
 @ensure_session_async
-async def read_all_imports_for_project(session: AsyncSession, project_id: UUID | str) -> list[ImportModel]:
+async def read_all_imports_for_project(session: AsyncSession, project_id: uuid.UUID | str) -> list[ImportModel]:
     stmt = select(Import).where(Import.project_id == project_id)
     result = (await session.execute(stmt)).scalars().all()
     return [ImportModel.model_validate(res.__dict__) for res in result]
 
 
 @ensure_session_async
-async def read_item_count_for_import(session: AsyncSession, import_id: UUID | str) -> int:
+async def read_item_count_for_import(session: AsyncSession, import_id: uuid.UUID | str) -> int:
     stmt = select(func.count()) \
         .select_from(m2m_import_item_table) \
         .where(m2m_import_item_table.c.import_id == import_id)
@@ -33,7 +32,7 @@ async def read_item_count_for_import(session: AsyncSession, import_id: UUID | st
 
 @ensure_session_async
 async def read_import(session: AsyncSession,
-                      import_id: UUID | str) -> ImportModel | None:
+                      import_id: uuid.UUID | str) -> ImportModel | None:
     stmt = select(Import).where(Import.import_id == import_id)
     result = (await session.execute(stmt)).scalars().one_or_none()
     if result is not None:
@@ -42,7 +41,7 @@ async def read_import(session: AsyncSession,
 
 
 @ensure_session_async
-async def upsert_import(session: AsyncSession, import_model: ImportModel) -> str | UUID | None:
+async def upsert_import(session: AsyncSession, import_model: ImportModel) -> str | uuid.UUID | None:
     key = await upsert_orm(upsert_model=import_model,
                            Schema=Import,
                            primary_key=Import.import_id.name,
@@ -51,7 +50,7 @@ async def upsert_import(session: AsyncSession, import_model: ImportModel) -> str
 
 
 @ensure_session_async
-async def delete_import(session: AsyncSession, import_id: UUID | str) -> None:
+async def delete_import(session: AsyncSession, import_id: uuid.UUID | str) -> None:
     """
     When an import is deleted, we want to also delete all items that belonged to that import
     and that import only.

@@ -7,10 +7,10 @@ from typing import Generator
 
 import rispy
 
-from .clean import clear_empty
-from ...models.items import AcademicItemModel
-from ...models.items.academic import AcademicAuthorModel
-from .duplicate import str_to_title_slug
+from ....models.items import AcademicItemModel
+from ....models.items.academic import AcademicAuthorModel
+from ..duplicate import str_to_title_slug
+from ..clean import clear_empty
 
 logger = logging.getLogger('nacsos_data.util.academic.scopus')
 

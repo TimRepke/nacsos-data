@@ -1,23 +1,20 @@
 import re
 import uuid
 import logging
-from typing import Generator, Callable, TypeAlias, AsyncGenerator, NamedTuple
+from collections import defaultdict
+from typing import Generator, Callable, TypeAlias, AsyncGenerator, Literal
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text, cast, TEXT
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 
-from ...schemas import AcademicItem
+from ...schemas import AcademicItem, m2m_import_item_table
 from ....models.items import AcademicItemModel
+from ....util import gather_async
+from ....util.duplicate import ItemEntry
 
 logger = logging.getLogger('nacsos_data.crud.items.academic')
 
 AcademicItemGenerator: TypeAlias = Callable[[], Generator[AcademicItemModel, None, None]]
-
-
-class ItemEntry(NamedTuple):
-    item_id: str
-    text: str
-
 
 REG_CLEAN = re.compile(r'[^a-z ]+', flags=re.IGNORECASE)
 
@@ -57,3 +54,107 @@ async def read_item_entries_from_db(session: AsyncSession,
             for item_id, text in prepared
             if text and len(text) > min_text_len
         ]
+
+
+IdField = Literal['item_id', 'doi', 'wos_id', 'scopus_id', 'openalex_id', 's2_id', 'pubmed_id', 'dimensions_id']
+
+
+async def read_known_ids_map(session: AsyncSession,
+                             project_id: str | uuid.UUID,
+                             field: IdField, ) -> dict[str, str]:
+    """
+    Return a mapping from ID in field (e.g. DOI) to item_id
+
+    Note, that this does ignore potential conflicts and always picks the "last" one.
+    e.g. there might be multiple item_ids for the same DOI, but this method will effectively pick a random item_id from that set
+
+    :param session:
+    :param project_id:
+    :param field:
+    :return:
+    """
+    if field not in {'item_id', 'doi', 'wos_id', 'scopus_id', 'openalex_id', 's2_id', 'pubmed_id', 'dimensions_id'}:
+        raise KeyError(f'Invalid field `{field}`')
+
+    return dict(await gather_async(
+        read_ids_for_project(
+            session=session,
+            project_id=project_id,
+            field=field,
+            log=logger
+        )))
+
+
+async def read_known_ids_map_full(session: AsyncSession,
+                                  project_id: str | uuid.UUID,
+                                  field: IdField, ) -> dict[str, set[str]]:
+    """
+    Return a mapping from ID in field (e.g. DOI) to item_id
+    Same as `read_known_ids_map()`, but returns all matching item_ids
+
+    :param session:
+    :param project_id:
+    :param field:
+    :return:
+    """
+    if field not in {'item_id', 'doi', 'wos_id', 'scopus_id', 'openalex_id', 's2_id', 'pubmed_id', 'dimensions_id'}:
+        raise KeyError(f'Invalid field `{field}`')
+
+    known_ids = defaultdict(set)
+
+    async for identifier, item_id in read_ids_for_project(
+            session=session,
+            project_id=project_id,
+            field=field,
+            log=logger):
+        known_ids[identifier].add(item_id)
+
+    return known_ids
+
+
+async def read_ids_for_project(
+        session: AsyncSession,
+        log: logging.Logger,
+        project_id: str | uuid.UUID,
+        field: IdField,
+        batch_size: int = 5000,
+) -> AsyncGenerator[tuple[str, str], None]:
+    if field not in {'item_id', 'doi', 'wos_id', 'scopus_id', 'openalex_id', 's2_id', 'pubmed_id', 'dimensions_id'}:
+        raise KeyError(f'Invalid field `{field}`')
+
+    rslt = (
+        await session.stream(
+            text(f'''
+            SELECT aiv.{field} as identifier, item_id::text
+            FROM academic_item_variant aiv
+            JOIN import ON aiv.import_id = import.import_id
+            WHERE import.project_id = :project_id
+
+            UNION
+
+            SELECT ai.{field} as identifier, item_id::text
+            FROM academic_item ai
+            WHERE ai.project_id = :project_id;
+        '''),
+            {'project_id': project_id})
+    ).mappings().partitions(batch_size)
+
+    async for batch in rslt:
+        log.debug(f'Received batch with {len(batch)} entries.')
+        for r in batch:
+            yield r['identifier'], r['item_id']
+
+
+async def read_item_ids_for_import(
+        session: AsyncSession,
+        import_id: str | uuid.UUID,
+        batch_size: int = 5000,
+) -> AsyncGenerator[str, None]:
+    stmt = (select(cast(m2m_import_item_table.c.item_id, TEXT))
+            .where(m2m_import_item_table.c.import_id == import_id)
+            .execution_options(yield_per=batch_size))
+    rslt = (await session.stream(stmt)).scalars().partitions()
+
+    async for batch in rslt:
+        for r in batch:
+            yield r

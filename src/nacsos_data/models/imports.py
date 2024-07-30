@@ -5,7 +5,7 @@ from typing import Literal, Annotated
 from uuid import UUID
 from pydantic import BaseModel, Field as PField
 
-from nacsos_data.models.openalex.solr import DefType, SearchField, OpType
+from .openalex.solr import DefType, SearchField, OpType
 
 
 class _FileImport(BaseModel):
@@ -65,8 +65,6 @@ class ImportModel(BaseModel):
 
     # Date and time when this import was created and when the actual import was triggered
     time_created: datetime | None = None
-    time_started: datetime | None = None
-    time_finished: datetime | None = None
 
     # This stores the configuration of the respective import method
     config: ImportConfig | None = None

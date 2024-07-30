@@ -7,10 +7,10 @@ from bibtexparser.middlewares import NameParts, BlockMiddleware
 from bibtexparser.model import Entry, Block
 from bibtexparser import middlewares, Library
 
-from .duplicate import str_to_title_slug
-from ...models.items import AcademicItemModel
-from ...models.items.academic import AcademicAuthorModel
-from .clean import clear_empty
+from ....models.items import AcademicItemModel
+from ....models.items.academic import AcademicAuthorModel
+from ..clean import clear_empty
+from ..duplicate import str_to_title_slug
 
 logger = logging.getLogger('nacsos_data.util.academic.bibtex')
 

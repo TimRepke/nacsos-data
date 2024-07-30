@@ -63,7 +63,7 @@ class DuplicateIndex:
             item_ids = [str(r.item_id) for r in batch]
             texts = [r.text.lower() for r in batch]
 
-            if not hasattr(self.vectoriser, 'vocabulary_') and len(texts) > self.MIN_DF:
+            if not hasattr(self.vectoriser, 'vocabulary') and not hasattr(self.vectoriser, 'vocabulary_') and len(texts) > self.MIN_DF:
                 logger.debug('Vectoriser has no vocabulary, fitting it now on the first batch.')
                 self.vectoriser.fit(texts)
 
@@ -115,6 +115,7 @@ class DuplicateIndex:
         vectors = vstack([batch_vectors for _, batch_vectors in db_data]
                          + [batch_vectors for _, batch_vectors in nw_data])
         # Using Jaccard dissimilarity, defined as: 1 - (token set intersection divided by token set union)
+        logger.info(f'document-word matrix has shape: {vectors.shape}')
         self.index = pynndescent.NNDescent(vectors, metric='jaccard')
 
     def test(self, item: ItemEntry) -> str | None:

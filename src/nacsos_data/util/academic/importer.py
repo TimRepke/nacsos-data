@@ -1,25 +1,204 @@
 import uuid
 import logging
-import datetime
-from pathlib import Path
-from typing import Generator
+import tempfile
 
-from sqlalchemy import insert, select
-from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
+from pathlib import Path
+from typing import Generator, IO
+from collections import defaultdict
+
+from sqlalchemy import insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 from psycopg.errors import UniqueViolation, OperationalError
 from sklearn.feature_extraction.text import CountVectorizer
 
-from ..duplicate import ItemEntry, DuplicateIndex
-from ...db.crud.imports import get_or_create_import
 from ...db import DatabaseEngineAsync, get_engine_async
-from ...db.crud.items.academic import AcademicItemGenerator, read_item_entries_from_db, gen_academic_entries, itm2txt
-from ...db.schemas import AcademicItem, m2m_import_item_table, Import
+from ...db.crud.imports import get_or_create_import
+from ...db.crud.items.academic import (
+    AcademicItemGenerator,
+    read_item_entries_from_db,
+    gen_academic_entries,
+    itm2txt,
+    read_item_ids_for_import,
+    read_known_ids_map,
+    IdField
+)
+from ...db.schemas import AcademicItem, m2m_import_item_table
+from ...models.items import AcademicItemModel
 from ...models.imports import M2MImportItemType
+from ...models.openalex.solr import DefType, SearchField, OpType
+from .. import gather_async
+from ..text import tokenise_item, extract_vocabulary
+from ..duplicate import ItemEntry, DuplicateIndex
 from .clean import get_cleaned_meta_field
 from .duplicate import str_to_title_slug, find_duplicates, duplicate_insertion
-from ...models.items import AcademicItemModel
-from ...models.openalex.solr import DefType, SearchField, OpType
+
+ID_FIELDS: list[IdField] = ['openalex_id', 's2_id', 'scopus_id', 'wos_id', 'pubmed_id', 'dimensions_id']
+
+
+def _read_buffered_items(fp: IO[str]) -> Generator[AcademicItemModel, None, None]:
+    fp.seek(0)
+    for line in fp:
+        yield AcademicItemModel.model_validate_json(line)
+
+
+def _check_known_identifiers(item: AcademicItemModel,
+                             known_ids: dict[str, dict[str, str]],
+                             imported_item_ids: set[str],
+                             logger: logging.Logger) -> str | None | bool:
+    for id_field in ID_FIELDS:  # check each item
+        identifier = getattr(item, id_field)
+        item_id = known_ids[id_field].get(identifier, None)
+
+        if identifier is not None and item_id is not None:
+            if item_id not in imported_item_ids:
+                logger.debug(' -> Found ID match and adding it to import/item m2m buffer')
+                return item_id
+            else:
+                logger.debug(' -> Found ID match but not adding it to m2m buffer (already exists)')
+                return None
+    return False
+
+
+async def _find_id_duplicates(
+        session: AsyncSession,
+        new_items: AcademicItemGenerator,
+        fp: IO[str],
+        import_id: str,
+        project_id: str,
+        logger: logging.Logger) -> tuple[int, dict[str, int], set[str], set[str]]:
+    logger.info('Fetching all known IDs from current project...')
+    known_ids: dict[str, dict[str, str]]
+    known_ids = {
+        id_field: await read_known_ids_map(session=session, project_id=project_id, field=id_field)
+        for id_field in ID_FIELDS
+    }
+
+    # Fetch item_ids already in the import (in case the import failed at some point or is continued mid-way)
+    imported_item_ids = set(await gather_async(read_item_ids_for_import(session=session, import_id=import_id)))
+
+    # Set of item_ids for which we need to add m2m tuples later
+    m2m_buffer: set[str] = set()
+    # Accumulator for our vocabulary
+    token_counts: defaultdict[str, int] = defaultdict(int)
+    n_unknown_items = 0
+
+    logger.info('Checking if there are any known identifiers in the new data...')
+    for item in new_items():  # Iterate all new items
+        # Check if we know this new item via some trusted identifier (e.g. openalex_id)
+        known_item_id = _check_known_identifiers(item, known_ids, imported_item_ids, logger)
+
+        # We know this new item (via an ID) and just need to add an m2m
+
+        # We don't know this new item, add it to our buffer file and extend vocabulary
+        if known_item_id is False:
+            for tok in tokenise_item(item, lowercase=True):
+                token_counts[tok] += 1
+            fp.write(item.model_dump_json() + '\n')
+            n_unknown_items += 1
+
+        # We found a match!
+        elif known_item_id is not None and type(known_item_id) is str:
+            m2m_buffer.add(known_item_id)
+            imported_item_ids.add(known_item_id)
+
+    # return number of items we need to check for duplicates, vocabulary, updated set of seen item_ids, and the m2m buffer
+    return n_unknown_items, token_counts, imported_item_ids, m2m_buffer
+
+
+async def _insert_m2m(session: AsyncSession, item_id: str, import_id: str, dry_run: bool, logger: logging.Logger) -> None:
+    if dry_run:
+        logger.debug(' [DRY-RUN] -> Added many-to-many relationship for import/item')
+    else:
+        stmt_m2m = insert(m2m_import_item_table).values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit)
+        await session.execute(stmt_m2m)
+        await session.flush()
+        logger.debug(' -> Added many-to-many relationship for import/item')
+
+
+async def _find_duplicate(session: AsyncSession,
+                          item: AcademicItemModel,
+                          project_id: str,
+                          min_text_len: int,
+                          index: DuplicateIndex,
+                          logger: logging.Logger) -> str | None:
+    txt = itm2txt(item)
+    if len(txt) > min_text_len:
+        existing_id = index.test(ItemEntry(item_id=str(item.item_id), text=txt))
+        if existing_id is not None:
+            logger.debug(f'  -> Text lookup found duplicate: {existing_id}')
+            return existing_id
+
+    duplicates = await find_duplicates(item=item,
+                                       project_id=str(project_id),
+                                       check_tslug=True,
+                                       check_tslug_advanced=True,
+                                       check_doi=True,
+                                       check_wos_id=True,
+                                       check_scopus_id=True,
+                                       check_oa_id=True,
+                                       check_pubmed_id=True,
+                                       check_dimensions_id=True,
+                                       check_s2_id=True,
+                                       session=session)
+    if duplicates is not None and len(duplicates):
+        existing_id = str(duplicates[0].item_id)
+        logger.debug(f'  -> There are at least {len(duplicates)}; I will probably use {existing_id}')
+        return existing_id
+
+    logger.debug('  -> No duplicate found.')
+    return None
+
+
+def _ensure_clean_item(item: AcademicItemModel, project_id: str) -> AcademicItemModel:
+    # remove empty entries from the meta-data field
+    item.meta = get_cleaned_meta_field(item)
+
+    # ensure the project id is set
+    item.project_id = project_id
+
+    # ensure we have a title_slug
+    if item.title_slug is None or len(item.title_slug) == 0:
+        item.title_slug = str_to_title_slug(item.title)
+
+    return item
+
+
+async def _insert_item(session: AsyncSession,
+                       item: AcademicItemModel,
+                       import_id: str,
+                       existing_id: str | None,
+                       trust_new_authors: bool,
+                       trust_new_keywords: bool,
+                       dry_run: bool,
+                       logger: logging.Logger) -> str:
+    if existing_id is None:
+        item_id = str(uuid.uuid4())
+        if dry_run:
+            logger.debug(f'  [DRY-RUN] -> Creating new item with ID {item_id}!')
+            return item_id
+
+        logger.debug(f' -> Creating new item with ID {item_id}!')
+        item.item_id = item_id
+        session.add(AcademicItem(**item.model_dump()))
+        await session.flush()
+        return item_id
+
+    if item.item_id is None:
+        item.item_id = uuid.uuid4()
+
+    if dry_run:
+        logger.debug(f'  [DRY-RUN] -> Creating variant for new item with ID {item.item_id}!')
+        return str(item.item_id)
+
+    logger.debug(f'  -> Creating variant for new item with ID {item.item_id}!')
+    await duplicate_insertion(orig_item_id=existing_id,
+                              import_id=import_id,
+                              new_item=item,
+                              trust_new_authors=trust_new_authors,
+                              trust_new_keywords=trust_new_keywords,
+                              session=session)
+    return str(item.item_id)
 
 
 async def import_academic_items(
@@ -34,6 +213,7 @@ async def import_academic_items(
         max_slop: float = 0.05,
         min_text_len: int = 300,
         batch_size: int = 2000,
+        max_features: int = 5000,
         dry_run: bool = True,
         trust_new_authors: bool = False,
         trust_new_keywords: bool = False,
@@ -88,6 +268,7 @@ async def import_academic_items(
     :param max_slop
     :param min_text_len
     :param batch_size
+    :param max_features: Maximum number of features for the vectorizer
     :param project_id: ID of the project the items should be added to
     :param import_id: (optional) ID to existing Import
     :param user_id: (your) user_id, which this import will be associated with
@@ -106,130 +287,94 @@ async def import_academic_items(
     if project_id is None:
         raise AttributeError('You have to provide a project ID!')
 
-    item_ids: list[str] = []
-    async with db_engine.session() as session:
-        import_orm = await get_or_create_import(session=session,
-                                                project_id=project_id,
-                                                import_id=import_id,
-                                                user_id=user_id,
-                                                import_name=import_name,
-                                                description=description,
-                                                i_type='script')
-        import_id = str(import_orm.import_id)
+    with tempfile.NamedTemporaryFile('w+') as duplicate_buffer:
+        async with (db_engine.session() as session):
+            # Get the import and figure out what ids to deduplicate on, based on import type
+            import_orm = await get_or_create_import(session=session,
+                                                    project_id=project_id,
+                                                    import_id=import_id,
+                                                    user_id=user_id,
+                                                    import_name=import_name,
+                                                    description=description,
+                                                    i_type='script')
+            import_id = str(import_orm.import_id)
 
-        # Keep track of when we started importing
-        import_orm.time_started = datetime.datetime.now()
-        await session.flush()
-
-        logger.info('Creating abstract duplicate detection index')
-        index = DuplicateIndex(
-            existing_items=read_item_entries_from_db(
+            logger.info('Checking new items for obvious ID-based duplicates...')
+            n_unknown_items, token_counts, imported_item_ids, m2m_buffer = await _find_id_duplicates(
                 session=session,
-                batch_size=batch_size,
-                project_id=project_id,
-                min_text_len=min_text_len,
-                log=logger
-            ),
-            new_items=gen_academic_entries(new_items()),
-            vectoriser=vectoriser,
-            max_slop=max_slop,
-            batch_size=batch_size)
+                project_id=str(project_id),
+                import_id=import_id,
+                new_items=new_items,
+                logger=logger,
+                fp=duplicate_buffer
+            )
+            logger.info(f'Found {n_unknown_items:,} unknown items and {len(m2m_buffer):,} duplicates in first pass.')
 
-    logger.debug('  -> initialising duplicate detection index...')
-    await index.init()
+        index: DuplicateIndex | None = None
+        if n_unknown_items > 0:
+            logger.debug('Constructing vocabulary...')
+            vocabulary = extract_vocabulary(token_counts, min_count=1, max_features=max_features)
 
-    logger.info('Done building the index! Next, I\'m going through new items and adding them!')
+            if vectoriser is None:
+                vectoriser = CountVectorizer(vocabulary=vocabulary)
 
-    for item in new_items():
-        logger.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
+            del token_counts  # clean up term counts to save RAM
 
-        # remove empty entries from the meta-data field
-        item.meta = get_cleaned_meta_field(item)
+            logger.debug('Constructing ANN index...')
+            async with (db_engine.session() as session):
+                index = DuplicateIndex(
+                    existing_items=read_item_entries_from_db(
+                        session=session,
+                        batch_size=batch_size,
+                        project_id=project_id,
+                        min_text_len=min_text_len,
+                        log=logger
+                    ),
+                    new_items=gen_academic_entries(_read_buffered_items(duplicate_buffer)),
+                    vectoriser=vectoriser,
+                    max_slop=max_slop,
+                    batch_size=batch_size)
 
-        # ensure the project id is set
-        item.project_id = project_id
+                logger.debug('  -> initialising duplicate detection index...')
+                await index.init()
 
-        # ensure we have a title_slug
-        if item.title_slug is None or len(item.title_slug) == 0:
-            item.title_slug = str_to_title_slug(item.title)
+        logger.info('Finished pre-processing and index building.')
+        logger.info('Proceeding to insert new items and creating m2m tuples...')
+        async with (db_engine.session() as session):
+            logger.info(f'Inserting {len(m2m_buffer):,} buffered m2m relations...')
+            for item_id in m2m_buffer:
+                await _insert_m2m(session=session, item_id=item_id, import_id=import_id, logger=logger, dry_run=dry_run)
 
-        txt = itm2txt(item)
-        existing_id: str | None = None
-        if len(txt) > min_text_len:
-            existing_id = index.test(ItemEntry(item_id=str(item.item_id), text=txt))
+            if n_unknown_items == 0 or index is None:
+                logger.info('No unknown items found, ending here!')
+                return import_id, list(imported_item_ids)
 
-        if existing_id is not None:
-            logger.debug(f'  -> Text lookup found duplicate: {existing_id}')
-        else:
-            duplicates = await find_duplicates(item=item,
-                                               project_id=str(project_id),
-                                               check_tslug=True,
-                                               check_tslug_advanced=True,
-                                               check_doi=True,
-                                               check_wos_id=True,
-                                               check_scopus_id=True,
-                                               check_oa_id=True,
-                                               check_pubmed_id=True,
-                                               check_dimensions_id=True,
-                                               check_s2_id=True,
-                                               session=session)
-            if duplicates is not None and len(duplicates):
-                existing_id = str(duplicates[0].item_id)
-                logger.debug(f'  -> There are at least {len(duplicates)}; I will probably use {existing_id}')
-
-        try:
-            if existing_id is not None:
-                item_id = existing_id
-                if not dry_run:
-                    if item.item_id is None:
-                        item.item_id = uuid.uuid4()
-                    await duplicate_insertion(orig_item_id=existing_id,
-                                              import_id=import_id,
-                                              new_item=item,
-                                              trust_new_authors=trust_new_authors,
-                                              trust_new_keywords=trust_new_keywords,
-                                              session=session)
-            else:
-                item_id = str(uuid.uuid4())
-                if dry_run:
-                    logger.debug('  -> I will create a new AcademicItem!')
-                else:
-                    logger.debug(f' -> Creating new item with ID {item_id}!')
-                    item.item_id = item_id
-                    session.add(AcademicItem(**item.model_dump()))
-                    await session.commit()
-
-            if dry_run:
-                logger.debug('  -> I will create an m2m entry.')
-            else:
-                item_ids.append(item_id)
-                stmt_m2m = insert(m2m_import_item_table) \
-                    .values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit)
+            logger.info(f'Inserting (maybe) {n_unknown_items:,} buffered duplicate candidates...')
+            for item in _read_buffered_items(duplicate_buffer):
                 try:
-                    await session.execute(stmt_m2m)
-                    await session.commit()
-                    logger.debug(' -> Added many-to-many relationship for import/item')
-                except IntegrityError:
-                    logger.debug(f' -> M2M_i2i already exists, ignoring {import_id} <-> {item_id}')
+                    logger.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
+
+                    # Make sure the item fields are complete and clean
+                    item = _ensure_clean_item(item, project_id=str(project_id))
+
+                    # Search for duplicates in the index and the database
+                    existing_id = await _find_duplicate(session=session, item=item, project_id=str(project_id),
+                                                        min_text_len=min_text_len, index=index, logger=logger)
+
+                    # Insert a new item or an item variant
+                    item_id = await _insert_item(session=session, item=item, existing_id=existing_id, import_id=import_id,
+                                                 trust_new_authors=trust_new_authors, trust_new_keywords=trust_new_keywords,
+                                                 dry_run=dry_run, logger=logger)
+
+                    # Add many-to-many relation to import
+                    imported_item_ids.add(item_id)
+                    await _insert_m2m(session=session, item_id=item_id, import_id=import_id, dry_run=dry_run, logger=logger)
+
+                except (UniqueViolation, IntegrityError, OperationalError) as e:
+                    logger.exception(e)
                     await session.rollback()
 
-        except (UniqueViolation, IntegrityError, OperationalError) as e:
-            logger.exception(e)
-            await session.rollback()
-
-    # Keep track of when we finished importing
-    async with db_engine.session() as session:
-        if import_id is None:
-            raise ValueError('import_id is required here.')
-
-        stmt = select(Import).where(Import.import_id == import_id)
-        result = (await session.execute(stmt)).scalars().one_or_none()
-        if result is not None:
-            result.time_finished = datetime.datetime.now()
-            await session.commit()
-            logger.info('Noted import finishing time in database!')
-
-    return import_id, item_ids
+    return import_id, list(imported_item_ids)
 
 
 async def import_wos_files(sources: list[Path],

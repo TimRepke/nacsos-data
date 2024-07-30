@@ -1,6 +1,5 @@
 import logging
 import uuid
-from datetime import datetime
 from typing import Generator, AsyncGenerator, TYPE_CHECKING
 
 from sqlalchemy import select, insert, func
@@ -184,9 +183,6 @@ async def import_lexis_nexis(session: AsyncSession,
                                             i_type='script')
     import_id = str(import_orm.import_id)
 
-    # Keep track of when we started importing
-    import_orm.time_started = datetime.now()
-
     if vectoriser is None:
         from sklearn.feature_extraction.text import CountVectorizer
         vectoriser = CountVectorizer(min_df=MIN_DF, max_df=MAX_DF, max_features=MAX_FEATURES)
@@ -310,7 +306,5 @@ async def import_lexis_nexis(session: AsyncSession,
                 session.add(LexisNexisItemSource(**source.model_dump()))
                 await session.flush()
 
-    # Keep track of when we finished importing
-    import_orm.time_finished = datetime.now()
     await session.flush()
     log.info('All done!')

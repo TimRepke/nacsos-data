@@ -1,3 +1,4 @@
+import logging
 from typing import Sequence, Generator, TypeVar, Any, AsyncIterator, AsyncGenerator
 
 T = TypeVar('T')
@@ -22,6 +23,10 @@ def batched(lst: Sequence[T] | Generator[T, None, None], batch_size: int) -> Gen
             yield batch
             batch = []
     yield batch
+
+
+async def gather_async(lst: AsyncIterator[T] | AsyncGenerator[T, None]) -> list[T]:
+    return [li async for li in lst]
 
 
 def clear_empty(obj: Any | None) -> Any | None:
@@ -78,3 +83,31 @@ def ensure_values(o: Any, *attrs: str | tuple[str, Any]) -> tuple[Any, ...]:
             v = default
         ret.append(v)
     return tuple(ret)
+
+
+def ensure_logger_async(fallback_logger: logging.Logger):  # type: ignore[no-untyped-def]
+    def decorator(func):  # type: ignore[no-untyped-def]
+        async def wrapper(*args,  # type: ignore[no-untyped-def]
+                          log: logging.Logger | None = None,
+                          **kwargs):
+            if log is None:
+                log = fallback_logger
+            return await func(*args, log=log, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def ensure_logger(fallback_logger: logging.Logger):  # type: ignore[no-untyped-def]
+    def decorator(func):  # type: ignore[no-untyped-def]
+        def wrapper(*args,  # type: ignore[no-untyped-def]
+                    log: logging.Logger | None = None,
+                    **kwargs):
+            if log is None:
+                log = fallback_logger
+            return func(*args, log=log, **kwargs)
+
+        return wrapper
+
+    return decorator

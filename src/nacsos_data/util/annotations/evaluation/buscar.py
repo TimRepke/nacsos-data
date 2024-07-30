@@ -45,7 +45,7 @@ def calculate_h0(labels_: ArrayOrList, n_docs: int, recall_target: float = .95) 
     )
 
     # Test the null hypothesis that a given recall target has been missed
-    p: npt.NDArray[np.float_] = hypergeom.cdf(  # the probability of observing
+    p: npt.NDArray[np.float64] = hypergeom.cdf(  # the probability of observing
         urns.cumsum(),  # the number of relevant documents in the sample
         n_docs - (urns.shape[0] - urn_sizes),  # in a population made up out of the urn and all remaining docs
         k_hat,  # where K_hat docs in the population are actually relevant
@@ -165,6 +165,6 @@ def compute_recall(labels_: ArrayOrList) -> list[float | None]:
     labels: Array = (labels_ if type(labels_) is np.ndarray
                      else np.array(labels_, dtype=np.int_))
     n_seen_relevant = labels.sum()
-    recall: npt.NDArray[np.float_] = labels.cumsum() / n_seen_relevant
+    recall: npt.NDArray[np.float64] = labels.cumsum() / n_seen_relevant
     recall_lst: list[float] = recall.tolist()
     return [ri if not np.isnan(ri) else None for ri in recall_lst]
