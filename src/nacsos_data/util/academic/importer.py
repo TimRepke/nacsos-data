@@ -3,26 +3,294 @@ import logging
 import datetime
 from pathlib import Path
 from typing import Generator
+from collections import defaultdict
+import re
+import tempfile
 
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, cast, TEXT
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 from sqlalchemy.exc import IntegrityError
 from psycopg.errors import UniqueViolation, OperationalError
 from sklearn.feature_extraction.text import CountVectorizer
+import numpy as np
 
 from ..duplicate import ItemEntry, DuplicateIndex
 from ...db.crud.imports import get_or_create_import
 from ...db import DatabaseEngineAsync, get_engine_async
-from ...db.crud.items.academic import AcademicItemGenerator, read_item_entries_from_db, gen_academic_entries, itm2txt
+from ...db.crud.items.academic import AcademicItemGenerator, read_item_entries_from_db, gen_academic_entries, read_ids_from_db, itm2txt
 from ...db.schemas import AcademicItem, m2m_import_item_table, Import
-from ...models.imports import M2MImportItemType
+from ...models.imports import M2MImportItemType, ImportModel
 from .clean import get_cleaned_meta_field
 from .duplicate import str_to_title_slug, find_duplicates, duplicate_insertion
 from ...models.items import AcademicItemModel
 from ...models.openalex.solr import DefType, SearchField, OpType
 
 
+def _read_json_items(fp) -> Generator[dict, None, None]:
+    fp.seek(0)
+    for line in fp:
+        yield AcademicItemModel.model_validate_json(line)
+
+
 async def import_academic_items(
+        db_engine: DatabaseEngineAsync,
+        project_id: str | uuid.UUID,
+        new_items: AcademicItemGenerator,
+        import_name: str | None = None,
+        import_id: str | uuid.UUID | None = None,
+        user_id: str | uuid.UUID | None = None,
+        description: str | None = None,
+        vectoriser: CountVectorizer | None = None,
+        max_slop: float = 0.05,
+        min_text_len: int = 300,
+        batch_size: int = 2000,
+        max_features: int = 5000,
+        dry_run: bool = True,
+        trust_new_authors: bool = False,
+        trust_new_keywords: bool = False,
+        logger: logging.Logger | None = None
+) -> tuple[str, list[str]]:
+    """
+    Helper function for programmatically importing `AcademicItem`s into the platform.
+
+    Example usage:
+    ```
+    from nacsos_data.db import get_engine_async
+    from nacsos_data.util.academic.scopus import read_scopus_file
+    from nacsos_data.util.academic.import import import_academic_items
+
+    PROJECT_ID = '??'
+
+    db_engine = get_engine_async(conf_file='/path/to/remote_config.env')
+    scopus_works = read_scopus_file('/path/to/scopus.csv', project_id=PROJECT_ID)
+    await import_academic_items(items=scopus_works, db_engine=db_engine, project_id=PROJECT_ID, ...)
+    ```
+
+    If you are working in a synchronous context, you can wrap the above code in a method and run with asyncio:
+    ```
+    import asyncio
+
+    def main():
+        ...
+
+    if __name__ == '__main__':
+        asyncio.run(main())
+    ```
+
+    Items are always associated with a project, and within a project with an `Import`.
+    This is used to indicate a "scope" of where the data comes from, e.g. a query from WoS or Scopus.
+    Item sets may overlap between Imports.
+
+    There are two modes:
+      1) You can use an existing Import by providing the `import_id`.
+         This might be useful when you already created a blank import via the WebUI or
+         want to add more items to that import. Note, that we recommend creating a new import if
+         the "scopes" are better semantically separate (e.g. query results from different points in time might be
+         two Imports rather than one Import that is added to).
+         In this case `user_id`, `import_name`, `description` are ignored.
+      2) Create a new Import by setting `user_id`, `import_name`, and `description`; optionally set `import_id`.
+         In this way, a new Import will be created and all items will be associated with that.
+
+    :param db_engine
+    :param trust_new_authors:
+    :param trust_new_keywords:
+    :param new_items: A list (or generator) of AcademicItems
+    :param vectoriser
+    :param max_slop
+    :param min_text_len
+    :param batch_size
+    :param max_features: Maximum number of features for the vectorizer
+    :param project_id: ID of the project the items should be added to
+    :param import_id: (optional) ID to existing Import
+    :param user_id: (your) user_id, which this import will be associated with
+    :param import_name: Concise and descriptive name for this import
+    :param description: Proper (markdown) description for this import.
+                        Usually this should describe the source of the dataset and, if applicable, the search query.
+    :param dry_run: If false, actually write data to the database;
+                    If true, simulate best as possible (note, that duplicates within the `items` are not validated
+                                                        and not all constraints can be checked)
+    :param logger:
+    :return: import_id and list of item_ids that were actually used in the end
+    """
+    if logger is None:
+        logger = logging.getLogger('nacsos_data.util.academic.import')
+
+    if project_id is None:
+        raise AttributeError('You have to provide a project ID!')
+
+    item_ids: set[str] = set()
+    async with db_engine.session() as session:
+        # Get the import and figure out what ids to deduplicate on, based on import type
+        import_orm = await get_or_create_import(session=session,
+                                                project_id=project_id,
+                                                import_id=import_id,
+                                                user_id=user_id,
+                                                import_name=import_name,
+                                                description=description,
+                                                i_type='script')
+        import_obj = ImportModel(**import_orm.__dict__)
+        import_id = str(import_orm.import_id)
+        if import_obj.config.kind == 'oa-solr' or import_orm.config.kind == 'oa-file':
+            id_field = 'openalex_id'
+        elif import_orm.config.kind == 'scopus':
+            id_field = 's2_id'
+        elif import_orm.config.kind == 'wos':
+            id_field = 'wos_id'
+        else:
+            id_field = None
+
+        if id_field is not None:
+            id_entries = [e async for e in read_ids_from_db(
+                session=session,
+                project_id=project_id,
+                field=id_field,
+                log=logger
+            )]
+            known_ids: dict[str, str] = dict(list(id_entries))
+        else:
+            known_ids = {}
+
+        token_counts = defaultdict(int)
+        token_pattern = re.compile(CountVectorizer().token_pattern)
+
+        item_ids = set((await session.execute(select(cast(m2m_import_item_table.c.item_id,TEXT))
+                                              .where(m2m_import_item_table.c.import_id == import_id))).scalars().all())
+
+        n_unknown_items = 0
+        with tempfile.NamedTemporaryFile('w+') as fp:
+            for item in new_items():
+                if id_field is not None:
+                    item_key = getattr(item, id_field)
+                else:
+                    item_key = None
+                if item_key in known_ids.keys():
+                    if dry_run:
+                        logger.debug('  -> I will create an m2m entry.')
+                    else:
+                        item_id = known_ids[item_key]
+                        if item_id not in item_ids:
+                            item_ids.add(item_id)
+                            stmt_m2m = insert(m2m_import_item_table) \
+                                .values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit)
+                            await session.execute(stmt_m2m)
+                            await session.flush()
+                            logger.debug(' -> Added many-to-many relationship for import/item')
+                        else:
+                            logger.debug(' -> Did not add many-to-many relationship for import/item (item already in import)')
+                else:
+                    # Add to vocab
+                    if item.text is not None:
+                        for tok in token_pattern.findall(item.text.lower()):
+                            token_counts[tok] += 1
+                        fp.write(item.model_dump_json() + '\n')
+                        n_unknown_items += 1
+            if n_unknown_items > 0:
+                vocab = [tok for tok, _ in sorted([(tok, cnt) for tok, cnt in token_counts.items() if cnt > 1], key=lambda x: x[1], reverse=True)]
+                del token_counts
+                if len(vocab) < max_features:
+                    max_features = len(vocab)
+                vocab = vocab[:max_features]
+                # filter vocab
+                vectoriser = CountVectorizer(vocabulary=vocab)
+
+                index = DuplicateIndex(
+                    existing_items=read_item_entries_from_db(
+                        session=session,
+                        batch_size=batch_size,
+                        project_id=project_id,
+                        min_text_len=min_text_len,
+                        log=logger
+                    ),
+                    new_items=gen_academic_entries(_read_json_items(fp)),
+                    vectoriser=vectoriser,
+                    max_slop=max_slop,
+                    batch_size=batch_size)
+
+                logger.debug('  -> initialising duplicate detection index...')
+                await index.init()
+
+                logger.info('Done building the index! Next, I\'m going through new items and adding them!')
+
+                for item in _read_json_items(fp):
+                    logger.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
+
+                    # remove empty entries from the meta-data field
+                    item.meta = get_cleaned_meta_field(item)
+
+                    # ensure the project id is set
+                    item.project_id = project_id
+
+                    # ensure we have a title_slug
+                    if item.title_slug is None or len(item.title_slug) == 0:
+                        item.title_slug = str_to_title_slug(item.title)
+
+                    txt = itm2txt(item)
+                    existing_id: str | None = None
+                    if len(txt) > min_text_len:
+                        existing_id = index.test(ItemEntry(item_id=str(item.item_id), text=txt))
+
+                    if existing_id is not None:
+                        logger.debug(f'  -> Text lookup found duplicate: {existing_id}')
+                    else:
+                        duplicates = await find_duplicates(item=item,
+                                                           project_id=str(project_id),
+                                                           check_tslug=True,
+                                                           check_tslug_advanced=True,
+                                                           check_doi=True,
+                                                           check_wos_id=True,
+                                                           check_scopus_id=True,
+                                                           check_oa_id=True,
+                                                           check_pubmed_id=True,
+                                                           check_dimensions_id=True,
+                                                           check_s2_id=True,
+                                                           session=session)
+                        if duplicates is not None and len(duplicates):
+                            existing_id = str(duplicates[0].item_id)
+                            logger.debug(f'  -> There are at least {len(duplicates)}; I will probably use {existing_id}')
+
+                    try:
+                        if existing_id is not None:
+                            item_id = existing_id
+                            if not dry_run:
+                                if item.item_id is None:
+                                    item.item_id = uuid.uuid4()
+                                await duplicate_insertion(orig_item_id=existing_id,
+                                                          import_id=import_id,
+                                                          new_item=item,
+                                                          trust_new_authors=trust_new_authors,
+                                                          trust_new_keywords=trust_new_keywords,
+                                                          session=session)
+                        else:
+                            item_id = str(uuid.uuid4())
+                            if dry_run:
+                                logger.debug('  -> I will create a new AcademicItem!')
+                            else:
+                                logger.debug(f' -> Creating new item with ID {item_id}!')
+                                item.item_id = item_id
+                                session.add(AcademicItem(**item.model_dump()))
+                                await session.flush()
+
+                        if dry_run:
+                            logger.debug('  -> I will create an m2m entry.')
+                        else:
+                            if item_id not in item_ids:
+                                item_ids.add(item_id)
+                                stmt_m2m = insert(m2m_import_item_table) \
+                                    .values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit)
+                                await session.execute(stmt_m2m)
+                                await session.flush()
+                                logger.debug(' -> Added many-to-many relationship for import/item')
+                            else:
+                                logger.debug(' -> Did not add many-to-many relationship for import/item (duplicate already added)')
+
+                    except (UniqueViolation, IntegrityError, OperationalError) as e:
+                        logger.exception(e)
+                        await session.rollback()
+
+    return
+
+
+async def import_academic_items_old(
         db_engine: DatabaseEngineAsync,
         project_id: str | uuid.UUID,
         new_items: AcademicItemGenerator,

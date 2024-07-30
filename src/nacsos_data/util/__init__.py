@@ -88,7 +88,7 @@ def ensure_logger_async(fallback_logger: logging.Logger):  # type: ignore[no-unt
                           **kwargs):
             if log is None:
                 log = fallback_logger
-            return await func(*args, logger=log, **kwargs)
+            return await func(*args, log=log, **kwargs)
 
         return wrapper
 

@@ -1,13 +1,13 @@
+import uuid
 import logging
 import datetime
-import uuid
-from collections import defaultdict
 from typing import Any
+from collections import defaultdict
 
-from ...models.annotations import AssignmentModel, AssignmentStatus, AnnotationModel
-from ...models.items.academic import AcademicAuthorModel, AffiliationModel, AcademicItemModel
-from ..errors import NotFoundError
-from .duplicate import get_title_slug
+from ....models.annotations import AssignmentModel, AssignmentStatus, AnnotationModel
+from ....models.items.academic import AcademicAuthorModel, AffiliationModel, AcademicItemModel
+from ...errors import NotFoundError
+from ..duplicate import get_title_slug
 
 logger = logging.getLogger('nacsos_data.util.academic.nacsos_legacy')
 
