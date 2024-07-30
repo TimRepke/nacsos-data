@@ -28,6 +28,8 @@ class AnnotationTrackerModel(DehydratedAnnotationTracker):
     majority: bool
     # Number of items (usually this will be the number of items in the number of items in the project)
     n_items_total: int
+    # Batch size for buscar compute (-1 will use scope borders)
+    batch_size: int
     # Recall target (parameter for the BUSCAR metric)
     recall_target: float
     # Include resolved labels from these resolutions or assignment scopes

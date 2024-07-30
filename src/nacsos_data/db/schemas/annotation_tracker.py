@@ -33,6 +33,8 @@ class AnnotationTracker(Base):
     majority = mapped_column(Boolean, nullable=False, unique=False, index=False)
     # Number of items (usually this will be the number of items in the number of items in the project)
     n_items_total = mapped_column(Integer, nullable=False, unique=False, index=False)
+    # Batch size for buscar compute (-1 will use scope borders)
+    batch_size = mapped_column(Integer, nullable=False, unique=False, index=False)
     # Recall target (parameter for the BUSCAR metric)
     recall_target = mapped_column(Float, nullable=False, unique=False, index=False)
     # Include resolved labels from these resolutions or assignment scopes
