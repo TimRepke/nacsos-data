@@ -99,8 +99,9 @@ async def _find_id_duplicates(
 
         # We found a match!
         elif known_item_id is not None and type(known_item_id) is str:
-            m2m_buffer.add(known_item_id)
-            imported_item_ids.add(known_item_id)
+            if known_item_id not in imported_item_ids:
+                m2m_buffer.add(known_item_id)
+                imported_item_ids.add(known_item_id)
 
     # return number of items we need to check for duplicates, vocabulary, updated set of seen item_ids, and the m2m buffer
     return n_unknown_items, token_counts, imported_item_ids, m2m_buffer
@@ -367,8 +368,9 @@ async def import_academic_items(
                                                  dry_run=dry_run, logger=logger)
 
                     # Add many-to-many relation to import
-                    imported_item_ids.add(item_id)
-                    await _insert_m2m(session=session, item_id=item_id, import_id=import_id, dry_run=dry_run, logger=logger)
+                    if item_id not in imported_item_ids:
+                        imported_item_ids.add(item_id)
+                        await _insert_m2m(session=session, item_id=item_id, import_id=import_id, dry_run=dry_run, logger=logger)
 
                 except (UniqueViolation, IntegrityError, OperationalError) as e:
                     logger.exception(e)
