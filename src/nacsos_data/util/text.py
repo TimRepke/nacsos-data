@@ -6,13 +6,13 @@ REG_CLEAN = re.compile(r'[^a-z ]+', flags=re.IGNORECASE)
 CLEAN_HTML = re.compile('<[a-zA-Z/]+[^>]*>')
 
 
-def preprocess_text(x: str) -> str:
+def preprocess_text(x: str | None) -> str:
     '''
     Preprocesses text by removing html tags (like <sub> <sup>) and lowering the case
     :param x: a string to be preprocessed
     :return: preprocessed string
     '''
-    return re.sub(CLEAN_HTML, '', x).lower()
+    return re.sub(CLEAN_HTML, '', str(x)).lower()
 
 
 def tokenise_text(txt: str | None, lowercase: bool = True, max_tokens: int = 80) -> list[str]:

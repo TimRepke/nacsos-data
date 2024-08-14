@@ -121,7 +121,7 @@ async def _find_duplicate(session: AsyncSession,
                           item: AcademicItemModel,
                           project_id: str,
                           min_text_len: int,
-                          index: DuplicateIndex,
+                          index: DuplicateIndex | MilvusDuplicateIndex,
                           logger: logging.Logger) -> str | None:
     txt = itm2txt(item)
     if len(txt) > min_text_len:
@@ -311,7 +311,7 @@ async def import_academic_items(
             )
             logger.info(f'Found {n_unknown_items:,} unknown items and {len(m2m_buffer):,} duplicates in first pass.')
 
-        index: DuplicateIndex | None = None
+        index: MilvusDuplicateIndex | None = None
         if n_unknown_items > 0:
             logger.debug('Constructing vocabulary...')
             vocabulary = extract_vocabulary(token_counts, min_count=1, max_features=max_features)
@@ -378,7 +378,7 @@ async def import_academic_items(
                     logger.exception(e)
                     await session.rollback()
 
-    index.remove_collection(index.collection_name)
+    index.client.drop_collection(index.collection_name)
 
     return import_id, list(imported_item_ids)
 

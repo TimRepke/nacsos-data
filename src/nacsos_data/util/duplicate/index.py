@@ -11,6 +11,9 @@ from ..text import preprocess_text, tokenise_text
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
     from pynndescent import NNDescent
+    import uuid
+    from scipy.sparse import csr_matrix
+    import typing
 
 logger = logging.getLogger('nacsos_data.util.deduplicate.index')
 
@@ -37,7 +40,7 @@ class MilvusDuplicateIndex:
     def __init__(self,
                  existing_items: AsyncGenerator[list[ItemEntry], None],
                  new_items: Generator[ItemEntry, None, None],
-                 project_id: str,
+                 project_id: str | uuid.UUID,
                  vectoriser: CountVectorizer | None = None,
                  max_slop: float = 0.02,
                  batch_size: int = 10000,
@@ -143,7 +146,7 @@ class MilvusDuplicateIndex:
 
         self.client.create_collection(collection_name=self.collection_name, schema=schema)
 
-        def get_vector_rep(x, i):
+        def get_vector_rep(x: csr_matrix, i: int) -> typing.Dict[typing.Any, typing.Any]:
             if x.nnz > 0:
                 return {
                     'id': i,
@@ -229,42 +232,6 @@ class MilvusDuplicateIndex:
                 # else: false positive, it's a duplicate and we just saw the first one of them
         return None
 
-    def test_dists(self, item: ItemEntry) -> str | None:
-        if self.collection_name is None:
-            raise RuntimeError('Index is not initialised, yet!')
-        if self.item_ids_db_inv is None or self.item_ids_nw_inv is None:
-            raise RuntimeError('Lookups are not initialised, yet!')
-
-        if item.text is not None and len(item.text) > self.MIN_TEXT_LEN:
-            vector = self.vectoriser.transform([item.text]).getrow(0)
-            magnitude = np.sqrt(vector.dot(vector.T).data[0])
-
-            search_params = {
-                'metric_type': 'IP',
-                'params': {'drop_ratio_search': 0.2},  # the ratio of small vector values to be dropped during search.
-            }
-
-            search_res = self.client.search(
-                collection_name=self.collection_name,
-                data=[vector],
-                limit=5,
-                output_fields=['id', 'magnitude'],
-                search_params=search_params,
-                filter=f'magnitude < {magnitude * 1.1} and magnitude > {magnitude * 0.9}',
-            )
-            item_hits = []
-            for hits in search_res:
-                for hit in hits:
-                    dist = 1 - hit['distance'] / (magnitude * hit['entity']['magnitude'])
-                    hit['cosine_dist'] = dist
-
-                    hit['item_id_db'] = self.item_ids_db_inv.get(hit['entity']['id'])
-                    hit['item_id_nw'] = self.item_ids_nw_inv.get(hit['entity']['id'])
-
-                    item_hits.append(hit)
-
-        return item_hits
-
     # Follow chains of duplicate reference if needed to resolve to the "origin" duplicate
     def _resolve(self, cid: str) -> str:
         if cid in self.saved:
@@ -276,9 +243,6 @@ class MilvusDuplicateIndex:
             self.saved[new_id] = new_id
         else:
             self.saved[new_id] = self._resolve(existing_id)
-
-    def remove_collection(self):
-        self.client.drop_collection(self.collection_name)
 
 
 class DuplicateIndex:
