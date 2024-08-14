@@ -5,13 +5,15 @@ TOKEN_PATTERN = re.compile(r'(?u)\b\w\w+\b')
 REG_CLEAN = re.compile(r'[^a-z ]+', flags=re.IGNORECASE)
 CLEAN_HTML = re.compile('<[a-zA-Z/]+[^>]*>')
 
+
 def preprocess_text(x: str) -> str:
     '''
     Preprocesses text by removing html tags (like <sub> <sup>) and lowering the case
     :param x: a string to be preprocessed
     :return: preprocessed string
     '''
-    return re.sub(CLEAN_HTML,'',x).lower()
+    return re.sub(CLEAN_HTML, '', x).lower()
+
 
 def tokenise_text(txt: str | None, lowercase: bool = True, max_tokens: int = 80) -> list[str]:
     '''
@@ -25,6 +27,7 @@ def tokenise_text(txt: str | None, lowercase: bool = True, max_tokens: int = 80)
     if lowercase:
         return TOKEN_PATTERN.findall(txt.lower())[:max_tokens]
     return TOKEN_PATTERN.findall(txt)[:max_tokens]
+
 
 def tokenise_item(item: AnyItemModel, lowercase: bool = True) -> list[str]:
     return tokenise_text(preprocess_text(item.text), lowercase=lowercase)

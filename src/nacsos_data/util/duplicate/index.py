@@ -3,12 +3,9 @@ from typing import TYPE_CHECKING, Generator, AsyncGenerator, NamedTuple
 from scipy.sparse import vstack
 from sklearn.feature_extraction.text import CountVectorizer
 from scipy.sparse import csr_matrix
-from pymilvus import MilvusClient, utility, BulkInsertState, connections, CollectionSchema, Collection, FieldSchema, DataType
+from pymilvus import MilvusClient, DataType
 from .. import batched
-import uuid
-import tempfile
 import numpy as np
-from milvus import default_server
 from ..text import preprocess_text, tokenise_text
 
 if TYPE_CHECKING:
@@ -21,6 +18,7 @@ logger = logging.getLogger('nacsos_data.util.deduplicate.index')
 class ItemEntry(NamedTuple):
     item_id: str
     text: str
+
 
 class MilvusDuplicateIndex:
     # Texts shorter than N characters will always be assumed unique (excluded from deduplication)
@@ -145,7 +143,7 @@ class MilvusDuplicateIndex:
 
         self.client.create_collection(collection_name=self.collection_name, schema=schema)
 
-        def get_vector_rep(x,i):
+        def get_vector_rep(x, i):
             if x.nnz > 0:
                 return {
                     'id': i,
@@ -161,7 +159,7 @@ class MilvusDuplicateIndex:
 
         self.client.insert(
             collection_name=self.collection_name, data=[
-                get_vector_rep(vectors.getrow(i),i) for i in range(vectors.shape[0])
+                get_vector_rep(vectors.getrow(i), i) for i in range(vectors.shape[0])
             ]
         )
         index_params = self.client.prepare_index_params()
@@ -198,18 +196,18 @@ class MilvusDuplicateIndex:
                 collection_name=self.collection_name,
                 data=[vector],
                 limit=5,
-                output_fields=['id','magnitude'],
+                output_fields=['id', 'magnitude'],
                 search_params=search_params,
-                filter=f'magnitude < {magnitude*1.1} and magnitude > {magnitude*0.9}',
+                filter=f'magnitude < {magnitude * 1.1} and magnitude > {magnitude * 0.9}',
             )
             for hits in search_res:
                 for hit in hits:
-                    dist = 1 - hit['distance']/(magnitude*hit['entity']['magnitude'])
+                    dist = 1 - hit['distance'] / (magnitude * hit['entity']['magnitude'])
 
                     # Likely not a duplicate
                     if dist > self.max_slop:
                         logger.debug(f' -> No close text match with >{1 - self.max_slop} overlap')
-                        continue # We no longer stop here in case there is a document with a lower inner product but higher cosine similarity
+                        continue  # We no longer stop here in case there is a document with a lower inner product but higher cosine similarity
 
                     item_id_db = self.item_ids_db_inv.get(hit['entity']['id'])
                     item_id_nw = self.item_ids_nw_inv.get(hit['entity']['id'])
@@ -245,8 +243,6 @@ class MilvusDuplicateIndex:
                 'metric_type': 'IP',
                 'params': {'drop_ratio_search': 0.2},  # the ratio of small vector values to be dropped during search.
             }
-
-            #self.client.load_collection(self.collection_name)
 
             search_res = self.client.search(
                 collection_name=self.collection_name,
