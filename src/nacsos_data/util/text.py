@@ -3,18 +3,31 @@ from ..models.items import AnyItemModel
 
 TOKEN_PATTERN = re.compile(r'(?u)\b\w\w+\b')
 REG_CLEAN = re.compile(r'[^a-z ]+', flags=re.IGNORECASE)
+CLEAN_HTML = re.compile('<[a-zA-Z/]+[^>]*>')
 
+def preprocess_text(x: str) -> str:
+    '''
+    Preprocesses text by removing html tags (like <sub> <sup>) and lowering the case
+    :param x: a string to be preprocessed
+    :return: preprocessed string
+    '''
+    return re.sub(CLEAN_HTML,'',x).lower()
 
-def tokenise_text(txt: str | None, lowercase: bool = False) -> list[str]:
+def tokenise_text(txt: str | None, lowercase: bool = True, max_tokens: int = 80) -> list[str]:
+    '''
+    :param txt: a text string to be tokenized
+    :param lowercase: lowercase or not, no reasons why not normally
+    :param max_tokens: only return the first max_tokens tokens (to deal with truncated abstracts)
+    :return: a list of tokens
+    '''
     if txt is None:
         return []
     if lowercase:
-        return TOKEN_PATTERN.findall(txt.lower())
-    return TOKEN_PATTERN.findall(txt)
+        return TOKEN_PATTERN.findall(txt.lower())[:max_tokens]
+    return TOKEN_PATTERN.findall(txt)[:max_tokens]
 
-
-def tokenise_item(item: AnyItemModel, lowercase: bool = False) -> list[str]:
-    return tokenise_text(item.text, lowercase=lowercase)
+def tokenise_item(item: AnyItemModel, lowercase: bool = True) -> list[str]:
+    return tokenise_text(preprocess_text(item.text), lowercase=lowercase)
 
 
 def extract_vocabulary(token_counts: dict[str, int], min_count: int = 1, max_features: int = 1000) -> list[str]:

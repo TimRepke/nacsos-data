@@ -1,3 +1,3 @@
-from .index import DuplicateIndex, ItemEntry
+from .index import DuplicateIndex, ItemEntry, MilvusDuplicateIndex
 
-__all__ = ['ItemEntry', 'DuplicateIndex']
+__all__ = ['ItemEntry', 'DuplicateIndex','MilvusDuplicateIndex']
