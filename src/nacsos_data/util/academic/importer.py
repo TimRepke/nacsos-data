@@ -377,7 +377,8 @@ async def import_academic_items(
                 except (UniqueViolation, IntegrityError, OperationalError) as e:
                     logger.exception(e)
                     await session.rollback()
-    index.remove_collection()
+
+    index.remove_collection(index.collection_name)
 
     return import_id, list(imported_item_ids)
 
