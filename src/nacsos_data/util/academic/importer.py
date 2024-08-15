@@ -29,7 +29,7 @@ from ...models.imports import M2MImportItemType
 from ...models.openalex.solr import DefType, SearchField, OpType
 from .. import gather_async
 from ..text import tokenise_item, extract_vocabulary
-from ..duplicate import ItemEntry, DuplicateIndex
+from ..duplicate import ItemEntry, DuplicateIndex, MilvusDuplicateIndex
 from .clean import get_cleaned_meta_field
 from .duplicate import str_to_title_slug, find_duplicates, duplicate_insertion
 
@@ -121,7 +121,7 @@ async def _find_duplicate(session: AsyncSession,
                           item: AcademicItemModel,
                           project_id: str,
                           min_text_len: int,
-                          index: DuplicateIndex,
+                          index: DuplicateIndex | MilvusDuplicateIndex,
                           logger: logging.Logger) -> str | None:
     txt = itm2txt(item)
     if len(txt) > min_text_len:
@@ -311,7 +311,7 @@ async def import_academic_items(
             )
             logger.info(f'Found {n_unknown_items:,} unknown items and {len(m2m_buffer):,} duplicates in first pass.')
 
-        index: DuplicateIndex | None = None
+        index: MilvusDuplicateIndex | None = None
         if n_unknown_items > 0:
             logger.debug('Constructing vocabulary...')
             vocabulary = extract_vocabulary(token_counts, min_count=1, max_features=max_features)
@@ -323,7 +323,7 @@ async def import_academic_items(
 
             logger.debug('Constructing ANN index...')
             async with (db_engine.session() as session):
-                index = DuplicateIndex(
+                index = MilvusDuplicateIndex(
                     existing_items=read_item_entries_from_db(
                         session=session,
                         batch_size=batch_size,
@@ -332,6 +332,7 @@ async def import_academic_items(
                         log=logger
                     ),
                     new_items=gen_academic_entries(_read_buffered_items(duplicate_buffer)),
+                    project_id=project_id,
                     vectoriser=vectoriser,
                     max_slop=max_slop,
                     batch_size=batch_size)
@@ -351,6 +352,7 @@ async def import_academic_items(
                 return import_id, list(imported_item_ids)
 
             logger.info(f'Inserting (maybe) {n_unknown_items:,} buffered duplicate candidates...')
+            index.client.load_collection(index.collection_name)
             for item in _read_buffered_items(duplicate_buffer):
                 try:
                     logger.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
@@ -375,6 +377,8 @@ async def import_academic_items(
                 except (UniqueViolation, IntegrityError, OperationalError) as e:
                     logger.exception(e)
                     await session.rollback()
+
+    index.client.drop_collection(index.collection_name)
 
     return import_id, list(imported_item_ids)
 
@@ -616,7 +620,7 @@ async def import_openalex(query: str,
         vectoriser=None,
         max_slop=0.05,
         batch_size=5000,
-        dry_run=False,
+        dry_run=True,
         trust_new_authors=False,
         trust_new_keywords=False,
         logger=logger
