@@ -2,7 +2,6 @@ import logging
 from typing import TYPE_CHECKING, Generator, AsyncGenerator, NamedTuple
 from scipy.sparse import vstack
 from sklearn.feature_extraction.text import CountVectorizer
-from scipy.sparse import csr_matrix
 from pymilvus import MilvusClient, DataType
 from .. import batched
 import numpy as np
