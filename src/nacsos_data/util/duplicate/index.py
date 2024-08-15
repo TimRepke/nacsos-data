@@ -9,7 +9,6 @@ from ..text import preprocess_text, tokenise_text
 import uuid
 from scipy.sparse import csr_matrix
 
-
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
     from pynndescent import NNDescent
@@ -75,7 +74,7 @@ class MilvusDuplicateIndex:
         async for batch in generator:
             logger.debug(f'Received batch with {len(batch)} entries.')
             item_ids = [str(r.item_id) for r in batch]
-            texts = [r.text.lower() for r in batch]
+            texts = [r.text for r in batch]
 
             if not hasattr(self.vectoriser, 'vocabulary') and not hasattr(self.vectoriser, 'vocabulary_') and len(texts) > self.MIN_DF:
                 logger.debug('Vectoriser has no vocabulary, fitting it now on the first batch.')
@@ -90,7 +89,7 @@ class MilvusDuplicateIndex:
         for bi, batch in enumerate(batched(generator, batch_size=self.batch_size)):
             logger.debug(f'Received batch with {len(batch)} entries.')
             item_ids = [str(r.item_id) for r in batch]
-            texts = [r.text.lower() for r in batch]
+            texts = [r.text for r in batch]
 
             if bi == 0 and len(texts) <= self.MIN_DF:
                 self.MIN_DF = 1

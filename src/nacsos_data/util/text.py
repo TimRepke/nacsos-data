@@ -6,6 +6,16 @@ REG_CLEAN = re.compile(r'[^a-z ]+', flags=re.IGNORECASE)
 CLEAN_HTML = re.compile('<[a-zA-Z/]+[^>]*>')
 
 
+def itm2txt(r: object) -> str:
+    # Abstract *has* to exist, otherwise do not continue
+    # I'm not sure why this makes sense, why not take title if no abstract is available?
+    # if getattr(r, 'text') is None:
+    #     return ''
+    # return REG_CLEAN.sub(' ', f'{getattr(r, "title", "") or ""} {getattr(r, "text", "") or ""}'.lower()).strip()
+    # We have a tokenizer and a preprocessor defined later, so lets use those.
+    return f'{getattr(r, "title", "") or ""} {getattr(r, "text", "") or ""}'
+
+
 def preprocess_text(x: str | None) -> str:
     '''
     Preprocesses text by removing html tags (like <sub> <sup>) and lowering the case
@@ -30,7 +40,7 @@ def tokenise_text(txt: str | None, lowercase: bool = True, max_tokens: int = 80)
 
 
 def tokenise_item(item: AnyItemModel, lowercase: bool = True) -> list[str]:
-    return tokenise_text(preprocess_text(item.text), lowercase=lowercase)
+    return tokenise_text(preprocess_text(itm2txt(item)), lowercase=lowercase)
 
 
 def extract_vocabulary(token_counts: dict[str, int], min_count: int = 1, max_features: int = 1000) -> list[str]:
