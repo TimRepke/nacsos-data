@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, Generator, AsyncGenerator, NamedTuple
+from typing import TYPE_CHECKING, Generator, AsyncGenerator, NamedTuple, Dict, Any
 from scipy.sparse import vstack
 from sklearn.feature_extraction.text import CountVectorizer
 from pymilvus import MilvusClient, DataType
@@ -7,12 +7,13 @@ from .. import batched
 import numpy as np
 from ..text import preprocess_text, tokenise_text
 import uuid
+from scipy.sparse import csr_matrix
+
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
     from pynndescent import NNDescent
-    from scipy.sparse import csr_matrix
-    import typing
+
 
 logger = logging.getLogger('nacsos_data.util.deduplicate.index')
 
@@ -145,7 +146,7 @@ class MilvusDuplicateIndex:
 
         self.client.create_collection(collection_name=self.collection_name, schema=schema)
 
-        def get_vector_rep(x: csr_matrix, i: int) -> typing.Dict[typing.Any, typing.Any]:
+        def get_vector_rep(x: csr_matrix, i: int) -> Dict[Any, Any]:
             if x.nnz > 0:
                 return {
                     'id': i,
