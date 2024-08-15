@@ -11,7 +11,6 @@ import uuid
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
     from pynndescent import NNDescent
-    import uuid
     from scipy.sparse import csr_matrix
     import typing
 
