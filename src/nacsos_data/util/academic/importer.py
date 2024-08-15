@@ -18,7 +18,6 @@ from ...db.crud.items.academic import (
     AcademicItemGenerator,
     read_item_entries_from_db,
     gen_academic_entries,
-    itm2txt,
     read_item_ids_for_import,
     read_known_ids_map,
     IdField
@@ -28,7 +27,7 @@ from ...models.items import AcademicItemModel
 from ...models.imports import M2MImportItemType
 from ...models.openalex.solr import DefType, SearchField, OpType
 from .. import gather_async
-from ..text import tokenise_item, extract_vocabulary
+from ..text import tokenise_item, extract_vocabulary, itm2txt
 from ..duplicate import ItemEntry, DuplicateIndex, MilvusDuplicateIndex
 from .clean import get_cleaned_meta_field
 from .duplicate import str_to_title_slug, find_duplicates, duplicate_insertion
@@ -620,7 +619,7 @@ async def import_openalex(query: str,
         vectoriser=None,
         max_slop=0.05,
         batch_size=5000,
-        dry_run=True,
+        dry_run=False,
         trust_new_authors=False,
         trust_new_keywords=False,
         logger=logger

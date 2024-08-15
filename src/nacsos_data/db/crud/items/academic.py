@@ -11,6 +11,7 @@ from ...schemas import AcademicItem, m2m_import_item_table
 from ....models.items import AcademicItemModel
 from ....util import gather_async
 from ....util.duplicate import ItemEntry
+from ....util.text import itm2txt
 
 logger = logging.getLogger('nacsos_data.crud.items.academic')
 
@@ -19,16 +20,11 @@ AcademicItemGenerator: TypeAlias = Callable[[], Generator[AcademicItemModel, Non
 REG_CLEAN = re.compile(r'[^a-z ]+', flags=re.IGNORECASE)
 
 
-def itm2txt(r: object) -> str:
-    # Abstract *has* to exist, otherwise do not continue
-    if getattr(r, 'text') is None:
-        return ''
-    return REG_CLEAN.sub(' ', f'{getattr(r, "title", "") or ""} {getattr(r, "text", "") or ""}'.lower()).strip()
-
-
 def gen_academic_entries(it: Generator[AcademicItemModel, None, None]) -> Generator[ItemEntry, None, None]:
     for itm in it:
-        yield ItemEntry(item_id=str(itm.item_id), text=itm2txt(itm))
+        if itm2txt(itm) != '':
+            # Don't bother trying to deduplicate items with no text
+            yield ItemEntry(item_id=str(itm.item_id), text=itm2txt(itm))
 
 
 async def read_item_entries_from_db(session: AsyncSession,
