@@ -6,11 +6,11 @@ from pymilvus import MilvusClient, DataType
 from .. import batched
 import numpy as np
 from ..text import preprocess_text, tokenise_text
+import uuid
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
     from pynndescent import NNDescent
-    import uuid
     from scipy.sparse import csr_matrix
     import typing
 
