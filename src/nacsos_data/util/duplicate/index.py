@@ -134,12 +134,12 @@ class MilvusDuplicateIndex:
             self.client.drop_collection(collection_name=self.collection_name)
         # Create a collection with a sparse vector field
         schema = self.client.create_schema(
-            auto_id=True,
+            auto_id=False,
             enable_dynamic_fields=True,
         )
 
-        schema.add_field(field_name="pk", datatype=DataType.VARCHAR, is_primary=True, max_length=100)
-        schema.add_field(field_name="id", datatype=DataType.INT32)
+        # schema.add_field(field_name="pk", datatype=DataType.VARCHAR, is_primary=True, max_length=100)
+        schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True)
         schema.add_field(field_name="magnitude", datatype=DataType.FLOAT)
         schema.add_field(field_name="sparse_vector", datatype=DataType.SPARSE_FLOAT_VECTOR)
 
@@ -161,7 +161,7 @@ class MilvusDuplicateIndex:
 
         chunk: int = 50000
         i: int
-        chunks = np.arange(vectors.shape[0], step=chunk) # type: ignore
+        chunks = np.arange(vectors.shape[0], step=chunk)  # type: ignore
         for i in chunks:
             self.client.insert(
                 collection_name=self.collection_name, data=[
