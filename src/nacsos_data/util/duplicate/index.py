@@ -159,13 +159,17 @@ class MilvusDuplicateIndex:
                     'magnitude': 0
                 }
 
+        rowlen = vectors.sum(axis=1).A1
+        non_empty = np.argwhere(rowlen > 0).ravel()
+        vectors = vectors[non_empty, :]
+
         chunk: int = 50000
         i: int
         chunks = np.arange(vectors.shape[0], step=chunk)  # type: ignore
         for i in chunks:
             self.client.insert(
                 collection_name=self.collection_name, data=[
-                    get_vector_rep(vectors.getrow(j + i), j + i) for j in range(vectors[i:i + chunk].shape[0])
+                    get_vector_rep(vectors.getrow(j + i), non_empty[j + i]) for j in range(vectors[i:i + chunk].shape[0])
                 ]
             )
         index_params = self.client.prepare_index_params()
