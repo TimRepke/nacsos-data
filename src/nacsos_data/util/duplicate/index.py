@@ -193,6 +193,10 @@ class MilvusDuplicateIndex:
 
         if item.text is not None and len(item.text) > self.MIN_TEXT_LEN:
             vector = self.vectoriser.transform([item.text]).getrow(0)
+
+            if vector.sum() == 0:
+                return None
+
             magnitude = np.sqrt(vector.dot(vector.T).data[0])
 
             search_params = {
