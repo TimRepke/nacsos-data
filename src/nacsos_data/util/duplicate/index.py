@@ -163,7 +163,7 @@ class MilvusDuplicateIndex:
         non_empty = np.argwhere(rowlen > 0).ravel()
         vectors = vectors[non_empty, :]
 
-        chunk: int = 50000
+        chunk: int = 10000
         i: int
         chunks = np.arange(vectors.shape[0], step=chunk)  # type: ignore
         for i in chunks:
