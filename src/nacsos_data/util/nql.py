@@ -305,7 +305,7 @@ class NQLQuery:
             col = self._get_column('abstract')
             if subquery.comp is not None and subquery.size is not None:
                 return col is not None and _field_cmp(subquery.comp, subquery.size, func.char_length(col))
-            elif subquery.empty == True:
+            elif subquery.empty is True:
                 return col is None
             else:
                 return col is not None
