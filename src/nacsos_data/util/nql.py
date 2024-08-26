@@ -35,7 +35,7 @@ from nacsos_data.models.nql import (
     NQLFilterParser,
     MetaFilterBool,
     MetaFilterInt,
-    MetaFilterStr
+    MetaFilterStr, AbstractFilter
 )
 from nacsos_data.db.crud.items.lexis_nexis import lexis_orm_to_model
 
@@ -44,7 +44,8 @@ class InvalidNQLError(Exception):
     pass
 
 
-def _field_cmp(cmp: ComparatorExt, value: int | float | bool | str,
+def _field_cmp(cmp: ComparatorExt,
+               value: int | float | bool | str,
                field: InstrumentedAttribute | Function) -> ColumnExpressionArgument:  # type: ignore[type-arg]
     if cmp == '>':
         return and_(field > value, field.isnot(None))  # type: ignore[no-any-return]
@@ -66,7 +67,8 @@ def _field_cmp(cmp: ComparatorExt, value: int | float | bool | str,
     raise InvalidNQLError(f'Unexpected comparator "{cmp}".')
 
 
-def _field_cmp_lst(cmp: SetComparator, values: list[int],
+def _field_cmp_lst(cmp: SetComparator,
+                   values: list[int],
                    field: MappedColumn) -> ColumnExpressionArgument:  # type: ignore[type-arg]
     if cmp == '==':
         return and_(field == values, field.isnot(None))  # type: ignore[no-any-return]
@@ -298,6 +300,15 @@ class NQLQuery:
             if subquery.incl:
                 return AnnotationAlias.item_id != None  # noqa: E711
             return AnnotationAlias.item_id == None  # noqa: E711
+
+        elif isinstance(subquery, AbstractFilter):
+            col = self._get_column('abstract')
+            if subquery.comp is not None and subquery.size is not None:
+                return col is not None and _field_cmp(subquery.comp, subquery.size, func.char_length(col))
+            elif subquery.empty == True:
+                return col is None
+            else:
+                return col is not None
 
         elif isinstance(subquery, ImportFilter):
             self._stmt = self.stmt.join(m2m_import_item_table, m2m_import_item_table.c.item_id == Item.item_id)

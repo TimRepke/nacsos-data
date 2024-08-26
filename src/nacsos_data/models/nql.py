@@ -123,6 +123,13 @@ class AnnotationFilter(BaseModel):
     scheme: str | None = None
 
 
+class AbstractFilter(BaseModel):
+    filter: Literal['abstract'] = 'abstract'
+    comp: Comparator | None = None
+    size: int | None = None
+    empty: bool | None = None
+
+
 NQLFilter: TypeAlias = ForwardRef('NQLFilter')  # type: ignore[valid-type]
 
 
@@ -140,6 +147,7 @@ NQLFilter = Annotated[FieldFilter
                       | LabelFilterInt
                       | AssignmentFilter
                       | AnnotationFilter
+                      | AbstractFilter
                       | ImportFilter
                       | MetaFilterBool
                       | MetaFilterInt
