@@ -306,9 +306,9 @@ class NQLQuery:
             if subquery.comp is not None and subquery.size is not None:
                 return col is not None and _field_cmp(subquery.comp, subquery.size, func.char_length(col))
             elif subquery.empty is True:
-                return col is None
+                return col is None  # type: ignore[return-value]
             else:
-                return col is not None
+                return col is not None  # type: ignore[return-value]
 
         elif isinstance(subquery, ImportFilter):
             self._stmt = self.stmt.join(m2m_import_item_table, m2m_import_item_table.c.item_id == Item.item_id)
