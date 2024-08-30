@@ -8,9 +8,8 @@ from sqlalchemy import select, func, text, cast, TEXT
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 
 from ...schemas import AcademicItem, m2m_import_item_table
-from ....models.items import AcademicItemModel
+from ....models.items import AcademicItemModel, ItemEntry
 from ....util import gather_async
-from ....util.duplicate import ItemEntry
 from ....util.text import itm2txt
 
 logger = logging.getLogger('nacsos_data.crud.items.academic')
@@ -57,7 +56,7 @@ IdField = Literal['item_id', 'doi', 'wos_id', 'scopus_id', 'openalex_id', 's2_id
 
 async def read_known_ids_map(session: AsyncSession,
                              project_id: str | uuid.UUID,
-                             field: IdField, ) -> dict[str, str]:
+                             field: IdField) -> dict[str, str]:
     """
     Return a mapping from ID in field (e.g. DOI) to item_id
 
@@ -83,7 +82,7 @@ async def read_known_ids_map(session: AsyncSession,
 
 async def read_known_ids_map_full(session: AsyncSession,
                                   project_id: str | uuid.UUID,
-                                  field: IdField, ) -> dict[str, set[str]]:
+                                  field: IdField) -> dict[str, set[str]]:
     """
     Return a mapping from ID in field (e.g. DOI) to item_id
     Same as `read_known_ids_map()`, but returns all matching item_ids

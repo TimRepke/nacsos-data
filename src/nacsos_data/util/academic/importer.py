@@ -23,12 +23,12 @@ from ...db.crud.items.academic import (
     IdField
 )
 from ...db.schemas import AcademicItem, m2m_import_item_table
-from ...models.items import AcademicItemModel
+from ...models.items import AcademicItemModel, ItemEntry
 from ...models.imports import M2MImportItemType
 from ...models.openalex.solr import DefType, SearchField, OpType
 from .. import gather_async
 from ..text import tokenise_item, extract_vocabulary, itm2txt
-from ..duplicate import ItemEntry, DuplicateIndex, MilvusDuplicateIndex
+from ..duplicate import MilvusDuplicateIndex, PynndescentDuplicateIndex
 from .clean import get_cleaned_meta_field
 from .duplicate import str_to_title_slug, find_duplicates, duplicate_insertion
 
@@ -120,7 +120,7 @@ async def _find_duplicate(session: AsyncSession,
                           item: AcademicItemModel,
                           project_id: str,
                           min_text_len: int,
-                          index: DuplicateIndex | MilvusDuplicateIndex,
+                          index: PynndescentDuplicateIndex | MilvusDuplicateIndex,
                           logger: logging.Logger) -> str | None:
     txt = itm2txt(item)
     if len(txt) > min_text_len:
@@ -288,7 +288,7 @@ async def import_academic_items(
         raise AttributeError('You have to provide a project ID!')
 
     with tempfile.NamedTemporaryFile('w+') as duplicate_buffer:
-        async with (db_engine.session() as session):
+        async with db_engine.session() as session:  # type: AsyncSession
             # Get the import and figure out what ids to deduplicate on, based on import type
             import_orm = await get_or_create_import(session=session,
                                                     project_id=project_id,
@@ -312,16 +312,16 @@ async def import_academic_items(
 
         index: MilvusDuplicateIndex | None = None
         if n_unknown_items > 0:
-            logger.debug('Constructing vocabulary...')
+            logger.debug(f'Constructing vocabulary from {len(token_counts):,} `token_counts`...')
             vocabulary = extract_vocabulary(token_counts, min_count=1, max_features=max_features)
-
-            if vectoriser is None:
-                vectoriser = CountVectorizer(vocabulary=vocabulary)
-
             del token_counts  # clean up term counts to save RAM
 
-            logger.debug('Constructing ANN index...')
-            async with (db_engine.session() as session):
+            if vectoriser is None:
+                logger.debug(f'Setting up vectorizer with {len(vocabulary):,} tokens in the vocabulary...')
+                vectoriser = CountVectorizer(vocabulary=vocabulary)
+
+            logger.debug('Constructing Milvus index...')
+            async with db_engine.session() as session:  # type: AsyncSession
                 index = MilvusDuplicateIndex(
                     existing_items=read_item_entries_from_db(
                         session=session,
@@ -341,7 +341,7 @@ async def import_academic_items(
 
         logger.info('Finished pre-processing and index building.')
         logger.info('Proceeding to insert new items and creating m2m tuples...')
-        async with (db_engine.session() as session):
+        async with db_engine.session() as session:  # type: AsyncSession
             logger.info(f'Inserting {len(m2m_buffer):,} buffered m2m relations...')
             for item_id in m2m_buffer:
                 await _insert_m2m(session=session, item_id=item_id, import_id=import_id, logger=logger, dry_run=dry_run)
@@ -350,35 +350,43 @@ async def import_academic_items(
                 logger.info('No unknown items found, ending here!')
                 return import_id, list(imported_item_ids)
 
-            logger.info(f'Inserting (maybe) {n_unknown_items:,} buffered duplicate candidates...')
+            logger.info(f'Loading milvus collection "{index.collection_name}"')
             index.client.load_collection(index.collection_name)
+
+            logger.info(f'Inserting (maybe) {n_unknown_items:,} buffered duplicate candidates...')
             for item in _read_buffered_items(duplicate_buffer):
                 try:
-                    logger.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
+                    async with session.begin_nested():
+                        logger.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
 
-                    # Make sure the item fields are complete and clean
-                    item = _ensure_clean_item(item, project_id=str(project_id))
+                        # Make sure the item fields are complete and clean
+                        item = _ensure_clean_item(item, project_id=str(project_id))
 
-                    # Search for duplicates in the index and the database
-                    existing_id = await _find_duplicate(session=session, item=item, project_id=str(project_id),
-                                                        min_text_len=min_text_len, index=index, logger=logger)
+                        # Search for duplicates in the index and the database
+                        existing_id = await _find_duplicate(session=session, item=item, project_id=str(project_id),
+                                                            min_text_len=min_text_len, index=index, logger=logger)
 
-                    # Insert a new item or an item variant
-                    item_id = await _insert_item(session=session, item=item, existing_id=existing_id, import_id=import_id,
-                                                 trust_new_authors=trust_new_authors, trust_new_keywords=trust_new_keywords,
-                                                 dry_run=dry_run, logger=logger)
+                        # Insert a new item or an item variant
+                        item_id = await _insert_item(session=session, item=item, existing_id=existing_id, import_id=import_id,
+                                                     trust_new_authors=trust_new_authors, trust_new_keywords=trust_new_keywords,
+                                                     dry_run=dry_run, logger=logger)
 
-                    # Add many-to-many relation to import
-                    if item_id not in imported_item_ids:
-                        imported_item_ids.add(item_id)
-                        await _insert_m2m(session=session, item_id=item_id, import_id=import_id, dry_run=dry_run, logger=logger)
+                        # Add many-to-many relation to import
+                        if item_id not in imported_item_ids:
+                            imported_item_ids.add(item_id)
+                            await _insert_m2m(session=session, item_id=item_id, import_id=import_id, dry_run=dry_run, logger=logger)
 
                 except (UniqueViolation, IntegrityError, OperationalError) as e:
                     logger.exception(e)
-                    await session.rollback()
 
+            # All done, commit and finalise import transaction.
+            logger.info('Finally committing all changes to the database!')
+            await session.commit()
+
+    logger.info('Cleaning up milvus!')
     index.client.drop_collection(index.collection_name)
 
+    logger.info('Import complete, returning to initiator with IDs!')
     return import_id, list(imported_item_ids)
 
 

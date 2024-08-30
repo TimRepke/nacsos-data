@@ -20,7 +20,7 @@ N_CANDIDATES = 5
 MAX_SLOP = 0.02
 
 
-# FIXME: This is untested and should be considered work in progress
+# FIXME: This is untested and deprecated and should be considered work in progress
 # TODO: use .index for indexing
 # TODO: do full cross-join incl self deduplication
 # TODO: go beyond text matching; also use other checks

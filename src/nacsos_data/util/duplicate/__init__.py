@@ -1,3 +1,4 @@
-from .index import DuplicateIndex, ItemEntry, MilvusDuplicateIndex
+from .index_pynn import DuplicateIndex as PynndescentDuplicateIndex
+from .index_milvus import MilvusDuplicateIndex
 
-__all__ = ['ItemEntry', 'DuplicateIndex','MilvusDuplicateIndex']
+__all__ = ['PynndescentDuplicateIndex','MilvusDuplicateIndex']

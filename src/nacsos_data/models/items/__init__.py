@@ -1,9 +1,13 @@
-from typing import TypeVar, Union
+from typing import TypeVar, Union, NamedTuple
 
 from .generic import GenericItemModel
 from .twitter import TwitterItemModel
 from .academic import AcademicItemModel, AcademicItemVariantModel
 from .lexis_nexis import LexisNexisItemModel, LexisNexisItemSourceModel, FullLexisNexisItemModel
+
+class ItemEntry(NamedTuple):
+    item_id: str
+    text: str
 
 AnyItemModel = Union[
     TwitterItemModel,
@@ -29,4 +33,4 @@ AnyItemModelType = TypeVar('AnyItemModelType',
 __all__ = ['GenericItemModel', 'TwitterItemModel',
            'AcademicItemModel', 'AcademicItemVariantModel',
            'LexisNexisItemModel', 'LexisNexisItemSourceModel', 'FullLexisNexisItemModel',
-           'AnyItemModel', 'AnyItemModelType', 'AnyItemModelList']
+           'AnyItemModel', 'AnyItemModelType', 'AnyItemModelList', 'ItemEntry']

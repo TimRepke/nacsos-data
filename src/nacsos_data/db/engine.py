@@ -83,7 +83,7 @@ class DatabaseEngineAsync:
         session: AsyncSession = self._session()
         try:
             yield session
-            await session.commit()  # FIXME should there even be a commit always?
+            # await session.commit()
         except Exception as e:
             await session.rollback()
             raise e
@@ -135,7 +135,7 @@ class DatabaseEngine:
         session = self._session()
         try:
             yield session
-            session.commit()
+            # session.commit()
         except Exception as e:
             session.rollback()
             raise e
