@@ -15,6 +15,7 @@ from datetime import datetime
 
 # unused import required so the engine sees the models!
 from . import schemas  # noqa F401
+from ..util import get_attr
 
 logger = logging.getLogger('nacsos_data.engine')
 
@@ -161,7 +162,9 @@ class DBSession(AsyncSession):
     def __init__(self,
                  session: AsyncSession,
                  use_commit: bool = False):
-        super().__init__(bind=session.bind, binds=session.binds, sync_session_class=session.sync_session_class)
+        super().__init__(bind=session.bind,
+                         binds=get_attr(session, 'binds', None),
+                         sync_session_class=session.sync_session_class)
         self.use_commit = use_commit
 
     async def flush_or_commit(self) -> None:
@@ -200,10 +203,7 @@ def ensure_session_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awa
                       use_commit: bool = False,
                       **kwargs: dict[str, Any]) -> R:
         db_session = await get_db_session(session=session, db_engine=db_engine, engine=engine, use_commit=use_commit)
-        return await func(*args,
-                          session=db_session,
-                          commit=flush_or_commit(session=db_session, use_commit=use_commit),
-                          **kwargs)
+        return await func(*args, session=db_session, **kwargs)
 
     return wrapper
 

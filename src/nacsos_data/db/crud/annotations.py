@@ -469,7 +469,7 @@ async def upsert_annotations(annotations: list[AnnotationModel],
                                                                         db_engine=db_engine)
         if annotation_scheme is not None:
             status = validate_annotated_assignment(annotation_scheme=annotation_scheme, annotations=annotations)
-            await update_assignment_status(assignment_id=assignment_id, status=status, db_engine=db_engine)
+            await update_assignment_status(assignment_id=assignment_id, status=status, db_engine=db_engine, use_commit=True)
             return status
 
     return None

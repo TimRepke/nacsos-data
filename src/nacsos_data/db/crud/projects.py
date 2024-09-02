@@ -78,7 +78,7 @@ async def update_project(project: ProjectModel, engine: DatabaseEngineAsync) -> 
     return await update_orm(updated_model=project,  # type: ignore[no-any-return]
                             Schema=Project, Model=ProjectModel,
                             filter_by={'project_id': project.project_id},
-                            skip_update=['project_id'], db_engine=engine)
+                            skip_update=['project_id'], db_engine=engine, use_commit=True)
 
 
 async def create_project_permissions(permissions: ProjectPermissionsModel,
@@ -97,7 +97,8 @@ async def update_project_permissions(permissions: ProjectPermissionsModel,
     return await update_orm(updated_model=permissions,  # type: ignore[no-any-return]
                             Schema=ProjectPermissions, Model=ProjectPermissionsModel,
                             filter_by={'project_permission_id': permissions.project_permission_id},
-                            skip_update=['project_id', 'user_id', 'project_permission_id'], db_engine=engine)
+                            skip_update=['project_id', 'user_id', 'project_permission_id'],
+                            db_engine=engine, use_commit=True)
 
 
 async def delete_project_permissions(project_permission_id: UUID | str,
@@ -106,3 +107,4 @@ async def delete_project_permissions(project_permission_id: UUID | str,
         stmt = (delete(ProjectPermissions)
                 .where(ProjectPermissions.project_permission_id == project_permission_id))
         await session.execute(stmt)
+        await session.commit()

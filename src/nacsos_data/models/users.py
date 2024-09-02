@@ -38,6 +38,8 @@ class UserBaseModel(DehydratedUser):
     #       so setting this to "false" to remove access should be preferred.
     is_active: bool | None = True
 
+    setting_newsletter: bool | None = False
+
     # Date and time when this user was created (or last changed)
     time_created: datetime.datetime | None = None
     time_updated: datetime.datetime | None = None

@@ -104,6 +104,7 @@ class Authentication:
         async with self.db_engine.session() as session:
             stmt = delete(AuthToken).where(AuthToken.username == username)
             await session.execute(stmt)
+            await session.commit()
 
     async def clear_token_by_id(self,
                                 token_id: str | uuid.UUID,
@@ -114,6 +115,7 @@ class Authentication:
             if verify_username:
                 stmt = stmt.where(AuthToken.username == verify_username)
             await session.execute(stmt)
+            await session.commit()
 
     async def refresh_or_create_token(self,
                                       username: str | None = None,
@@ -152,6 +154,7 @@ class Authentication:
                 token = AuthTokenModel(token_id=token_id, username=username, valid_till=valid_till)
                 token_orm = AuthToken(**token.model_dump())
                 session.add(token_orm)
+                await session.commit()
                 return token
 
             # Failed!

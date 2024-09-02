@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING
 from sqlalchemy import text
 
 from nacsos_data.db import DatabaseEngineAsync
-from nacsos_data.models.annotations import \
-    AssignmentModel, \
-    AssignmentStatus, \
+from nacsos_data.models.annotations import (
+    AssignmentModel,
+    AssignmentStatus,
     AssignmentScopeRandomConfig
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401

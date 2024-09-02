@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING
-from sqlalchemy import String, Boolean, ForeignKey, DateTime, func
+from sqlalchemy import String, Boolean, ForeignKey, DateTime, func, text
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -47,6 +47,9 @@ class User(Base):
     # Note: Deleting an account might lead to inconsistencies with other parts of the DB,
     #       so setting this to "false" to remove access should be preferred.
     is_active = mapped_column(Boolean, nullable=False, default=True)
+
+    # User-setting: if True, will receive newsletter emails.
+    setting_newsletter = mapped_column(Boolean, nullable=False, default=False, server_default=text('false'))
 
     # Date and time when this user was created (or last updated)
     time_created = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
