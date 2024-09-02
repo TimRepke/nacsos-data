@@ -2,7 +2,7 @@ import logging
 from contextlib import contextmanager
 from datetime import timedelta
 from timeit import default_timer
-from typing import Sequence, Generator, TypeVar, Any, AsyncIterator, AsyncGenerator
+from typing import Sequence, Generator, TypeVar, Any, AsyncIterator, AsyncGenerator, Callable
 
 T = TypeVar('T')
 
@@ -116,7 +116,7 @@ def ensure_logger(fallback_logger: logging.Logger):  # type: ignore[no-untyped-d
     return decorator
 
 @contextmanager
-def elapsed_timer(logger: logging.Logger, tn: str = 'Task') -> None:
+def elapsed_timer(logger: logging.Logger, tn: str = 'Task') -> Generator[Callable[[], float]]:
     # https://stackoverflow.com/questions/7370801/how-do-i-measure-elapsed-time-in-python
     logger.info(f'{tn}...')
     start = default_timer()
