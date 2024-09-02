@@ -2,7 +2,7 @@ import json
 import logging
 from functools import wraps
 from pathlib import Path
-from typing import AsyncIterator, Iterator, Any, TypeVar, Callable, Awaitable
+from typing import AsyncIterator, Iterator, Any, TypeVar, Callable, Awaitable, Coroutine, TypeAlias
 from json import JSONEncoder
 
 from pydantic import BaseModel
@@ -144,26 +144,66 @@ class DatabaseEngine:
 
 
 R = TypeVar('R')
+CommitFunc: TypeAlias = Callable[[], Coroutine[None, None, None]]
+
+
+def flush_or_commit(session: AsyncSession, use_commit: bool) -> CommitFunc:
+    async def func() -> None:
+        if use_commit:
+            await session.commit()
+        else:
+            await session.flush()
+
+    return func
+
+
+class DBSession(AsyncSession):
+    def __init__(self,
+                 session: AsyncSession,
+                 use_commit: bool = False):
+        super().__init__(bind=session.bind, binds=session.binds, sync_session_class=session.sync_session_class)
+        self.use_commit = use_commit
+
+    async def flush_or_commit(self) -> None:
+        if self.use_commit:
+            await self.commit()
+        else:
+            await self.flush()
+
+
+async def get_db_session(session: AsyncSession | DBSession | None = None,
+                         db_engine: DatabaseEngineAsync | None = None,
+                         engine: DatabaseEngineAsync | None = None,
+                         use_commit: bool = False) -> DBSession:
+    if session is not None:
+        if isinstance(session, DBSession):
+            return session
+        return DBSession(session=session, use_commit=use_commit)
+
+    if engine is not None:
+        db_engine = engine  # alias; fall through and use the other branch to ensure session
+
+    if db_engine is not None:
+        fresh_session: AsyncSession
+        async with db_engine.session() as fresh_session:
+            return DBSession(session=fresh_session, use_commit=use_commit)
+
+    raise RuntimeError('I need a session or an engine to get a session!')
 
 
 def ensure_session_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awaitable[R]]:
     @wraps(func)
     async def wrapper(*args: Any,
-                      session: AsyncSession | None = None,
+                      session: AsyncSession | DBSession | None = None,
                       db_engine: DatabaseEngineAsync | None = None,
                       engine: DatabaseEngineAsync | None = None,
+                      use_commit: bool = False,
                       **kwargs: dict[str, Any]) -> R:
-        if session is not None:
-            return await func(*args, session=session, **kwargs)
-        if engine is not None:
-            db_engine = engine  # alias; fall through and use the other branch to ensure session
-        if db_engine is not None:
-            logger.debug(f'Opening a new session to execute {func}')
-            fresh_session: AsyncSession
-            async with db_engine.session() as fresh_session:
-                return await func(*args, session=fresh_session, **kwargs)
-
-        raise RuntimeError('I need a session or an engine to get a session!')
+        db_session = await get_db_session(session=session, db_engine=db_engine, engine=engine, use_commit=use_commit)
+        return await func(*args,
+                          session=db_session,
+                          commit=flush_or_commit(session=db_session, use_commit=use_commit),
+                          **kwargs)
 
     return wrapper
 

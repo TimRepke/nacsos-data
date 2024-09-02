@@ -4,9 +4,8 @@ from typing import Any, Type, TypeVar
 from sqlalchemy import select
 from uuid import UUID, uuid4
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..engine import DatabaseEngineAsync, ensure_session_async
+from ..engine import ensure_session_async, DBSession
 from ..schemas import Base
 
 logger = logging.getLogger('nacsos_data.crud')
@@ -46,7 +45,7 @@ M = TypeVar('M', bound=BaseModel)
 
 
 @ensure_session_async
-async def update_orm(session: AsyncSession, updated_model: BaseModel, Model: Type[M], Schema: Type[Base],
+async def update_orm(session: DBSession, updated_model: BaseModel, Model: Type[M], Schema: Type[Base],
                      filter_by: dict[str, Any], skip_update: list[str]) -> M:
     stmt = select(Schema).filter_by(**filter_by)
     orm_model = (await session.execute(stmt)).scalars().one_or_none()
@@ -55,14 +54,15 @@ async def update_orm(session: AsyncSession, updated_model: BaseModel, Model: Typ
             if key in skip_update:
                 continue
             setattr(orm_model, key, value)
-    await session.commit()
+
+    await session.flush_or_commit()
 
     # return the updated project for completeness
     return Model(**orm_model.__dict__)
 
 
 @ensure_session_async
-async def upsert_orm(session: AsyncSession,
+async def upsert_orm(session: DBSession,
                      upsert_model: BaseModel, Schema: Type[S], primary_key: str,
                      skip_update: list[str] | None = None) -> str | UUID | None:
     # returns id of inserted or updated assignment scope
@@ -91,7 +91,7 @@ async def upsert_orm(session: AsyncSession,
                 # logger.debug(f'{key}: "{value}"')
                 setattr(orm_model, key, value)
 
-            await session.commit()
+            await session.flush_or_commit()
 
             return p_key
         # else: does not exist, create item
@@ -101,7 +101,7 @@ async def upsert_orm(session: AsyncSession,
                  f'attempting to INSERT!')
     orm_model = Schema(**upsert_model.model_dump())
     session.add(orm_model)
-    await session.commit()
+    await session.flush_or_commit()
 
     return p_key
 

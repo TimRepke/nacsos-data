@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 import sqlalchemy.sql.functions as F
 
-from nacsos_data.db.engine import ensure_session_async
+from nacsos_data.db.engine import ensure_session_async, DBSession
 from nacsos_data.db.schemas import LexisNexisItem, LexisNexisItemSource, Item, m2m_import_item_table
 
 from .parse import parse_lexis_nexis_file
@@ -88,7 +88,7 @@ def load_vectors_from_file(filename: str,
 
 
 @ensure_session_async
-async def import_lexis_nexis(session: AsyncSession,
+async def import_lexis_nexis(session: DBSession,
                              project_id: str,
                              filename: str,
                              import_name: str | None = None,
@@ -232,79 +232,80 @@ async def import_lexis_nexis(session: AsyncSession,
     for result, item, source in parse_lexis_nexis_file(filename=filename,
                                                        project_id=project_id,
                                                        fail_on_error=fail_on_parse_error):
-        log.debug(f'Importing "{source.title}" ({source.lexis_id})')
-        existing_id: str | None = None
+        try:
+            async with session.begin_nested():
+                log.debug(f'Importing "{source.title}" ({source.lexis_id})')
+                existing_id: str | None = None
 
-        if source.lexis_id is None:
-            raise ValueError(' -> Document is missing a LexisNexis ID')
+                if source.lexis_id is None:
+                    raise ValueError(' -> Document is missing a LexisNexis ID')
 
-        # Naive deduplication: We've already seen the same LexisNexis ID
-        if source.lexis_id in ln2id:
-            existing_id = ln2id[source.lexis_id]
-            log.debug(f' -> Duplicate by LN id: {source.lexis_id}')
+                # Naive deduplication: We've already seen the same LexisNexis ID
+                if source.lexis_id in ln2id:
+                    existing_id = ln2id[source.lexis_id]
+                    log.debug(f' -> Duplicate by LN id: {source.lexis_id}')
 
-        if item.text is not None and len(item.text) > MIN_TEXT_LEN:
-            vector = vectoriser.transform([item.text])
-            indices, similarities = index.query(vector, k=5)
-            for vec_index, similarity in zip(indices[0], similarities[0]):
-                # Too dissimilar, we can stop right here (note: list is sorted asc)
-                if similarity > max_slop:
-                    log.debug(f' -> No close text match with >{1 - max_slop} overlap')
-                    break
+                if item.text is not None and len(item.text) > MIN_TEXT_LEN:
+                    vector = vectoriser.transform([item.text])
+                    indices, similarities = index.query(vector, k=5)
+                    for vec_index, similarity in zip(indices[0], similarities[0]):
+                        # Too dissimilar, we can stop right here (note: list is sorted asc)
+                        if similarity > max_slop:
+                            log.debug(f' -> No close text match with >{1 - max_slop} overlap')
+                            break
 
-                # Looking at itself, continue
-                if (item_ids_db_inv.get(vec_index) == item.item_id) or (item_ids_f_inv.get(vec_index) == item.item_id):
-                    continue
+                        # Looking at itself, continue
+                        if (item_ids_db_inv.get(vec_index) == item.item_id) or (item_ids_f_inv.get(vec_index) == item.item_id):
+                            continue
 
-                # See, if we already stored this in the database ahead of time
-                if vec_index in item_ids_db_inv:
-                    existing_id = item_ids_db_inv[vec_index]
-                    log.debug(' -> Found text match in database')
-                    break
-                # See, if we've seen this and saved this already in the process
-                elif vec_index in lexis_ids_f_inv and lexis_ids_f_inv[vec_index] in ln2id:
-                    existing_id = ln2id[lexis_ids_f_inv[vec_index]]
-                    log.debug(' -> Found text match in file (but we sent it to the database earlier)')
-                    break
-                # else: false positive, it's a duplicate and we just saw the first one of them
+                        # See, if we already stored this in the database ahead of time
+                        if vec_index in item_ids_db_inv:
+                            existing_id = item_ids_db_inv[vec_index]
+                            log.debug(' -> Found text match in database')
+                            break
+                        # See, if we've seen this and saved this already in the process
+                        elif vec_index in lexis_ids_f_inv and lexis_ids_f_inv[vec_index] in ln2id:
+                            existing_id = ln2id[lexis_ids_f_inv[vec_index]]
+                            log.debug(' -> Found text match in file (but we sent it to the database earlier)')
+                            break
+                        # else: false positive, it's a duplicate and we just saw the first one of them
 
-        # This seems to be a novel item we haven't seen before
-        if existing_id is None:
-            new_id = str(item.item_id)
-            log.debug(f' -> Creating new item with ID={new_id}')
-            ln2id[source.lexis_id] = new_id
-            session.add(LexisNexisItem(**item.model_dump()))
-            await session.flush()
-            session.add(LexisNexisItemSource(**source.model_dump()))
-            await session.flush()
+                # This seems to be a novel item we haven't seen before
+                if existing_id is None:
+                    new_id = str(item.item_id)
+                    log.debug(f' -> Creating new item with ID={new_id}')
+                    ln2id[source.lexis_id] = new_id
+                    session.add(LexisNexisItem(**item.model_dump()))
+                    await session.flush()
+                    session.add(LexisNexisItemSource(**source.model_dump()))
+                    await session.flush()
 
-            stmt_m2m = (insert(m2m_import_item_table)
-                        .values(item_id=new_id, import_id=import_id, type=M2MImportItemType.explicit))
-            try:
-                await session.execute(stmt_m2m)
-                await session.flush()
-                log.debug(' -> Added many-to-many relationship for import/item')
-            except IntegrityError:
-                log.debug(f' -> M2M_i2i already exists, ignoring {import_id} <-> {new_id}')
-                await session.rollback()
+                    stmt_m2m = (insert(m2m_import_item_table)
+                                .values(item_id=new_id, import_id=import_id, type=M2MImportItemType.explicit))
+                    await session.execute(stmt_m2m)
+                    await session.flush()
+                    log.debug(' -> Added many-to-many relationship for import/item')
 
-        # This seems to be a duplicate of a known item
-        else:
-            log.debug(f' -> Trying to add source to existing item with item_id={existing_id}')
-            source.item_id = existing_id
-            source_unique = True
-            if dedup_source:
-                stmt = (select(F.count(LexisNexisItemSource.item_source_id))
-                        .where(LexisNexisItemSource.item_id == existing_id,
-                               LexisNexisItemSource.lexis_id == source.lexis_id))
-                n_results = await session.scalar(stmt)
-                if n_results is not None and n_results > 0:
-                    source_unique = False
+                # This seems to be a duplicate of a known item
+                else:
+                    log.debug(f' -> Trying to add source to existing item with item_id={existing_id}')
+                    source.item_id = existing_id
+                    source_unique = True
+                    if dedup_source:
+                        stmt = (select(F.count(LexisNexisItemSource.item_source_id))
+                                .where(LexisNexisItemSource.item_id == existing_id,
+                                       LexisNexisItemSource.lexis_id == source.lexis_id))
+                        n_results = await session.scalar(stmt)
+                        if n_results is not None and n_results > 0:
+                            source_unique = False
 
-            if source_unique:
-                log.debug(f' -> Adding source to existing item with source_id={source.item_source_id}')
-                session.add(LexisNexisItemSource(**source.model_dump()))
-                await session.flush()
+                    if source_unique:
+                        log.debug(f' -> Adding source to existing item with source_id={source.item_source_id}')
+                        session.add(LexisNexisItemSource(**source.model_dump()))
+                        await session.flush()
 
-    await session.flush()
+        except IntegrityError:
+            log.debug(f' -> M2M_i2i already exists, ignoring {import_id} <-> {new_id}')
+
+    await session.flush_or_commit()
     log.info('All done!')

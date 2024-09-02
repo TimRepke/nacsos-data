@@ -15,7 +15,7 @@ from sklearn.metrics import precision_recall_fscore_support
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nacsos_data.db.engine import ensure_session_async
+from nacsos_data.db.engine import ensure_session_async, DBSession
 from nacsos_data.db.schemas import AcademicItem
 from nacsos_data.util.annotations.label_transform import get_annotations, annotations_to_sequence
 
@@ -151,7 +151,7 @@ def test_model(pre: FeaturiserType, clf: ModelType, labels: list[int],
 
 
 @ensure_session_async
-async def get_predictions(session: AsyncSession,
+async def get_predictions(session: DBSession,
                           inclusion_rule: str,
                           project_id: str,
                           source_ids: list[str],
@@ -190,7 +190,7 @@ async def get_predictions(session: AsyncSession,
 
 
 @ensure_session_async
-async def get_labelled_texts(session: AsyncSession,
+async def get_labelled_texts(session: DBSession,
                              inclusion_rule: str,
                              source_ids: list[str],
                              majority_on_conflict: bool = True) -> tuple[list[str], list[str], list[int]]:
@@ -223,7 +223,7 @@ async def project_texts_batched(session: AsyncSession, project_id: str, batch_si
 
 
 @ensure_session_async
-async def compare_models(session: AsyncSession,
+async def compare_models(session: DBSession,
                          inclusion_rule: str,
                          source_ids: list[str],
                          features: str,

@@ -5,7 +5,7 @@ from sqlalchemy import select, asc
 from passlib.context import CryptContext
 
 from nacsos_data.db import DatabaseEngineAsync
-from nacsos_data.db.engine import ensure_session_async
+from nacsos_data.db.engine import ensure_session_async, DBSession
 from nacsos_data.db.schemas import User, ProjectPermissions
 from nacsos_data.models.users import UserInDBModel, UserModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -87,7 +87,7 @@ async def read_users(engine: DatabaseEngineAsync,
 
 
 @ensure_session_async
-async def user_ids_to_names(session: AsyncSession) -> dict[str, str]:
+async def user_ids_to_names(session: DBSession) -> dict[str, str]:
     stmt = select(User.user_id, User.username)
     result = (await session.execute(stmt)).mappings().all()
     return {

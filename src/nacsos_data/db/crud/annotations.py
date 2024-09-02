@@ -6,7 +6,6 @@ from sqlalchemy import select, delete, asc, desc
 from sqlalchemy.sql import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.schemas import (
     Annotation,
     AnnotationScheme,
@@ -38,7 +37,7 @@ from nacsos_data.util.annotations.validation import (
 )
 
 from . import upsert_orm, MissingIdError
-from ..engine import ensure_session_async
+from ..engine import ensure_session_async, DBSession, DatabaseEngineAsync
 from ...util.annotations import (
     dehydrate_user_annotations,
     dehydrate_resolutions
@@ -60,7 +59,7 @@ class UserProjectAssignmentScope(BaseModel):
 
 
 @ensure_session_async
-async def read_assignment_scopes_for_project_for_user(session: AsyncSession,
+async def read_assignment_scopes_for_project_for_user(session: DBSession,
                                                       project_id: str | uuid.UUID,
                                                       user_id: str | uuid.UUID) \
         -> list[UserProjectAssignmentScope]:
@@ -103,25 +102,30 @@ async def read_assignment_scopes_for_project_for_user(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_assignment_scopes_for_project(session: AsyncSession,
+async def read_assignment_scopes_for_project(session: DBSession,
                                              project_id: str | uuid.UUID) -> list[AssignmentScopeModel]:
-    stmt = (select(AssignmentScope)
+    result = (
+        await session.execute(
+            select(AssignmentScope)
             .join(AnnotationScheme,
                   AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id)
             .where(AnnotationScheme.project_id == project_id)
-            .order_by(desc(AssignmentScope.time_created)))
-    result = (await session.execute(stmt)).scalars().all()
+            .order_by(desc(AssignmentScope.time_created))
+        )
+    ).scalars().all()
     return [AssignmentScopeModel(**res.__dict__) for res in result]
 
 
 @ensure_session_async
-async def read_assignments_for_scope_for_user(session: AsyncSession,
+async def read_assignments_for_scope_for_user(session: DBSession,
                                               assignment_scope_id: str | uuid.UUID,
                                               user_id: str | uuid.UUID,
                                               limit: int | None = None) -> list[AssignmentModel]:
-    stmt = select(Assignment) \
-        .filter_by(assignment_scope_id=assignment_scope_id, user_id=user_id) \
+    stmt = (
+        select(Assignment)
+        .filter_by(assignment_scope_id=assignment_scope_id, user_id=user_id)
         .order_by(asc(Assignment.order))
+    )
     if limit is not None:
         stmt = stmt.limit(limit)
 
@@ -130,12 +134,14 @@ async def read_assignments_for_scope_for_user(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_assignments_for_scope(session: AsyncSession,
+async def read_assignments_for_scope(session: DBSession,
                                      assignment_scope_id: str | uuid.UUID) -> list[AssignmentModel]:
-    stmt = select(Assignment) \
-        .filter_by(assignment_scope_id=assignment_scope_id) \
-        .order_by(asc(Assignment.order))
-    result = (await session.execute(stmt)).scalars().all()
+    result = (
+        await session.execute(
+            select(Assignment)
+            .filter_by(assignment_scope_id=assignment_scope_id)
+            .order_by(asc(Assignment.order)))
+    ).scalars().all()
     return [AssignmentModel(**res.__dict__) for res in result]
 
 
@@ -163,43 +169,44 @@ class AssignmentScopeEntry(BaseModel):
 
 
 @ensure_session_async
-async def read_assignment_overview_for_scope(session: AsyncSession,
+async def read_assignment_overview_for_scope(session: DBSession,
                                              assignment_scope_id: str | uuid.UUID) -> list[AssignmentScopeEntry]:
-    stmt = text('''
-        WITH labels_pre as (SELECT ass.assignment_id,
-                           ann.key,
-                           jsonb_agg(jsonb_build_object('repeat', ann.repeat,
-                                                        'value_bool', ann.value_bool,
-                                                        'value_int', ann.value_int,
-                                                        'multi_int', ann.multi_int)) as label
-                        FROM assignment ass
-                                 LEFT OUTER JOIN annotation ann on ann.assignment_id = ass.assignment_id
-                        WHERE ass.assignment_scope_id = :scope_id
-                        GROUP BY ass.assignment_id, ann.key),
-             labels as (SELECT assignment_id,
-                               jsonb_object_agg(key, label) filter (where key is not null ) as labels
-                        FROM labels_pre
-                        GROUP BY assignment_id),
-             assis as (SELECT ass.item_id,
-                              MIN(ass."order") as first_occurrence,
-                              array_agg(jsonb_build_object(
-                                      'assignment_id', ass.assignment_id,
-                                      'user_id', ass.user_id,
-                                      'username', u.username,
-                                      'status', ass.status,
-                                      'order', ass."order",
-                                      'labels', labels.labels
-                                  )) as assignments
-                       FROM assignment ass
-                                JOIN "user" u on u.user_id = ass.user_id
-                                JOIN labels on labels.assignment_id = ass.assignment_id
-                       --WHERE ass.assignment_scope_id = :scope_id
-                       GROUP BY ass.item_id
-                       ORDER BY first_occurrence)
-        SELECT row_number() over () as identifier,
-               assis.*
-        FROM assis;''')
-    result = await session.execute(stmt, {'scope_id': assignment_scope_id})
+    result = await session.execute(
+        text('''
+            WITH labels_pre as (SELECT ass.assignment_id,
+                               ann.key,
+                               jsonb_agg(jsonb_build_object('repeat', ann.repeat,
+                                                            'value_bool', ann.value_bool,
+                                                            'value_int', ann.value_int,
+                                                            'multi_int', ann.multi_int)) as label
+                            FROM assignment ass
+                                     LEFT OUTER JOIN annotation ann on ann.assignment_id = ass.assignment_id
+                            WHERE ass.assignment_scope_id = :scope_id
+                            GROUP BY ass.assignment_id, ann.key),
+                 labels as (SELECT assignment_id,
+                                   jsonb_object_agg(key, label) filter (where key is not null ) as labels
+                            FROM labels_pre
+                            GROUP BY assignment_id),
+                 assis as (SELECT ass.item_id,
+                                  MIN(ass."order") as first_occurrence,
+                                  array_agg(jsonb_build_object(
+                                          'assignment_id', ass.assignment_id,
+                                          'user_id', ass.user_id,
+                                          'username', u.username,
+                                          'status', ass.status,
+                                          'order', ass."order",
+                                          'labels', labels.labels
+                                      )) as assignments
+                           FROM assignment ass
+                                    JOIN "user" u on u.user_id = ass.user_id
+                                    JOIN labels on labels.assignment_id = ass.assignment_id
+                           --WHERE ass.assignment_scope_id = :scope_id
+                           GROUP BY ass.item_id
+                           ORDER BY first_occurrence)
+            SELECT row_number() over () as identifier,
+                   assis.*
+            FROM assis;'''),
+        {'scope_id': assignment_scope_id})
     return [AssignmentScopeEntry.model_validate(r) for r in result.mappings().all()]
 
 
@@ -209,19 +216,21 @@ async def read_next_assignment_for_scope_for_user(current_assignment_id: str | u
                                                   db_engine: DatabaseEngineAsync) -> AssignmentModel | None:
     session: AsyncSession
     async with db_engine.session() as session:
-        stmt = text("""
-        WITH tmp as (SELECT assignment_id,
-                        LEAD(assignment_id, 1) over (order by "order") as next_assignment_id
-                 FROM assignment
-                 WHERE user_id = :user_id AND assignment_scope_id=:assignment_scope_id)
-        SELECT assignment.*
-        FROM assignment
-            JOIN tmp  ON  tmp.next_assignment_id=assignment.assignment_id
-        WHERE tmp.assignment_id=:assignment_id;
-        """)
-        result = (await session.execute(stmt, {'user_id': user_id,
-                                               'assignment_scope_id': assignment_scope_id,
-                                               'assignment_id': current_assignment_id})).mappings().one_or_none()
+        result = (
+            await session.execute(
+                text('''
+                WITH tmp as (SELECT assignment_id,
+                                LEAD(assignment_id, 1) over (order by "order") as next_assignment_id
+                         FROM assignment
+                         WHERE user_id = :user_id AND assignment_scope_id=:assignment_scope_id)
+                SELECT assignment.*
+                FROM assignment
+                    JOIN tmp  ON  tmp.next_assignment_id=assignment.assignment_id
+                WHERE tmp.assignment_id=:assignment_id;'''),
+                {'user_id': user_id,
+                 'assignment_scope_id': assignment_scope_id,
+                 'assignment_id': current_assignment_id})
+        ).mappings().one_or_none()
         if result is not None:
             return AssignmentModel(**result)  # type: ignore[misc]
 
@@ -234,7 +243,7 @@ async def read_next_assignment_for_scope_for_user(current_assignment_id: str | u
 
 
 @ensure_session_async
-async def read_next_open_assignment_for_scope_for_user(session: AsyncSession,
+async def read_next_open_assignment_for_scope_for_user(session: DBSession,
                                                        assignment_scope_id: str | uuid.UUID,
                                                        user_id: str | uuid.UUID) -> AssignmentModel | None:
     stmt = select(Assignment) \
@@ -250,7 +259,7 @@ async def read_next_open_assignment_for_scope_for_user(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_assignment(session: AsyncSession, assignment_id: str | uuid.UUID) -> AssignmentModel | None:
+async def read_assignment(session: DBSession, assignment_id: str | uuid.UUID) -> AssignmentModel | None:
     stmt = select(Assignment).filter_by(assignment_id=assignment_id)
     result = (await session.execute(stmt)).scalars().one_or_none()
 
@@ -261,7 +270,7 @@ async def read_assignment(session: AsyncSession, assignment_id: str | uuid.UUID)
 
 
 @ensure_session_async
-async def read_annotations_for_scope_for_user(session: AsyncSession,
+async def read_annotations_for_scope_for_user(session: DBSession,
                                               assignment_scope_id: str | uuid.UUID,
                                               user_id: str | uuid.UUID) -> list[AnnotationModel]:
     stmt = (select(Annotation)
@@ -273,7 +282,7 @@ async def read_annotations_for_scope_for_user(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_annotations_for_assignment(session: AsyncSession,
+async def read_annotations_for_assignment(session: DBSession,
                                           assignment_id: str | uuid.UUID) -> list[AnnotationModel]:
     stmt = select(Annotation).filter_by(assignment_id=assignment_id)
     result = (await session.execute(stmt)).scalars().all()
@@ -281,7 +290,7 @@ async def read_annotations_for_assignment(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_assignment_scope(session: AsyncSession,
+async def read_assignment_scope(session: DBSession,
                                 assignment_scope_id: str | uuid.UUID) -> AssignmentScopeModel | None:
     stmt = select(AssignmentScope).filter_by(assignment_scope_id=assignment_scope_id)
     result = (await session.execute(stmt)).scalars().one_or_none()
@@ -291,7 +300,7 @@ async def read_assignment_scope(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_annotation_scheme(session: AsyncSession,
+async def read_annotation_scheme(session: DBSession,
                                  assignment_id: str | uuid.UUID | None = None,
                                  assignment_scope_id: str | uuid.UUID | None = None) -> AnnotationSchemeModel | None:
     if assignment_id is not None:
@@ -311,19 +320,19 @@ async def read_annotation_scheme(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_annotation_scheme_for_assignment(session: AsyncSession,
+async def read_annotation_scheme_for_assignment(session: DBSession,
                                                 assignment_id: str | uuid.UUID) -> AnnotationSchemeModel | None:
     return await read_annotation_scheme(session=session, assignment_id=assignment_id)
 
 
 @ensure_session_async
-async def read_annotation_scheme_for_scope(session: AsyncSession,
+async def read_annotation_scheme_for_scope(session: DBSession,
                                            assignment_scope_id: str | uuid.UUID) -> AnnotationSchemeModel | None:
     return await read_annotation_scheme(session=session, assignment_scope_id=assignment_scope_id)
 
 
 @ensure_session_async
-async def read_annotation_schemes_for_project(session: AsyncSession,
+async def read_annotation_schemes_for_project(session: DBSession,
                                               project_id: str | uuid.UUID) -> list[AnnotationSchemeModel]:
     stmt = select(AnnotationScheme).filter_by(project_id=project_id)
     result = (await session.execute(stmt)).scalars().all()
@@ -342,13 +351,13 @@ async def read_scheme_with_annotations(assignment_id: str | uuid.UUID,
 
 
 @ensure_session_async
-async def update_assignment_status(session: AsyncSession,
+async def update_assignment_status(session: DBSession,
                                    assignment_id: str | uuid.UUID,
                                    status: AssignmentStatus) -> None:
     stmt = select(Assignment).where(Assignment.assignment_id == assignment_id)
     assignment: Assignment = (await session.scalars(stmt)).one()
     assignment.status = status
-    await session.commit()
+    await session.flush_or_commit()
 
 
 async def upsert_annotation_scheme(annotation_scheme: AnnotationSchemeModel,
@@ -356,18 +365,19 @@ async def upsert_annotation_scheme(annotation_scheme: AnnotationSchemeModel,
     key = await upsert_orm(upsert_model=annotation_scheme,
                            Schema=AnnotationScheme,
                            primary_key=AnnotationScheme.annotation_scheme_id.name,
-                           db_engine=db_engine)
+                           db_engine=db_engine,
+                           autocommit=True)
     return key
 
 
 @ensure_session_async
-async def delete_annotation_scheme(session: AsyncSession,
+async def delete_annotation_scheme(session: DBSession,
                                    annotation_scheme_id: str | uuid.UUID) -> None:
     stmt = select(AnnotationScheme).filter_by(annotation_scheme_id=annotation_scheme_id)
     annotation_scheme = (await session.scalars(stmt)).one_or_none()
     if annotation_scheme is not None:
         await session.delete(annotation_scheme)
-        await session.commit()
+        await session.flush_or_commit()
     else:
         raise ValueError(f'AnnotationScheme with id="{annotation_scheme_id}" does not seem to exist.')
 
@@ -377,18 +387,19 @@ async def upsert_assignment_scope(assignment_scope: AssignmentScopeModel,
     key = await upsert_orm(upsert_model=assignment_scope,
                            Schema=AssignmentScope,
                            primary_key=AssignmentScope.assignment_scope_id.name,
-                           db_engine=db_engine)
+                           db_engine=db_engine,
+                           autocommit=True)
     return key
 
 
 @ensure_session_async
-async def delete_assignment_scope(session: AsyncSession,
+async def delete_assignment_scope(session: DBSession,
                                   assignment_scope_id: str | uuid.UUID) -> None:
     stmt = select(AssignmentScope).filter_by(assignment_scope_id=assignment_scope_id)
     assignment_scope = (await session.scalars(stmt)).one_or_none()
     if assignment_scope is not None:
         await session.delete(assignment_scope)
-        await session.commit()
+        await session.flush_or_commit()
     else:
         raise ValueError(f'Assignment scope with id="{assignment_scope_id}" does not seem to exist.')
 
@@ -434,7 +445,7 @@ async def upsert_annotations(annotations: list[AnnotationModel],
                 new_annotations.append(Annotation(**annotation.model_dump()))
 
         session.add_all(new_annotations)
-        await session.commit()
+        await session.flush()
 
         for annotation in annotations:
             if annotation.annotation_id in ids_to_update:
@@ -450,7 +461,8 @@ async def upsert_annotations(annotations: list[AnnotationModel],
                 annotation_db.value_bool = annotation.value_bool
                 annotation_db.value_str = annotation.value_str
                 annotation_db.value_float = annotation.value_float
-                await session.commit()
+                await session.flush()
+        await session.commit()
 
     if assignment_id is not None:
         annotation_scheme = await read_annotation_scheme_for_assignment(assignment_id=assignment_id,
@@ -472,7 +484,7 @@ class ItemWithCount(BaseModel):
 
 
 @ensure_session_async
-async def read_item_ids_with_assignment_count_for_project(session: AsyncSession,
+async def read_item_ids_with_assignment_count_for_project(session: DBSession,
                                                           project_id: str | uuid.UUID) -> list[ItemWithCount]:
     stmt = text("""
     SELECT assignment.item_id,
@@ -497,7 +509,7 @@ class AssignmentCounts(BaseModel):
 
 
 @ensure_session_async
-async def read_assignment_counts_for_scope(session: AsyncSession,
+async def read_assignment_counts_for_scope(session: DBSession,
                                            assignment_scope_id: str | uuid.UUID) -> AssignmentCounts:
     stmt = text("""
     SELECT COUNT(DISTINCT assignment.assignment_id)                       AS num_total,
@@ -517,15 +529,15 @@ async def read_assignment_counts_for_scope(session: AsyncSession,
 
 
 @ensure_session_async
-async def store_assignments(session: AsyncSession,
+async def store_assignments(session: DBSession,
                             assignments: list[AssignmentModel]) -> None:
     assignments_orm = [Assignment(**assignment.model_dump()) for assignment in assignments]
     session.add_all(assignments_orm)
-    await session.commit()
+    await session.flush_or_commit()
 
 
 @ensure_session_async
-async def read_resolved_bot_annotation_meta(session: AsyncSession,
+async def read_resolved_bot_annotation_meta(session: DBSession,
                                             bot_annotation_metadata_id: str) -> BotAnnotationResolution:
     stmt = (select(BotAnnotationMetaData)
             .where(BotAnnotationMetaData.bot_annotation_metadata_id == bot_annotation_metadata_id))
@@ -536,7 +548,7 @@ async def read_resolved_bot_annotation_meta(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_resolved_bot_annotations_for_meta(session: AsyncSession,
+async def read_resolved_bot_annotations_for_meta(session: DBSession,
                                                  bot_meta: BotAnnotationResolution,
                                                  include_empty: bool = True,
                                                  include_new: bool = False,
@@ -554,7 +566,7 @@ async def read_resolved_bot_annotations_for_meta(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_resolved_bot_annotations(session: AsyncSession,
+async def read_resolved_bot_annotations(session: DBSession,
                                         existing_resolution: str,
                                         include_empty: bool = True,
                                         include_new: bool = False,
@@ -569,7 +581,7 @@ async def read_resolved_bot_annotations(session: AsyncSession,
 
 
 @ensure_session_async
-async def store_resolved_bot_annotations(session: AsyncSession,
+async def store_resolved_bot_annotations(session: DBSession,
                                          project_id: str,
                                          name: str,
                                          assignment_scope_id: str | uuid.UUID,
@@ -607,7 +619,7 @@ async def store_resolved_bot_annotations(session: AsyncSession,
             # FIXME: When a parent is empty, it will be excluded, leading to a missing foreign key error!
             #        However, just adding all BA's will add lots of junk to the database...
 
-    await session.commit()
+    await session.flush_or_commit()
 
     return str(meta_uuid)
 
@@ -624,7 +636,7 @@ def has_changed(orm: BotAnnotation, resolution: BotAnnotationModel) -> bool:
 
 
 @ensure_session_async
-async def update_resolved_bot_annotations(session: AsyncSession,
+async def update_resolved_bot_annotations(session: DBSession,
                                           bot_annotation_metadata_id: str,
                                           name: str,
                                           matrix: ResolutionMatrix) -> None:
@@ -712,4 +724,4 @@ async def update_resolved_bot_annotations(session: AsyncSession,
         session.add_all(new_bot_annotations)
         await session.flush()
 
-    await session.commit()
+    await session.flush_or_commit()

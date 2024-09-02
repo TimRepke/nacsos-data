@@ -1,9 +1,8 @@
 import logging
 import uuid
 from sqlalchemy import text, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from nacsos_data.db.engine import ensure_session_async
+from nacsos_data.db.engine import ensure_session_async, DBSession
 from nacsos_data.db.schemas import AssignmentScope, User, AnnotationScheme
 from nacsos_data.models.annotations import (
     AnnotationSchemeModel,
@@ -46,7 +45,7 @@ logger = logging.getLogger('nacsos_data.util.annotations.resolve')
 
 
 @ensure_session_async
-async def read_labels(session: AsyncSession,
+async def read_labels(session: DBSession,
                       assignment_scope_id: str | uuid.UUID,
                       ignore_hierarchy: bool = True,
                       ignore_repeat: bool = True) -> list[list[Label]]:
@@ -101,7 +100,7 @@ async def read_labels(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_scopes_for_scheme(session: AsyncSession, scheme_id: str | uuid.UUID, order_by_name: bool = False) \
+async def read_scopes_for_scheme(session: DBSession, scheme_id: str | uuid.UUID, order_by_name: bool = False) \
         -> list[str]:
     """
 
@@ -119,7 +118,7 @@ async def read_scopes_for_scheme(session: AsyncSession, scheme_id: str | uuid.UU
 
 
 @ensure_session_async
-async def read_annotation_scheme(session: AsyncSession,
+async def read_annotation_scheme(session: DBSession,
                                  annotation_scheme_id: str | uuid.UUID) -> AnnotationSchemeModel | None:
     stmt = select(AnnotationScheme).filter_by(annotation_scheme_id=annotation_scheme_id)
     result = (await session.execute(stmt)).scalars().one_or_none()
@@ -129,7 +128,7 @@ async def read_annotation_scheme(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_annotation_scheme_for_scope(session: AsyncSession,
+async def read_annotation_scheme_for_scope(session: DBSession,
                                            assignment_scope_id: str | uuid.UUID) -> AnnotationSchemeModel | None:
     stmt = (select(AnnotationScheme)
             .join(AssignmentScope, AssignmentScope.annotation_scheme_id == AnnotationScheme.annotation_scheme_id)
@@ -141,7 +140,7 @@ async def read_annotation_scheme_for_scope(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_annotators(session: AsyncSession, assignment_scope_id: str | uuid.UUID) -> list[UserModel]:
+async def read_annotators(session: DBSession, assignment_scope_id: str | uuid.UUID) -> list[UserModel]:
     # list of all (unique) users that have at least one annotation in the set
     return [UserModel.model_validate(user) for user in (await session.execute(text(
         "SELECT DISTINCT u.* "
@@ -153,7 +152,7 @@ async def read_annotators(session: AsyncSession, assignment_scope_id: str | uuid
 
 
 @ensure_session_async
-async def read_users(session: AsyncSession, user_ids: list[str] | None) -> list[UserModel]:
+async def read_users(session: DBSession, user_ids: list[str] | None) -> list[UserModel]:
     if user_ids is None:
         raise AttributeError('No users specified...')
     stmt = select(User).where(User.user_id.in_(user_ids))
@@ -162,7 +161,7 @@ async def read_users(session: AsyncSession, user_ids: list[str] | None) -> list[
 
 
 @ensure_session_async
-async def _get_aux_data(session: AsyncSession,
+async def _get_aux_data(session: DBSession,
                         assignment_scope_id: str | uuid.UUID,
                         ignore_hierarchy: bool = False,
                         ignore_repeat: bool = False) \
@@ -233,7 +232,7 @@ def _populate_matrix_annotations(annotation_map: ResolutionMatrix,
 
 
 @ensure_session_async
-async def get_annotation_matrix(session: AsyncSession,
+async def get_annotation_matrix(session: DBSession,
                                 assignment_scope_id: str | uuid.UUID,
                                 ignore_hierarchy: bool = False,
                                 ignore_repeat: bool = False) \
@@ -259,7 +258,7 @@ async def get_annotation_matrix(session: AsyncSession,
 
 
 @ensure_session_async
-async def get_resolved_item_annotations(session: AsyncSession,
+async def get_resolved_item_annotations(session: DBSession,
                                         strategy: ResolutionMethod,
                                         assignment_scope_id: str | uuid.UUID,
                                         ignore_hierarchy: bool = False,

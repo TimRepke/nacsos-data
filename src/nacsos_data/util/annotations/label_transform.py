@@ -4,9 +4,8 @@ from uuid import UUID
 from lark import Lark, Transformer, Tree, Token
 from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from nacsos_data.db.engine import ensure_session_async
+from nacsos_data.db.engine import ensure_session_async, DBSession
 
 GRAMMAR = '''
 ?clause: expr
@@ -95,7 +94,7 @@ class SortedAnnotation(BaseModel):
 
 
 @ensure_session_async
-async def get_annotations(session: AsyncSession, source_ids: list[str] | None = None) -> list[SortedAnnotation]:
+async def get_annotations(session: DBSession, source_ids: list[str] | None = None) -> list[SortedAnnotation]:
     if source_ids is None:
         return []
     stmt = text('''

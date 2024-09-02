@@ -9,11 +9,9 @@ from scipy.stats import pearsonr, kendalltau, spearmanr, ConstantInputWarning
 from sklearn.exceptions import UndefinedMetricWarning
 from sklearn.metrics import cohen_kappa_score, precision_recall_fscore_support
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from nacsos_data.db.crud.annotations import read_annotation_scheme_for_scope
 from nacsos_data.db.crud.users import user_ids_to_names
-from nacsos_data.db.engine import ensure_session_async
+from nacsos_data.db.engine import ensure_session_async, DBSession
 from nacsos_data.models.annotation_quality import AnnotationQualityModel
 from nacsos_data.models.annotations import AnnotationSchemeModel, FlatLabel, AnnotationSchemeLabelTypes
 from nacsos_data.util.annotations.label_transform import get_annotations, annotations_to_sequence, SortedAnnotationLabel
@@ -384,7 +382,7 @@ def fix(val: float | None) -> float | None:
 
 
 @ensure_session_async
-async def compute_irr_scores(session: AsyncSession,
+async def compute_irr_scores(session: DBSession,
                              assignment_scope_id: str | uuid.UUID,
                              resolution_id: str | uuid.UUID | None = None,
                              project_id: str | uuid.UUID | None = None,

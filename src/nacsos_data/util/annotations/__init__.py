@@ -2,9 +2,8 @@ import uuid
 from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from nacsos_data.db.engine import ensure_session_async
+from nacsos_data.db.engine import ensure_session_async, DBSession
 from nacsos_data.models.annotations import (
     AnnotationSchemeModel,
     AnnotationSchemeLabel,
@@ -38,7 +37,7 @@ def unravel_annotation_scheme_keys(scheme: AnnotationSchemeModel) -> list[str]:
 
 
 @ensure_session_async
-async def get_ordering(session: AsyncSession, assignment_scope_id: str | uuid.UUID) -> list[OrderingEntry]:
+async def get_ordering(session: DBSession, assignment_scope_id: str | uuid.UUID) -> list[OrderingEntry]:
     """
     Retrieve all items from this assignment scope, order them by the order of assignments and attach some
     basic information about the state of the assignment.
@@ -97,7 +96,7 @@ def dehydrate_resolutions(matrix: ResolutionMatrix) -> list[ResolutionSnapshotEn
 
 
 @ensure_session_async
-async def read_item_annotations(session: AsyncSession,
+async def read_item_annotations(session: DBSession,
                                 assignment_scope_id: str | uuid.UUID,
                                 ignore_hierarchy: bool = False,
                                 ignore_repeat: bool = False) -> list[ItemAnnotation]:
@@ -155,7 +154,7 @@ async def read_item_annotations(session: AsyncSession,
 
 
 @ensure_session_async
-async def read_bot_annotations(session: AsyncSession,
+async def read_bot_annotations(session: DBSession,
                                bot_annotation_metadata_id: str) -> list[BotItemAnnotation]:
     stmt = text(f'''
         WITH RECURSIVE ctename AS ( 

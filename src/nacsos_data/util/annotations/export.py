@@ -29,7 +29,7 @@ from nacsos_data.db.schemas.bot_annotations import BotAnnotation, BotAnnotationM
 
 from ..errors import NotFoundError
 from ..nql import NQLQuery
-from ...db.engine import ensure_session_async
+from ...db.engine import ensure_session_async, DBSession
 from ...db.schemas import User, ProjectPermissions, Project, AcademicItem, TwitterItem, LexisNexisItem
 from ...models.nql import NQLFilter
 
@@ -275,7 +275,7 @@ F2CRetType = (tuple[Type[AcademicItem]
 
 
 @ensure_session_async
-async def prepare_export_table(session: AsyncSession,
+async def prepare_export_table(session: DBSession,
                                nql_filter: NQLFilter | None,
                                bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
                                assignment_scope_ids: list[str] | list[uuid.UUID] | None,

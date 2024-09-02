@@ -3,24 +3,23 @@ import uuid
 
 from sqlalchemy import select, delete, func
 from sqlalchemy.exc import NoResultFound
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.crud import upsert_orm
-from nacsos_data.db.engine import ensure_session_async
+from nacsos_data.db.engine import ensure_session_async, DBSession
 from nacsos_data.db.schemas import Import, m2m_import_item_table, Task
 from nacsos_data.db.schemas.items.base import Item
 from nacsos_data.models.imports import ImportModel
 
 
 @ensure_session_async
-async def read_all_imports_for_project(session: AsyncSession, project_id: uuid.UUID | str) -> list[ImportModel]:
+async def read_all_imports_for_project(session: DBSession, project_id: uuid.UUID | str) -> list[ImportModel]:
     stmt = select(Import).where(Import.project_id == project_id)
     result = (await session.execute(stmt)).scalars().all()
     return [ImportModel.model_validate(res.__dict__) for res in result]
 
 
 @ensure_session_async
-async def read_item_count_for_import(session: AsyncSession, import_id: uuid.UUID | str) -> int:
+async def read_item_count_for_import(session: DBSession, import_id: uuid.UUID | str) -> int:
     stmt = select(func.count()) \
         .select_from(m2m_import_item_table) \
         .where(m2m_import_item_table.c.import_id == import_id)
@@ -31,7 +30,7 @@ async def read_item_count_for_import(session: AsyncSession, import_id: uuid.UUID
 
 
 @ensure_session_async
-async def read_import(session: AsyncSession,
+async def read_import(session: DBSession,
                       import_id: uuid.UUID | str) -> ImportModel | None:
     stmt = select(Import).where(Import.import_id == import_id)
     result = (await session.execute(stmt)).scalars().one_or_none()
@@ -41,7 +40,7 @@ async def read_import(session: AsyncSession,
 
 
 @ensure_session_async
-async def upsert_import(session: AsyncSession, import_model: ImportModel) -> str | uuid.UUID | None:
+async def upsert_import(session: DBSession, import_model: ImportModel) -> str | uuid.UUID | None:
     key = await upsert_orm(upsert_model=import_model,
                            Schema=Import,
                            primary_key=Import.import_id.name,
@@ -50,7 +49,7 @@ async def upsert_import(session: AsyncSession, import_model: ImportModel) -> str
 
 
 @ensure_session_async
-async def delete_import(session: AsyncSession, import_id: uuid.UUID | str) -> None:
+async def delete_import(session: DBSession, import_id: uuid.UUID | str) -> None:
     """
     When an import is deleted, we want to also delete all items that belonged to that import
     and that import only.
@@ -63,24 +62,26 @@ async def delete_import(session: AsyncSession, import_id: uuid.UUID | str) -> No
     stmt = select(Import).where(Import.import_id == import_id)  # type: ignore[assignment]
     imp = (await session.execute(stmt)).scalars().first()
     if imp and imp.pipeline_task_id is not None:
-        stmt = delete(Task).where(Task.task_id == imp.pipeline_task_id)
-        await session.execute(stmt)
+        await session.execute(delete(Task)
+                              .where(Task.task_id == imp.pipeline_task_id))
     # TODO rm -r .tasks/user_data/{imp.config.sources}
     # TODO rm -r .tasks/artefacts/{task.task_id}
 
     # Delete import
-    stmt = delete(Import).where(Import.import_id == import_id)
-    await session.execute(stmt)
+    await session.execute(delete(Import)
+                          .where(Import.import_id == import_id))
 
     # Delete items that no longer belong to any imports (this will cascade to delete their
     # assignments and annotations, so be careful!
-    stmt = delete(Item).where(~Item.imports.any())
-    await session.execute(stmt)
-    await session.commit()
+    await session.execute(delete(Item)
+                          .where(~Item.imports.any()))
+
+    # Send changes to database
+    await session.flush_or_commit()
 
 
 @ensure_session_async
-async def get_or_create_import(session: AsyncSession,
+async def get_or_create_import(session: DBSession,
                                project_id: str,
                                import_name: str | None = None,
                                import_id: str | uuid.UUID | None = None,
@@ -104,7 +105,7 @@ async def get_or_create_import(session: AsyncSession,
             time_created=datetime.datetime.now()
         )
         session.add(import_orm)
-        await session.flush()
+        await session.flush_or_commit()
         return import_orm
 
     if import_id is not None:

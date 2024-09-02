@@ -3,7 +3,6 @@ import logging
 from typing import TYPE_CHECKING, Generator, AsyncGenerator
 
 import numpy as np
-import numpy.typing as npt
 from scipy.sparse import vstack, csr_matrix
 from sklearn.feature_extraction.text import CountVectorizer
 

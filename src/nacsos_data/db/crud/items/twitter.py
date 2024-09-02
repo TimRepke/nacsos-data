@@ -48,7 +48,7 @@ async def import_tweet(tweet: TwitterItemModel,
             orm_tweet.project_id = project_id  # type: ignore[assignment]
         try:
             session.add(orm_tweet)
-            await session.commit()
+            await session.flush()
         except IntegrityError:
             logger.debug(f'Tweet with twitter_id="{orm_tweet.twitter_id}" '
                          f'already exists in project "{orm_tweet.project_id}".')
@@ -71,6 +71,8 @@ async def import_tweet(tweet: TwitterItemModel,
             except IntegrityError:
                 logger.debug(f'M2M_i2i already exists, ignoring {import_id} <-> {orm_tweet.item_id}')
                 await session.rollback()
+
+        await session.commit()
 
         return TwitterItemModel.model_validate(orm_tweet.__dict__)
 

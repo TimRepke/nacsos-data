@@ -26,7 +26,7 @@ from ...db.schemas import AcademicItem, m2m_import_item_table
 from ...models.items import AcademicItemModel, ItemEntry
 from ...models.imports import M2MImportItemType
 from ...models.openalex.solr import DefType, SearchField, OpType
-from .. import gather_async
+from .. import gather_async, elapsed_timer
 from ..text import tokenise_item, extract_vocabulary, itm2txt
 from ..duplicate import MilvusDuplicateIndex, PynndescentDuplicateIndex
 from .clean import get_cleaned_meta_field
@@ -66,15 +66,16 @@ async def _find_id_duplicates(
         import_id: str,
         project_id: str,
         logger: logging.Logger) -> tuple[int, dict[str, int], set[str], set[str]]:
-    logger.info('Fetching all known IDs from current project...')
-    known_ids: dict[str, dict[str, str]]
-    known_ids = {
-        id_field: await read_known_ids_map(session=session, project_id=project_id, field=id_field)
-        for id_field in ID_FIELDS
-    }
+    with elapsed_timer(logger, 'Fetching all known IDs from current project'):
+        known_ids: dict[str, dict[str, str]]
+        known_ids = {
+            id_field: await read_known_ids_map(session=session, project_id=project_id, field=id_field)
+            for id_field in ID_FIELDS
+        }
 
-    # Fetch item_ids already in the import (in case the import failed at some point or is continued mid-way)
-    imported_item_ids = set(await gather_async(read_item_ids_for_import(session=session, import_id=import_id)))
+    with elapsed_timer(logger, 'Fetching known `item_ids` for import'):
+        # Fetch item_ids already in the import (in case the import failed at some point or is continued mid-way)
+        imported_item_ids = set(await gather_async(read_item_ids_for_import(session=session, import_id=import_id)))
 
     # Set of item_ids for which we need to add m2m tuples later
     m2m_buffer: set[str] = set()
@@ -82,25 +83,25 @@ async def _find_id_duplicates(
     token_counts: defaultdict[str, int] = defaultdict(int)
     n_unknown_items = 0
 
-    logger.info('Checking if there are any known identifiers in the new data...')
-    for item in new_items():  # Iterate all new items
-        # Check if we know this new item via some trusted identifier (e.g. openalex_id)
-        known_item_id = _check_known_identifiers(item, known_ids, imported_item_ids, logger)
+    with elapsed_timer(logger, 'Checking if there are any known identifiers in the new data'):
+        for item in new_items():  # Iterate all new items
+            # Check if we know this new item via some trusted identifier (e.g. openalex_id)
+            known_item_id = _check_known_identifiers(item, known_ids, imported_item_ids, logger)
 
-        # We know this new item (via an ID) and just need to add an m2m
+            # We know this new item (via an ID) and just need to add an m2m
 
-        # We don't know this new item, add it to our buffer file and extend vocabulary
-        if known_item_id is False:
-            for tok in tokenise_item(item, lowercase=True):
-                token_counts[tok] += 1
-            fp.write(item.model_dump_json() + '\n')
-            n_unknown_items += 1
+            # We don't know this new item, add it to our buffer file and extend vocabulary
+            if known_item_id is False:
+                for tok in tokenise_item(item, lowercase=True):
+                    token_counts[tok] += 1
+                fp.write(item.model_dump_json() + '\n')
+                n_unknown_items += 1
 
-        # We found a match!
-        elif known_item_id is not None and type(known_item_id) is str:
-            if known_item_id not in imported_item_ids:
-                m2m_buffer.add(known_item_id)
-                imported_item_ids.add(known_item_id)
+            # We found a match!
+            elif known_item_id is not None and type(known_item_id) is str:
+                if known_item_id not in imported_item_ids:
+                    m2m_buffer.add(known_item_id)
+                    imported_item_ids.add(known_item_id)
 
     # return number of items we need to check for duplicates, vocabulary, updated set of seen item_ids, and the m2m buffer
     return n_unknown_items, token_counts, imported_item_ids, m2m_buffer
@@ -299,26 +300,26 @@ async def import_academic_items(
                                                     i_type='script')
             import_id = str(import_orm.import_id)
 
-            logger.info('Checking new items for obvious ID-based duplicates...')
-            n_unknown_items, token_counts, imported_item_ids, m2m_buffer = await _find_id_duplicates(
-                session=session,
-                project_id=str(project_id),
-                import_id=import_id,
-                new_items=new_items,
-                logger=logger,
-                fp=duplicate_buffer
-            )
+            with elapsed_timer(logger, 'Checking new items for obvious ID-based duplicates'):
+                n_unknown_items, token_counts, imported_item_ids, m2m_buffer = await _find_id_duplicates(
+                    session=session,
+                    project_id=str(project_id),
+                    import_id=import_id,
+                    new_items=new_items,
+                    logger=logger,
+                    fp=duplicate_buffer
+                )
             logger.info(f'Found {n_unknown_items:,} unknown items and {len(m2m_buffer):,} duplicates in first pass.')
 
         index: MilvusDuplicateIndex | None = None
         if n_unknown_items > 0:
-            logger.debug(f'Constructing vocabulary from {len(token_counts):,} `token_counts`...')
-            vocabulary = extract_vocabulary(token_counts, min_count=1, max_features=max_features)
-            del token_counts  # clean up term counts to save RAM
+            with elapsed_timer(logger, f'Constructing vocabulary from {len(token_counts):,} `token_counts`'):
+                vocabulary = extract_vocabulary(token_counts, min_count=1, max_features=max_features)
+                del token_counts  # clean up term counts to save RAM
 
             if vectoriser is None:
-                logger.debug(f'Setting up vectorizer with {len(vocabulary):,} tokens in the vocabulary...')
-                vectoriser = CountVectorizer(vocabulary=vocabulary)
+                with elapsed_timer(logger, f'Setting up vectorizer with {len(vocabulary):,} tokens in the vocabulary'):
+                    vectoriser = CountVectorizer(vocabulary=vocabulary)
 
             logger.debug('Constructing Milvus index...')
             async with db_engine.session() as session:  # type: AsyncSession
@@ -336,45 +337,44 @@ async def import_academic_items(
                     max_slop=max_slop,
                     batch_size=batch_size)
 
-                logger.debug('  -> initialising duplicate detection index...')
-                await index.init()
+                with elapsed_timer(logger, '  -> initialising duplicate detection index...'):
+                    await index.init()
 
         logger.info('Finished pre-processing and index building.')
         logger.info('Proceeding to insert new items and creating m2m tuples...')
         async with db_engine.session() as session:  # type: AsyncSession
-            logger.info(f'Inserting {len(m2m_buffer):,} buffered m2m relations...')
-            for item_id in m2m_buffer:
-                await _insert_m2m(session=session, item_id=item_id, import_id=import_id, logger=logger, dry_run=dry_run)
+            with elapsed_timer(logger, f'Inserting {len(m2m_buffer):,} buffered m2m relations'):
+                for item_id in m2m_buffer:
+                    await _insert_m2m(session=session, item_id=item_id, import_id=import_id, logger=logger, dry_run=dry_run)
 
             if n_unknown_items == 0 or index is None:
                 logger.info('No unknown items found, ending here!')
                 return import_id, list(imported_item_ids)
 
-            logger.info(f'Loading milvus collection "{index.collection_name}"')
-            index.client.load_collection(index.collection_name)
+            with elapsed_timer(logger, f'Loading milvus collection "{index.collection_name}"'):
+                index.client.load_collection(index.collection_name)
 
             logger.info(f'Inserting (maybe) {n_unknown_items:,} buffered duplicate candidates...')
             for item in _read_buffered_items(duplicate_buffer):
                 try:
                     async with session.begin_nested():
-                        logger.info(f'Importing AcademicItem with doi {item.doi} and title "{item.title}"')
+                        with elapsed_timer(logger, f'Importing AcademicItem with doi {item.doi} and title "{item.title}"'):
+                            # Make sure the item fields are complete and clean
+                            item = _ensure_clean_item(item, project_id=str(project_id))
 
-                        # Make sure the item fields are complete and clean
-                        item = _ensure_clean_item(item, project_id=str(project_id))
+                            # Search for duplicates in the index and the database
+                            existing_id = await _find_duplicate(session=session, item=item, project_id=str(project_id),
+                                                                min_text_len=min_text_len, index=index, logger=logger)
 
-                        # Search for duplicates in the index and the database
-                        existing_id = await _find_duplicate(session=session, item=item, project_id=str(project_id),
-                                                            min_text_len=min_text_len, index=index, logger=logger)
+                            # Insert a new item or an item variant
+                            item_id = await _insert_item(session=session, item=item, existing_id=existing_id, import_id=import_id,
+                                                         trust_new_authors=trust_new_authors, trust_new_keywords=trust_new_keywords,
+                                                         dry_run=dry_run, logger=logger)
 
-                        # Insert a new item or an item variant
-                        item_id = await _insert_item(session=session, item=item, existing_id=existing_id, import_id=import_id,
-                                                     trust_new_authors=trust_new_authors, trust_new_keywords=trust_new_keywords,
-                                                     dry_run=dry_run, logger=logger)
-
-                        # Add many-to-many relation to import
-                        if item_id not in imported_item_ids:
-                            imported_item_ids.add(item_id)
-                            await _insert_m2m(session=session, item_id=item_id, import_id=import_id, dry_run=dry_run, logger=logger)
+                            # Add many-to-many relation to import
+                            if item_id not in imported_item_ids:
+                                imported_item_ids.add(item_id)
+                                await _insert_m2m(session=session, item_id=item_id, import_id=import_id, dry_run=dry_run, logger=logger)
 
                 except (UniqueViolation, IntegrityError, OperationalError) as e:
                     logger.exception(e)
@@ -383,8 +383,8 @@ async def import_academic_items(
             logger.info('Finally committing all changes to the database!')
             await session.commit()
 
-    logger.info('Cleaning up milvus!')
-    index.client.drop_collection(index.collection_name)
+    with elapsed_timer(logger, 'Cleaning up milvus!'):
+        index.client.drop_collection(index.collection_name)
 
     logger.info('Import complete, returning to initiator with IDs!')
     return import_id, list(imported_item_ids)
