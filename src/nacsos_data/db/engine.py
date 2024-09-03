@@ -82,20 +82,20 @@ class DatabaseEngineAsync:
     @asynccontextmanager
     async def session(self) -> AsyncIterator[AsyncSession]:
         session: AsyncSession = self._session()
-        import inspect
-        curframe = inspect.currentframe()
-        calframe = inspect.getouterframes(curframe, 2)
-        cnt = f'{calframe[2][3]} <- {calframe[3][3]} <- {calframe[4][3]}'
+
+        if logger.isEnabledFor(logging.DEBUG):
+            import inspect
+            curframe = inspect.currentframe()
+            calframe = inspect.getouterframes(curframe, 2)
+            logger.debug('New session for: ' + ' <- '.join([fr[3] for fr in calframe[2:6]]))
+
         try:
-            logger.debug(f'Yield session (pre) {cnt}')
             yield session
             # await session.commit()
         except Exception as e:
-            logger.debug(f'Rollback session (pre) {cnt}')
             await session.rollback()
             raise e
         finally:
-            logger.debug(f'Close session (pre) {cnt}')
             await session.close()
 
 
