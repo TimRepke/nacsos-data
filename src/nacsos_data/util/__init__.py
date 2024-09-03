@@ -130,5 +130,5 @@ def elapsed_timer(logger: logging.Logger, tn: str = 'Task') -> Generator[Callabl
 
 def get_attr(obj: Any, key: str, default: T | None = None) -> T | None:
     if hasattr(obj, key):
-        return getattr(obj, key)
+        return getattr(obj, key)  # type: ignore[no-any-return]
     return default

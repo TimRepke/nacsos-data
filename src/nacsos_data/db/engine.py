@@ -7,7 +7,7 @@ from json import JSONEncoder
 
 from pydantic import BaseModel
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncConnection
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine, text, URL
 from contextlib import contextmanager, asynccontextmanager
@@ -51,7 +51,6 @@ class DatabaseEngineAsync:
         self._password = password
         self._database = database
 
-        # TODO expire_on_commit (check if this should be turned off)
         self._connection_str = URL.create(
             drivername='postgresql+psycopg',
             username=self._user,
@@ -62,8 +61,9 @@ class DatabaseEngineAsync:
         )
         self.engine = create_async_engine(self._connection_str, echo=debug, future=True,
                                           json_serializer=DictLikeEncoder().encode)
-        self._session: async_sessionmaker[AsyncSession] = async_sessionmaker(  # type: ignore[type-arg] # FIXME
-            bind=self.engine, autoflush=False, autocommit=False)
+        self._session: async_sessionmaker[AsyncSession] = async_sessionmaker(  # type: ignore[type-arg]
+            bind=self.engine, autoflush=False, autocommit=False, expire_on_commit=True,
+            close_resets_only=False)
 
     async def startup(self) -> None:
         """
@@ -72,9 +72,9 @@ class DatabaseEngineAsync:
         try:
             logger.debug('AsyncEngine starting up...')
             logger.info(f'AsyncEngine connecting to {self._user}:****@{self._host}:{self._port}/{self._database}')
-            session: AsyncSession = self._session()
-            await session.execute(text('SELECT 1;'))
-            logger.info('Connection seems to be ready.')
+            async with self._session() as session:
+                await session.execute(text('SELECT 1;'))
+                logger.info('Connection seems to be ready.')
         except OperationalError as e:
             logger.error('Connection failed!')
             logger.exception(e)
@@ -82,13 +82,20 @@ class DatabaseEngineAsync:
     @asynccontextmanager
     async def session(self) -> AsyncIterator[AsyncSession]:
         session: AsyncSession = self._session()
+        import inspect
+        curframe = inspect.currentframe()
+        calframe = inspect.getouterframes(curframe, 2)
+        cnt = f'{calframe[2][3]} <- {calframe[3][3]} <- {calframe[4][3]}'
         try:
+            logger.debug(f'Yield session (pre) {cnt}')
             yield session
             # await session.commit()
         except Exception as e:
+            logger.debug(f'Rollback session (pre) {cnt}')
             await session.rollback()
             raise e
         finally:
+            logger.debug(f'Close session (pre) {cnt}')
             await session.close()
 
 
@@ -106,7 +113,6 @@ class DatabaseEngine:
         self._password = password
         self._database = database
 
-        # TODO expire_on_commit (check if this should be turned off)
         self._connection_str = URL.create(
             drivername='postgresql+psycopg',
             username=self._user,
@@ -117,7 +123,7 @@ class DatabaseEngine:
         )
         self.engine = create_engine(self._connection_str, echo=debug, future=True,
                                     json_serializer=DictLikeEncoder().encode)
-        self._session: sessionmaker[Session] = sessionmaker(  # type: ignore[type-arg] # FIXME
+        self._session: sessionmaker[Session] = sessionmaker(  # type: ignore[type-arg]
             bind=self.engine, autoflush=False, autocommit=False)
 
     def startup(self) -> None:
@@ -194,6 +200,38 @@ async def get_db_session(session: AsyncSession | DBSession | None = None,
     raise RuntimeError('I need a session or an engine to get a session!')
 
 
+DBConnection: TypeAlias = AsyncConnection | AsyncSession | DBSession
+
+
+def ensure_connection_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awaitable[R]]:
+    @wraps(func)
+    async def wrapper(*args: Any,
+                      connection: DatabaseEngineAsync | AsyncConnection | AsyncSession | DBSession,
+                      **kwargs: dict[str, Any]) -> R:
+        if isinstance(connection, AsyncConnection):
+            return await func(*args, db_conn=connection, **kwargs)
+
+        conn: AsyncConnection
+        if isinstance(connection, DatabaseEngineAsync):
+            async with connection.engine.connect() as conn:
+                return await func(*args, db_conn=conn, **kwargs)
+
+        if isinstance(connection, DBSession) or isinstance(connection, AsyncSession):
+            try:
+                conn = await connection.connection()
+                ret = await func(*args, db_conn=conn, **kwargs)
+            except Exception as e:
+                await conn.rollback()
+                raise e
+            finally:
+                await conn.close()
+                return ret
+
+        raise RuntimeError('Unsupported connection type!')
+
+    return wrapper
+
+
 def ensure_session_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awaitable[R]]:
     @wraps(func)
     async def wrapper(*args: Any,
@@ -207,23 +245,6 @@ def ensure_session_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awa
 
     return wrapper
 
-
-# def ensure_session_async(func):  # type: ignore[no-untyped-def]
-#     @wraps(func)
-#     async def wrapper(*args,  # type: ignore[no-untyped-def]
-#                       session: AsyncSession | None = None,
-#                       db_engine: DatabaseEngineAsync | None = None,
-#                       **kwargs):
-#         if session is not None:
-#             return await func(*args, session=session, **kwargs)  # type: ignore[arg-type]
-#         if db_engine is not None:
-#             logger.debug(f'Opening a new session to execute {func}')
-#             async with db_engine.session() as fresh_session:  # type: AsyncSession
-#                 return await func(*args, session=fresh_session, **kwargs)  # type: ignore[arg-type]
-#
-#         raise RuntimeError('I need a session or an engine to get a session!')
-#
-#     return wrapper
 
 def ensure_session(func):  # type: ignore[no-untyped-def]
     @wraps(func)

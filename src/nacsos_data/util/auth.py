@@ -14,7 +14,7 @@ from ..models.projects import ProjectPermissionsModel, ProjectPermission
 from ..models.users import UserInDBModel, UserModel, AuthTokenModel
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
+    from sqlalchemy.ext.asyncio import AsyncSession, AsyncConnection  # noqa: F401
 
 logger = logging.getLogger('nacsos_data.util.auth')
 
@@ -80,24 +80,24 @@ class Authentication:
             return AuthTokenModel.model_validate(token.__dict__)
 
     async def fetch_token_by_id(self, token_id: str | uuid.UUID, only_active: bool = True) -> AuthTokenModel:
-        session: AsyncSession
-        async with self.db_engine.session() as session:
+        async with self.db_engine.engine.connect() as connection:  # type: AsyncConnection
             stmt = select(AuthToken).where(AuthToken.token_id == token_id)
             if only_active:
                 stmt = stmt.where(or_(AuthToken.valid_till > datetime.datetime.now(),
                                       AuthToken.valid_till.is_(None)))
-            token = (await session.scalars(stmt)).one_or_none()
+            token = (await connection.execute(stmt)).mappings().one_or_none()
 
             if token is None:
                 raise InvalidCredentialsError(f'No valid auth token found for token_id "{token_id}"')
 
-            return AuthTokenModel.model_validate(token.__dict__)
+            return AuthTokenModel.model_validate(token)
 
     async def clear_tokens_inactive(self) -> None:
         session: AsyncSession
         async with self.db_engine.session() as session:
             stmt = delete(AuthToken).where(AuthToken.valid_till < datetime.datetime.now())
             await session.execute(stmt)
+            await session.commit()
 
     async def clear_tokens_by_user(self, username: str) -> None:
         session: AsyncSession
