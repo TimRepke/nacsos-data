@@ -4,7 +4,7 @@ import logging
 from pydantic import BaseModel
 from sqlalchemy import select, delete, asc, desc
 from sqlalchemy.sql import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncConnection
 
 from nacsos_data.db.schemas import (
     Annotation,
@@ -37,7 +37,7 @@ from nacsos_data.util.annotations.validation import (
 )
 
 from . import upsert_orm, MissingIdError
-from ..engine import ensure_session_async, DBSession, DatabaseEngineAsync
+from ..engine import ensure_session_async, DBSession, DatabaseEngineAsync, ensure_connection_async
 from ...util.annotations import (
     dehydrate_user_annotations,
     dehydrate_resolutions
@@ -168,10 +168,10 @@ class AssignmentScopeEntry(BaseModel):
     assignments: list[AssignmentInfo]
 
 
-@ensure_session_async
-async def read_assignment_overview_for_scope(session: DBSession,
+@ensure_connection_async
+async def read_assignment_overview_for_scope(db_conn: AsyncConnection,
                                              assignment_scope_id: str | uuid.UUID) -> list[AssignmentScopeEntry]:
-    result = await session.execute(
+    result = await db_conn.execute(
         text('''
             WITH labels_pre as (SELECT ass.assignment_id,
                                ann.key,

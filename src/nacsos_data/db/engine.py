@@ -180,26 +180,6 @@ class DBSession(AsyncSession):
             await self.flush()
 
 
-async def get_db_session(session: AsyncSession | DBSession | None = None,
-                         db_engine: DatabaseEngineAsync | None = None,
-                         engine: DatabaseEngineAsync | None = None,
-                         use_commit: bool = False) -> DBSession:
-    if session is not None:
-        if isinstance(session, DBSession):
-            return session
-        return DBSession(session=session, use_commit=use_commit)
-
-    if engine is not None:
-        db_engine = engine  # alias; fall through and use the other branch to ensure session
-
-    if db_engine is not None:
-        fresh_session: AsyncSession
-        async with db_engine.session() as fresh_session:
-            return DBSession(session=fresh_session, use_commit=use_commit)
-
-    raise RuntimeError('I need a session or an engine to get a session!')
-
-
 DBConnection: TypeAlias = AsyncConnection | AsyncSession | DBSession
 
 
@@ -240,8 +220,20 @@ def ensure_session_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awa
                       engine: DatabaseEngineAsync | None = None,
                       use_commit: bool = False,
                       **kwargs: dict[str, Any]) -> R:
-        db_session = await get_db_session(session=session, db_engine=db_engine, engine=engine, use_commit=use_commit)
-        return await func(*args, session=db_session, **kwargs)
+        if session is not None:
+            if isinstance(session, DBSession):
+                return await func(*args, session=session, **kwargs)
+            return await func(*args, session=DBSession(session=session, use_commit=use_commit), **kwargs)
+
+        if engine is not None:
+            db_engine = engine  # alias; fall through and use the other branch to ensure session
+
+        if db_engine is not None:
+            fresh_session: AsyncSession
+            async with db_engine.session() as fresh_session:
+                return await func(*args, session=DBSession(session=fresh_session, use_commit=use_commit), **kwargs)
+
+        raise RuntimeError('I need a session or an engine to get a session!')
 
     return wrapper
 
