@@ -366,7 +366,7 @@ async def upsert_annotation_scheme(annotation_scheme: AnnotationSchemeModel,
                            Schema=AnnotationScheme,
                            primary_key=AnnotationScheme.annotation_scheme_id.name,
                            db_engine=db_engine,
-                           autocommit=True)
+                           use_commit=True)
     return key
 
 
@@ -388,7 +388,7 @@ async def upsert_assignment_scope(assignment_scope: AssignmentScopeModel,
                            Schema=AssignmentScope,
                            primary_key=AssignmentScope.assignment_scope_id.name,
                            db_engine=db_engine,
-                           autocommit=True)
+                           use_commit=True)
     return key
 
 
