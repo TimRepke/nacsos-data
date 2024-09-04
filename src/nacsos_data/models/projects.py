@@ -1,3 +1,4 @@
+import uuid
 from typing import Literal
 from uuid import UUID
 import datetime
@@ -109,7 +110,7 @@ class ProjectPermissionsModel(BaseModel):
     import_limit_oa: int = 0
 
     @classmethod
-    def get_virtual_admin(cls, project_id: str, user_id: str) -> 'ProjectPermissionsModel':
+    def get_virtual_admin(cls, project_id: str | uuid.UUID, user_id: str | uuid.UUID) -> 'ProjectPermissionsModel':
         return cls(project_permission_id=None, project_id=project_id,
                    user_id=user_id, owner=True,
                    dataset_read=True, dataset_edit=True,

@@ -2,7 +2,7 @@ import json
 import logging
 from functools import wraps
 from pathlib import Path
-from typing import AsyncIterator, Iterator, Any, TypeVar, Callable, Awaitable, Coroutine, TypeAlias
+from typing import AsyncIterator, Iterator, Any, TypeVar, Callable, Awaitable, Coroutine, TypeAlias, Type
 from json import JSONEncoder
 
 from pydantic import BaseModel
@@ -15,7 +15,6 @@ from datetime import datetime
 
 # unused import required so the engine sees the models!
 from . import schemas  # noqa F401
-from ..util import get_attr
 
 logger = logging.getLogger('nacsos_data.engine')
 
@@ -62,8 +61,7 @@ class DatabaseEngineAsync:
         self.engine = create_async_engine(self._connection_str, echo=debug, future=True,
                                           json_serializer=DictLikeEncoder().encode)
         self._session: async_sessionmaker[AsyncSession] = async_sessionmaker(  # type: ignore[type-arg]
-            bind=self.engine, autoflush=False, autocommit=False, expire_on_commit=True,
-            close_resets_only=False)
+            bind=self.engine, autoflush=False, autocommit=False, expire_on_commit=True, class_=DBSession)
 
     async def startup(self) -> None:
         """
@@ -80,8 +78,9 @@ class DatabaseEngineAsync:
             logger.exception(e)
 
     @asynccontextmanager
-    async def session(self) -> AsyncIterator[AsyncSession]:
-        session: AsyncSession = self._session()
+    async def session(self, use_commit: bool = False) -> AsyncIterator[AsyncSession]:
+        session: AsyncSession = self._session(use_commit=use_commit)
+        print(session)
 
         if logger.isEnabledFor(logging.DEBUG):
             import inspect
@@ -166,11 +165,13 @@ def flush_or_commit(session: AsyncSession, use_commit: bool) -> CommitFunc:
 
 class DBSession(AsyncSession):
     def __init__(self,
-                 session: AsyncSession,
-                 use_commit: bool = False):
-        super().__init__(bind=session.bind,
-                         binds=get_attr(session, 'binds', None),
-                         sync_session_class=session.sync_session_class)
+                 bind: Any | None = None,
+                 *,
+                 binds: dict[str, Any] | None = None,
+                 sync_session_class: Type[Session] | None = None,
+                 use_commit: bool = False,
+                 **kw: Any):
+        super().__init__(bind=bind, binds=binds, sync_session_class=sync_session_class)  # type: ignore[arg-type]
         self.use_commit = use_commit
 
     async def flush_or_commit(self) -> None:
@@ -221,17 +222,17 @@ def ensure_session_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awa
                       use_commit: bool = False,
                       **kwargs: dict[str, Any]) -> R:
         if session is not None:
-            if isinstance(session, DBSession):
-                return await func(*args, session=session, **kwargs)
-            return await func(*args, session=DBSession(session=session, use_commit=use_commit), **kwargs)
+            # FIXME: In theory, we could give this a normal AsyncSession and a func using `session.flush_or_commit()` would blow up.
+            # if isinstance(session, AsyncSession):
+            #     await func(*args, session=DBSession(session=fresh_session, use_commit=use_commit), **kwargs)
+            return await func(*args, session=session, **kwargs)
 
         if engine is not None:
             db_engine = engine  # alias; fall through and use the other branch to ensure session
 
         if db_engine is not None:
-            fresh_session: AsyncSession
-            async with db_engine.session() as fresh_session:
-                return await func(*args, session=DBSession(session=fresh_session, use_commit=use_commit), **kwargs)
+            async with db_engine.session(use_commit=use_commit) as session:
+                return await func(*args, session=session, **kwargs)
 
         raise RuntimeError('I need a session or an engine to get a session!')
 
