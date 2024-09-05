@@ -80,7 +80,6 @@ class DatabaseEngineAsync:
     @asynccontextmanager
     async def session(self, use_commit: bool = False) -> AsyncIterator[AsyncSession]:
         session: AsyncSession = self._session(use_commit=use_commit)
-        print(session)
 
         if logger.isEnabledFor(logging.DEBUG):
             import inspect
