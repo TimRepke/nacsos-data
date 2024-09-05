@@ -97,36 +97,68 @@ class AuthenticationCache:
         logger.debug(f'Known token_ids: {self._token_cache.keys()}')
         logger.debug(f'Known token usernames: {self._token_lookup.keys()}')
 
-    def get_user(self, username: str | None = None, user_id: str | uuid.UUID | None = None, user: UserModel | None = None) -> UserModel:
+    async def get_user(self, username: str | None = None,
+                       user_id: str | uuid.UUID | None = None,
+                       user: UserModel | None = None,
+                       retry: bool = False) -> UserModel:
         if user is not None:
             return user
+        try:
+            if user_id is not None:
+                return self._user_cache[str(user_id)]
 
-        if user_id is not None:
-            return self._user_cache[str(user_id)]
+            if username is not None:
+                return self._user_cache[self._user_lookup[username]]
+        except KeyError as e:
+            if not retry:
+                logger.warning('Did not find requested user, trying to reload!')
+                await self.reload_users()
+                return await self.get_user(username=username, user_id=user_id, user=user, retry=True)
 
-        if username is not None:
-            return self._user_cache[self._user_lookup[username]]
+            logger.error(f'Did not find "{username}" / "{user_id}" in the list of {self._token_lookup}')
+            raise e
 
         raise RuntimeError('Need to specify either username or user_id or user!')
 
-    def get_project_permission(self,
-                               project_id: str | uuid.UUID,
-                               username: str | None = None,
-                               user_id: str | uuid.UUID | None = None,
-                               user: UserModel | None = None) -> ProjectPermissionsModel | None:
-        user = self.get_user(username=username, user_id=user_id, user=user)
-        return self._permission_cache[str(project_id)].get(str(user.user_id))
+    async def get_project_permission(self,
+                                     project_id: str | uuid.UUID,
+                                     username: str | None = None,
+                                     user_id: str | uuid.UUID | None = None,
+                                     user: UserModel | None = None,
+                                     retry: bool = False) -> ProjectPermissionsModel | None:
+        user = await self.get_user(username=username, user_id=user_id, user=user)
+        permission = self._permission_cache.get(str(project_id), {}).get(str(user.user_id))
 
-    def get_auth_token(self,
-                       token_id: str | uuid.UUID | None = None,
-                       username: str | None = None,
-                       user_id: str | uuid.UUID | None = None,
-                       user: UserModel | None = None) -> AuthTokenModel | None:
+        if permission is None and not retry:
+            logger.warning('Did not find requested project-user permission, trying to reload!')
+            await self.reload_permissions()
+            return await self.get_project_permission(project_id=project_id, username=username, user_id=user_id, user=user, retry=True)
+
+        return permission
+
+    async def get_auth_token(self,
+                             token_id: str | uuid.UUID | None = None,
+                             username: str | None = None,
+                             user_id: str | uuid.UUID | None = None,
+                             user: UserModel | None = None,
+                             retry: bool = False) -> AuthTokenModel | None:
         if token_id is not None:
             return self._token_cache.get(str(token_id))
 
-        user = self.get_user(username, user_id, user)
-        return self._token_cache.get(self._token_lookup[user.username])  # type: ignore[index]
+        try:
+            user = await self.get_user(username, user_id, user)
+            token_id = self._token_lookup.get(user.username)  # type: ignore[index]
+            if token_id is None:
+                return None
+            return self._token_cache.get(token_id)
+        except KeyError as e:
+            if not retry:
+                logger.warning('Did not find requested user, trying to reload!')
+                await self.reload_tokens()
+                return await self.get_auth_token(token_id=token_id, username=username, user_id=user_id, user=user, retry=True)
+
+            logger.error(f'Did not find "{user.username}" in the list of {self._token_lookup}')  # type: ignore[union-attr]
+            raise e
 
 
 class Authentication:
@@ -157,7 +189,7 @@ class Authentication:
                                       plain_password: str,
                                       username: str | None = None,
                                       user_id: str | uuid.UUID | None = None) -> UserModel:
-        user = self.cache.get_user(username=username, user_id=user_id)
+        user = await self.cache.get_user(username=username, user_id=user_id)
         async with self.db_engine.engine.connect() as conn:
             passwd = (
                 await conn.execute(
@@ -170,15 +202,15 @@ class Authentication:
 
         return user
 
-    def fetch_token_by_user(self, username: str, only_active: bool = True) -> AuthTokenModel:
-        token = self.cache.get_auth_token(username=username)
+    async def fetch_token_by_user(self, username: str, only_active: bool = True) -> AuthTokenModel:
+        token = await self.cache.get_auth_token(username=username)
         if token is not None and (
                 not only_active or (only_active and (token.valid_till is None or token.valid_till > datetime.datetime.now()))):
             return token
         raise InvalidCredentialsError(f'No valid auth token found for user "{username}"')
 
-    def fetch_token_by_id(self, token_id: str | uuid.UUID, only_active: bool = True) -> AuthTokenModel:
-        token = self.cache.get_auth_token(token_id=token_id)
+    async def fetch_token_by_id(self, token_id: str | uuid.UUID, only_active: bool = True) -> AuthTokenModel:
+        token = await self.cache.get_auth_token(token_id=token_id)
         if token is not None and (
                 not only_active or (only_active and (token.valid_till is None or token.valid_till > datetime.datetime.now()))):
             return token
@@ -216,7 +248,7 @@ class Authentication:
             token_lifetime_minutes = self.token_lifetime_minutes
         valid_till = datetime.datetime.now() + datetime.timedelta(minutes=token_lifetime_minutes)
 
-        token = self.cache.get_auth_token(token_id=token_id, username=username)
+        token = await self.cache.get_auth_token(token_id=token_id, username=username)
         async with self.db_engine.session() as session:
             if token:
                 await session.execute(update(AuthToken)
@@ -236,24 +268,24 @@ class Authentication:
         await self.cache.reload_tokens()
         return token
 
-    def get_current_user(self, token_id: str | uuid.UUID) -> UserModel:
-        token = self.cache.get_auth_token(token_id=token_id)
+    async def get_current_user(self, token_id: str | uuid.UUID) -> UserModel:
+        token = await self.cache.get_auth_token(token_id=token_id)
 
         if token is None:
             raise InvalidCredentialsError('No token with this ID!')
 
-        user = self.cache.get_user(username=token.username)
+        user = await self.cache.get_user(username=token.username)
 
         logger.debug(f'Current user: {user.username} ({user.user_id})')
         return user
 
-    def get_project_permissions(self,
-                                project_id: str | uuid.UUID,
-                                username: str | None = None,
-                                user_id: str | None = None,
-                                user: UserModel | None = None) -> ProjectPermissionsModel:
+    async def get_project_permissions(self,
+                                      project_id: str | uuid.UUID,
+                                      username: str | None = None,
+                                      user_id: str | None = None,
+                                      user: UserModel | None = None) -> ProjectPermissionsModel:
         if username is not None or user_id is not None:
-            user = self.cache.get_user(username=username, user_id=user_id)
+            user = await self.cache.get_user(username=username, user_id=user_id)
 
         if user is None:
             raise RuntimeError()  # should never happen, just for mypy
@@ -266,31 +298,31 @@ class Authentication:
             # admin gets to do anything always, so return with simulated full permissions
             return ProjectPermissionsModel.get_virtual_admin(project_id=project_id, user_id=user.user_id)
 
-        permissions = self.cache.get_project_permission(project_id=project_id, user=user)
+        permissions = await self.cache.get_project_permission(project_id=project_id, user=user)
 
         if permissions is None:
             raise InsufficientPermissionError('No permission found for this project!')
 
         return permissions
 
-    def check_permissions(self,
-                          project_id: str | uuid.UUID,
-                          user_id: str | uuid.UUID | None = None,
-                          username: str | None = None,
-                          user: UserModel | None = None,
-                          required_permissions: list[ProjectPermission] | ProjectPermission | None = None,
-                          fulfill_all: bool = True) -> UserPermissions:
+    async def check_permissions(self,
+                                project_id: str | uuid.UUID,
+                                user_id: str | uuid.UUID | None = None,
+                                username: str | None = None,
+                                user: UserModel | None = None,
+                                required_permissions: list[ProjectPermission] | ProjectPermission | None = None,
+                                fulfill_all: bool = True) -> UserPermissions:
         if user_id is None and username is None and user is None:
             raise AssertionError('Need one of `user_id`, `username` or `user`!')
 
         # we did not get a user object, so we have to fetch the user info from the database
         if user is None:
-            user = self.cache.get_user(username=username, user_id=user_id)
+            user = await self.cache.get_user(username=username, user_id=user_id)
 
         if type(required_permissions) is str:
             required_permissions = [required_permissions]
 
-        permissions = self.get_project_permissions(project_id=project_id, user=user)
+        permissions = await self.get_project_permissions(project_id=project_id, user=user)
         user_permissions = UserPermissions(user=user, permissions=permissions)
 
         # no specific permissions were required (only basic access to the project) -> permitted!
