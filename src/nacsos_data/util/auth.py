@@ -153,7 +153,7 @@ class AuthenticationCache:
             return self._token_cache.get(token_id)
         except KeyError as e:
             if not retry:
-                logger.warning('Did not find requested user, trying to reload!')
+                logger.warning('Did not find requested token, trying to reload!')
                 await self.reload_tokens()
                 return await self.get_auth_token(token_id=token_id, username=username, user_id=user_id, user=user, retry=True)
 
