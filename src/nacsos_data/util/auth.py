@@ -261,7 +261,7 @@ class Authentication:
                 session.add(AuthToken(**token.model_dump()))
 
             else:
-                raise InvalidCredentialsError('No auth token found!')
+                raise InvalidCredentialsError(f'No active auth token found for {username} / {token_id}!')
 
             await session.commit()
 
@@ -272,7 +272,7 @@ class Authentication:
         token = await self.cache.get_auth_token(token_id=token_id)
 
         if token is None:
-            raise InvalidCredentialsError('No token with this ID!')
+            raise InvalidCredentialsError(f'No token with id={token_id}!')
 
         user = await self.cache.get_user(username=token.username)
 
