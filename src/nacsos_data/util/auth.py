@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Generator, Any
 
 from pydantic import BaseModel
-from sqlalchemy import select, delete, or_, update
+from sqlalchemy import select, delete, or_
 
 from ..db import DatabaseEngineAsync
 from ..db.crud.users import verify_password
@@ -38,9 +38,9 @@ class AuthenticationCache:
         self.db_engine = engine
         self.refresh_time = refresh_time
 
-        self._permission_cache: dict[str, dict[str, ProjectPermissionsModel]] = {}
-        self._user_cache: dict[str, UserModel] = {}
-        self._token_cache: dict[str, AuthTokenModel] = {}
+        self._permission_cache: dict[str, dict[str, ProjectPermissionsModel]] = {}  # dict[project_id, dict[user_id, Permission]]
+        self._user_cache: dict[str, UserModel] = {}  # dict[user_id, User]
+        self._token_cache: dict[str, AuthTokenModel] = {}  # dict[token_id, Token]
 
         self._user_lookup: dict[str, str] = {}  # dict[username, user_id]
         self._token_lookup: dict[str, str] = {}  # dict[username, token_id]
@@ -105,17 +105,17 @@ class AuthenticationCache:
             return user
         try:
             if user_id is not None:
-                return self._user_cache[str(user_id)]
+                return self._user_cache[str(user_id).lower().strip()]
 
             if username is not None:
-                return self._user_cache[self._user_lookup[username]]
+                return self._user_cache[self._user_lookup[username.lower().strip()]]
         except KeyError as e:
+            logger.error(f'Did not find "{username}" / "{user_id}" in the list of {self._token_lookup}')
             if not retry:
                 logger.warning('Did not find requested user, trying to reload!')
                 await self.reload_users()
                 return await self.get_user(username=username, user_id=user_id, user=user, retry=True)
 
-            logger.error(f'Did not find "{username}" / "{user_id}" in the list of {self._token_lookup}')
             raise e
 
         raise RuntimeError('Need to specify either username or user_id or user!')
@@ -127,7 +127,7 @@ class AuthenticationCache:
                                      user: UserModel | None = None,
                                      retry: bool = False) -> ProjectPermissionsModel | None:
         user = await self.get_user(username=username, user_id=user_id, user=user)
-        permission = self._permission_cache.get(str(project_id), {}).get(str(user.user_id))
+        permission = self._permission_cache.get(str(project_id).lower().strip(), {}).get(str(user.user_id).lower().strip())
 
         if permission is None and not retry:
             logger.warning('Did not find requested project-user permission, trying to reload!')
@@ -143,14 +143,14 @@ class AuthenticationCache:
                              user: UserModel | None = None,
                              retry: bool = False) -> AuthTokenModel | None:
         if token_id is not None:
-            return self._token_cache.get(str(token_id))
+            return self._token_cache.get(str(token_id).lower().strip())
 
         try:
             user = await self.get_user(username, user_id, user)
-            token_id = self._token_lookup.get(user.username)  # type: ignore[index]
+            token_id = self._token_lookup.get(user.username.lower().strip())  # type: ignore[index]
             if token_id is None:
                 return None
-            return self._token_cache.get(token_id)
+            return self._token_cache.get(token_id.lower().strip())
         except KeyError as e:
             if not retry:
                 logger.warning('Did not find requested token, trying to reload!')
@@ -246,27 +246,43 @@ class Authentication:
                                       verify_username: str | None = None) -> AuthTokenModel:
         if token_lifetime_minutes is None:
             token_lifetime_minutes = self.token_lifetime_minutes
-        valid_till = datetime.datetime.now() + datetime.timedelta(minutes=token_lifetime_minutes)
 
-        token = await self.cache.get_auth_token(token_id=token_id, username=username)
+        session: AsyncSession
         async with self.db_engine.session() as session:
-            if token:
-                await session.execute(update(AuthToken)
-                                      .where(or_(AuthToken.token_id == token_id,
-                                                 AuthToken.username == username))
-                                      .values(valid_till=valid_till))
-
+            valid_till = datetime.datetime.now() + datetime.timedelta(minutes=token_lifetime_minutes)
+            if token_id is not None:
+                stmt = select(AuthToken).where(AuthToken.token_id == token_id)
             elif username is not None:
-                token = AuthTokenModel(token_id=uuid.uuid4(), username=username, valid_till=valid_till)
-                session.add(AuthToken(**token.model_dump()))
-
+                stmt = select(AuthToken).where(AuthToken.username == username)
             else:
-                raise InvalidCredentialsError(f'No active auth token found for {username} / {token_id}!')
+                raise AssertionError('Missing username or token_id!')
 
-            await session.commit()
+            token_orm: AuthToken | None = (await session.scalars(stmt)).one_or_none()
 
-        await self.cache.reload_tokens()
-        return token
+            # There's an existing token that we just need to update
+            if token_orm is not None:
+                if verify_username is not None and verify_username != token_orm.username:
+                    raise InvalidCredentialsError('This is not you!')
+
+                token_orm.valid_till = valid_till
+                token = AuthTokenModel.model_validate(token_orm.__dict__)
+                await session.commit()
+                await self.cache.reload_tokens()
+                return token
+
+            # No token exists yet, but username was provided, so we create one
+            elif token_orm is None and username is not None:
+                token_id = uuid.uuid4()
+                token = AuthTokenModel(token_id=token_id, username=username, valid_till=valid_till)
+                token_orm = AuthToken(**token.model_dump())
+                session.add(token_orm)
+                await session.commit()
+                await self.cache.reload_tokens()
+                return token
+
+            # Failed!
+            else:
+                raise InvalidCredentialsError(f'No auth token found for {username} / {token_id}!')
 
     async def get_current_user(self, token_id: str | uuid.UUID) -> UserModel:
         token = await self.cache.get_auth_token(token_id=token_id)
