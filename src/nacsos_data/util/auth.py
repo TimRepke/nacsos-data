@@ -143,14 +143,14 @@ class AuthenticationCache:
                              user: UserModel | None = None,
                              retry: bool = False) -> AuthTokenModel | None:
         if token_id is not None:
-            return self._token_cache.get(str(token_id).lower().strip())
+            tok = self._token_cache.get(str(token_id).lower().strip())
+            if tok:
+                return tok
 
         try:
             user = await self.get_user(username, user_id, user)
-            token_id = self._token_lookup.get(user.username.lower().strip())  # type: ignore[index,union-attr]
-            if token_id is None:
-                return None
-            return self._token_cache.get(token_id.lower().strip())
+            token_id = self._token_lookup[str(user.username).lower().strip()]  # type: ignore[index,union-attr]
+            return self._token_cache[str(token_id).lower().strip()]
         except KeyError as e:
             if not retry:
                 logger.warning('Did not find requested token, trying to reload!')
