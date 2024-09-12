@@ -147,7 +147,7 @@ class AuthenticationCache:
 
         try:
             user = await self.get_user(username, user_id, user)
-            token_id = self._token_lookup.get(user.username.lower().strip())  # type: ignore[index]
+            token_id = self._token_lookup.get(user.username.lower().strip())  # type: ignore[index,union-attr]
             if token_id is None:
                 return None
             return self._token_cache.get(token_id.lower().strip())
