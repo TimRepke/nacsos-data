@@ -151,7 +151,7 @@ class AuthenticationCache:
             user = await self.get_user(username, user_id, user)
             token_id = self._token_lookup[str(user.username).lower().strip()]  # type: ignore[index,union-attr]
             return self._token_cache[str(token_id).lower().strip()]
-        except KeyError as e:
+        except Exception as e:
             if not retry:
                 logger.warning('Did not find requested token, trying to reload!')
                 await self.reload_tokens()
