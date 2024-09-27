@@ -184,6 +184,8 @@ tags = (
     ("Z7", "E-mail Address (non-English)", False, False),
     ("Z8", "CSCD Times Cited Count", False, False),
     ("ZK", "Author Keywords (Korean)", False, False),
+    ("ZS", "Some count", False, False),
+    ("ZB", "Some count", False, False),
 )
 is_splittable = {abbr: iterable for abbr, _, iterable, _ in tags}
 has_item_per_line = {abbr: item_per_line for abbr, _, _, item_per_line in tags}
