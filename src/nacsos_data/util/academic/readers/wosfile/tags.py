@@ -184,8 +184,28 @@ tags = (
     ("Z7", "E-mail Address (non-English)", False, False),
     ("Z8", "CSCD Times Cited Count", False, False),
     ("ZK", "Author Keywords (Korean)", False, False),
-    ("ZS", "Some count", False, False),
-    ("ZB", "Some count", False, False),
+
+    # Undocumented tags
+    ("ZS", "Magic undocumented tag", False, False),
+    ("ZB", "Magic undocumented tag", False, False),
+    ("ZR", "Magic undocumented tag", False, False),
+    ("ZA", "Magic undocumented tag", False, False),
+    ("ER", "Magic undocumented tag", False, False),
+    ("EF", "Magic undocumented tag", False, False),
+    ("G1", "Magic undocumented tag", False, False),
 )
 is_splittable = {abbr: iterable for abbr, _, iterable, _ in tags}
 has_item_per_line = {abbr: item_per_line for abbr, _, _, item_per_line in tags}
+
+# Find new tags via
+# -----------------
+# from nacsos_data.util.academic.readers.wosfile.tags import tags
+# import re
+# TAG = re.compile(r"^[A-Z0-9]{2}")
+# stags = []
+# with open('/home/tim/Downloads/savedrecs.txt') as f:
+#     for li, line in enumerate(f):
+#         m = TAG.search(line)
+#         if m:
+#             stags.append(m[0])
+# print(set(stags) - set([t[0] for t in tags]))
