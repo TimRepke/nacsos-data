@@ -232,17 +232,24 @@ class PlainTextReader(Reader):
         values: List[str] = []
         heading = ""
         lines = self._next_record_lines()
-
-        # Parse record, this is mostly handling multi-line fields
-        for line in lines:
-            if not line.startswith("  "):  # new field
-                # Add previous field, if available, to record
-                if heading:
-                    record[heading] = self._format_values(heading, values)
-                heading, v = line.split(None, 1)
-                values = [v]
-            else:
-                values.append(line.strip())
+        try:
+            # Parse record, this is mostly handling multi-line fields
+            for line in lines:
+                if not line.startswith("  "):  # new field
+                    # Add previous field, if available, to record
+                    if heading:
+                        record[heading] = self._format_values(heading, values)
+                    parts = line.split(None, 1)
+                    if len(parts) == 2:
+                        heading, v = parts
+                        values = [v]
+                    else:
+                        logger.warning(f'Line does not have enough parts, ignoring: {line}')
+                else:
+                    values.append(line.strip())
+        except Exception as e:
+            logger.error(f'Failed to parse line "{line}"')
+            raise e
 
         # Add last field
         record[heading] = self._format_values(heading, values)
