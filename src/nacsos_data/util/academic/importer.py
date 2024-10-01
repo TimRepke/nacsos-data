@@ -349,6 +349,7 @@ async def import_academic_items(
 
             if n_unknown_items == 0 or index is None:
                 logger.info('No unknown items found, ending here!')
+                await session.commit()
                 return import_id, list(imported_item_ids)
 
             with elapsed_timer(logger, f'Loading milvus collection "{index.collection_name}"'):
