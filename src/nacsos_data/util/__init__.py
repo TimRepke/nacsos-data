@@ -1,6 +1,5 @@
 import logging
 from collections.abc import MutableMapping
-from copy import deepcopy
 from contextlib import contextmanager
 from datetime import timedelta
 from timeit import default_timer
@@ -71,7 +70,7 @@ def fuze_dicts(d1: dict[str, Any], d2: dict[str, Any]) -> dict[str, Any]:
         if k in d2:
             # this next check is the only difference!
             if all(isinstance(e, MutableMapping) for e in (v, d2[k])):
-                d2[k] = rec_merge(v, d2[k])
+                d2[k] = fuze_dicts(v, d2[k])
             # we could further check types and merge as appropriate here.
     d3 = d1.copy()
     d3.update(d2)

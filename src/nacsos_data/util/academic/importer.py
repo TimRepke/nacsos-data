@@ -44,7 +44,7 @@ def _read_buffered_items(fp: IO[str]) -> Generator[AcademicItemModel, None, None
 
 def _check_known_identifiers(item: AcademicItemModel,
                              known_ids: dict[str, dict[str, str]],
-                             logger: logging.Logger) -> str | None | bool:
+                             logger: logging.Logger) -> str | bool:
     for id_field in ID_FIELDS:  # check each item
         identifier = getattr(item, id_field)
         item_id = known_ids[id_field].get(identifier, None)
@@ -82,14 +82,14 @@ async def _find_id_duplicates(
             # Check if we know this new item via some trusted identifier (e.g. openalex_id)
             known_item_id = _check_known_identifiers(item, known_ids, logger)
 
-            # We know this new item (via an ID) and just need to add an m2m
-
             # We don't know this new item, add it to our buffer file and extend vocabulary
             if known_item_id is False:
                 for tok in tokenise_item(item, lowercase=True):
                     token_counts[tok] += 1
                 fp.write(item.model_dump_json() + '\n')
                 n_unknown_items += 1
+            elif known_item_id is True:  # never happens, just to appease mypy
+                pass
             # We found a match!
             else:
                 m2m_buffer.add(known_item_id)
@@ -211,8 +211,10 @@ async def _insert_item(session: AsyncSession,
 
 
 async def _get_latest_revision_counter(session: AsyncSession, import_id: str | uuid.UUID) -> int:
-    latest_revision = (await session.execute(
-        text('SELECT COALESCE(MAX("import_revision_counter"), 0) as latest_revision FROM import_revision WHERE import_id=:import_id;'),
+    latest_revision: int = (await session.execute(  # type: ignore[assignment]
+        text('SELECT COALESCE(MAX("import_revision_counter"), 0) as latest_revision '
+             'FROM import_revision '
+             'WHERE import_id=:import_id;'),
         {'import_id': import_id}
     )).scalar()
     return latest_revision
@@ -232,6 +234,7 @@ def _revision_required(num_new_items: int | None, last_revision: ImportRevisionM
                        min_update_size: int | None, logger: logging.Logger) -> bool:
     if (min_update_size is not None
             and num_new_items is not None
+            and last_revision is not None
             and last_revision.num_items_retrieved is not None
             and abs(last_revision.num_items_retrieved - num_new_items) < min_update_size):
         logger.warning(f'Expected a difference of {min_update_size} between {num_new_items:,} new items in query and '
@@ -444,7 +447,6 @@ async def import_academic_items(
                             await _upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=latest_revision,
                                               logger=logger, dry_run=dry_run)
 
-
                 except (UniqueViolation, IntegrityError, OperationalError) as e:
                     logger.exception(e)
 
@@ -467,15 +469,17 @@ async def import_academic_items(
                                                             'FROM m2m_import_item '
                                                             'WHERE latest_revision = :rev AND import_id=:import_id'),
                                                        {'rev': latest_revision - 1, 'import_id': import_id})).scalar()
-            await session.execute(update(ImportRevision),
-                                  {
-                                      'import_revision_id': revision_id,
-                                      'num_items': num_items,
-                                      'num_items_retrieved': num_new_items,
-                                      'num_items_new': num_items_new,
-                                      'num_items_updated': num_updated,
-                                      'num_items_removed': num_items_removed,
-                                  })
+            revision_stats = {
+                'import_revision_id': revision_id,
+                'num_items': num_items,
+                'num_items_retrieved': num_new_items,
+                'num_items_new': num_items_new,
+                'num_items_updated': num_updated,
+                'num_items_removed': num_items_removed,
+            }
+            logger.info(f'Setting new revision stats: {revision_stats}')
+            await session.execute(update(ImportRevision), revision_stats)
+            await session.commit()
 
     logger.info('Import complete, returning to initiator!')
     return import_id, latest_revision
