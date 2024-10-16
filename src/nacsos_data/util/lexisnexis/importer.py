@@ -181,6 +181,9 @@ async def import_lexis_nexis(session: DBSession,
                                             import_name=import_name,
                                             description=description,
                                             i_type='script')
+
+    raise NotImplementedError('This method is currently unsupported. This needs revision support!')
+
     import_id = str(import_orm.import_id)
 
     if vectoriser is None:
