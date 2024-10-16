@@ -25,7 +25,7 @@ from ...db.crud.items.academic import (
 from ...db.schemas import AcademicItem, m2m_import_item_table
 from ...db.schemas.imports import ImportRevision
 from ...models.items import AcademicItemModel, ItemEntry
-from ...models.imports import M2MImportItemType
+from ...models.imports import M2MImportItemType, ImportRevisionModel
 from ...models.openalex.solr import DefType, SearchField, OpType
 from .. import elapsed_timer
 from ..text import tokenise_item, extract_vocabulary, itm2txt
@@ -210,12 +210,34 @@ async def _insert_item(session: AsyncSession,
     return existing_id, has_changes
 
 
-async def _get_latest_revision(session: AsyncSession, import_id: str | uuid.UUID) -> int:
+async def _get_latest_revision_counter(session: AsyncSession, import_id: str | uuid.UUID) -> int:
     latest_revision = (await session.execute(
         text('SELECT COALESCE(MAX("import_revision_counter"), 0) as latest_revision FROM import_revision WHERE import_id=:import_id;'),
         {'import_id': import_id}
     )).scalar()
     return latest_revision
+
+
+async def _get_latest_revision(session: AsyncSession, import_id: str | uuid.UUID) -> ImportRevisionModel | None:
+    rslt = (await session.execute(
+        text('SELECT * FROM import_revision WHERE import_id=:import_id ORDER BY import_revision_counter DESC LIMIT 1;'),
+        {'import_id': import_id}
+    )).mappings().one_or_none()
+    if rslt:
+        return ImportRevisionModel(**rslt)
+    return None
+
+
+def _revision_required(num_new_items: int | None, last_revision: ImportRevisionModel | None,
+                       min_update_size: int | None, logger: logging.Logger) -> bool:
+    if (min_update_size is not None
+            and num_new_items is not None
+            and last_revision.num_items_retrieved is not None
+            and abs(last_revision.num_items_retrieved - num_new_items) < min_update_size):
+        logger.warning(f'Expected a difference of {min_update_size} between {num_new_items:,} new items in query and '
+                       f'{last_revision.num_items_retrieved:,} items in latest revision. Ending here!')
+        return False
+    return True
 
 
 async def import_academic_items(
@@ -227,15 +249,15 @@ async def import_academic_items(
         user_id: str | uuid.UUID | None = None,
         description: str | None = None,
         vectoriser: CountVectorizer | None = None,
+        min_update_size: int | None = None,
+        num_new_items: int | None = None,
         max_slop: float = 0.05,
         min_text_len: int = 300,
         batch_size: int = 2000,
         max_features: int = 5000,
         dry_run: bool = True,
-        trust_new_authors: bool = False,
-        trust_new_keywords: bool = False,
         logger: logging.Logger | None = None
-) -> str:
+) -> tuple[str, int | None]:
     """
     Helper function for programmatically importing `AcademicItem`s into the platform.
 
@@ -278,8 +300,10 @@ async def import_academic_items(
          In this way, a new Import will be created and all items will be associated with that.
 
     :param db_engine
-    :param trust_new_authors:
-    :param trust_new_keywords:
+    :param min_update_size: Minimum difference in number of items between revisions
+                            if None, will always create a new revision
+                            if difference between `num_new_items` is lower than `min_update_size`, will not create new revision
+    :param num_new_items: Number of new items yielded by `new_items` generator; if empty, will derive this number from the generator
     :param new_items: A list (or generator) of AcademicItems
     :param vectoriser
     :param max_slop
@@ -296,7 +320,7 @@ async def import_academic_items(
                     If true, simulate best as possible (note, that duplicates within the `items` are not validated
                                                         and not all constraints can be checked)
     :param logger:
-    :return: import_id and list of item_ids that were actually used in the end
+    :return: import_id, latest_revision_num (or None if no action taken)
     """
     if logger is None:
         logger = logging.getLogger('nacsos_data.util.academic.import')
@@ -315,9 +339,20 @@ async def import_academic_items(
                                                     description=description,
                                                     i_type='script')
             import_id = str(import_orm.import_id)
+
             revision_id = str(uuid.uuid4())
-            latest_revision = await _get_latest_revision(session=session, import_id=import_id)
-            latest_revision += 1
+            last_revision = await _get_latest_revision(session=session, import_id=import_id)
+            latest_revision = 1
+            if last_revision is not None:
+                latest_revision = last_revision.import_revision_counter + 1
+
+                # Check if we should even create a new revision based on the difference in the number of query results
+                if not _revision_required(num_new_items=num_new_items, last_revision=last_revision,
+                                          min_update_size=min_update_size, logger=logger):
+                    # Return without committing anything
+                    return import_id, None
+
+            # Create a new revision
             session.add(ImportRevision(
                 import_revision_id=revision_id,
                 import_id=import_id,
@@ -326,7 +361,7 @@ async def import_academic_items(
             await session.flush()
 
             with elapsed_timer(logger, 'Checking new items for obvious ID-based duplicates'):
-                n_unknown_items, n_new_items, token_counts, m2m_buffer = await _find_id_duplicates(
+                n_unknown_items, num_new_items, token_counts, m2m_buffer = await _find_id_duplicates(
                     session=session,
                     project_id=str(project_id),
                     new_items=new_items,
@@ -334,6 +369,13 @@ async def import_academic_items(
                     fp=duplicate_buffer
                 )
             logger.info(f'Found {n_unknown_items:,} unknown items and {len(m2m_buffer):,} duplicates in first pass.')
+
+            # Check if we should even create a new revision based on the difference in the number of query results.
+            # This is repeating the previous check in case the `num_new_items` parameter was left empty before.
+            if not _revision_required(num_new_items=num_new_items, last_revision=last_revision,
+                                      min_update_size=min_update_size, logger=logger):
+                # Return without committing anything
+                return import_id, None
 
         index: MilvusDuplicateIndex | None = None
         if n_unknown_items > 0:
@@ -376,7 +418,7 @@ async def import_academic_items(
             if n_unknown_items == 0 or index is None:
                 logger.info('No unknown items found, ending here!')
                 await session.commit()
-                return import_id
+                return import_id, latest_revision
 
             with elapsed_timer(logger, f'Loading milvus collection "{index.collection_name}"'):
                 index.client.load_collection(index.collection_name)
@@ -429,21 +471,23 @@ async def import_academic_items(
                                   {
                                       'import_revision_id': revision_id,
                                       'num_items': num_items,
-                                      'num_items_retrieved': n_new_items,
+                                      'num_items_retrieved': num_new_items,
                                       'num_items_new': num_items_new,
                                       'num_items_updated': num_updated,
                                       'num_items_removed': num_items_removed,
                                   })
 
-    logger.info('Import complete, returning to initiator with IDs!')
-    return import_id
+    logger.info('Import complete, returning to initiator!')
+    return import_id, latest_revision
 
 
 async def import_wos_files(sources: list[Path],
                            db_config: Path,
                            project_id: str | None = None,
                            import_id: str | None = None,
-                           logger: logging.Logger | None = None) -> None:
+                           min_update_size: int | None = None,
+                           num_new_items: int | None = None,
+                           logger: logging.Logger | None = None) -> tuple[str, int | None]:
     """
     Import Web of Science files in ISI format.
     Each record will be checked for duplicates within the project.
@@ -478,10 +522,12 @@ async def import_wos_files(sources: list[Path],
         raise ValueError('Project ID is not set!')
     db_engine = get_engine_async(conf_file=str(db_config))
 
-    await import_academic_items(
+    return await import_academic_items(
         db_engine=db_engine,
         project_id=project_id,
         new_items=from_sources,
+        min_update_size=min_update_size,
+        num_new_items=num_new_items,
         import_name=None,
         description=None,
         user_id=None,
@@ -498,7 +544,9 @@ async def import_scopus_csv_file(sources: list[Path],
                                  db_config: Path,
                                  project_id: str | None = None,
                                  import_id: str | None = None,
-                                 logger: logging.Logger | None = None) -> None:
+                                 min_update_size: int | None = None,
+                                 num_new_items: int | None = None,
+                                 logger: logging.Logger | None = None) -> tuple[str, int | None]:
     """
     Import Scopus files in CSV format.
     Consult the [documentation](https://apsis.mcc-berlin.net/nacsos-docs/user/import/) before continuing!
@@ -534,10 +582,12 @@ async def import_scopus_csv_file(sources: list[Path],
         raise ValueError('Project ID is not set!')
     db_engine = get_engine_async(conf_file=str(db_config))
 
-    await import_academic_items(
+    return await import_academic_items(
         db_engine=db_engine,
         project_id=project_id,
         new_items=from_sources,
+        min_update_size=min_update_size,
+        num_new_items=num_new_items,
         import_name=None,
         description=None,
         user_id=None,
@@ -554,7 +604,9 @@ async def import_academic_db(sources: list[Path],
                              db_config: Path,
                              project_id: str | None = None,
                              import_id: str | None = None,
-                             logger: logging.Logger | None = None) -> None:
+                             min_update_size: int | None = None,
+                             num_new_items: int | None = None,
+                             logger: logging.Logger | None = None) -> tuple[str, int | None]:
     """
     Import articles that are in the exact format of how AcademicItems are stored in the database.
     We assume one JSON-encoded AcademicItemModel per line.
@@ -590,10 +642,12 @@ async def import_academic_db(sources: list[Path],
         raise ValueError('Project ID is not set!')
     db_engine = get_engine_async(conf_file=str(db_config))
 
-    await import_academic_items(
+    return await import_academic_items(
         db_engine=db_engine,
         project_id=project_id,
         new_items=from_sources,
+        min_update_size=min_update_size,
+        num_new_items=num_new_items,
         import_name=None,
         description=None,
         user_id=None,
@@ -614,7 +668,9 @@ async def import_openalex(query: str,
                           op: OpType = 'AND',
                           project_id: str | None = None,
                           import_id: str | None = None,
-                          logger: logging.Logger | None = None) -> None:
+                          min_update_size: int | None = None,
+                          num_new_items: int | None = None,
+                          logger: logging.Logger | None = None) -> tuple[str, int | None]:
     """
     Import items from our self-hosted Solr database.
     Each record will be checked for duplicates within the project.
@@ -639,7 +695,7 @@ async def import_openalex(query: str,
     logger = logging.getLogger('import_openalex') if logger is None else logger
 
     def from_source() -> Generator[AcademicItemModel, None, None]:
-
+        # FIXME: add a way to get the number of items to pass on to `import_academic_items`
         for itm in generate_items_from_openalex(
                 query=query,
                 openalex_endpoint=openalex_url,
@@ -659,10 +715,12 @@ async def import_openalex(query: str,
         raise ValueError('Project ID is not set!')
     db_engine = get_engine_async(conf_file=str(db_config))
 
-    await import_academic_items(
+    return await import_academic_items(
         db_engine=db_engine,
         project_id=project_id,
         new_items=from_source,
+        min_update_size=min_update_size,
+        num_new_items=num_new_items,
         import_name=None,
         description=None,
         user_id=None,
@@ -679,7 +737,9 @@ async def import_openalex_files(sources: list[Path],
                                 db_config: Path,
                                 project_id: str | None = None,
                                 import_id: str | None = None,
-                                logger: logging.Logger | None = None) -> None:
+                                min_update_size: int | None = None,
+                                num_new_items: int | None = None,
+                                logger: logging.Logger | None = None) -> tuple[str, int | None]:
     """
     Import articles that are in the OpenAlex format used in our solr database.
     We assume one JSON-encoded WorkSolr object per line.
@@ -714,10 +774,12 @@ async def import_openalex_files(sources: list[Path],
         raise ValueError('Project ID is not set!')
     db_engine = get_engine_async(conf_file=str(db_config))
 
-    await import_academic_items(
+    return await import_academic_items(
         db_engine=db_engine,
         project_id=project_id,
         new_items=from_sources,
+        min_update_size=min_update_size,
+        num_new_items=num_new_items,
         import_name=None,
         description=None,
         user_id=None,

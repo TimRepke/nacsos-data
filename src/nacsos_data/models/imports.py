@@ -84,7 +84,7 @@ class M2MImportItemType(str, Enum):
     implicit = 'implicit'
 
 
-class ImportRevision(BaseModel):
+class ImportRevisionModel(BaseModel):
     # Unique identifier for this import revision
     import_revision_id: UUID | str | None = None
     # NUmber of this revision within this import
