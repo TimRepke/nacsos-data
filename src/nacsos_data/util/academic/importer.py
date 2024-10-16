@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Generator, IO
 from collections import defaultdict
 
-from sqlalchemy import insert, text, update
+from sqlalchemy import text, update
 from sqlalchemy.dialects.postgresql import insert as insert_pg
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
@@ -19,7 +19,6 @@ from ...db.crud.items.academic import (
     AcademicItemGenerator,
     read_item_entries_from_db,
     gen_academic_entries,
-    read_item_ids_for_import,
     read_known_ids_map,
     IdField
 )
@@ -28,12 +27,11 @@ from ...db.schemas.imports import ImportRevision
 from ...models.items import AcademicItemModel, ItemEntry
 from ...models.imports import M2MImportItemType
 from ...models.openalex.solr import DefType, SearchField, OpType
-from .. import gather_async, elapsed_timer
+from .. import elapsed_timer
 from ..text import tokenise_item, extract_vocabulary, itm2txt
 from ..duplicate import MilvusDuplicateIndex, PynndescentDuplicateIndex
 from .clean import get_cleaned_meta_field
 from .duplicate import str_to_title_slug, find_duplicates, duplicate_insertion
-from ...scripts.dummy_data.dummy_annotations import session
 
 ID_FIELDS: list[IdField] = ['openalex_id', 's2_id', 'scopus_id', 'wos_id', 'pubmed_id', 'dimensions_id']
 
@@ -377,6 +375,7 @@ async def import_academic_items(
 
             if n_unknown_items == 0 or index is None:
                 logger.info('No unknown items found, ending here!')
+                await session.commit()
                 return import_id
 
             with elapsed_timer(logger, f'Loading milvus collection "{index.collection_name}"'):
