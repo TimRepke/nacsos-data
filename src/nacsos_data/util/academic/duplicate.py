@@ -1,16 +1,17 @@
 import re
 import uuid
 import logging
-from typing import Any
+from datetime import date
 
 from pydantic import BaseModel
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import fuze_dicts
 from ...db import DatabaseEngineAsync
-from ...db.schemas import AcademicItem, ItemType, AcademicItemVariant, m2m_import_item_table
+from ...db.schemas import AcademicItem, AcademicItemVariant, m2m_import_item_table
 from ...models.items import AcademicItemModel
-from ...models.items.academic import AcademicAuthorModel, AcademicItemVariantModel
+from ...models.items.academic import AcademicItemVariantModel
 from ..errors import NotFoundError
 from .clean import clear_empty
 
@@ -18,6 +19,9 @@ logger = logging.getLogger('nacsos_data.util.academic.duplicate')
 
 REGEX_NON_ALPH = re.compile(r'[^a-z]')
 REGEX_NON_ALPHNUM = re.compile(r'[^a-z0-9]')
+LATEST_POSSIBLE_PUB_YEAR = date.today().year + 5
+# determined by case study at https://gitlab.pik-potsdam.de/mcc-apsis/nacsos/case-studies/duplicate-detection/-/blob/main/202407_experiments/avg_abstract_len.sql?ref_type=heads
+MAX_ABSTRACT_LENGTH = 10000
 
 
 def str_to_title_slug(title: str | None) -> str | None:
@@ -230,131 +234,6 @@ def are_abstracts_duplicate(abs1: str | None, abs2: str | None) -> bool:
     return abs1 == abs2
 
 
-def fuse_items(item1: AcademicItemModel,
-               item2: AcademicItemModel,
-               fuse_authors: bool = True,
-               fuse_keywords: bool = True) -> AcademicItemModel:
-    """
-    This method fuses the data from two items together.
-    When in doubt, it will prefer values from the first item over those in the second.
-    For many attributes, it will try to find the best fit or even merge data.
-
-    :param fuse_authors: if True, fuse lists of authors; if False: just take author list from item1 (if available)
-    :param fuse_keywords: if True, fuse lists of keywords; if False: just take keywords from item1 (if available)
-    :param item1:
-    :param item2:
-    :return:
-    """
-    item = AcademicItemModel(
-        type=ItemType.academic,
-        item_id=item1.item_id or item2.item_id or uuid.uuid4()
-    )
-
-    def _pick_best_str_(field: str, o1: object, o2: object) -> str | None:
-        if hasattr(o1, field):
-            val1: str | None = getattr(o1, field)
-            if val1 is not None and len(val1) > 0:
-                return val1
-
-        if hasattr(o2, field):
-            val2: str | None = getattr(o2, field)
-            if val2 is not None and len(val2) > 0:
-                return val2
-
-        return None
-
-    def _pick_best_str(field: str) -> str | None:
-        return _pick_best_str_(field, item1, item2)
-
-    item.doi = _pick_best_str('doi')
-    item.wos_id = _pick_best_str('wos_id')
-    item.scopus_id = _pick_best_str('scopus_id')
-    item.openalex_id = _pick_best_str('openalex_id')
-    item.s2_id = _pick_best_str('s2_id')
-    item.pubmed_id = _pick_best_str('pubmed_id')
-    item.dimensions_id = _pick_best_str('dimensions_id')
-
-    # TODO: Do something more sensible than picking any title in order
-    item.title = _pick_best_str('title')
-    item.title_slug = str_to_title_slug(item.title)
-    item.source = _pick_best_str('source')
-
-    if item1.publication_year is not None and item2.publication_year is not None:
-        item.publication_year = max(item1.publication_year, item2.publication_year)
-    elif item1.publication_year is not None:
-        item.publication_year = item1.publication_year
-    elif item2.publication_year is not None:
-        item.publication_year = item2.publication_year
-
-    # TODO: Do we want to be more considerate and do recursive updating?
-    meta1: dict[str, Any] | None = clear_empty(item1.meta)
-    meta2: dict[str, Any] | None = clear_empty(item2.meta)
-    if meta1 is not None and meta2 is not None:
-        item.meta = meta2.update(meta1)
-    elif meta1 is not None:
-        item.meta = meta1
-    elif meta2 is not None:
-        item.meta = meta2
-
-    if item1.text is not None and item2.text is not None:
-        # TODO: Do something more sensible than taking the longer abstract
-        if len(item1.text) > len(item2.text):
-            item.text = item1.text
-        else:
-            item.text = item2.text
-    elif item1.text is not None:  # type: ignore[unreachable]
-        item.text = item1.text
-    elif item2.text is not None:
-        item.text = item2.text
-
-    # TODO: Try de-duplicating keywords
-    if not fuse_keywords and item1.keywords is not None and len(item1.keywords) > 0:
-        item.keywords = item1.keywords
-    elif item1.keywords is not None and item2.keywords is not None:
-        item.keywords = list(set(item1.keywords).union(set(item2.keywords)))
-    elif item1.keywords is not None:
-        item.keywords = item1.keywords
-    elif item2.keywords is not None:
-        item.keywords = item2.keywords
-
-    if not fuse_authors and item1.authors is not None and len(item1.authors) > 0:
-        item.authors = item1.authors
-    else:
-        authors_: list[AcademicAuthorModel] = (item1.authors or []) + (item2.authors or [])
-        authors: dict[str, AcademicAuthorModel] = {}
-        for author in authors_:
-            if author.name not in authors:  # TODO: There's probably a better way to match authors than by literal string match
-                authors[author.name] = author
-            else:
-                if authors[author.name].surname_initials is None:
-                    if author.surname_initials is not None and len(author.surname_initials) == 0:
-                        authors[author.name].surname_initials = author.surname_initials
-
-                authors[author.name].surname_initials = _pick_best_str_('surname_initials', authors[author.name],
-                                                                        author)
-                authors[author.name].email = _pick_best_str_('email', authors[author.name], author)
-                authors[author.name].orcid = _pick_best_str_('orcid', authors[author.name], author)
-                authors[author.name].scopus_id = _pick_best_str_('scopus_id', authors[author.name], author)
-                authors[author.name].openalex_id = _pick_best_str_('openalex_id', authors[author.name], author)
-                authors[author.name].s2_id = _pick_best_str_('s2_id', authors[author.name], author)
-
-                aff1 = authors[author.name].affiliations if len(authors[author.name].affiliations or []) > 0 else None
-                aff2 = author.affiliations if len(author.affiliations or []) > 0 else None
-                if aff1 is not None and aff2 is not None:
-                    # TODO: There's probably a better way to match affiliations than by literal string match
-                    authors[author.name].affiliations = list({aff.name: aff for aff in aff1 + aff2}.values())
-                elif aff1 is None and aff2 is not None:
-                    authors[author.name].affiliations = aff2
-                elif aff1 is not None and aff2 is None:
-                    authors[author.name].affiliations = aff1
-                else:
-                    authors[author.name].affiliations = None
-
-        item.authors = list(authors.values())
-
-    return item
-
-
 def _safe_lower(s: str | None) -> str | None:
     if s is not None:
         return s.lower().strip()
@@ -364,21 +243,17 @@ def _safe_lower(s: str | None) -> str | None:
 async def duplicate_insertion(new_item: AcademicItemModel,
                               orig_item_id: str | uuid.UUID,
                               import_id: str | uuid.UUID | None,
-                              trust_new_authors: bool,
-                              trust_new_keywords: bool,
                               session: AsyncSession,
-                              log: logging.Logger | None = None) -> None:
+                              log: logging.Logger | None = None) -> bool:
     """
     This method handles insertion of an item for which we found a duplicate in the database with `item_id`
 
     :param log:
-    :param trust_new_keywords: if True, won't try to fuse list of keywords but just take them from `new_item` instead
-    :param trust_new_authors: if True, won't try to fuse list of authors but just take them from `new_item` instead
     :param import_id:
     :param session:
     :param new_item:
     :param orig_item_id: id in academic_item of which the `new_item` is a duplicate
-    :return:
+    :return: Return True if we ended up creating a new variant.
     """
     if log is None:
         log = logger
@@ -393,8 +268,8 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     orig_item = AcademicItemModel.model_validate(orig_item_orm.__dict__)
 
     # Get prior variants of that AcademicItem
-    variants = (await session.scalars(select(AcademicItemVariant)
-                                      .where(AcademicItemVariant.item_id == orig_item_id))).all()
+    variants = (await session.execute(select(AcademicItemVariant)
+                                      .where(AcademicItemVariant.item_id == orig_item_id))).mappings().all()
 
     # If we have no prior variant, we need to create one
     if len(variants) == 0:
@@ -402,7 +277,6 @@ async def duplicate_insertion(new_item: AcademicItemModel,
         orig_import_id = await session.scalar(select(m2m_import_item_table.c.import_id)
                                               .where(m2m_import_item_table.c.item_id == orig_item_id))
         # Note, we are not checking for "not None", because it might be a valid case where no import_id exists
-
         variant = AcademicItemVariantModel(
             item_variant_id=uuid.uuid4(),
             item_id=orig_item_id,
@@ -428,106 +302,107 @@ async def duplicate_insertion(new_item: AcademicItemModel,
 
         log.debug(f'Created first variant of item {orig_item_id} at {variant.item_variant_id}')
         # use this new variant for further value thinning
-        variants = [variant]  # type: ignore[list-item]
+        variants = [variant.model_dump()]  # type: ignore[list-item]
 
-    new_variant = AcademicItemVariantModel(
-        item_variant_id=uuid.uuid4(),
-        item_id=orig_item_id,
-        import_id=import_id,
-        doi=new_item.doi,
-        wos_id=new_item.wos_id,
-        scopus_id=new_item.scopus_id,
-        openalex_id=new_item.openalex_id,
-        s2_id=new_item.s2_id,
-        pubmed_id=new_item.pubmed_id,
-        dimensions_id=new_item.dimensions_id,
-        title=new_item.title,
-        publication_year=new_item.publication_year,
-        source=new_item.source,
-        keywords=new_item.keywords,
-        authors=new_item.authors,
-        abstract=new_item.text,
-        meta=new_item.meta)
+    # Object to keep track of previously unseen values
+    new_variant = {}
 
-    # if we've seen this abstract before, drop it to save memory
-    if any([are_abstracts_duplicate(new_item.text, var.abstract) for var in variants]):
-        new_variant.abstract = None
-    # if we've seen this doi before, drop it
-    if any([new_item.doi == var.doi for var in variants]):
-        new_variant.doi = None
-    # if we've seen this wos_id before, drop it
-    if any([new_item.wos_id == var.wos_id for var in variants]):
-        new_variant.wos_id = None
-    # if we've seen this scopus_id before, drop it
-    if any([new_item.scopus_id == var.scopus_id for var in variants]):
-        new_variant.scopus_id = None
-    # if we've seen this openalex_id before, drop it
-    if any([new_item.openalex_id == var.openalex_id for var in variants]):
-        new_variant.openalex_id = None
-    # if we've seen this s2_id before, drop it
-    if any([new_item.s2_id == var.s2_id for var in variants]):
-        new_variant.s2_id = None
-    # if we've seen this pubmed_id before, drop it
-    if any([new_item.pubmed_id == var.pubmed_id for var in variants]):
-        new_variant.pubmed_id = None
-    # if we've seen this dimensions_id before, drop it
-    if any([new_item.dimensions_id == var.dimensions_id for var in variants]):
-        new_variant.dimensions_id = None
-    # if we've seen this title before, drop it
-    if any([_safe_lower(new_item.title) == _safe_lower(var.title) for var in variants]):
-        new_variant.title = None
-    # if we've seen this publication_year before, drop it
-    if any([new_item.publication_year == var.publication_year for var in variants]):
-        new_variant.publication_year = None
-    # if we've seen this source before, drop it
-    if any([new_item.source == var.source for var in variants]):
-        new_variant.source = None
+    # Check ID fields, title, abstract, and source (aka venue/journal)
+    for field in ['doi', 'wos_id', 'scopus_id', 'openalex_id', 's2_id', 'pubmed_id', 'dimensions_id', 'source', 'title', 'text']:
+        # If the new item value is empty, we have noting else to do
+        if getattr(new_item, field) is None:
+            continue
 
-    log.debug(f'Found {len(variants or [])} variants and adding one more.')
+        # Cleaned value from the new item for `field`
+        new_value = getattr(new_item, field).strip()
+        # Get all non-empty values for the field across variants
+        field_values = set([var[field].strip() for var in variants if var[field] is not None and len(var[field].strip()) > 0])
 
-    session.add(AcademicItemVariant(**new_variant.model_dump()))
-    await session.flush()
+        # Check if we have seen this value before
+        if new_value not in field_values:
+            if field == 'title':
+                new_variant[field] = new_value
+                setattr(orig_item_orm, field, new_value)
+                setattr(orig_item_orm, field, get_title_slug(new_value))
+            elif field == 'text':
+                candidates = sorted([abs for abs in field_values | {new_value} if len(abs) < MAX_ABSTRACT_LENGTH], key=lambda a: len(a))
+                new_variant[field] = new_value
+                if len(candidates) > 0:
+                    setattr(orig_item_orm, field, candidates[-1])
+            else:
+                # This was new, so keep track of it in our variant
+                new_variant[field] = new_value
+                # We always like new IDs, so update the reference item
+                setattr(orig_item_orm, field, new_value)
 
-    # Fuse all the fields from both, the existing and new variant into a new item
-    fused_item = fuse_items(item1=new_item,
-                            item2=orig_item,
-                            fuse_authors=not trust_new_authors,
-                            fuse_keywords=not trust_new_keywords)
+    # Check publication year field
+    new_pub_year = getattr(new_item, 'publication_year')
+    if new_pub_year is not None:
+        # Get all non-empty publication_year across variants
+        pub_yrs = set([var['publication_year'] for var in variants if var['publication_year'] is not None])
 
-    # Python seems to drop the ORM for some reason, so fetch us a fresh copy of the original item
-    orig_item_orm = await session.get(AcademicItem, {'item_id': orig_item_id})
-    if orig_item_orm is None:  # if this happens, something went horribly wrong. But at least mypy is happy.
-        raise RuntimeError(f'No item found for {orig_item_id}')
+        # Check if we have seen this value before
+        if new_pub_year not in pub_yrs:
+            # This was new, so keep track of it in our variant
+            new_variant['publication_year'] = new_pub_year
+            # We always like new IDs, so update the reference item
+            setattr(orig_item_orm, 'publication_year', min(LATEST_POSSIBLE_PUB_YEAR, max(pub_yrs | {new_pub_year})))
 
-    # Partially update the fields in the database that changed after fusion
-    if fused_item.doi != orig_item_orm.doi:
-        orig_item_orm.doi = fused_item.doi
-    if fused_item.wos_id != orig_item_orm.wos_id:
-        orig_item_orm.wos_id = fused_item.wos_id
-    if fused_item.scopus_id != orig_item_orm.scopus_id:
-        orig_item_orm.scopus_id = fused_item.scopus_id
-    if fused_item.openalex_id != orig_item_orm.openalex_id:
-        orig_item_orm.openalex_id = fused_item.openalex_id
-    if fused_item.s2_id != orig_item_orm.s2_id:
-        orig_item_orm.s2_id = fused_item.s2_id
-    if fused_item.pubmed_id != orig_item_orm.pubmed_id:
-        orig_item_orm.pubmed_id = fused_item.pubmed_id
-    if fused_item.dimensions_id != orig_item_orm.dimensions_id:
-        orig_item_orm.dimensions_id = fused_item.dimensions_id
-    if fused_item.title != orig_item_orm.title:
-        orig_item_orm.title = fused_item.title
-    if fused_item.title_slug != orig_item_orm.title_slug:
-        orig_item_orm.title_slug = fused_item.title_slug
-    if fused_item.publication_year != orig_item_orm.publication_year:
-        orig_item_orm.publication_year = fused_item.publication_year
-    if fused_item.source != orig_item_orm.source:
-        orig_item_orm.source = fused_item.source
-    if fused_item.text != orig_item_orm.text:
-        orig_item_orm.text = fused_item.text
-    # here we don't check and just do
-    orig_item_orm.meta = fused_item.meta
-    orig_item_orm.keywords = fused_item.keywords
-    orig_item_orm.authors = fused_item.authors
+    # Check publication year field
+    new_keywords = getattr(new_item, 'keywords')
+    if new_keywords is not None and len(new_keywords) > 0:
+        # Get all non-empty publication_year across variants
+        keywords = set([var['keywords'] for var in variants if var['keywords'] is not None])
 
-    # commit the changes
-    await session.flush()
+        # Check if we have seen this value before
+        if new_keywords not in keywords:
+            # This was new, so keep track of it in our variant
+            new_variant['keywords'] = new_keywords
+            # We always like new IDs, so update the reference item
+            setattr(orig_item_orm, 'keywords', [kw for kw_lst in keywords for kw in kw_lst])
+
+    # Checking metadata field
+    # only keep track of unique meta objects in variants
+    # always apply deep-fuzed meta objects when encountering new meta object
+    new_meta = getattr(new_item, 'meta')
+    if new_meta is not None and len(new_meta) > 0:
+        # Get all non-empty publication_year across variants
+        metas = [var['meta'] for var in variants if var['meta'] is not None and len(var['meta']) > 0]
+
+        # Check if we have seen this value before
+        if new_meta not in metas:
+            # This was new, so keep track of it in our variant
+            new_variant['meta'] = new_meta
+            # We always like new IDs, so update the reference item
+            setattr(orig_item_orm, 'meta', clear_empty(fuze_dicts(getattr(orig_item_orm, 'meta'), new_meta)))
+
+    # Checking authorships
+    # only keep track of unique list of authors (or variations thereof) in variants
+    # always keep last valid list of authors
+    new_authors = getattr(new_item, 'authors')
+    if new_authors is not None and len(new_authors) > 0:
+        # Get all non-empty publication_year across variants
+        authors = [var['authors'] for var in variants if var['authors'] is not None and len(var['authors']) > 0]
+
+        # Check if we have seen this value before
+        if new_authors not in authors:
+            # This was new, so keep track of it in our variant
+            new_variant['authors'] = new_authors
+            # We always like new IDs, so update the reference item
+            setattr(orig_item_orm, 'authors', new_authors)
+
+    log.debug(f'Duplicate checking revealed new field variants for {len(new_variant)} fields: {new_variant.keys()}.')
+
+    if len(new_variant) > 0:
+        new_variant_db = AcademicItemVariant(**new_variant)
+        new_variant_db.item_variant_id = uuid.uuid4()
+        new_variant_db.import_id = import_id
+        new_variant_db.item_id = orig_item_id
+        session.add(new_variant_db)
+
+        # commit the changes
+        await session.flush()
+
+        return True
+
+    return False

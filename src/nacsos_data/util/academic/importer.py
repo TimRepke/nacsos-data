@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Generator, IO
 from collections import defaultdict
 
-from sqlalchemy import insert
+from sqlalchemy import insert, text, update
+from sqlalchemy.dialects.postgresql import insert as insert_pg
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 from psycopg.errors import UniqueViolation, OperationalError
@@ -23,6 +24,7 @@ from ...db.crud.items.academic import (
     IdField
 )
 from ...db.schemas import AcademicItem, m2m_import_item_table
+from ...db.schemas.imports import ImportRevision
 from ...models.items import AcademicItemModel, ItemEntry
 from ...models.imports import M2MImportItemType
 from ...models.openalex.solr import DefType, SearchField, OpType
@@ -31,6 +33,7 @@ from ..text import tokenise_item, extract_vocabulary, itm2txt
 from ..duplicate import MilvusDuplicateIndex, PynndescentDuplicateIndex
 from .clean import get_cleaned_meta_field
 from .duplicate import str_to_title_slug, find_duplicates, duplicate_insertion
+from ...scripts.dummy_data.dummy_annotations import session
 
 ID_FIELDS: list[IdField] = ['openalex_id', 's2_id', 'scopus_id', 'wos_id', 'pubmed_id', 'dimensions_id']
 
@@ -43,19 +46,15 @@ def _read_buffered_items(fp: IO[str]) -> Generator[AcademicItemModel, None, None
 
 def _check_known_identifiers(item: AcademicItemModel,
                              known_ids: dict[str, dict[str, str]],
-                             imported_item_ids: set[str],
                              logger: logging.Logger) -> str | None | bool:
     for id_field in ID_FIELDS:  # check each item
         identifier = getattr(item, id_field)
         item_id = known_ids[id_field].get(identifier, None)
 
         if identifier is not None and item_id is not None:
-            if item_id not in imported_item_ids:
-                logger.debug(' -> Found ID match and adding it to import/item m2m buffer')
-                return item_id
-            else:
-                logger.debug(' -> Found ID match but not adding it to m2m buffer (already exists)')
-                return None
+            logger.debug(' -> Found ID match and adding it to import/item m2m buffer')
+            return item_id
+
     return False
 
 
@@ -63,9 +62,8 @@ async def _find_id_duplicates(
         session: AsyncSession,
         new_items: AcademicItemGenerator,
         fp: IO[str],
-        import_id: str,
         project_id: str,
-        logger: logging.Logger) -> tuple[int, dict[str, int], set[str], set[str]]:
+        logger: logging.Logger) -> tuple[int, int, dict[str, int], set[str]]:
     with elapsed_timer(logger, 'Fetching all known IDs from current project'):
         known_ids: dict[str, dict[str, str]]
         known_ids = {
@@ -73,20 +71,18 @@ async def _find_id_duplicates(
             for id_field in ID_FIELDS
         }
 
-    with elapsed_timer(logger, 'Fetching known `item_ids` for import'):
-        # Fetch item_ids already in the import (in case the import failed at some point or is continued mid-way)
-        imported_item_ids = set(await gather_async(read_item_ids_for_import(session=session, import_id=import_id)))
-
     # Set of item_ids for which we need to add m2m tuples later
     m2m_buffer: set[str] = set()
     # Accumulator for our vocabulary
     token_counts: defaultdict[str, int] = defaultdict(int)
     n_unknown_items = 0
+    n_new_items = 0
 
     with elapsed_timer(logger, 'Checking if there are any known identifiers in the new data'):
         for item in new_items():  # Iterate all new items
+            n_new_items += 1
             # Check if we know this new item via some trusted identifier (e.g. openalex_id)
-            known_item_id = _check_known_identifiers(item, known_ids, imported_item_ids, logger)
+            known_item_id = _check_known_identifiers(item, known_ids, logger)
 
             # We know this new item (via an ID) and just need to add an m2m
 
@@ -96,22 +92,26 @@ async def _find_id_duplicates(
                     token_counts[tok] += 1
                 fp.write(item.model_dump_json() + '\n')
                 n_unknown_items += 1
-
             # We found a match!
-            elif known_item_id is not None and type(known_item_id) is str:
-                if known_item_id not in imported_item_ids:
-                    m2m_buffer.add(known_item_id)
-                    imported_item_ids.add(known_item_id)
+            else:
+                m2m_buffer.add(known_item_id)
 
     # return number of items we need to check for duplicates, vocabulary, updated set of seen item_ids, and the m2m buffer
-    return n_unknown_items, token_counts, imported_item_ids, m2m_buffer
+    return n_unknown_items, n_new_items, token_counts, m2m_buffer
 
 
-async def _insert_m2m(session: AsyncSession, item_id: str, import_id: str, dry_run: bool, logger: logging.Logger) -> None:
+async def _upsert_m2m(session: AsyncSession, item_id: str, import_id: str, latest_revision: int,
+                      dry_run: bool, logger: logging.Logger) -> None:
     if dry_run:
         logger.debug(' [DRY-RUN] -> Added many-to-many relationship for import/item')
     else:
-        stmt_m2m = insert(m2m_import_item_table).values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit)
+        stmt_m2m = (insert_pg(m2m_import_item_table)
+                    .values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit,
+                            first_revision=latest_revision, latest_revision=latest_revision)
+                    .on_conflict_do_update(constraint='m2m_import_item_pkey',
+                                           set_={
+                                               'latest_revision': latest_revision,
+                                           }))
         await session.execute(stmt_m2m)
         await session.flush()
         logger.debug(' -> Added many-to-many relationship for import/item')
@@ -169,37 +169,55 @@ async def _insert_item(session: AsyncSession,
                        item: AcademicItemModel,
                        import_id: str,
                        existing_id: str | None,
-                       trust_new_authors: bool,
-                       trust_new_keywords: bool,
                        dry_run: bool,
-                       logger: logging.Logger) -> str:
+                       logger: logging.Logger) -> tuple[str, bool]:
+    """
+    Returns the item_id of the item that was inserted. This might be the existing ID or a new one.
+    The second return value is
+       False: New item was created (no variant, yet)
+       True: Variant was created
+
+    :param session:
+    :param item:
+    :param import_id:
+    :param existing_id:
+    :param dry_run:
+    :param logger:
+    :return: tuple of item_id and variant insertion
+    """
     if existing_id is None:
         item_id = str(uuid.uuid4())
         if dry_run:
             logger.debug(f'  [DRY-RUN] -> Creating new item with ID {item_id}!')
-            return item_id
+            return item_id, False
 
         logger.debug(f' -> Creating new item with ID {item_id}!')
         item.item_id = item_id
         session.add(AcademicItem(**item.model_dump()))
         await session.flush()
-        return item_id
+        return item_id, False
 
     if item.item_id is None:
         item.item_id = uuid.uuid4()
 
     if dry_run:
         logger.debug(f'  [DRY-RUN] -> Creating variant for item_id {existing_id} with variant_id {item.item_id}!')
-        return existing_id
+        return existing_id, True
 
     logger.debug(f'  -> Creating variant for item_id {existing_id} with variant_id {item.item_id}!')
-    await duplicate_insertion(orig_item_id=existing_id,
-                              import_id=import_id,
-                              new_item=item,
-                              trust_new_authors=trust_new_authors,
-                              trust_new_keywords=trust_new_keywords,
-                              session=session)
-    return existing_id
+    has_changes = await duplicate_insertion(orig_item_id=existing_id,
+                                            import_id=import_id,
+                                            new_item=item,
+                                            session=session)
+    return existing_id, has_changes
+
+
+async def _get_latest_revision(session: AsyncSession, import_id: str | uuid.UUID) -> int:
+    latest_revision = (await session.execute(
+        text('SELECT COALESCE(MAX("import_revision_counter"), 0) as latest_revision FROM import_revision WHERE import_id=:import_id;'),
+        {'import_id': import_id}
+    )).scalar()
+    return latest_revision
 
 
 async def import_academic_items(
@@ -219,7 +237,7 @@ async def import_academic_items(
         trust_new_authors: bool = False,
         trust_new_keywords: bool = False,
         logger: logging.Logger | None = None
-) -> tuple[str, list[str]]:
+) -> str:
     """
     Helper function for programmatically importing `AcademicItem`s into the platform.
 
@@ -299,12 +317,20 @@ async def import_academic_items(
                                                     description=description,
                                                     i_type='script')
             import_id = str(import_orm.import_id)
+            revision_id = str(uuid.uuid4())
+            latest_revision = await _get_latest_revision(session=session, import_id=import_id)
+            latest_revision += 1
+            session.add(ImportRevision(
+                import_revision_id=revision_id,
+                import_id=import_id,
+                import_revision_counter=latest_revision,
+            ))
+            await session.flush()
 
             with elapsed_timer(logger, 'Checking new items for obvious ID-based duplicates'):
-                n_unknown_items, token_counts, imported_item_ids, m2m_buffer = await _find_id_duplicates(
+                n_unknown_items, n_new_items, token_counts, m2m_buffer = await _find_id_duplicates(
                     session=session,
                     project_id=str(project_id),
-                    import_id=import_id,
                     new_items=new_items,
                     logger=logger,
                     fp=duplicate_buffer
@@ -342,14 +368,16 @@ async def import_academic_items(
 
         logger.info('Finished pre-processing and index building.')
         logger.info('Proceeding to insert new items and creating m2m tuples...')
+        num_updated = 0
         async with db_engine.session() as session:  # type: AsyncSession
             with elapsed_timer(logger, f'Inserting {len(m2m_buffer):,} buffered m2m relations'):
                 for item_id in m2m_buffer:
-                    await _insert_m2m(session=session, item_id=item_id, import_id=import_id, logger=logger, dry_run=dry_run)
+                    await _upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=latest_revision,
+                                      logger=logger, dry_run=dry_run)
 
             if n_unknown_items == 0 or index is None:
                 logger.info('No unknown items found, ending here!')
-                return import_id, list(imported_item_ids)
+                return import_id
 
             with elapsed_timer(logger, f'Loading milvus collection "{index.collection_name}"'):
                 index.client.load_collection(index.collection_name)
@@ -367,14 +395,14 @@ async def import_academic_items(
                                                                 min_text_len=min_text_len, index=index, logger=logger)
 
                             # Insert a new item or an item variant
-                            item_id = await _insert_item(session=session, item=item, existing_id=existing_id, import_id=import_id,
-                                                         trust_new_authors=trust_new_authors, trust_new_keywords=trust_new_keywords,
-                                                         dry_run=dry_run, logger=logger)
+                            item_id, has_changes = await _insert_item(session=session, item=item, existing_id=existing_id,
+                                                                      import_id=import_id, dry_run=dry_run, logger=logger)
+                            num_updated += has_changes
 
-                            # Add many-to-many relation to import
-                            if item_id not in imported_item_ids:
-                                imported_item_ids.add(item_id)
-                                await _insert_m2m(session=session, item_id=item_id, import_id=import_id, dry_run=dry_run, logger=logger)
+                            # UPSERT m2m
+                            await _upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=latest_revision,
+                                              logger=logger, dry_run=dry_run)
+
 
                 except (UniqueViolation, IntegrityError, OperationalError) as e:
                     logger.exception(e)
@@ -386,8 +414,30 @@ async def import_academic_items(
     with elapsed_timer(logger, 'Cleaning up milvus!'):
         index.client.drop_collection(index.collection_name)
 
+    with elapsed_timer(logger, 'Updating revision stats...'):
+        async with db_engine.session() as session:  # type: AsyncSession
+            num_items = (await session.execute(text('SELECT count(1) FROM m2m_import_item WHERE import_id = :import_id'),
+                                               {'import_id': import_id})).scalar()
+            num_items_new = (await session.execute(text('SELECT count(1) '
+                                                        'FROM m2m_import_item '
+                                                        'WHERE first_revision = :rev AND import_id=:import_id'),
+                                                   {'rev': latest_revision, 'import_id': import_id})).scalar()
+            num_items_removed = (await session.execute(text('SELECT count(1) '
+                                                            'FROM m2m_import_item '
+                                                            'WHERE latest_revision = :rev AND import_id=:import_id'),
+                                                       {'rev': latest_revision - 1, 'import_id': import_id})).scalar()
+            await session.execute(update(ImportRevision),
+                                  {
+                                      'import_revision_id': revision_id,
+                                      'num_items': num_items,
+                                      'num_items_retrieved': n_new_items,
+                                      'num_items_new': num_items_new,
+                                      'num_items_updated': num_updated,
+                                      'num_items_removed': num_items_removed,
+                                  })
+
     logger.info('Import complete, returning to initiator with IDs!')
-    return import_id, list(imported_item_ids)
+    return import_id
 
 
 async def import_wos_files(sources: list[Path],
@@ -441,8 +491,6 @@ async def import_wos_files(sources: list[Path],
         max_slop=0.05,
         batch_size=5000,
         dry_run=False,
-        trust_new_authors=False,
-        trust_new_keywords=False,
         logger=logger
     )
 
@@ -499,8 +547,6 @@ async def import_scopus_csv_file(sources: list[Path],
         max_slop=0.05,
         batch_size=5000,
         dry_run=False,
-        trust_new_authors=False,
-        trust_new_keywords=False,
         logger=logger
     )
 
@@ -557,8 +603,6 @@ async def import_academic_db(sources: list[Path],
         max_slop=0.05,
         batch_size=5000,
         dry_run=False,
-        trust_new_authors=False,
-        trust_new_keywords=False,
         logger=logger
     )
 
@@ -628,8 +672,6 @@ async def import_openalex(query: str,
         max_slop=0.05,
         batch_size=5000,
         dry_run=False,
-        trust_new_authors=False,
-        trust_new_keywords=False,
         logger=logger
     )
 
@@ -685,7 +727,5 @@ async def import_openalex_files(sources: list[Path],
         max_slop=0.05,
         batch_size=5000,
         dry_run=False,
-        trust_new_authors=False,
-        trust_new_keywords=False,
         logger=logger
     )

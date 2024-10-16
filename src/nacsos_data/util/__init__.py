@@ -1,4 +1,6 @@
 import logging
+from collections.abc import MutableMapping
+from copy import deepcopy
 from contextlib import contextmanager
 from datetime import timedelta
 from timeit import default_timer
@@ -62,6 +64,18 @@ def clear_empty(obj: Any | None) -> Any | None:
         return None
 
     return obj
+
+# from https://stackoverflow.com/a/24088493
+def fuze_dicts(d1: dict[str, Any], d2: dict[str, Any]) -> dict[str, Any]:
+    for k, v in d1.items():
+        if k in d2:
+            # this next check is the only difference!
+            if all(isinstance(e, MutableMapping) for e in (v, d2[k])):
+                d2[k] = rec_merge(v, d2[k])
+            # we could further check types and merge as appropriate here.
+    d3 = d1.copy()
+    d3.update(d2)
+    return d3
 
 
 def ensure_values(o: Any, *attrs: str | tuple[str, Any]) -> tuple[Any, ...]:

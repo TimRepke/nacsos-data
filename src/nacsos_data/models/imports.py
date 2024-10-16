@@ -84,4 +84,23 @@ class M2MImportItemType(str, Enum):
     implicit = 'implicit'
 
 
-# __all__ = ['M2MImportItemType', 'ImportModel']
+class ImportRevision(BaseModel):
+    # Unique identifier for this import revision
+    import_revision_id: UUID | str | None = None
+    # NUmber of this revision within this import
+    import_revision_counter: int
+    # Date and time when this import was created and when the actual import was triggered
+    time_created: datetime
+
+    import_id: UUID | str | None = None
+
+    # Number of items (raw count) from the source
+    num_items_retrieved: int | None = None
+    # Size of import (overall) at the end of this revision
+    num_items: int | None = None
+    # Number of items added in this revision
+    num_items_new: int | None = None
+    # Number of items detected as duplicate in this revision
+    num_items_updated: int | None = None
+    # Number of items in last revision but not in this one
+    num_items_removed: int | None = None
