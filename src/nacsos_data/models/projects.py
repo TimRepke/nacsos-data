@@ -34,6 +34,10 @@ class ProjectModel(BaseModel):
     # This is used to show item-type specific interface elements and join enriched meta-data
     type: ItemTypeLiteral | ItemType
 
+    # This is a mutex to prevent parallel imports for a project
+    # If this is TRUE, DO NOT RUN ANOTHER IMPORT!
+    import_mutex: bool | None = None
+
     # === Project settings ===
     # True = motivational quotes are shown to the user
     setting_motivational_quotes: bool = True

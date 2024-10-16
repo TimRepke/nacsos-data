@@ -6,14 +6,16 @@ from pathlib import Path
 from typing import Generator, IO
 from collections import defaultdict
 
-from sqlalchemy import text, update
+from sqlalchemy import text, update, select
 from sqlalchemy.dialects.postgresql import insert as insert_pg
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 from psycopg.errors import UniqueViolation, OperationalError
 from sklearn.feature_extraction.text import CountVectorizer
 
+from ..errors import ParallelImportError
 from ...db import DatabaseEngineAsync, get_engine_async
+from ...db.crud import MissingIdError
 from ...db.crud.imports import get_or_create_import
 from ...db.crud.items.academic import (
     AcademicItemGenerator,
@@ -22,7 +24,7 @@ from ...db.crud.items.academic import (
     read_known_ids_map,
     IdField
 )
-from ...db.schemas import AcademicItem, m2m_import_item_table
+from ...db.schemas import AcademicItem, m2m_import_item_table, Project
 from ...db.schemas.imports import ImportRevision
 from ...models.items import AcademicItemModel, ItemEntry
 from ...models.imports import M2MImportItemType, ImportRevisionModel
@@ -243,6 +245,23 @@ def _revision_required(num_new_items: int | None, last_revision: ImportRevisionM
     return True
 
 
+async def _set_session_mutex(session: AsyncSession, project_id: str | uuid.UUID, lock: bool) -> None:
+    # We assume everything relevant was committed beforehand
+    await session.rollback()
+
+    project: Project | None = (await session.execute(select(Project).where(Project.project_id == project_id))).scalar()
+    if project is None:
+        raise MissingIdError(f'No project for ID={project_id}!')
+
+    # If this is not the unset call, prevent further execution
+    if lock is True and project.import_mutex:
+        raise ParallelImportError('You should not run parallel imports!')
+
+    # Set or free our import mutex
+    project.import_mutex = True if lock else None
+    await session.commit()
+
+
 async def import_academic_items(
         db_engine: DatabaseEngineAsync,
         project_id: str | uuid.UUID,
@@ -333,6 +352,8 @@ async def import_academic_items(
 
     with tempfile.NamedTemporaryFile('w+') as duplicate_buffer:
         async with db_engine.session() as session:  # type: AsyncSession
+            await _set_session_mutex(session, project_id=project_id, lock=True)
+
             # Get the import and figure out what ids to deduplicate on, based on import type
             import_orm = await get_or_create_import(session=session,
                                                     project_id=project_id,
@@ -352,7 +373,9 @@ async def import_academic_items(
                 # Check if we should even create a new revision based on the difference in the number of query results
                 if not _revision_required(num_new_items=num_new_items, last_revision=last_revision,
                                           min_update_size=min_update_size, logger=logger):
-                    # Return without committing anything
+                    # Free our import mutex
+                    await _set_session_mutex(session, project_id=project_id, lock=False)
+                    # Return without committing anything (note, that freeing mutex will roll back session!
                     return import_id, None
 
             # Create a new revision
@@ -377,7 +400,9 @@ async def import_academic_items(
             # This is repeating the previous check in case the `num_new_items` parameter was left empty before.
             if not _revision_required(num_new_items=num_new_items, last_revision=last_revision,
                                       min_update_size=min_update_size, logger=logger):
-                # Return without committing anything
+                # Free our import mutex
+                await _set_session_mutex(session, project_id=project_id, lock=False)
+                # Return without committing anything (note, that freeing mutex will roll back session!
                 return import_id, None
 
         index: MilvusDuplicateIndex | None = None
@@ -420,7 +445,13 @@ async def import_academic_items(
 
             if n_unknown_items == 0 or index is None:
                 logger.info('No unknown items found, ending here!')
+                # Commit all changes
                 await session.commit()
+
+                # Free our import mutex
+                await _set_session_mutex(session, project_id=project_id, lock=False)
+
+                # Return to caller
                 return import_id, latest_revision
 
             with elapsed_timer(logger, f'Loading milvus collection "{index.collection_name}"'):
@@ -480,6 +511,9 @@ async def import_academic_items(
             logger.info(f'Setting new revision stats: {revision_stats}')
             await session.execute(update(ImportRevision), revision_stats)
             await session.commit()
+
+            # Free our import mutex
+            await _set_session_mutex(session, project_id=project_id, lock=False)
 
     logger.info('Import complete, returning to initiator!')
     return import_id, latest_revision

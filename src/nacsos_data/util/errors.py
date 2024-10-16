@@ -29,3 +29,10 @@ class EmptyAnnotationsError(ValueError):
     annotations for that label.
     """
     pass
+
+
+class ParallelImportError(AssertionError):
+    """
+    Used in imports to prevent parallel imports within a project.
+    """
+    pass

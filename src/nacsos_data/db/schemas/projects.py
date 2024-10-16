@@ -46,6 +46,10 @@ class Project(Base):
     # This is used to show item-type specific interface elements and join enriched meta-data
     type = mapped_column(SAEnum(ItemType), nullable=False)
 
+    # This is a mutex to prevent parallel imports for a project
+    # If this is TRUE, DO NOT RUN ANOTHER IMPORT!
+    import_mutex = mapped_column(Boolean, nullable=True, server_default=None, default=None)
+
     # ORM reference to all items in the project
     # Note, that they will not be loaded into memory automatically!
     # https://docs.sqlalchemy.org/en/20/orm/large_collections.html
