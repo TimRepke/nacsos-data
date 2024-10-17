@@ -734,7 +734,9 @@ async def import_openalex(query: str,
     num_new_items = None
     # In case we are going to check it, fetch the item count
     if min_update_size is not None:
-        num_new_items = await get_count_from_openalex(query=query, openalex_endpoint=openalex_url, op=op, field=field, def_type=def_type)
+        num_new_items = (
+            await get_count_from_openalex(query=query, openalex_endpoint=openalex_url, op=op, field=field, def_type=def_type)
+        ).num_found
 
     db_engine = get_engine_async(conf_file=str(db_config))
 
