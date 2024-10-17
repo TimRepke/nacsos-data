@@ -73,9 +73,6 @@ class Import(Base):
                                ForeignKey(Project.project_id, ondelete='CASCADE'),
                                nullable=False, index=True, primary_key=False)
 
-    # The task_id assigned by nacsos-pipes service (if this import is handled by a pipeline)
-    pipeline_task_id = mapped_column(String, nullable=True, index=True, primary_key=False)
-
     # Unique descriptive name/title for the import
     name = mapped_column(String, nullable=False)
 
@@ -117,6 +114,8 @@ class ImportRevision(Base):
     import_revision_counter = mapped_column(Integer, nullable=False)
     # Date and time when this import was created and when the actual import was triggered
     time_created = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # The task_id assigned by nacsos-pipes service (if this import is handled by a pipeline)
+    pipeline_task_id = mapped_column(String, nullable=True, index=False, primary_key=False, default=None, server_default=None)
 
     import_id = mapped_column(UUID(as_uuid=True),
                               ForeignKey(Import.import_id),

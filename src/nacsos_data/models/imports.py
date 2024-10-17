@@ -50,8 +50,6 @@ class ImportModel(BaseModel):
     user_id: UUID | str | None = None
     # The project this import is attached to
     project_id: UUID | str
-    # The task_id assigned by nacsos-pipes service (if this import is handled by a pipeline)
-    pipeline_task_id: str | None = None
 
     # Unique descriptive name/title for the import
     name: str
@@ -91,6 +89,8 @@ class ImportRevisionModel(BaseModel):
     import_revision_counter: int
     # Date and time when this import was created and when the actual import was triggered
     time_created: datetime
+    # The task_id assigned by nacsos-pipes service (if this import is handled by a pipeline)
+    pipeline_task_id: str | None = None
 
     import_id: UUID | str | None = None
 

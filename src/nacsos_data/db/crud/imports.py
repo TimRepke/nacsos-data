@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from nacsos_data.db.crud import upsert_orm
 from nacsos_data.db.engine import ensure_session_async, DBSession
 from nacsos_data.db.schemas import Import, m2m_import_item_table, Task, Project
+from nacsos_data.db.schemas.imports import ImportRevision
 from nacsos_data.db.schemas.items.base import Item
 from nacsos_data.models.imports import ImportModel
 from nacsos_data.util.errors import MissingIdError, ParallelImportError
@@ -61,11 +62,12 @@ async def delete_import(session: DBSession, import_id: uuid.UUID | str) -> None:
     await session.execute(stmt)
 
     # Delete related tasks
-    stmt = select(Import).where(Import.import_id == import_id)  # type: ignore[assignment]
-    imp = (await session.execute(stmt)).scalars().first()
-    if imp and imp.pipeline_task_id is not None:
-        await session.execute(delete(Task)
-                              .where(Task.task_id == imp.pipeline_task_id))
+    pipeline_task_ids = (await session.execute(
+        select(ImportRevision.pipeline_task_id)
+        .where(ImportRevision.import_id == import_id,
+               ImportRevision.pipeline_task_id.is_not(None)))).scalars().all()
+    await session.execute(delete(Task).where(Task.task_id.in_(pipeline_task_ids)))
+
     # TODO rm -r .tasks/user_data/{imp.config.sources}
     # TODO rm -r .tasks/artefacts/{task.task_id}
 
