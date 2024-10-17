@@ -26,7 +26,7 @@ def upgrade():
                     sa.Column('import_revision_counter', sa.Integer(), nullable=False),
                     sa.Column('time_created', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
                     sa.Column('import_id', sa.UUID(), nullable=False),
-                    sa.Column('num_retrieved', sa.Integer(), nullable=True),
+                    sa.Column('num_items_retrieved', sa.Integer(), nullable=True),
                     sa.Column('num_items', sa.Integer(), nullable=True),
                     sa.Column('num_items_new', sa.Integer(), nullable=True),
                     sa.Column('num_items_updated', sa.Integer(), nullable=True),
