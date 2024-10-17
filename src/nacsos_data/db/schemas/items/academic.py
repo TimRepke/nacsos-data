@@ -138,5 +138,5 @@ class AcademicItemVariant(Base):
     keywords = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True,
                              index=False)
     authors = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=False)
-    abstract = mapped_column(String, nullable=True, unique=False, index=False)
+    text = mapped_column(String, nullable=True, unique=False, index=False)
     meta = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=False)

@@ -243,12 +243,48 @@ def _revision_required(num_new_items: int | None, last_revision: ImportRevisionM
     return True
 
 
+async def _update_statistics(session: AsyncSession,
+                             project_id: str | uuid.UUID,
+                             import_id: str | uuid.UUID,
+                             revision_id: str | uuid.UUID,
+                             latest_revision: int,
+                             num_new_items: int,
+                             num_updated: int,
+                             logger: logging.Logger) -> None:
+    with elapsed_timer(logger, 'Updating revision stats...'):
+        num_items = (await session.execute(text('SELECT count(1) FROM m2m_import_item WHERE import_id = :import_id'),
+                                           {'import_id': import_id})).scalar()
+        num_items_new = (await session.execute(text('SELECT count(1) '
+                                                    'FROM m2m_import_item '
+                                                    'WHERE first_revision = :rev AND import_id=:import_id'),
+                                               {'rev': latest_revision, 'import_id': import_id})).scalar()
+        num_items_removed = (await session.execute(text('SELECT count(1) '
+                                                        'FROM m2m_import_item '
+                                                        'WHERE latest_revision = :rev AND import_id=:import_id'),
+                                                   {'rev': latest_revision - 1, 'import_id': import_id})).scalar()
+        revision_stats = {
+            'num_items': num_items,
+            'num_items_retrieved': num_new_items,
+            'num_items_new': num_items_new,
+            'num_items_updated': num_updated,
+            'num_items_removed': num_items_removed,
+        }
+        logger.info(f'Setting new revision stats: {revision_stats}')
+        await session.execute(update(ImportRevision)
+                              .where(ImportRevision.import_revision_id==revision_id)
+                              .values(**revision_stats))
+        await session.commit()
+
+    return None
+
+
 async def import_academic_items(
         db_engine: DatabaseEngineAsync,
         project_id: str | uuid.UUID,
         new_items: AcademicItemGenerator,
         import_name: str | None = None,
         import_id: str | uuid.UUID | None = None,
+        pipeline_task_id: str | None = None,
         user_id: str | uuid.UUID | None = None,
         description: str | None = None,
         vectoriser: CountVectorizer | None = None,
@@ -364,8 +400,9 @@ async def import_academic_items(
                 import_revision_id=revision_id,
                 import_id=import_id,
                 import_revision_counter=latest_revision,
+                pipeline_task_id=pipeline_task_id,
             ))
-            await session.flush()
+            await session.commit()  # Note, committing instead of flushing here, so this is persisted for reference even on error
 
             with elapsed_timer(logger, 'Checking new items for obvious ID-based duplicates'):
                 n_unknown_items, num_new_items, token_counts, m2m_buffer = await _find_id_duplicates(
@@ -381,9 +418,9 @@ async def import_academic_items(
             # This is repeating the previous check in case the `num_new_items` parameter was left empty before.
             if not _revision_required(num_new_items=num_new_items, last_revision=last_revision,
                                       min_update_size=min_update_size, logger=logger):
-                # Free our import mutex
+                # Free our import mutex (note, that freeing mutex will roll back session!)
                 await set_session_mutex(session, project_id=project_id, lock=False)
-                # Return without committing anything (note, that freeing mutex will roll back session!
+                # Return without committing anything
                 return import_id, None
 
         index: MilvusDuplicateIndex | None = None
@@ -429,6 +466,11 @@ async def import_academic_items(
                 # Commit all changes
                 await session.commit()
 
+                # Updating revision stats
+                await _update_statistics(session=session, project_id=project_id, import_id=import_id, revision_id=revision_id,
+                                         latest_revision=latest_revision, num_new_items=num_new_items, num_updated=num_updated,
+                                         logger=logger)
+
                 # Free our import mutex
                 await set_session_mutex(session, project_id=project_id, lock=False)
 
@@ -469,32 +511,11 @@ async def import_academic_items(
     with elapsed_timer(logger, 'Cleaning up milvus!'):
         index.client.drop_collection(index.collection_name)
 
-    with elapsed_timer(logger, 'Updating revision stats...'):
-        async with db_engine.session() as session:  # type: AsyncSession
-            num_items = (await session.execute(text('SELECT count(1) FROM m2m_import_item WHERE import_id = :import_id'),
-                                               {'import_id': import_id})).scalar()
-            num_items_new = (await session.execute(text('SELECT count(1) '
-                                                        'FROM m2m_import_item '
-                                                        'WHERE first_revision = :rev AND import_id=:import_id'),
-                                                   {'rev': latest_revision, 'import_id': import_id})).scalar()
-            num_items_removed = (await session.execute(text('SELECT count(1) '
-                                                            'FROM m2m_import_item '
-                                                            'WHERE latest_revision = :rev AND import_id=:import_id'),
-                                                       {'rev': latest_revision - 1, 'import_id': import_id})).scalar()
-            revision_stats = {
-                'import_revision_id': revision_id,
-                'num_items': num_items,
-                'num_items_retrieved': num_new_items,
-                'num_items_new': num_items_new,
-                'num_items_updated': num_updated,
-                'num_items_removed': num_items_removed,
-            }
-            logger.info(f'Setting new revision stats: {revision_stats}')
-            await session.execute(update(ImportRevision), revision_stats)
-            await session.commit()
-
-            # Free our import mutex
-            await set_session_mutex(session, project_id=project_id, lock=False)
+    async with db_engine.session() as session:  # type: AsyncSession
+        await _update_statistics(session=session, project_id=project_id,import_id=import_id,revision_id=revision_id,
+                           latest_revision=latest_revision, num_new_items=num_new_items, num_updated=num_updated, logger=logger)
+        # Free our import mutex
+        await set_session_mutex(session, project_id=project_id, lock=False)
 
     logger.info('Import complete, returning to initiator!')
     return import_id, latest_revision
@@ -504,6 +525,7 @@ async def import_wos_files(sources: list[Path],
                            db_config: Path,
                            project_id: str | None = None,
                            import_id: str | None = None,
+                           pipeline_task_id: str | None = None,
                            min_update_size: int | None = None,
                            num_new_items: int | None = None,
                            logger: logging.Logger | None = None) -> tuple[str, int | None]:
@@ -551,6 +573,7 @@ async def import_wos_files(sources: list[Path],
         description=None,
         user_id=None,
         import_id=import_id,
+        pipeline_task_id=pipeline_task_id,
         vectoriser=None,
         max_slop=0.05,
         batch_size=5000,
@@ -563,6 +586,7 @@ async def import_scopus_csv_file(sources: list[Path],
                                  db_config: Path,
                                  project_id: str | None = None,
                                  import_id: str | None = None,
+                                 pipeline_task_id: str | None = None,
                                  min_update_size: int | None = None,
                                  num_new_items: int | None = None,
                                  logger: logging.Logger | None = None) -> tuple[str, int | None]:
@@ -611,6 +635,7 @@ async def import_scopus_csv_file(sources: list[Path],
         description=None,
         user_id=None,
         import_id=import_id,
+        pipeline_task_id=pipeline_task_id,
         vectoriser=None,
         max_slop=0.05,
         batch_size=5000,
@@ -623,6 +648,7 @@ async def import_academic_db(sources: list[Path],
                              db_config: Path,
                              project_id: str | None = None,
                              import_id: str | None = None,
+                             pipeline_task_id: str | None = None,
                              min_update_size: int | None = None,
                              num_new_items: int | None = None,
                              logger: logging.Logger | None = None) -> tuple[str, int | None]:
@@ -671,6 +697,7 @@ async def import_academic_db(sources: list[Path],
         description=None,
         user_id=None,
         import_id=import_id,
+        pipeline_task_id=pipeline_task_id,
         vectoriser=None,
         max_slop=0.05,
         batch_size=5000,
@@ -687,6 +714,7 @@ async def import_openalex(query: str,
                           op: OpType = 'AND',
                           project_id: str | None = None,
                           import_id: str | None = None,
+                          pipeline_task_id: str | None = None,
                           min_update_size: int | None = None,
                           logger: logging.Logger | None = None) -> tuple[str, int | None]:
     """
@@ -750,6 +778,7 @@ async def import_openalex(query: str,
         description=None,
         user_id=None,
         import_id=import_id,
+        pipeline_task_id=pipeline_task_id,
         vectoriser=None,
         max_slop=0.05,
         batch_size=5000,
@@ -762,6 +791,7 @@ async def import_openalex_files(sources: list[Path],
                                 db_config: Path,
                                 project_id: str | None = None,
                                 import_id: str | None = None,
+                                pipeline_task_id: str | None = None,
                                 min_update_size: int | None = None,
                                 num_new_items: int | None = None,
                                 logger: logging.Logger | None = None) -> tuple[str, int | None]:
@@ -809,6 +839,7 @@ async def import_openalex_files(sources: list[Path],
         description=None,
         user_id=None,
         import_id=import_id,
+        pipeline_task_id=pipeline_task_id,
         vectoriser=None,
         max_slop=0.05,
         batch_size=5000,

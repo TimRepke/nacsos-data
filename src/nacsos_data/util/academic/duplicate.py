@@ -25,7 +25,8 @@ MAX_ABSTRACT_LENGTH = 10000
 
 
 def str_to_title_slug(title: str | None) -> str | None:
-    if title is None or len(title) == 0:
+    print(title)
+    if title is None or len(title.strip()) == 0:
         return None
     # remove all non-alphabetic characters
     return REGEX_NON_ALPH.sub('', title.lower())
@@ -268,8 +269,9 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     orig_item = AcademicItemModel.model_validate(orig_item_orm.__dict__)
 
     # Get prior variants of that AcademicItem
-    variants = (await session.execute(select(AcademicItemVariant)
-                                      .where(AcademicItemVariant.item_id == orig_item_id))).mappings().all()
+    variants = [v.__dict__
+                for v in (await session.execute(select(AcademicItemVariant)
+                                                .where(AcademicItemVariant.item_id == orig_item_id))).scalars().all()]
 
     # If we have no prior variant, we need to create one
     if len(variants) == 0:
@@ -323,7 +325,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
             if field == 'title':
                 new_variant[field] = new_value
                 setattr(orig_item_orm, field, new_value)
-                setattr(orig_item_orm, field, get_title_slug(new_value))
+                setattr(orig_item_orm, field, str_to_title_slug(new_value))
             elif field == 'text':
                 candidates = sorted([abs for abs in field_values | {new_value} if len(abs) < MAX_ABSTRACT_LENGTH], key=lambda a: len(a))
                 new_variant[field] = new_value

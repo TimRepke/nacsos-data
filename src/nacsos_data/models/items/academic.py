@@ -78,5 +78,5 @@ class AcademicItemVariantModel(BaseModel):
     source: str | None = None
     keywords: list[str] | None = None
     authors: list[AcademicAuthorModel] | None = None
-    abstract: str | None = None
+    text: str | None = None
     meta: dict[str, Any] | None = None
