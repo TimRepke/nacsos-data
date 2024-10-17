@@ -295,7 +295,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
             source=orig_item.source,
             keywords=orig_item.keywords,
             authors=orig_item.authors,
-            abstract=orig_item.text,
+            text=orig_item.text,
             meta=orig_item.meta)
 
         # add to database

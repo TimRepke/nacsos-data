@@ -271,7 +271,7 @@ async def _update_statistics(session: AsyncSession,
         }
         logger.info(f'Setting new revision stats: {revision_stats}')
         await session.execute(update(ImportRevision)
-                              .where(ImportRevision.import_revision_id==revision_id)
+                              .where(ImportRevision.import_revision_id == revision_id)
                               .values(**revision_stats))
         await session.commit()
 
@@ -512,8 +512,8 @@ async def import_academic_items(
         index.client.drop_collection(index.collection_name)
 
     async with db_engine.session() as session:  # type: AsyncSession
-        await _update_statistics(session=session, project_id=project_id,import_id=import_id,revision_id=revision_id,
-                           latest_revision=latest_revision, num_new_items=num_new_items, num_updated=num_updated, logger=logger)
+        await _update_statistics(session=session, project_id=project_id, import_id=import_id, revision_id=revision_id,
+                                 latest_revision=latest_revision, num_new_items=num_new_items, num_updated=num_updated, logger=logger)
         # Free our import mutex
         await set_session_mutex(session, project_id=project_id, lock=False)
 
