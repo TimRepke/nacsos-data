@@ -36,14 +36,14 @@ from nacsos_data.util.annotations.validation import (
     has_values
 )
 
-from . import upsert_orm, MissingIdError
+from . import upsert_orm
 from ..engine import ensure_session_async, DBSession, DatabaseEngineAsync, ensure_connection_async
 from ...util.annotations import (
     dehydrate_user_annotations,
     dehydrate_resolutions
 )
 from ...util.annotations.resolve import get_resolved_item_annotations
-from ...util.errors import NotFoundError
+from ...util.errors import NotFoundError, MissingIdError
 
 logger = logging.getLogger('nacsos_data.crud.annotations')
 

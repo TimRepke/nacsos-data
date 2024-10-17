@@ -10,35 +10,6 @@ from ..schemas import Base
 
 logger = logging.getLogger('nacsos_data.crud')
 
-
-class DuplicateKeyWarning(UserWarning):
-    """
-    This warning is raised when a user tries to insert
-    something with a unique key that already exists.
-    It's not considered an Exception, since trying to
-    insert is considered a valid process for duplicate-free insertion.
-    """
-    pass
-
-
-class UpdateFailedWarning(Warning):
-    """
-    Raised when an update has failed.
-    """
-    pass
-
-
-class UpsertFailedWarning(Warning):
-    """
-    Raised when an upsert (insert on_conflict update) has failed.
-    """
-    pass
-
-
-class MissingIdError(KeyError):
-    pass
-
-
 T = TypeVar('T')
 S = TypeVar('S', bound=Base)
 M = TypeVar('M', bound=BaseModel)

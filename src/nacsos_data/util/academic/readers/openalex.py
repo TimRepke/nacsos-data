@@ -191,6 +191,20 @@ async def query_async(query: str,
             } if hist_facets is not None else None)
 
 
+async def get_count_from_openalex(query: str,
+                                  openalex_endpoint: str,
+                                  def_type: DefType = 'lucene',
+                                  op: OpType = 'AND',
+                                  field: SearchField = 'title_abstract') -> SearchResult:
+    return await query_async(query=query,
+                             openalex_endpoint=openalex_endpoint,
+                             def_type=def_type,
+                             field=field,
+                             limit=0,
+                             histogram=False,
+                             op=op)
+
+
 def generate_docs_from_openalex(query: str,
                                 openalex_endpoint: str,
                                 export_fields: list[str] | None = None,

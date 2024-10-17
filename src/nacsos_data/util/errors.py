@@ -36,3 +36,31 @@ class ParallelImportError(AssertionError):
     Used in imports to prevent parallel imports within a project.
     """
     pass
+
+
+class DuplicateKeyWarning(UserWarning):
+    """
+    This warning is raised when a user tries to insert
+    something with a unique key that already exists.
+    It's not considered an Exception, since trying to
+    insert is considered a valid process for duplicate-free insertion.
+    """
+    pass
+
+
+class UpdateFailedWarning(Warning):
+    """
+    Raised when an update has failed.
+    """
+    pass
+
+
+class UpsertFailedWarning(Warning):
+    """
+    Raised when an upsert (insert on_conflict update) has failed.
+    """
+    pass
+
+
+class MissingIdError(KeyError):
+    pass

@@ -5,10 +5,10 @@ from typing import Any
 from pydantic import BaseModel
 from sqlalchemy import func, select, asc, desc, delete, update
 
-from nacsos_data.db.crud import MissingIdError
 from nacsos_data.db.engine import ensure_session_async, DBSession
 from nacsos_data.db.schemas import Task
 from nacsos_data.models.pipeline import TaskStatus, TaskModel
+from nacsos_data.util.errors import MissingIdError
 
 
 @ensure_session_async

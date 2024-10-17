@@ -3,12 +3,14 @@ import uuid
 
 from sqlalchemy import select, delete, func
 from sqlalchemy.exc import NoResultFound
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.crud import upsert_orm
 from nacsos_data.db.engine import ensure_session_async, DBSession
-from nacsos_data.db.schemas import Import, m2m_import_item_table, Task
+from nacsos_data.db.schemas import Import, m2m_import_item_table, Task, Project
 from nacsos_data.db.schemas.items.base import Item
 from nacsos_data.models.imports import ImportModel
+from nacsos_data.util.errors import MissingIdError, ParallelImportError
 
 
 @ensure_session_async
@@ -120,3 +122,20 @@ async def get_or_create_import(session: DBSession,
 
     raise AttributeError('Seems like neither provided information for creating '
                          'a new import nor the ID to an existing import!')
+
+
+async def set_session_mutex(session: AsyncSession, project_id: str | uuid.UUID, lock: bool) -> None:
+    # We assume everything relevant was committed beforehand
+    await session.rollback()
+
+    project: Project | None = (await session.execute(select(Project).where(Project.project_id == project_id))).scalar()
+    if project is None:
+        raise MissingIdError(f'No project for ID={project_id}!')
+
+    # If this is not the unset call, prevent further execution
+    if lock is True and project.import_mutex:
+        raise ParallelImportError('You should not run parallel imports!')
+
+    # Set or free our import mutex
+    project.import_mutex = True if lock else None
+    await session.commit()
