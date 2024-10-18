@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from typing import Literal, Optional, Union
 
 from datetime import datetime

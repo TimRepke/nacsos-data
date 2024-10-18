@@ -66,7 +66,7 @@ def clear_empty(obj: Any | None) -> Any | None:
 
 
 # from https://stackoverflow.com/a/24088493
-def fuze_dicts(d1: dict[str, Any] | None, d2: dict[str, Any] | None) -> dict[str, Any]:
+def fuze_dicts(d1: dict[str, Any] | None, d2: dict[str, Any] | None) -> dict[str, Any] | None:
     if d1 is None:
         return d2
     if d2 is None:
