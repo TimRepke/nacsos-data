@@ -101,7 +101,7 @@ async def _find_id_duplicates(
 async def _upsert_m2m(session: AsyncSession, item_id: str, import_id: str, latest_revision: int,
                       dry_run: bool, logger: logging.Logger) -> None:
     if dry_run:
-        logger.debug(' [DRY-RUN] -> Added many-to-many relationship for import/item')
+        logger.debug(' [DRY-RUN] -> Upserted many-to-many relationship for import/item')
     else:
         stmt_m2m = (insert_pg(m2m_import_item_table)
                     .values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit,
@@ -112,7 +112,7 @@ async def _upsert_m2m(session: AsyncSession, item_id: str, import_id: str, lates
                                            }))
         await session.execute(stmt_m2m)
         await session.flush()
-        logger.debug(' -> Added many-to-many relationship for import/item')
+        logger.debug(' -> Upserted many-to-many relationship for import/item')
 
 
 async def _find_duplicate(session: AsyncSession,

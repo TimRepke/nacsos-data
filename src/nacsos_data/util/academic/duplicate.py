@@ -325,7 +325,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
             if field == 'title':
                 new_variant[field] = new_value
                 setattr(orig_item_orm, field, new_value)
-                setattr(orig_item_orm, field, str_to_title_slug(new_value))
+                setattr(orig_item_orm, 'title_slug', str_to_title_slug(new_value))
             elif field == 'text':
                 candidates = sorted([abs for abs in field_values | {new_value} if len(abs) < MAX_ABSTRACT_LENGTH], key=lambda a: len(a))
                 new_variant[field] = new_value

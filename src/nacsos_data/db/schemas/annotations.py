@@ -115,10 +115,6 @@ class AssignmentScope(Base):
     # Stores the config parameters used in creating the assignments for future reference
     config = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True)
 
-    # List of keywords to highlight in this assignment scope (based on Highlighter)
-    highlighter_ids = mapped_column(ARRAY(UUID(as_uuid=True)),  # ForeignKey(Highlighter.highlighter_id),
-                                    nullable=True, index=False)
-
     # reference to the associated assignments
     assignments: Relationship['Assignment'] = relationship('Assignment', cascade='all, delete')
     # reference to the associated quality trackers

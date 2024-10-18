@@ -64,8 +64,14 @@ def clear_empty(obj: Any | None) -> Any | None:
 
     return obj
 
+
 # from https://stackoverflow.com/a/24088493
-def fuze_dicts(d1: dict[str, Any], d2: dict[str, Any]) -> dict[str, Any]:
+def fuze_dicts(d1: dict[str, Any] | None, d2: dict[str, Any] | None) -> dict[str, Any]:
+    if d1 is None:
+        return d2
+    if d2 is None:
+        return d1
+
     for k, v in d1.items():
         if k in d2:
             # this next check is the only difference!
