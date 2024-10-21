@@ -7,7 +7,6 @@ from sqlalchemy_json import mutable_json_type
 from . import ItemType
 from .. import Import
 from .base import Item
-from ..imports import ImportRevision
 from ..projects import Project
 from ...base_class import Base
 

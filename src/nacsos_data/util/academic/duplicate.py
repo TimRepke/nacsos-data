@@ -283,8 +283,8 @@ async def duplicate_insertion(new_item: AcademicItemModel,
         variant = AcademicItemVariantModel(
             item_variant_id=uuid.uuid4(),
             item_id=orig_item_id,
-            import_id=(orig_import or {})['import_id'],
-            import_revision=(orig_import or {})['latest_revision'],
+            import_id=(orig_import or {})['import_id'],  # ignore: type[index]
+            import_revision=(orig_import or {})['latest_revision'],  # ignore: type[index]
             doi=orig_item.doi,
             wos_id=orig_item.wos_id,
             scopus_id=orig_item.scopus_id,
