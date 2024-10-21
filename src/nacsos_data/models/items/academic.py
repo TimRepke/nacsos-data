@@ -66,6 +66,7 @@ class AcademicItemVariantModel(BaseModel):
     item_variant_id: str | uuid.UUID
     item_id: str | uuid.UUID
     import_id: str | uuid.UUID | None = None
+    import_revision: int | None = None
     doi: str | None = None
     wos_id: str | None = None
     scopus_id: str | None = None

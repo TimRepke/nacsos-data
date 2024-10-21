@@ -7,6 +7,7 @@ from sqlalchemy_json import mutable_json_type
 from . import ItemType
 from .. import Import
 from .base import Item
+from ..imports import ImportRevision
 from ..projects import Project
 from ...base_class import Base
 
@@ -120,10 +121,11 @@ class AcademicItemVariant(Base):
                             ForeignKey(AcademicItem.item_id, ondelete='CASCADE'),
                             nullable=False, index=True, unique=False)
 
-    # (Optional) reference to the import where this variant came from
+    # (Optional) reference to the import/import_revision where this variant came from
     import_id = mapped_column(UUID(as_uuid=True),
                               ForeignKey(Import.import_id, ondelete='CASCADE'),
                               nullable=True, index=False, unique=False)
+    import_revision = mapped_column(Integer, nullable=True, index=True, unique=False)
 
     doi = mapped_column(String, nullable=True, unique=False, index=False)
     wos_id = mapped_column(String, nullable=True, unique=False, index=False)

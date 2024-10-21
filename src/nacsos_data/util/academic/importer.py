@@ -166,6 +166,7 @@ def _ensure_clean_item(item: AcademicItemModel, project_id: str) -> AcademicItem
 async def _insert_item(session: AsyncSession,
                        item: AcademicItemModel,
                        import_id: str,
+                       import_revision: int,
                        existing_id: str | None,
                        dry_run: bool,
                        logger: logging.Logger) -> tuple[str, bool]:
@@ -178,6 +179,7 @@ async def _insert_item(session: AsyncSession,
     :param session:
     :param item:
     :param import_id:
+    :param import_revision:
     :param existing_id:
     :param dry_run:
     :param logger:
@@ -205,6 +207,7 @@ async def _insert_item(session: AsyncSession,
     logger.debug(f'  -> Creating variant for item_id {existing_id} with variant_id {item.item_id}!')
     has_changes = await duplicate_insertion(orig_item_id=existing_id,
                                             import_id=import_id,
+                                            import_revision=import_revision,
                                             new_item=item,
                                             session=session)
     return existing_id, has_changes
@@ -494,7 +497,8 @@ async def import_academic_items(
 
                             # Insert a new item or an item variant
                             item_id, has_changes = await _insert_item(session=session, item=item, existing_id=existing_id,
-                                                                      import_id=import_id, dry_run=dry_run, logger=logger)
+                                                                      import_id=import_id, import_revision=latest_revision, dry_run=dry_run,
+                                                                      logger=logger)
                             num_updated += has_changes
 
                             # UPSERT m2m
