@@ -504,6 +504,9 @@ async def compute_irr_scores(session: DBSession,
                         quality.krippendorff = compute_krippendorff(user_annotations_raw,  # type: ignore[arg-type]
                                                                     'nominal',
                                                                     users=[user_base, user_target])
+                    if label.kind == 'bool':
+                        quality.precision, quality.recall, quality.f1 = precision_recall_f1(
+                            base, target, average='binary')  # type: ignore[arg-type] # FIXME
 
                     qualities.append(quality)
                     label_qualities.append(quality)
