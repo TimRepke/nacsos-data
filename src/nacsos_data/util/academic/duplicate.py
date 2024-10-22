@@ -25,7 +25,6 @@ MAX_ABSTRACT_LENGTH = 10000
 
 
 def str_to_title_slug(title: str | None) -> str | None:
-    print(title)
     if title is None or len(title.strip()) == 0:
         return None
     # remove all non-alphabetic characters
