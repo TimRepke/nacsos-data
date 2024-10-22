@@ -268,6 +268,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
         raise NotFoundError(f'No item found for {orig_item_id}')
 
     orig_item = AcademicItemModel.model_validate(orig_item_orm.__dict__)
+    editable = orig_item_orm.time_edited is None
 
     # Get prior variants of that AcademicItem
     variants = [v.__dict__
@@ -326,18 +327,20 @@ async def duplicate_insertion(new_item: AcademicItemModel,
         if new_value not in field_values:
             if field == 'title':
                 new_variant[field] = new_value
-                setattr(orig_item_orm, field, new_value)
-                setattr(orig_item_orm, 'title_slug', str_to_title_slug(new_value))
+                if editable:
+                    setattr(orig_item_orm, field, new_value)
+                    setattr(orig_item_orm, 'title_slug', str_to_title_slug(new_value))
             elif field == 'text':
                 candidates = sorted([abs for abs in field_values | {new_value} if len(abs) < MAX_ABSTRACT_LENGTH], key=lambda a: len(a))
                 new_variant[field] = new_value
-                if len(candidates) > 0:
+                if len(candidates) > 0 and editable:
                     setattr(orig_item_orm, field, candidates[-1])
             else:
                 # This was new, so keep track of it in our variant
                 new_variant[field] = new_value
-                # We always like new IDs, so update the reference item
-                setattr(orig_item_orm, field, new_value)
+                if editable:
+                    # We always like new IDs, so update the reference item
+                    setattr(orig_item_orm, field, new_value)
 
     # Check publication year field
     new_pub_year = getattr(new_item, 'publication_year')
@@ -349,8 +352,9 @@ async def duplicate_insertion(new_item: AcademicItemModel,
         if new_pub_year not in pub_yrs:
             # This was new, so keep track of it in our variant
             new_variant['publication_year'] = new_pub_year
-            # We always like new IDs, so update the reference item
-            setattr(orig_item_orm, 'publication_year', min(LATEST_POSSIBLE_PUB_YEAR, max(pub_yrs | {new_pub_year})))
+            if editable:
+                # We always like new years, so update the reference item
+                setattr(orig_item_orm, 'publication_year', min(LATEST_POSSIBLE_PUB_YEAR, max(pub_yrs | {new_pub_year})))
 
     # Check publication year field
     new_keywords = getattr(new_item, 'keywords')
@@ -362,8 +366,9 @@ async def duplicate_insertion(new_item: AcademicItemModel,
         if new_keywords not in keywords:
             # This was new, so keep track of it in our variant
             new_variant['keywords'] = new_keywords
-            # We always like new IDs, so update the reference item
-            setattr(orig_item_orm, 'keywords', [kw for kw_lst in keywords for kw in kw_lst])
+            if editable:
+                # We always like new IDs, so update the reference item
+                setattr(orig_item_orm, 'keywords', [kw for kw_lst in keywords for kw in kw_lst])
 
     # Checking metadata field
     # only keep track of unique meta objects in variants
@@ -377,8 +382,9 @@ async def duplicate_insertion(new_item: AcademicItemModel,
         if new_meta not in metas:
             # This was new, so keep track of it in our variant
             new_variant['meta'] = new_meta
-            # We always like new IDs, so update the reference item
-            setattr(orig_item_orm, 'meta', clear_empty(fuze_dicts(getattr(orig_item_orm, 'meta'), new_meta)))
+            if editable:
+                # We always like new IDs, so update the reference item
+                setattr(orig_item_orm, 'meta', clear_empty(fuze_dicts(getattr(orig_item_orm, 'meta'), new_meta)))
 
     # Checking authorships
     # only keep track of unique list of authors (or variations thereof) in variants
@@ -392,8 +398,9 @@ async def duplicate_insertion(new_item: AcademicItemModel,
         if new_authors not in authors:
             # This was new, so keep track of it in our variant
             new_variant['authors'] = new_authors
-            # We always like new IDs, so update the reference item
-            setattr(orig_item_orm, 'authors', new_authors)
+            if editable:
+                # We always like new IDs, so update the reference item
+                setattr(orig_item_orm, 'authors', new_authors)
 
     log.debug(f'Duplicate checking revealed new field variants for {len(new_variant)} fields: {new_variant.keys()}.')
 

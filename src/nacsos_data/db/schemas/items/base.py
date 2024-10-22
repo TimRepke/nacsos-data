@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, ForeignKey, Enum as SAEnum
+from sqlalchemy import String, ForeignKey, Enum as SAEnum, func, DateTime
 from sqlalchemy.orm import relationship, mapped_column, Mapped
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -41,6 +41,9 @@ class Item(Base):
     # Discriminator for figuring out which subclass to load for this item for more details
     # Note, that all items within a project must have the same type (thus `Item.type` == `Project.type`)
     type = mapped_column(SAEnum(ItemType), nullable=False)
+
+    # Date when this item was edited; if NULL, considered unedited; if not NULL, consider to never auto-update
+    time_edited = mapped_column(DateTime(timezone=True), default=None, nullable=True)
 
     imports: Mapped[list[Import]] = relationship(
         'Import',
