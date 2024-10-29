@@ -277,14 +277,16 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     # If we have no prior variant, we need to create one
     if len(variants) == 0:
         # For the first variant, we need to fetch the original import_id
-        orig_import = (await session.execute(select(m2m_import_item_table.c.import_id, m2m_import_item_table.c.latest_revision)
-                                             .where(m2m_import_item_table.c.item_id == orig_item_id))).mappings().one_or_none()
+        orig_import = (await session.execute(select(m2m_import_item_table.c.import_id, m2m_import_item_table.c.first_revision)
+                                             .where(m2m_import_item_table.c.item_id == orig_item_id)
+                                             .order_by(m2m_import_item_table.c.first_revision)
+                                             .limit(1))).mappings().one_or_none()
         # Note, we are not checking for "not None", because it might be a valid case where no import_id exists
         variant = AcademicItemVariantModel(
             item_variant_id=uuid.uuid4(),
             item_id=orig_item_id,
             import_id=(orig_import or {})['import_id'],  # type: ignore[index]
-            import_revision=(orig_import or {})['latest_revision'],  # type: ignore[index]
+            import_revision=(orig_import or {})['first_revision'],  # type: ignore[index]
             doi=orig_item.doi,
             wos_id=orig_item.wos_id,
             scopus_id=orig_item.scopus_id,
