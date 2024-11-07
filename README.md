@@ -8,6 +8,15 @@ The main purpose of this package is to be used in the NACSOS backend/frontend in
 It can also be imported in any other project, where accessing data through the proper API 
 does not provide the required functionality.
 
+## Setup for development
+```bash
+python3.12 -m venv venv
+source venv/bin/activate
+pip install -e "".[testing,utils,priority,scripts]""
+```
+You can leave out the extras that you don't need.
+The minimal installation for development is probably `pip install -e ".[utils]"` but it mostly also works with no extras!
+
 ## Creating database revision
 ```bash
 nacsos_migrate revision --autogenerate --root-path src/nacsos_data/ --ini-file alembic.ini --message "???"

@@ -34,7 +34,7 @@ build-job:
     - source venv/bin/activate
     - pwd
     - ls -lisah
-    - pip install -r requirements.txt
+    - pip install -e ".[testing,utils]"
 
 test-job1:
   except:

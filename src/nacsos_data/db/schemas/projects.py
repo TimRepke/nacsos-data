@@ -123,6 +123,8 @@ class ProjectPermissions(Base):
     annotations_read = mapped_column(Boolean, nullable=False, default=False)
     # If true, the user has permission to annotate items in this project (assuming a respective assignment exists)
     annotations_edit = mapped_column(Boolean, nullable=False, default=False)
+    # If true, the user has permission to run prioritisation machine learning
+    annotations_prio = mapped_column(Boolean, nullable=False, default=False, server_default='FALSE')
 
     # If true, the user has permission to see available pipelines (and their configuration) for this project
     pipelines_read = mapped_column(Boolean, nullable=False, default=False)

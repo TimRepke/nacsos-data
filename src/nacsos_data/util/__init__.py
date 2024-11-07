@@ -3,7 +3,10 @@ from collections.abc import MutableMapping
 from contextlib import contextmanager
 from datetime import timedelta
 from timeit import default_timer
-from typing import Sequence, Generator, TypeVar, Any, AsyncIterator, AsyncGenerator, Callable
+from typing import Sequence, Generator, TypeVar, Any, AsyncIterator, AsyncGenerator, Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 T = TypeVar('T')
 
@@ -149,5 +152,22 @@ def elapsed_timer(logger: logging.Logger, tn: str = 'Task') -> Generator[Callabl
 
 def get_attr(obj: Any, key: str, default: T | None = None) -> T | None:
     if hasattr(obj, key):
-        return getattr(obj, key)  # type: ignore[no-any-return]
+        val = getattr(obj, key)
+        if val is None:
+            return default
+        return val  # type: ignore[no-any-return]
     return default
+
+
+def oring(arr: list['pd.Series']) -> 'pd.Series':
+    ret = arr[0]
+    for a in arr[1:]:
+        ret |= a
+    return ret
+
+
+def anding(arr: list['pd.Series']) -> 'pd.Series':
+    ret = arr[0]
+    for a in arr[1:]:
+        ret &= a
+    return ret

@@ -47,7 +47,7 @@ ProjectPermission = Literal[
     'owner',
     'dataset_read', 'dataset_edit',
     'imports_read', 'imports_edit',
-    'annotations_read', 'annotations_edit',
+    'annotations_read', 'annotations_edit', 'annotations_prio',
     'pipelines_read', 'pipelines_edit',
     'artefacts_read', 'artefacts_edit',
     'search_dimensions', 'search_oa'
@@ -93,6 +93,8 @@ class ProjectPermissionsModel(BaseModel):
     annotations_read: bool = False
     # If true, the user has permission to annotate items in this project (assuming a respective assignment exists)
     annotations_edit: bool = False
+    # If true, the user has permission to run prioritisation machine learning
+    annotations_prio: bool = False
 
     # If true, the user has permission to see available pipelines (and their configuration) for this project
     pipelines_read: bool = False
@@ -119,7 +121,7 @@ class ProjectPermissionsModel(BaseModel):
                    user_id=user_id, owner=True,
                    dataset_read=True, dataset_edit=True,
                    imports_read=True, imports_edit=True,
-                   annotations_read=True, annotations_edit=True,
+                   annotations_read=True, annotations_edit=True, annotations_prio=True,
                    pipelines_read=True, pipelines_edit=True,
                    artefacts_read=True, artefacts_edit=True,
                    search_oa=True, search_dimensions=True,

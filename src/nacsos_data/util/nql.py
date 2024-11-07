@@ -4,6 +4,7 @@ from sqlalchemy.sql import extract
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import MappedColumn, aliased, InstrumentedAttribute, Session
 
+from nacsos_data.db.engine import DBSession
 from nacsos_data.db.schemas import (
     AcademicItem,
     Annotation,
@@ -15,9 +16,11 @@ from nacsos_data.db.schemas import (
     LexisNexisItem,
     Item,
     LexisNexisItemSource,
-    GenericItem
+    GenericItem,
+    Project,
+    AnyItemSchema
 )
-from nacsos_data.models.items import AcademicItemModel, LexisNexisItemModel, GenericItemModel, FullLexisNexisItemModel
+from nacsos_data.models.items import AcademicItemModel, LexisNexisItemModel, GenericItemModel, FullLexisNexisItemModel, AnyItemModel
 from nacsos_data.models.nql import (
     NQLFilter,
     SetComparator,
@@ -35,7 +38,8 @@ from nacsos_data.models.nql import (
     NQLFilterParser,
     MetaFilterBool,
     MetaFilterInt,
-    MetaFilterStr, AbstractFilter
+    MetaFilterStr,
+    AbstractFilter
 )
 from nacsos_data.db.crud.items.lexis_nexis import lexis_orm_to_model
 
@@ -82,28 +86,21 @@ def _field_cmp_lst(cmp: SetComparator,
     raise InvalidNQLError(f'Unexpected comparator "{cmp}".')
 
 
-class NQLQuery:
-    def __init__(self,
-                 query: NQLFilter,
-                 project_id: str,
-                 project_type: ItemType | str = ItemType.academic):
-        self.project_id = project_id
-        self.project_type = project_type
-
-        self.query = query
-
-        if project_type == ItemType.academic:
-            self.Schema = AcademicItem
-            self.Model = AcademicItemModel
-            self._stmt = (
+def get_select_base(project_type: ItemType | str = ItemType.academic) -> tuple[Type[AnyItemSchema], Type[AnyItemModel], Select]:
+    if project_type == ItemType.academic:
+        return (
+            AcademicItem,
+            AcademicItemModel,
+            (
                 select(AcademicItem)
                 .distinct(AcademicItem.item_id)
             )
-        elif project_type == ItemType.lexis:
-            self.Schema = LexisNexisItem  # type: ignore[assignment]
-            self.Model = LexisNexisItemModel  # type: ignore[assignment]
-            self._stmt = (
-                select(LexisNexisItem,  # type: ignore[assignment]
+        )
+    if project_type == ItemType.lexis:
+        return (
+            LexisNexisItem,
+            LexisNexisItemModel, (
+                select(LexisNexisItem,
                        func.array_agg(
                            func.row_to_json(
                                LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
@@ -111,23 +108,50 @@ class NQLQuery:
                        ).label('sources_grp'))
                 .join(LexisNexisItemSource, LexisNexisItemSource.item_id == LexisNexisItem.item_id)
                 .group_by(LexisNexisItem.item_id, Item.item_id)
-            )
-        elif project_type == ItemType.generic:
-            self.Schema = GenericItem  # type: ignore[assignment]
-            self.Model = GenericItemModel  # type: ignore[assignment]
-            self._stmt = (
-                select(GenericItem)  # type: ignore[assignment]
+            ))
+    if project_type == ItemType.generic:
+        return (
+            GenericItem,
+            GenericItemModel,
+            (
+                select(GenericItem)
                 .distinct(GenericItem.item_id)
-            )
-        else:
-            raise NotImplementedError(f"Can't use NQL for {project_type} yet.")
+            ))
 
-        filters = self._assemble_filters(self.query)
-        filters = and_(Item.project_id == self.project_id, filters)
-        self._stmt = self._stmt.where(filters)
+    raise NotImplementedError(f"Can't use NQL for {project_type} yet.")
+
+
+class NQLQuery:
+    def __init__(self,
+                 project_id: str,
+                 query: NQLFilter | None = None,
+                 project_type: ItemType | str = ItemType.academic):
+        self.project_id = project_id
+        self.project_type = project_type
+
+        self.query = query
+        self.Schema, self.Model, self._stmt = get_select_base(project_type=project_type)
+
+        if query is None:
+            self._stmt = self._stmt.where(Item.project_id == self.project_id)
+        else:
+            filters = self._assemble_filters(self.query)
+            filters = and_(Item.project_id == self.project_id, filters)
+            self._stmt = self._stmt.where(filters)
 
     def __str__(self) -> str:
         return str(self.query)
+
+    @classmethod
+    async def get_query(cls, session: DBSession, project_id: str, project_type: ItemType | None = None,
+                        query: NQLFilter | None = None) -> 'NQLQuery':
+        if project_type is None:
+            project_type: ItemType | None = (await session.scalar(select(Project.type).where(Project.project_id == project_id)))
+
+            if project_type is None:
+                raise KeyError(f'Found no matching project for {project_id}. This should NEVER happen!')
+
+        return cls(query=query, project_id=str(project_id), project_type=project_type)
 
     @property
     def stmt(self) -> Select:  # type: ignore[type-arg]
@@ -502,4 +526,4 @@ def nql_to_sql(query: NQLFilter, project_id: str,
     return query_to_sql(query=query, project_id=project_id, project_type=project_type)
 
 
-__all__ = ['query_to_sql', 'nql_to_sql', 'NQLFilter', 'NQLFilterParser', 'InvalidNQLError', 'NQLQuery']
+__all__ = ['query_to_sql', 'nql_to_sql', 'NQLFilter', 'NQLFilterParser', 'InvalidNQLError', 'NQLQuery', 'get_select_base']
