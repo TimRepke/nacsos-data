@@ -12,6 +12,7 @@ def inclusion_curve(df: 'pd.DataFrame', key: str = 'incl',
     from matplotlib import pyplot as plt
 
     seen = ~df[key].isna()
+    fig: plt.Figure
     ax: plt.Axes
     fig, ax = plt.subplots(figsize=(15, 5), **(fig_params or {}))
 
@@ -96,12 +97,12 @@ def buscar_frontiers(df: 'pd.DataFrame', key: str = 'incl', batch_size: int = 10
     ax1.set_xlim(xmax=n_seen)
 
     ax1t = ax1.twinx()
-    ax1t.scatter(buscar[0], buscar[1])
+    ax1t.scatter(buscar[0], buscar[1])  # type: ignore[arg-type]
     ax1t.set_ylim(ymax=1, ymin=0)
     ax1t.set_ylabel('p score')
     ax1t.grid()
 
-    ax2.plot(recall[0], recall[1], marker='o')
+    ax2.plot(recall[0], recall[1], marker='o')  # type: ignore[arg-type]
     ax2.set_ylabel('p score')
     ax2.set_xlabel('recall target')
     ax2.set_yticks([0.01, 0.05, 0.1, 0.25, 0.33, 0.5])
@@ -152,22 +153,24 @@ def score_distribution(df: 'pd.DataFrame',
     import numpy as np
     from matplotlib import pyplot as plt
 
+    fig: plt.Figure
+    axes: list[list[plt.Axes]]
     fig, axes = plt.subplots(2, 3, figsize=(12, 3), **(fig_params or {}))
 
     ax = axes[0][0]
-    ax.set_title(f'Sorted classifier scores for unseen items')
+    ax.set_title('Sorted classifier scores for unseen items')
     y = np.array(sorted(df[df[source].isna()][f'{target}:1'], reverse=True))
     ax.plot(y)
     ax.vlines(np.argwhere(y > 0.5).max(), 0, 1, colors='green', ls=':', lw=1)
 
     ax = axes[0][1]
-    ax.set_title(f'Sorted classifier scores for annotated items')
+    ax.set_title('Sorted classifier scores for annotated items')
     y = np.array(sorted(df[~df[source].isna()][f'{target}:1'], reverse=True))
     ax.plot(y)
     ax.vlines(np.argwhere(y > 0.5).max(), 0, 1, colors='green', ls=':', lw=1)
 
     ax = axes[0][2]
-    ax.set_title(f'Sorted classifier scores for items labelled as include')
+    ax.set_title('Sorted classifier scores for items labelled as include')
     y = np.array(sorted(df[df[source] == 1][f'{target}:1'], reverse=True))
     ax.plot(y)
     ax.vlines(np.argwhere(y > 0.5).max(), 0, 1, colors='green', ls=':', lw=1)

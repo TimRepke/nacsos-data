@@ -1,14 +1,10 @@
 import uuid
 
-from sqlalchemy import String, ForeignKey, DateTime, func, Enum, Float, Integer
+from sqlalchemy import String, ForeignKey, DateTime, func, Float, Integer
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
-from sqlalchemy_json import mutable_json_type
-
-from ...models.pipeline import TaskStatus
 from ..base_class import Base
 from .projects import Project
-from .users import User
 
 
 class Priority(Base):

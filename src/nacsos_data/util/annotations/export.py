@@ -1,7 +1,7 @@
 import uuid
 import logging
 from collections import defaultdict
-from typing import Type, TYPE_CHECKING
+from typing import Type, TYPE_CHECKING, Generator
 
 from pydantic import BaseModel
 import sqlalchemy as sa
@@ -104,7 +104,7 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
                      labels: dict[str, LabelOptions] | None,
                      ignore_repeat: bool) -> sa.CTE:
     def _label_filter(Schema: Type[Annotation] | Type[BotAnnotation],
-                      label: LabelOptions) -> ColumnElement[bool] | None:  # type: ignore[type-arg]
+                      label: LabelOptions) -> sa.ColumnElement[bool] | None:  # type: ignore[type-arg]
         if label.options_int:
             return sa.and_(Schema.key == label.key,
                            Schema.value_int.in_(label.options_int))
@@ -128,7 +128,7 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
             ors = [_label_filter(Annotation, label_) for label_ in labels.values()]
             ors = [o for o in ors if o is not None]
             if ors is not None and len(ors) > 0:
-                where.append(or_(*ors))  # type: ignore[arg-type]
+                where.append(sa.or_(*ors))  # type: ignore[arg-type]
 
         sub_queries.append(
             sa.select(Assignment.item_id,
@@ -151,7 +151,7 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
             ors = [_label_filter(BotAnnotation, label_) for label_ in labels.values()]
             ors = [o for o in ors if o is not None]
             if len(ors) > 0:
-                where.append(or_(*ors))  # type: ignore[arg-type]
+                where.append(sa.or_(*ors))  # type: ignore[arg-type]
 
         sub_queries.append(
             sa.select(BotAnnotation.item_id,
@@ -306,9 +306,9 @@ async def prepare_export_table(session: DBSession,
         stmt_items = nql_query.stmt.subquery('items')
 
         stmt = (
-            select(stmt_items.columns,  # type: ignore[call-overload]
-                   stmt_labels.columns,
-                   sa.func.coalesce(User.username, 'RESOLVED').label('username'))
+            sa.select(stmt_items.columns,  # type: ignore[call-overload]
+                      stmt_labels.columns,
+                      sa.func.coalesce(User.username, 'RESOLVED').label('username'))
             .select_from(stmt_items)
             .join(stmt_labels, stmt_labels.c.item_id == stmt_items.c.item_id, isouter=True)
             .join(User, User.user_id == stmt_labels.c.user_id, isouter=True)
@@ -322,13 +322,13 @@ async def prepare_export_table(session: DBSession,
     return [dict(r) for r in result]
 
 
-def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]):
+def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]) -> Generator[str, None, None]:
     if val['bool'] is not None:
-        yield f'{key}:{int(val['bool'])}'
+        yield f'{key}:{int(val['bool'])}'  # type: ignore[arg-type]
     elif val['int'] is not None:
         yield f'{key}:{val['int']}'
     elif val['multi'] is not None:
-        for vi in val['multi']:
+        for vi in val['multi']:  # type: ignore[union-attr]
             yield f'{key}:{vi}'
     else:
         raise RuntimeError('No annotation in label')
@@ -388,17 +388,17 @@ async def wide_export_table(session: DBSession,
                coalesce(labels.item_id, ulabels.item_id)         as item_id
         FROM labels FULL OUTER JOIN ulabels ON labels.item_id = ulabels.item_id
     ''').columns(
-        scope_order=sa.Integer,
-        item_order=sa.Integer,
-        item_id=psa.UUID,
-        labels_resolved=psa.JSONB,
-        labels_unresolved=psa.JSONB,
+        sa.column('scope_order', sa.Integer),
+        sa.column('item_order', sa.Integer),
+        sa.column('item_id', psa.UUID),
+        sa.column('labels_resolved', psa.JSONB),
+        sa.column('labels_unresolved', psa.JSONB),
     ).alias('annotations')
 
-    nql = await  NQLQuery.get_query(session=session, query=nql_filter, project_id=project_id)
+    nql = await NQLQuery.get_query(session=session, query=nql_filter, project_id=str(project_id))
 
-    stmt_items = nql.stmt
-    rslt = (await session.execute(stmt_items, {'scopes': scope_ids})).mappings().all()
+    # stmt_items = nql.stmt
+    # rslt = (await session.execute(stmt_items, {'scopes': scope_ids})).mappings().all()
     stmt_items = nql.stmt.subquery()
     stmt = (sa.select(stmt_items, stmt_labels)
             .join(stmt_labels, stmt_labels.c.item_id == stmt_items.c.item_id, isouter=True)
@@ -419,13 +419,13 @@ async def wide_export_table(session: DBSession,
         'py': r.get('publication_year'),
         **{
             f'res|{key}': True
-            for resolution in get_attr(r, 'labels_resolved', [])
+            for resolution in get_attr(r, 'labels_resolved', [])  # type: ignore[union-attr]
             for k, v in resolution.items()
             for key in _generate_keys(k, v)
         },
         **{
             f'{usr}|{key}': True
-            for usr, annotation in get_attr(r, 'labels_unresolved', {}).items()
+            for usr, annotation in get_attr(r, 'labels_unresolved', {}).items()  # type: ignore[union-attr]
             for k, v in annotation.items()
             for key in _generate_keys(k, v)
         },

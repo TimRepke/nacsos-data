@@ -15,7 +15,7 @@ logger = logging.getLogger('nacsos_data.util.priority.labels')
 # add `start: clause`
 
 GRAMMAR = '''
-?clause: cols             
+?clause: cols
        | clause _and  clause            -> and
        | clause _or  clause            -> or
        | "(" clause ")"
@@ -63,8 +63,7 @@ def parse_rule(rule: str) -> Tree[Token]:
     return tree
 
 
-
-def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | None = None):
+def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | None = None) -> 'pd.Series':
     tree = parse_rule(rule)
     columns: set[str] = set(df.columns) if label_cols is None else set(label_cols)
     anycols: dict[str, list[str]] = defaultdict(list)
@@ -99,8 +98,10 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
             # ------------------------
             # column statement to mask
             # ------------------------
-            ctp = subtree.children[0].type  # column type
-            col = subtree.children[0].value  # column name
+            # column type
+            ctp = subtree.children[0].type  # type: ignore[union-attr]
+            # column name
+            col = subtree.children[0].value  # type: ignore[union-attr]
 
             if ctp == 'SRC' and col not in columns:
                 raise KeyError(f'`{col}` not in dataframe!')
@@ -111,7 +112,7 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
             if subtree.data == 'maybeyes':
                 return df[col].astype('boolean')
             if subtree.data == 'maybeno':
-                return df[col].astype('boolean') == False
+                return df[col].astype('boolean') is False
             if subtree.data == 'forceyes':
                 return df[col] == 1
             if subtree.data == 'forceno':
@@ -126,10 +127,10 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
             if subtree.data == 'forceallyes':
                 return anding([df[c] == 1 for c in anycols[col]])
             if subtree.data == 'anyno':
-                return oring([df[c].astype('boolean') == False for c in anycols[col]])
+                return oring([df[c].astype('boolean') is False for c in anycols[col]])
             if subtree.data == 'allno':
                 return (oring([df[c].astype('boolean').isna() for c in anycols[col]])
-                        & anding([(df[c].astype('boolean') == False) | df[c].astype('boolean').isna() for c in anycols[col]]))
+                        & anding([(df[c].astype('boolean') is False) | df[c].astype('boolean').isna() for c in anycols[col]]))
             if subtree.data == 'forceallno':
                 return anding([df[c] == 0 for c in anycols[col]])
 

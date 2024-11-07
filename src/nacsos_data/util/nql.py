@@ -86,37 +86,35 @@ def _field_cmp_lst(cmp: SetComparator,
     raise InvalidNQLError(f'Unexpected comparator "{cmp}".')
 
 
-def get_select_base(project_type: ItemType | str = ItemType.academic) -> tuple[Type[AnyItemSchema], Type[AnyItemModel], Select]:
+def get_select_base(
+        project_type: ItemType | str = ItemType.academic
+) -> tuple[Type[AnyItemSchema], Type[AnyItemModel], Select]:  # type: ignore[type-arg]
     if project_type == ItemType.academic:
-        return (
+        return (  # type: ignore[return-value]
             AcademicItem,
             AcademicItemModel,
-            (
-                select(AcademicItem)
-                .distinct(AcademicItem.item_id)
-            )
+            select(AcademicItem).distinct(AcademicItem.item_id)
         )
     if project_type == ItemType.lexis:
-        return (
+        return (  # type: ignore[return-value]
             LexisNexisItem,
-            LexisNexisItemModel, (
-                select(LexisNexisItem,
-                       func.array_agg(
-                           func.row_to_json(
-                               LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
-                           )
-                       ).label('sources_grp'))
-                .join(LexisNexisItemSource, LexisNexisItemSource.item_id == LexisNexisItem.item_id)
-                .group_by(LexisNexisItem.item_id, Item.item_id)
-            ))
+            LexisNexisItemModel,
+            select(LexisNexisItem,
+                   func.array_agg(
+                       func.row_to_json(
+                           LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
+                       )
+                   ).label('sources_grp'))
+            .join(LexisNexisItemSource, LexisNexisItemSource.item_id == LexisNexisItem.item_id)
+            .group_by(LexisNexisItem.item_id, Item.item_id)
+        )
     if project_type == ItemType.generic:
-        return (
+        return (  # type: ignore[return-value]
             GenericItem,
             GenericItemModel,
-            (
-                select(GenericItem)
-                .distinct(GenericItem.item_id)
-            ))
+            select(GenericItem)
+            .distinct(GenericItem.item_id)
+        )
 
     raise NotImplementedError(f"Can't use NQL for {project_type} yet.")
 
@@ -143,10 +141,10 @@ class NQLQuery:
         return str(self.query)
 
     @classmethod
-    async def get_query(cls, session: DBSession, project_id: str, project_type: ItemType | None = None,
+    async def get_query(cls, session: DBSession | AsyncSession, project_id: str, project_type: ItemType | None = None,
                         query: NQLFilter | None = None) -> 'NQLQuery':
         if project_type is None:
-            project_type: ItemType | None = (await session.scalar(select(Project.type).where(Project.project_id == project_id)))
+            project_type = await session.scalar(select(Project.type).where(Project.project_id == project_id))
 
             if project_type is None:
                 raise KeyError(f'Found no matching project for {project_id}. This should NEVER happen!')
@@ -502,8 +500,10 @@ class NQLQuery:
         rslt = session.execute(stmt).mappings().all()
         return self._transform_results(rslt)
 
-    async def results_async(self, session: AsyncSession, limit: int | None = 20, offset: int | None = None) \
-            -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
+    async def results_async(self,
+                            session: AsyncSession | DBSession,
+                            limit: int | None = 20,
+                            offset: int | None = None) -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
         stmt = self.stmt
         if limit is not None:
             stmt = stmt.limit(limit)

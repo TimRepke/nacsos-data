@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger('nacsos_data.util.priority.labels')
 
 
-def compute_metrics(p) -> dict[str, np.ndarray]:
+def compute_metrics(p: tuple[np.ndarray, np.ndarray]) -> dict[str, np.ndarray]:  # type: ignore[type-arg]
     import evaluate
     logits, labels = p
     predictions = np.argmax(logits, axis=-1)
@@ -32,7 +32,7 @@ def compute_metrics(p) -> dict[str, np.ndarray]:
     }
 
 
-def training(df: 'pd.DataFrame',
+def training(df: 'pd.DataFrame',  # type: ignore[no-untyped-def]
              text: str = 'text',
              source: str = 'incl',
              target: str = 'pred|incl',

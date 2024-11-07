@@ -1,9 +1,15 @@
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import TYPE_CHECKING
 
 from nacsos_data.db import get_engine_async
 from nacsos_data.models.nql import AssignmentFilter
 from nacsos_data.util.annotations.export import wide_export_table
 from pydantic_settings import BaseSettings
+
+from nacsos_data.util.priority.mask import get_inclusion_mask
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
+
 
 class PrioritySettings(BaseSettings):
     # ID of priority config
@@ -13,7 +19,7 @@ class PrioritySettings(BaseSettings):
     OUT_DIR: str
 
 
-async def main():
+async def main() -> None:
     db_engine = get_engine_async(conf_file='../../nacsos-core/config/local.env')
 
     async with db_engine.session() as session:  # type: AsyncSession
@@ -35,11 +41,12 @@ async def main():
         incl = get_inclusion_mask(df=t, rule='res|rel:1', label_cols=label_cols)
         print('is na', t['res|rel:1'].isna().sum())
         t['incl'] = incl
-        seen = ~incl.isna()
+        # seen = ~incl.isna()
         print(incl)
         print(t.shape)
 
 
 if __name__ == '__main__':
     import asyncio
+
     asyncio.run(main())

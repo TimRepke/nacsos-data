@@ -232,7 +232,7 @@ def recall_frontier(
         p_scores.append(p)
         recall_targets.append(recall_target)
         recall_target -= 0.005
-        if p < 0.01:
+        if p is None or p < 0.01:
             break
 
     return recall_targets, p_scores
