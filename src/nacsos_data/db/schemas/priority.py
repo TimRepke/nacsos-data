@@ -34,6 +34,7 @@ class Priority(Base):
     # NQL Filter for the dataset
     # Filter for which items to use for prediction AND training (labels are not an outer join!)
     nql = mapped_column(String, nullable=True, unique=False, index=False)
+    nql_parsed = mapped_column(JSONB, nullable=True, index=False)
 
     # Rule for inclusion definition from columns
     incl_rule = mapped_column(String, nullable=False, unique=False, index=False)

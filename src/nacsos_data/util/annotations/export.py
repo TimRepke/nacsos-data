@@ -264,7 +264,7 @@ F2CRetType = (tuple[Type[AcademicItem]
 
 
 @ensure_session_async
-async def prepare_export_table(session: DBSession,
+async def prepare_export_table(session: DBSession | AsyncSession,
                                nql_filter: NQLFilter | None,
                                bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
                                assignment_scope_ids: list[str] | list[uuid.UUID] | None,
@@ -335,7 +335,7 @@ def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]) -> G
 
 
 @ensure_session_async
-async def wide_export_table(session: DBSession,
+async def wide_export_table(session: DBSession | AsyncSession,
                             nql_filter: NQLFilter | None,
                             scope_ids: list[str] | list[uuid.UUID],
                             project_id: str | uuid.UUID,

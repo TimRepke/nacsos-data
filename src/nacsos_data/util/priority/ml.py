@@ -53,6 +53,8 @@ def training(df: 'pd.DataFrame',  # type: ignore[no-untyped-def]
     from datasets import Dataset
     from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
 
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     # Create a copy of labelled data so we don't mess up the global dataframe
     dfi = df[~df[source].isna()][[text, source]].copy()
     dfi['label'] = dfi[source]
@@ -119,7 +121,8 @@ def training(df: 'pd.DataFrame',  # type: ignore[no-untyped-def]
             ds.set_format('torch')
 
             for batch in tqdm(ds.iter(batch_size=batch_size_predict)):
-                pred = model(input_ids=batch['input_ids'].to('cuda'), attention_mask=batch['attention_mask'].to('cuda'))
+                pred = model(input_ids=batch['input_ids'].to(device),
+                             attention_mask=batch['attention_mask'].to(device))
                 predictions.append(torch.softmax(pred.logits, dim=1).cpu())
 
         logger.info('Writing predictions to dataframe...')
@@ -139,6 +142,7 @@ def report(df: 'pd.DataFrame',
            source: str = 'incl',
            target: str = 'pred|incl') -> tuple['pd.DataFrame', 'pd.DataFrame']:
     from sklearn.metrics import classification_report
+    import pandas as pd
 
     logger.info('Computing classification report on test data...')
     y_true = df[df[f'{target}-test'] == 1][source].to_numpy().astype(int)
@@ -163,7 +167,7 @@ def workload_estimation(df: 'pd.DataFrame',
     from sklearn.metrics import precision_recall_curve
 
     y_true = df[df[f'{target}-test'] == 1][source].to_numpy().astype(int)
-    y_pred = df[df[f'{target}-test'] == 1][[f'{target}:0', f'{target}:1']].to_numpy()
+    y_pred = df[df[f'{target}-test'] == 1][[f'{target}:0', f'{target}:1']].to_numpy().argmax(axis=1)
 
     precision, recall, thresholds = precision_recall_curve(y_true, y_pred)
 
@@ -186,17 +190,15 @@ def workload_estimation(df: 'pd.DataFrame',
         ret += '\n'
         ret += '> Extrapolation\n'
 
-        mask_new = df['import_upd'] & ~df['import_orig']
-        mask_th = df['pred_incl|1'] > thresholds[idx]
-        n_incl = (mask_th & mask_new).sum()
+        mask_unseen = df[source].isna()
+        mask_th = df[f'{target}:1'] > thresholds[idx]
+        n_incl = (mask_unseen & mask_th).sum()
         r = recall[idx]
         p = precision[idx]
 
         ret += f'Total documents: {df.shape[0]:,}\n'
-        ret += f'Original: {df['import_orig'].sum():,}, new query: {df['import_upd'].sum():,}\n'
-        ret += f'New query (excl orig): {mask_new.sum():,}\n'
         ret += f'Num documents above threshold: {mask_th.sum():,}, num new docs above threshold: {n_incl:,}\n'
-        ret += f'Extrapolating false negatives based on test recall: {int(mask_new.sum() * (1 - r)):,}\n'
+        ret += f'Extrapolating false negatives based on test recall: {int(mask_unseen.sum() * (1 - r)):,}\n'
         ret += f'Extrapolating false positives based on test precision: {int(n_incl * (1 - p)):,}\n'
         ret += '\n'
         ret += '\n'

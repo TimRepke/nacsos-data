@@ -5,6 +5,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import Annotated
 
+from nacsos_data.models.nql import NQLFilter
+
 
 class _MLConfig(BaseModel):
     model_config = ConfigDict(extra='ignore')
@@ -84,6 +86,7 @@ class PriorityModel(DehydratedPriorityModel):
     # NQL Filter for the dataset
     # Filter for which items to use for prediction AND training (labels are not an outer join!)
     nql: str | None = None
+    nql_parsed: NQLFilter | None = None
 
     # Rule for inclusion definition from columns
     incl_rule: str | None = None
