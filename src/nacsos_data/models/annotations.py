@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, Optional, Union
+from typing import Literal, Optional, Union, Any
 
 from datetime import datetime
 from uuid import UUID
@@ -153,47 +153,46 @@ class AnnotationSchemeModelFlat(AnnotationSchemeInfo):
     labels: list[FlattenedAnnotationSchemeLabel]
 
 
-AssignmentScopeBaseConfigTypes = Literal['random', 'random_exclusion', 'random_nql']
+class _AssignmentConfig(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+
+    users: dict[str, int]
+    overlaps: dict[int, int]
+    random_seed: int = 1337
+
+    @property
+    def num_assigned_items(self) -> int:
+        return sum(self.overlaps.values())
+
+    @property
+    def num_available_assignments(self) -> int:
+        return sum(self.users.values())
+
+    @property
+    def num_required_assignments(self) -> int:
+        return sum([o * n for o, n in self.overlaps.items()])
 
 
-class AssignmentScopeBaseConfigTypesEnum(str, Enum):
-    RANDOM = 'random'
-    RANDOM_EXCLUSION = 'random_exclusion'
-    RANDOM_NQL = 'random_nql'
+class AssignmentConfigRandom(_AssignmentConfig):
+    config_type: Literal['RANDOM'] = 'RANDOM'
+    nql: str
+    nql_parsed: NQLFilter | None = None
 
 
-class AssignmentScopeBaseConfig(BaseModel):
-    config_type: AssignmentScopeBaseConfigTypes
-    # list of user ids in the pool
-    users: list[str] | list[UUID] | None = None
+class AssignmentConfigPriority(_AssignmentConfig):
+    config_type: Literal['PRIORITY'] = 'PRIORITY'
+    priority_id: str
+    prio_offset: int
 
 
-class _AssignmentScopeRandomConfig(AssignmentScopeBaseConfig):
-    num_items: int
-    min_assignments_per_item: int
-    max_assignments_per_item: int
-    num_multi_coded_items: int
-    random_seed: int
+class AssignmentConfigLegacy(_AssignmentConfig):
+    config_type: Literal['LEGACY'] = 'LEGACY'
+    legacy: dict[str, Any]
 
 
-class AssignmentScopeRandomConfig(_AssignmentScopeRandomConfig):
-    config_type: Literal['random'] = 'random'
-
-
-class AssignmentScopeRandomWithExclusionConfig(_AssignmentScopeRandomConfig):
-    config_type: Literal['random_exclusion'] = 'random_exclusion'
-    excluded_scopes: list[str] | list[UUID]
-
-
-class AssignmentScopeRandomWithNQLConfig(_AssignmentScopeRandomConfig):
-    config_type: Literal['random_nql'] = 'random_nql'
-    query_parsed: NQLFilter
-    query_str: str
-
-
-AssignmentScopeConfig = Annotated[AssignmentScopeRandomWithExclusionConfig
-                                  | AssignmentScopeRandomWithNQLConfig
-                                  | AssignmentScopeRandomConfig, Field(discriminator='config_type')]
+AssignmentConfig = Annotated[AssignmentConfigRandom
+                             | AssignmentConfigPriority
+                             | AssignmentConfigLegacy, Field(discriminator='config_type')]
 
 
 class AssignmentScopeModel(BaseModel):
@@ -219,7 +218,7 @@ class AssignmentScopeModel(BaseModel):
     # This may be displayed to the annotators as refined instruction or background information.
     description: str | None = None
     # Config for the assignment (for reference, optional)
-    config: AssignmentScopeConfig | None = None
+    config: AssignmentConfig | None = None
 
 
 class AssignmentStatus(str, Enum):

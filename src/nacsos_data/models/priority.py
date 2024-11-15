@@ -62,7 +62,7 @@ PriorityModelConfig = Annotated[SciBERTModel
                                 | SVMModel, Field(discriminator='conf')]
 
 
-class DehydratedPriorityModel(BaseModel):
+class _PriorityModel(BaseModel):
     # Unique identifier for this task.
     priority_id: str | uuid.UUID | None = None
 
@@ -79,7 +79,12 @@ class DehydratedPriorityModel(BaseModel):
     time_assigned: datetime | None = None
 
 
-class PriorityModel(DehydratedPriorityModel):
+class DehydratedPriorityModel(_PriorityModel):
+    # Length of the `prioritised_ids` array
+    num_prioritised: int | None = None
+
+
+class PriorityModel(_PriorityModel):
     # ForeignKey(BotAnnotationMetaData.bot_annotation_metadata_id or AssignmentScope.assignment_scope_id)
     source_scopes: list[str] | list[uuid.UUID] | None = None
 
