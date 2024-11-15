@@ -87,7 +87,7 @@ def distribute_assignments(users: dict[str, int],
     """
     random.seed(random_seed)
     user_pool: list[PoolUser] = [PoolUser(user_id=user_id, budget=budget)
-                                 for user_id, budget in users.items()]
+                                 for user_id, budget in users.items() if budget > 0]
     item_pool: list[PoolItem] = [PoolItem(item_id=item_id, order=i)
                                  for i, item_id in enumerate(item_ids)]
 
@@ -105,6 +105,9 @@ def distribute_assignments(users: dict[str, int],
 
         if len(item_pool) < item_count:
             raise AssertionError('Configuration impossible, item pool ran out early!')
+
+        if item_count == 0 or overlap == 0:
+            continue
 
         random.shuffle(item_pool)
 
