@@ -185,7 +185,7 @@ class AssignmentConfigPriority(_AssignmentConfig):
     prio_offset: int
 
 
-class AssignmentConfigLegacy(_AssignmentConfig):
+class AssignmentConfigLegacy(BaseModel):
     config_type: Literal['LEGACY'] = 'LEGACY'
     legacy: dict[str, Any]
 

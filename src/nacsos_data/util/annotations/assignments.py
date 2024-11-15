@@ -1,3 +1,4 @@
+import logging
 import uuid
 import random
 from dataclasses import dataclass
@@ -10,6 +11,8 @@ from nacsos_data.db.engine import DBSession, ensure_session_async
 from nacsos_data.models.annotations import AssignmentModel, AssignmentScopeModel, AssignmentStatus
 from nacsos_data.models.nql import NQLFilter
 from nacsos_data.util.nql import NQLQuery
+
+logger = logging.getLogger('nacsos_data.util.assignments')
 
 
 @ensure_session_async
@@ -88,20 +91,31 @@ def distribute_assignments(users: dict[str, int],
     item_pool: list[PoolItem] = [PoolItem(item_id=item_id, order=i)
                                  for i, item_id in enumerate(item_ids)]
 
+    logger.info(f'user_pool: {len(user_pool)} '
+                f'/ item_pool: {len(item_pool)} '
+                f'/ item_ids: {len(item_ids)} '
+                f'/ overlaps: {len(overlaps)}')
+
     assignments = []
 
     for overlap, item_count in overlaps.items():
+        logger.info(f'> overlap: {overlap} / item_count: {item_count} '
+                    f'| user_pool: {len(user_pool)} / item_pool: {len(item_pool)}')
+        logger.debug(f'{user_pool}')
+
         if len(item_pool) < item_count:
             raise AssertionError('Configuration impossible, item pool ran out early!')
 
         random.shuffle(item_pool)
 
-        for item in item_pool[:item_count]:
+        for i, item in enumerate(item_pool[:item_count]):
+            logger.debug(f'{user_pool}')
             if len(user_pool) < overlap:
                 raise AssertionError('Configuration impossible, user pool ran out early!')
 
-            random.shuffle(user_pool)
-            for user_idx in range(overlap):
+            # random.shuffle(user_pool)
+            for j in range(overlap):
+                user_idx = (i + j) % len(user_pool)
                 user_pool[user_idx].budget -= 1
                 assignments.append(
                     AssignmentModel(assignment_id=uuid.uuid4(),
@@ -114,6 +128,7 @@ def distribute_assignments(users: dict[str, int],
 
             # Clear users from pool where budget ran out
             user_pool = [user for user in user_pool if user.budget > 0]
+            user_pool.sort(key=lambda x: x.budget, reverse=True)
 
         item_pool = item_pool[item_count:]
     return assignments
@@ -128,8 +143,8 @@ async def create_assignments(session: DBSession, assignment_scope_id: str, proje
 
     scope = AssignmentScopeModel(**scope_.__dict__)
     config = scope.config
-    if not config:
-        raise ValueError('No config!')
+    if not config or config.config_type == 'LEGACY':
+        raise ValueError('No valid config!')
 
     item_ids = await get_sample(session=session,
                                 project_id=project_id,
