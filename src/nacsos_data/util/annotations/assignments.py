@@ -113,7 +113,6 @@ def distribute_assignments(users: dict[str, int],
             if len(user_pool) < overlap:
                 raise AssertionError('Configuration impossible, user pool ran out early!')
 
-            # random.shuffle(user_pool)
             for j in range(overlap):
                 user_idx = (i + j) % len(user_pool)
                 user_pool[user_idx].budget -= 1
