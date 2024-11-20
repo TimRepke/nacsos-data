@@ -71,6 +71,9 @@ async def delete_import(session: DBSession, import_id: uuid.UUID | str) -> None:
     # TODO rm -r .tasks/user_data/{imp.config.sources}
     # TODO rm -r .tasks/artefacts/{task.task_id}
 
+    # Delete related revisions
+    await session.execute(delete(ImportRevision).where(ImportRevision.import_id == import_id))
+
     # Delete import
     await session.execute(delete(Import)
                           .where(Import.import_id == import_id))
