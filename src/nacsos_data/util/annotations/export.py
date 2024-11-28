@@ -331,7 +331,8 @@ def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]) -> G
         for vi in val['multi']:  # type: ignore[union-attr]
             yield f'{key}:{vi}'
     elif val['str'] is not None:
-        yield f'{key}'
+        # yield f'{key}'
+        pass
     else:
         raise RuntimeError('No annotation in label')
 
@@ -439,8 +440,8 @@ async def wide_export_table(session: DBSession | AsyncSession,
 
     df[label_cols] = df[label_cols].astype('Int8')
     df['py'] = df['py'].astype('Int16')
-    df['item_order'] = df['item_order'].astype('Int16')
-    df['scope_order'] = df['scope_order'].astype('Int16')
+    df['item_order'] = df['item_order'].astype('Int64').astype('Int32')
+    df['scope_order'] = df['scope_order'].astype('Int64').astype('Int16')
 
     # Setting implicit False values to False (instead of leaving them empty)
     anycols: dict[str, list[str]] = defaultdict(list)
