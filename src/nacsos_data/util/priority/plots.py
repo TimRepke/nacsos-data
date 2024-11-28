@@ -69,7 +69,12 @@ def scope_inclusions(df: 'pd.DataFrame', key: str = 'incl',
     return fig, df
 
 
-def buscar_frontiers(df: 'pd.DataFrame', key: str = 'incl', batch_size: int = 100,
+def buscar_frontiers(df: 'pd.DataFrame',
+                     key: str = 'incl',
+                     batch_size: int = 100,
+                    recall_target: float = 0.95,
+                    bias: float = 1.,
+                    confidence_level: float = 0.95,
                      fig_params: dict[str, Any] | None = None) -> tuple['plt.Figure', 'pd.DataFrame', 'pd.DataFrame']:
     from matplotlib import pyplot as plt
     import pandas as pd
@@ -87,9 +92,13 @@ def buscar_frontiers(df: 'pd.DataFrame', key: str = 'incl', batch_size: int = 10
     n_total = df.shape[0]
 
     # Compute H0
-    buscar = retrospective_h0(df[seen][key], n_total, batch_size=batch_size)
+    buscar = retrospective_h0(df[seen][key], n_total,
+                              batch_size=batch_size,
+                              recall_target=recall_target,
+                              bias=bias,
+                              confidence_level=confidence_level)
     # Compute frontier
-    recall = recall_frontier(df[key].dropna(), df.shape[0])
+    recall = recall_frontier(df[key].dropna(), df.shape[0], bias=bias)
 
     # Produce left panel
     ax1.set_ylabel('Relevant documents found')
@@ -120,6 +129,9 @@ def buscar_workload(df: 'pd.DataFrame',  # Assuming df is ordered by (scope_orde
                     source: str = 'incl',
                     target: str = 'pred|incl',
                     batch_size: int = 100,
+                    recall_target: float = 0.95,
+                    bias: float = 1.,
+                    confidence_level: float = 0.95,
                     fig_params: dict[str, Any] | None = None) -> tuple['plt.Figure', 'pd.DataFrame']:
     from matplotlib import pyplot as plt
     import pandas as pd
@@ -158,7 +170,12 @@ def buscar_workload(df: 'pd.DataFrame',  # Assuming df is ordered by (scope_orde
             .rename(columns={'index': 'orig_order'}))
 
     # Compute H0
-    buscar = retrospective_h0(data['label'], num_total, batch_size=batch_size)
+    buscar = retrospective_h0(data['label'],
+                              num_total,
+                              batch_size=batch_size,
+                              recall_target=recall_target,
+                              bias=bias,
+                              confidence_level=confidence_level)
     # Add buscar score to table
     data.loc[buscar[0][:-1], 'buscar'] = buscar[1][:-1]
 

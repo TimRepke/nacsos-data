@@ -39,6 +39,9 @@ async def main(db_engine: DatabaseEngineAsync,
                out_path: Path,
                logger: logging.Logger,
                buscar_batchsize: int = 100,
+               buscar_recall_target: float = 0.95,
+               buscar_bias: float = 1.,
+               buscar_confidence_level: float = 0.95,
                data_table: str = 'data.arrow',
                tab_incl_stats: str = 'inclusion_statistics.json',
                fig_incl_stats: str = 'inclusion_statistics.png',
@@ -181,7 +184,9 @@ async def main(db_engine: DatabaseEngineAsync,
 
     logger.info('Buscar remaining workload estimation...')
     fig, buscar = buscar_workload(df=df, source=incl_field, target=incl_pred_field,
-                                  batch_size=buscar_batchsize, fig_params=fig_params)
+                                  batch_size=buscar_batchsize, fig_params=fig_params,
+                                  recall_target=buscar_recall_target, bias=buscar_bias,
+                                  confidence_level=buscar_confidence_level)
     fig.savefig(out_path / fig_buscar_est, transparent=True, bbox_inches='tight')
     store_df(out_path / tab_buscar_est, buscar)
     buscar.replace({np.nan: None}).to_csv(out_path / tab_predictions, index=False)
