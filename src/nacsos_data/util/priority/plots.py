@@ -72,9 +72,9 @@ def scope_inclusions(df: 'pd.DataFrame', key: str = 'incl',
 def buscar_frontiers(df: 'pd.DataFrame',
                      key: str = 'incl',
                      batch_size: int = 100,
-                    recall_target: float = 0.95,
-                    bias: float = 1.,
-                    confidence_level: float = 0.95,
+                     recall_target: float = 0.95,
+                     bias: float = 1.,
+                     confidence_level: float = 0.95,
                      fig_params: dict[str, Any] | None = None) -> tuple['plt.Figure', 'pd.DataFrame', 'pd.DataFrame']:
     from matplotlib import pyplot as plt
     import pandas as pd
