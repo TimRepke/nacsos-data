@@ -330,6 +330,8 @@ def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]) -> G
     elif val['multi'] is not None:
         for vi in val['multi']:  # type: ignore[union-attr]
             yield f'{key}:{vi}'
+    elif val['str'] is not None:
+        yield f'{key}'
     else:
         raise RuntimeError('No annotation in label')
 
@@ -368,7 +370,7 @@ async def wide_export_table(session: DBSession | AsyncSession,
                        ass."order",
                        scope.scope_order,
                        u.username,
-                       json_object_agg(a.key, json_build_object('bool', a.value_bool, 'int', a.value_int, 'multi', a.multi_int)) as label
+                       json_object_agg(a.key, json_build_object('bool', a.value_bool, 'int', a.value_int, 'multi', a.multi_int, 'str', a.value_str)) as label
                 FROM annotation a
                      JOIN "user" u ON u.user_id = a.user_id
                      JOIN assignment ass ON a.item_id = ass.item_id
