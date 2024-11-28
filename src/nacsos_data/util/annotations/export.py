@@ -354,7 +354,7 @@ async def wide_export_table(session: DBSession | AsyncSession,
                 SELECT ba.item_id,
                        ba."order",
                        scope.scope_order,
-                       json_object_agg(ba.key, json_build_object('bool', ba.value_bool, 'int', ba.value_int, 'multi', ba.multi_int)) as label
+                       json_object_agg(ba.key, json_build_object('bool', ba.value_bool, 'int', ba.value_int, 'multi', ba.multi_int, 'str', ba.value_str)) as label
                 FROM bot_annotation ba
                      JOIN scopes scope ON scope.scope_id = ba.bot_annotation_metadata_id
                 GROUP BY ba.item_id, ba."order", scope.scope_order),
