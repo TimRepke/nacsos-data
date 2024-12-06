@@ -113,47 +113,48 @@ def resolve_bot_annotation_parents(annotation_map: ResolutionMatrix,
     return annotation_map
 
 
+def scheme_flattening_recursion(labels: list[AnnotationSchemeLabel],
+                                parent_choice: int | None = None,
+                                parent_label: str | None = None,
+                                parent_repeat: int = 1) -> list[FlattenedAnnotationSchemeLabel]:
+    ret = []
+
+    choices: list[AnnotationSchemeLabelChoiceFlat] | None
+    for label in labels:
+        if label.choices is None:
+            choices = None
+        else:
+            choices = []
+            for choice in label.choices:
+                choices.append(AnnotationSchemeLabelChoiceFlat(name=choice.name,
+                                                               hint=choice.hint,
+                                                               value=choice.value))
+                if choice.children is not None:
+                    ret += scheme_flattening_recursion(choice.children,
+                                                       parent_choice=choice.value,
+                                                       parent_label=label.key,
+                                                       parent_repeat=label.max_repeat)
+
+        ret.append(FlattenedAnnotationSchemeLabel(key=label.key,
+                                                  name=label.name,
+                                                  hint=label.hint,
+                                                  required=label.required,
+                                                  max_repeat=label.max_repeat,
+                                                  implicit_max_repeat=label.max_repeat * parent_repeat,
+                                                  kind=label.kind,
+                                                  choices=choices,
+                                                  parent_label=parent_label,
+                                                  parent_choice=parent_choice))
+
+    return ret
+
+
 def flatten_annotation_scheme(annotation_scheme: AnnotationSchemeModel) -> AnnotationSchemeModelFlat:
-    def recurse(labels: list[AnnotationSchemeLabel],
-                parent_choice: int | None = None,
-                parent_label: str | None = None,
-                parent_repeat: int = 1) -> list[FlattenedAnnotationSchemeLabel]:
-        ret = []
-
-        choices: list[AnnotationSchemeLabelChoiceFlat] | None
-        for label in labels:
-            if label.choices is None:
-                choices = None
-            else:
-                choices = []
-                for choice in label.choices:
-                    choices.append(AnnotationSchemeLabelChoiceFlat(name=choice.name,
-                                                                   hint=choice.hint,
-                                                                   value=choice.value))
-                    if choice.children is not None:
-                        ret += recurse(choice.children,
-                                       parent_choice=choice.value,
-                                       parent_label=label.key,
-                                       parent_repeat=label.max_repeat)
-
-            ret.append(FlattenedAnnotationSchemeLabel(key=label.key,
-                                                      name=label.name,
-                                                      hint=label.hint,
-                                                      required=label.required,
-                                                      max_repeat=label.max_repeat,
-                                                      implicit_max_repeat=label.max_repeat * parent_repeat,
-                                                      kind=label.kind,
-                                                      choices=choices,
-                                                      parent_label=parent_label,
-                                                      parent_choice=parent_choice))
-
-        return ret
-
     return AnnotationSchemeModelFlat(annotation_scheme_id=annotation_scheme.annotation_scheme_id,
                                      project_id=annotation_scheme.project_id,
                                      name=annotation_scheme.name,
                                      description=annotation_scheme.description,
-                                     labels=recurse(annotation_scheme.labels))
+                                     labels=scheme_flattening_recursion(annotation_scheme.labels))
 
 
 AnnotationModelLookupType = dict[str, list[AnnotationModel]]

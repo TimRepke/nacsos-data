@@ -342,7 +342,8 @@ async def wide_export_table(session: DBSession | AsyncSession,
                             nql_filter: NQLFilter | None,
                             scope_ids: list[str] | list[uuid.UUID],
                             project_id: str | uuid.UUID,
-                            limit: int | None = None) -> tuple[list[str], list[str], 'pd.DataFrame']:
+                            limit: int | None = None,
+                            include_meta: bool = False) -> tuple[list[str], list[str], 'pd.DataFrame']:
     import pandas as pd
 
     stmt_labels = sa.text('''
@@ -420,6 +421,7 @@ async def wide_export_table(session: DBSession | AsyncSession,
         'oa_id': r.get('openalex_id'),
         'doi': r.get('doi'),
         'py': r.get('publication_year'),
+        'meta': r,
         **{
             f'res|{key}': True
             for resolution in get_attr(r, 'labels_resolved', [])  # type: ignore[union-attr]
@@ -436,6 +438,10 @@ async def wide_export_table(session: DBSession | AsyncSession,
         for r in rslt
     ])
     base_cols = ['scope_order', 'item_order', 'item_id', 'text', 'wos_id', 'oa_id', 'doi', 'py']
+    if include_meta:
+        base_cols += ['meta']
+    else:
+        df.drop(columns=['meta'], inplace=True)
     label_cols = list(sorted(set(df.columns) - set(base_cols)))
 
     df[label_cols] = df[label_cols].astype('Int8')
@@ -451,7 +457,9 @@ async def wide_export_table(session: DBSession | AsyncSession,
 
     for colgrp, cols in anycols.items():
         logger.debug(f'Resolving implicit False values for {colgrp}: [{cols}]')
-        df[cols] = df[cols].where(~(df[cols].isna() & ~anding([df[col].isna() for col in cols]).to_numpy()[:, None]), other=0)
+        base = anding([df[col].isna() for col in cols])
+        if base is not None:
+            df[cols] = df[cols].where(~(df[cols].isna() & ~base.to_numpy()[:, None]), other=0)
 
     # df = df.replace({np.nan: None})
 

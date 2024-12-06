@@ -3,7 +3,7 @@ from collections.abc import MutableMapping
 from contextlib import contextmanager
 from datetime import timedelta
 from timeit import default_timer
-from typing import Sequence, Generator, TypeVar, Any, AsyncIterator, AsyncGenerator, Callable, TYPE_CHECKING
+from typing import Sequence, Generator, TypeVar, Any, AsyncIterator, AsyncGenerator, Callable, TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -159,15 +159,24 @@ def get_attr(obj: Any, key: str, default: T | None = None) -> T | None:
     return default
 
 
-def oring(arr: list['pd.Series']) -> 'pd.Series':
-    ret = arr[0]
-    for a in arr[1:]:
+
+def oring(arr: list[Optional['pd.Series']]) -> Optional['pd.Series']:
+    fixed_arr: list['pd.Series'] | None = clear_empty(arr)
+    if fixed_arr is None:
+        return None
+
+    ret = fixed_arr[0]
+    for a in fixed_arr[1:]:
         ret |= a
     return ret
 
 
-def anding(arr: list['pd.Series']) -> 'pd.Series':
-    ret = arr[0]
-    for a in arr[1:]:
+def anding(arr: list[Optional['pd.Series']]) -> Optional['pd.Series']:
+    fixed_arr: list['pd.Series'] | None = clear_empty(arr)
+    if fixed_arr is None:
+        return None
+
+    ret = fixed_arr[0]
+    for a in fixed_arr[1:]:
         ret &= a
     return ret
