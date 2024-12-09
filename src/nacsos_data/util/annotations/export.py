@@ -409,6 +409,7 @@ async def wide_export_table(session: DBSession | AsyncSession,
             .order_by(stmt_labels.c.scope_order, stmt_labels.c.item_order))
     if limit:
         stmt = stmt.limit(limit)
+
     rslt = (await session.execute(stmt, {'scopes': scope_ids})).mappings().all()
     logger.debug(f'Result lines (limit: {limit}) from DB: {len(rslt):,}')
 

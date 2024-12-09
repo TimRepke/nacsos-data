@@ -142,7 +142,7 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
             if subtree.data == 'maybeyes':
                 return df[col].astype('boolean')
             if subtree.data == 'maybeno':
-                return df[col].astype('boolean') is False
+                return df[col].astype('boolean') == False  # noqa: E712
             if subtree.data == 'forceyes':
                 return df[col] == 1
             if subtree.data == 'forceno':
@@ -157,10 +157,10 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
             if subtree.data == 'forceallyes':
                 return anding([df[c] == 1 for c in anycols[col]])
             if subtree.data == 'anyno':
-                return oring([df[c].astype('boolean') is False for c in anycols[col]])
+                return oring([df[c].astype('boolean') == False for c in anycols[col]])  # noqa: E712
             if subtree.data == 'allno':
                 return anding([oring([df[c].astype('boolean').isna() for c in anycols[col]]),
-                               anding([(df[c].astype('boolean') is False) | df[c].astype('boolean').isna() for c in anycols[col]])])
+                               anding([(df[c].astype('boolean') == False) | df[c].astype('boolean').isna() for c in anycols[col]])])  # noqa: E712
             if subtree.data == 'forceallno':
                 return anding([df[c] == 0 for c in anycols[col]])
 
@@ -168,17 +168,17 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
             if subtree.data == 'resanyyes':
                 if resanycols[col]['res']:
                     return ((df[resanycols[col]['res']].notna()
-                             & df[resanycols[col]['res']] is True)
+                             & df[resanycols[col]['res']] == True)  # noqa: E712
                             | (df[resanycols[col]['res']].isna()
                                & oring([df[c].astype('boolean') for c in resanycols[col]['users']])))
-                return oring([df[c].astype('boolean') is True for c in anycols[col]])
+                return oring([df[c].astype('boolean') == True for c in anycols[col]])  # noqa: E712
 
             if subtree.data == 'resanyno':
                 if resanycols[col]['res']:
                     return ((df[resanycols[col]['res']].notna()
-                             & df[resanycols[col]['res']] is False)
+                             & df[resanycols[col]['res']] == False)  # noqa: E712
                             | (df[resanycols[col]['res']].isna()
-                               & oring([df[c].astype('boolean') is False for c in resanycols[col]['users']])))
+                               & oring([df[c].astype('boolean') == False for c in resanycols[col]['users']])))  # noqa: E712
 
                 return oring([df[c].astype('boolean') for c in anycols[col]])
 
