@@ -360,16 +360,16 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     # Check publication year field
     new_keywords = getattr(new_item, 'keywords')
     if new_keywords is not None and len(new_keywords) > 0:
-        # Get all non-empty publication_year across variants
-        keywords = set([var['keywords'] for var in variants if var['keywords'] is not None])
+        # Get all keywords across variants
+        keywords = set([kw for var in variants if var['keywords'] is not None for kw in var['keywords']])
 
-        # Check if we have seen this value before
-        if new_keywords not in keywords:
+        # Check if there are new keywords
+        if len(set(new_keywords) - keywords) > 0:
             # This was new, so keep track of it in our variant
             new_variant['keywords'] = new_keywords
             if editable:
-                # We always like new IDs, so update the reference item
-                setattr(orig_item_orm, 'keywords', [kw for kw_lst in keywords for kw in kw_lst])
+                # We always like new stuff, so update the reference item
+                setattr(orig_item_orm, 'keywords', keywords | set(new_keywords))
 
     # Checking metadata field
     # only keep track of unique meta objects in variants
