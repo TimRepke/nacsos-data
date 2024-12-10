@@ -369,7 +369,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
             new_variant['keywords'] = new_keywords
             if editable:
                 # We always like new stuff, so update the reference item
-                setattr(orig_item_orm, 'keywords', keywords | set(new_keywords))
+                setattr(orig_item_orm, 'keywords', list(keywords | set(new_keywords)))
 
     # Checking metadata field
     # only keep track of unique meta objects in variants
