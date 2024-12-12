@@ -322,17 +322,16 @@ async def prepare_export_table(session: DBSession | AsyncSession,
     return [dict(r) for r in result]
 
 
-def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]) -> Generator[str, None, None]:
+def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]) -> Generator[tuple[str, bool|str], None, None]:
     if val['bool'] is not None:
-        yield f'{key}:{int(val['bool'])}'  # type: ignore[arg-type]
+        yield f'{key}:{int(val['bool'])}', True  # type: ignore[arg-type]
     elif val['int'] is not None:
-        yield f'{key}:{val['int']}'
+        yield f'{key}:{val['int']}', True
     elif val['multi'] is not None:
         for vi in val['multi']:  # type: ignore[union-attr]
-            yield f'{key}:{vi}'
+            yield f'{key}:{vi}', True
     elif val['str'] is not None:
-        # yield f'{key}'
-        pass
+        yield f'STR|{key}', val['str']
     else:
         raise RuntimeError('No annotation in label')
 
@@ -424,17 +423,18 @@ async def wide_export_table(session: DBSession | AsyncSession,
         'py': r.get('publication_year'),
         'meta': r,
         **{
-            f'res|{key}': True
+            f'res|{key}': val
             for resolution in get_attr(r, 'labels_resolved', [])  # type: ignore[union-attr]
             for k, v in resolution.items()
-            for key in _generate_keys(k, v)
+            for key, val in _generate_keys(k, v)
         },
         **{
-            f'{usr}|{key}': True
+            f'{usr}|{key}': val
             for usr, annotation in get_attr(r, 'labels_unresolved', {}).items()  # type: ignore[union-attr]
             for k, v in annotation.items()
-            for key in _generate_keys(k, v)
+            for key, val in _generate_keys(k, v)
         },
+        # TODO: two more loops for str
     }
         for r in rslt
     ])
@@ -443,6 +443,8 @@ async def wide_export_table(session: DBSession | AsyncSession,
         base_cols += ['meta']
     else:
         df.drop(columns=['meta'], inplace=True)
+    str_cols = [col for col in df.columns if '|STR|' in col]
+    base_cols += str_cols
     label_cols = list(sorted(set(df.columns) - set(base_cols)))
 
     df[label_cols] = df[label_cols].astype('Int8')
