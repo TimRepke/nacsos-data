@@ -322,7 +322,7 @@ async def prepare_export_table(session: DBSession | AsyncSession,
     return [dict(r) for r in result]
 
 
-def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]) -> Generator[tuple[str, bool|str], None, None]:
+def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]) -> Generator[tuple[str, bool | str], None, None]:
     if val['bool'] is not None:
         yield f'{key}:{int(val['bool'])}', True  # type: ignore[arg-type]
     elif val['int'] is not None:
@@ -342,8 +342,11 @@ async def wide_export_table(session: DBSession | AsyncSession,
                             scope_ids: list[str] | list[uuid.UUID],
                             project_id: str | uuid.UUID,
                             limit: int | None = None,
+                            prefix: dict[str, str] | None = None,
                             include_meta: bool = False) -> tuple[list[str], list[str], 'pd.DataFrame']:
     import pandas as pd
+    if prefix is None:
+        prefix = {}
 
     stmt_labels = sa.text('''
         WITH
@@ -423,18 +426,17 @@ async def wide_export_table(session: DBSession | AsyncSession,
         'py': r.get('publication_year'),
         'meta': r,
         **{
-            f'res|{key}': val
+            f'res|{prefix.get(k, '')}{key}': val
             for resolution in get_attr(r, 'labels_resolved', [])  # type: ignore[union-attr]
             for k, v in resolution.items()
             for key, val in _generate_keys(k, v)
         },
         **{
-            f'{usr}|{key}': val
+            f'{usr}|{prefix.get(k, '')}{key}': val
             for usr, annotation in get_attr(r, 'labels_unresolved', {}).items()  # type: ignore[union-attr]
             for k, v in annotation.items()
             for key, val in _generate_keys(k, v)
         },
-        # TODO: two more loops for str
     }
         for r in rslt
     ])
