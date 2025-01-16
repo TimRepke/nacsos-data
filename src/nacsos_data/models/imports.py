@@ -36,7 +36,16 @@ class OpenAlexSolrImport(BaseModel):
     op: OpType = 'AND'
 
 
+class ScopusAPIImport(BaseModel):
+    kind: Literal['scopus-api'] = 'scopus-api'
+    file: str
+    file_date: str
+    query: str
+    date: str
+
+
 ImportConfig = Annotated[ScopusImport
+                         | ScopusAPIImport
                          | AcademicItemImport
                          | OpenAlexFileImport
                          | OpenAlexSolrImport

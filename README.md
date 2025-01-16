@@ -12,7 +12,7 @@ does not provide the required functionality.
 ```bash
 python3.12 -m venv venv
 source venv/bin/activate
-pip install -e "".[testing,utils,priority,scripts]""
+pip install -e ".[testing,utils,priority,scripts]"
 ```
 You can leave out the extras that you don't need.
 The minimal installation for development is probably `pip install -e ".[utils]"` but it mostly also works with no extras!
