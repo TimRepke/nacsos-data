@@ -8,9 +8,15 @@ The main purpose of this package is to be used in the NACSOS backend/frontend in
 It can also be imported in any other project, where accessing data through the proper API 
 does not provide the required functionality.
 
+## Milvus via docker
+```
+cd /srv/milvus
+sudo milvus/scripts/standalone_embed.sh start
+```
+
 ## Setup for development
 ```bash
-python3.12 -m venv venv
+python3.13 -m venv venv
 source venv/bin/activate
 pip install -e ".[testing,utils,priority,scripts]"
 ```

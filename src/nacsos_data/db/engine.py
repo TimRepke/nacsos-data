@@ -43,7 +43,8 @@ class DatabaseEngineAsync:
     """
 
     def __init__(self, host: str, port: int, user: str, password: str,
-                 database: str = 'nacsos_core', debug: bool = False):
+                 database: str = 'nacsos_core', debug: bool = False,
+                 kw_engine: dict[str, Any] | None = None, kw_session: dict[str, Any] | None = None):
         self._host = host
         self._port = port
         self._user = user
@@ -58,10 +59,20 @@ class DatabaseEngineAsync:
             port=self._port,
             database=self._database,
         )
-        self.engine = create_async_engine(self._connection_str, echo=debug, future=True,
-                                          json_serializer=DictLikeEncoder().encode)
-        self._session: async_sessionmaker[AsyncSession] = async_sessionmaker(  # type: ignore[type-arg]
-            bind=self.engine, autoflush=False, autocommit=False, expire_on_commit=True, class_=DBSession)
+        self.engine = create_async_engine(self._connection_str, **{
+            'echo': debug,
+            'future': True,
+            'json_serializer': DictLikeEncoder().encode,
+            **(kw_engine or {}),
+        })
+        self._session: async_sessionmaker[AsyncSession] = async_sessionmaker(**{  # type: ignore[type-arg]
+            'bind': self.engine,
+            'autoflush': False,
+            'autocommit': False,
+            'expire_on_commit': True,
+            'class_': DBSession,
+            **(kw_session or {}),
+        })
 
     async def startup(self) -> None:
         """

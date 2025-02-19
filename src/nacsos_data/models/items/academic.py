@@ -28,7 +28,11 @@ class AcademicAuthorModel(BaseModel):
     scopus_id: str | None = None  # Scopus ID (if known/present)
     openalex_id: str | None = None  # OpenAlex ID (if known/present)
     s2_id: str | None = None  # SemanticScholar ID (if known/present)
+    dimensions_id: str | None = None  # Dimensions ID (if known/present)
+
     affiliations: list[AffiliationModel] | None = None
+
+    meta: dict[str, Any] | None = None
 
 
 class AcademicItemModel(ItemModel):

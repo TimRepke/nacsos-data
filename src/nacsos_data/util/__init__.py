@@ -159,11 +159,10 @@ def get_attr(obj: Any, key: str, default: T | None = None) -> T | None:
     return default
 
 
-
 def oring(arr: list[Optional['pd.Series']]) -> Optional['pd.Series']:
     fixed_arr: list['pd.Series'] | None = clear_empty(arr)
     if fixed_arr is None:
-        return None
+        return False
 
     ret = fixed_arr[0]
     for a in fixed_arr[1:]:
@@ -174,7 +173,7 @@ def oring(arr: list[Optional['pd.Series']]) -> Optional['pd.Series']:
 def anding(arr: list[Optional['pd.Series']]) -> Optional['pd.Series']:
     fixed_arr: list['pd.Series'] | None = clear_empty(arr)
     if fixed_arr is None:
-        return None
+        return False
 
     ret = fixed_arr[0]
     for a in fixed_arr[1:]:
