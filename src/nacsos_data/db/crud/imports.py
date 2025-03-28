@@ -47,7 +47,7 @@ async def upsert_import(session: DBSession, import_model: ImportModel) -> str | 
     key = await upsert_orm(upsert_model=import_model,
                            Schema=Import,
                            primary_key=Import.import_id.name,
-                           session=session)
+                           session=session)  # FIXME: does this need `use_commit=True` ?
     return key
 
 

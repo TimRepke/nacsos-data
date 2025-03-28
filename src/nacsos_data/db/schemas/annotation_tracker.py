@@ -34,9 +34,13 @@ class AnnotationTracker(Base):
     # Number of items (usually this will be the number of items in the number of items in the project)
     n_items_total = mapped_column(Integer, nullable=False, unique=False, index=False)
     # Batch size for buscar compute (-1 will use scope borders)
-    batch_size = mapped_column(Integer, nullable=False, unique=False, index=False)
+    batch_size = mapped_column(Integer, nullable=False, unique=False, index=False, server_default='500')
     # Recall target (parameter for the BUSCAR metric)
-    recall_target = mapped_column(Float, nullable=False, unique=False, index=False)
+    recall_target = mapped_column(Float, nullable=False, unique=False, index=False, server_default='0.9')
+    # Recall confidence level (parameter for the BUSCAR metric)
+    confidence_level = mapped_column(Float, nullable=False, unique=False, index=False, server_default='0.9')
+    # Sampling bias (parameter for the BUSCAR metric)
+    bias = mapped_column(Float, nullable=False, unique=False, index=False, server_default='1.0')
     # Include resolved labels from these resolutions or assignment scopes
     #   -> ForeignKey(BotAnnotationMetaData.bot_annotation_metadata_id)
     #   -> ForeignKey(AssignmentScope.assignment_scope_id)
@@ -47,6 +51,7 @@ class AnnotationTracker(Base):
     recall = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=False)
     # list[tuple[int, float]] of the BUSCAR metric (stopping criterion)
     buscar = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=False)
+    buscar_frontier = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=False)
 
     # Date and time when this tracker was created (or last updated)
     time_created = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

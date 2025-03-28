@@ -32,6 +32,10 @@ class AnnotationTrackerModel(DehydratedAnnotationTracker):
     batch_size: int
     # Recall target (parameter for the BUSCAR metric)
     recall_target: float
+    # Recall confidence level (parameter for the BUSCAR metric)
+    confidence_level: float = 0.9
+    # Sampling bias (parameter for the BUSCAR metric)
+    bias: float = 1.0
     # Include resolved labels from these resolutions or assignment scopes
     #   -> ForeignKey(BotAnnotationMetaData.bot_annotation_metadata_id)
     #   -> ForeignKey(AssignmentScope.assignment_scope_id)
@@ -42,6 +46,7 @@ class AnnotationTrackerModel(DehydratedAnnotationTracker):
     recall: list[float | None] | None = None
     # list[tuple[int, float]] of the BUSCAR metric (stopping criterion)
     buscar: H0Series | None = None
+    buscar_frontier: list[tuple[float, float]] | None = None
     # Date and time when this tracker was created (or last updated)
     time_created: datetime | None = None
     time_updated: datetime | None = None
