@@ -35,7 +35,7 @@ def read_wos_file(filepath: str,
         if pub_year and type(pub_year) is str and len(pub_year) > 0:
             item.publication_year = int(pub_year)  # type: ignore[assignment]
 
-        abstract = record.get('AB')
+        abstract = record.get('AB', record.get('AE'))
         if abstract and len(abstract) > 0:
             item.text = abstract  # type: ignore[assignment]
 
