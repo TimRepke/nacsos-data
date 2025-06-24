@@ -159,7 +159,7 @@ def get_attr(obj: Any, key: str, default: T | None = None) -> T | None:
     return default
 
 
-def oring(arr: list[Optional['pd.Series[bool]']]) -> bool | 'pd.Series[bool]':
+def oring(arr: list[Optional['pd.Series[bool]']]) -> 'bool | pd.Series[bool]':
     fixed_arr: list['pd.Series[bool]'] | None = clear_empty(arr)
     if fixed_arr is None:
         return False
@@ -170,7 +170,7 @@ def oring(arr: list[Optional['pd.Series[bool]']]) -> bool | 'pd.Series[bool]':
     return ret
 
 
-def anding(arr: list[Optional['pd.Series[bool]']]) -> bool | 'pd.Series[bool]':
+def anding(arr: list[Optional['pd.Series[bool]']]) -> 'bool | pd.Series[bool]':
     fixed_arr: list['pd.Series[bool]'] | None = clear_empty(arr)
     if fixed_arr is None:
         return False
@@ -179,3 +179,11 @@ def anding(arr: list[Optional['pd.Series[bool]']]) -> bool | 'pd.Series[bool]':
     for a in fixed_arr[1:]:
         ret &= a
     return ret
+
+
+def get(obj: dict[str, Any], *keys: str, default: Any = None) -> Any:  # type: ignore[var-annotated]
+    for key in keys:
+        obj = obj.get(key)  # type: ignore[assignment]
+        if obj is None:
+            return default  # type: ignore[unreachable]
+    return obj
