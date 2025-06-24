@@ -72,7 +72,7 @@ def parse_rule(query: str) -> Tree[Token]:
     transformer = TypeTransformer()
     tree = parser.parse(query)
     tree = transformer.transform(tree)
-    return tree
+    return tree  # type: ignore[no-any-return]
 
 
 class SortedAnnotationLabel(BaseModel):
@@ -98,9 +98,12 @@ async def get_annotations(session: DBSession, source_ids: list[str] | None = Non
     if source_ids is None:
         return []
     stmt = text('''
-        WITH sources as (SELECT row_number() over () source_order, source_id
-                         FROM unnest(:source_ids ::uuid[]) as source_id),
-             labels as (SELECT source_order,
+                WITH
+                    sources as (
+                        SELECT row_number() over () source_order, source_id
+                        FROM unnest(:source_ids ::uuid[]) as source_id),
+                    labels as (
+                        SELECT source_order,
                                source_id,
                                'H'                                                                   as source_type,
                                ann.user_id::text                                                     as user_id,
@@ -112,11 +115,12 @@ async def get_annotations(session: DBSession, source_ids: list[str] | None = Non
                                array_agg(ann.value_bool) FILTER ( WHERE ann.value_bool is not null ) as values_bool,
                                mode() WITHIN GROUP ( ORDER BY ann.value_bool )                       as value_bool,
                                array_agg(ann.multi_int) FILTER ( WHERE ann.multi_int is not null
-                                                                   AND array_length(ann.multi_int, 1) > 0 ) as multis
+                                   AND array_length(ann.multi_int, 1) > 0 )                          as multis
                         FROM sources
-                                 LEFT JOIN assignment ass ON ass.assignment_scope_id = source_id::uuid
-                                 LEFT JOIN annotation ann ON ann.assignment_id = ass.assignment_id
-                        WHERE ass.item_id is not null AND ann.key is not null
+                             LEFT JOIN assignment ass ON ass.assignment_scope_id = source_id::uuid
+                             LEFT JOIN annotation ann ON ann.assignment_id = ass.assignment_id
+                        WHERE ass.item_id is not null
+                          AND ann.key is not null
                         GROUP BY source_order, source_id, ann.user_id, ann.item_id, ann.key
 
                         UNION
@@ -133,27 +137,28 @@ async def get_annotations(session: DBSession, source_ids: list[str] | None = Non
                                array_agg(ba.value_bool) FILTER ( WHERE ba.value_bool is not null ) as values_bool,
                                mode() WITHIN GROUP ( ORDER BY ba.value_bool )                      as value_bool,
                                array_agg(ba.multi_int) FILTER ( WHERE ba.multi_int is not null
-                                                                  AND array_length(ba.multi_int, 1) > 0 ) as multis
+                                   AND array_length(ba.multi_int, 1) > 0 )                         as multis
                         FROM sources
-                                 LEFT JOIN bot_annotation ba ON ba.bot_annotation_metadata_id = source_id::uuid
-                        WHERE ba.item_id is not null AND ba.key is not null
+                             LEFT JOIN bot_annotation ba ON ba.bot_annotation_metadata_id = source_id::uuid
+                        WHERE ba.item_id is not null
+                          AND ba.key is not null
                         GROUP BY source_order, source_id, ba.item_id, ba.key)
-        SELECT source_order,
-               source_id,
-               source_type,
-               user_id,
-               min(item_order)                                                as item_order,
-               item_id,
-               json_object_agg(key,
-                               json_build_object('value_int', value_int,
-                                                 'values_int', values_int,
-                                                 'value_bool', value_bool,
-                                                 'values_bool', values_bool,
-                                                 'multis', multis)) as labels
-        FROM labels
-        GROUP BY source_order, source_id, source_type, item_id, user_id
-        ORDER BY source_order, item_order;
-    ''')
+                SELECT source_order,
+                       source_id,
+                       source_type,
+                       user_id,
+                       min(item_order)                                      as item_order,
+                       item_id,
+                       json_object_agg(key,
+                                       json_build_object('value_int', value_int,
+                                                         'values_int', values_int,
+                                                         'value_bool', value_bool,
+                                                         'values_bool', values_bool,
+                                                         'multis', multis)) as labels
+                FROM labels
+                GROUP BY source_order, source_id, source_type, item_id, user_id
+                ORDER BY source_order, item_order;
+                ''')
     rslt = await session.execute(stmt, {'source_ids': source_ids})
     return [SortedAnnotation.model_validate(r) for r in rslt.mappings().all()]
 
@@ -166,7 +171,6 @@ class AnnotationValues(BaseModel):
 
 
 ItemAnnotationValues = dict[str, AnnotationValues]
-
 
 T = TypeVar('T')
 A = TypeVar('A', ItemAnnotationValues, dict[str, SortedAnnotationLabel])

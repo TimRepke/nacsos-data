@@ -166,7 +166,8 @@ class MilvusDuplicateIndex:
         for i in chunks:
             self.client.insert(
                 collection_name=self.collection_name, data=[
-                    _get_vector_rep(vectors.getrow(j + i), non_empty[j + i]) for j in range(vectors[i:i + chunk].shape[0])
+                    _get_vector_rep(vectors.getrow(j + i), non_empty[j + i])  # type: ignore[arg-type]
+                    for j in range(vectors[i:i + chunk].shape[0])
                 ]
             )
         index_params = self.client.prepare_index_params()

@@ -440,7 +440,7 @@ class NQLQuery:
                     AnnotationAlias,
                     self.Schema.item_id == AnnotationAlias.item_id  # type: ignore[attr-defined]
                 )
-                return and_(AnnotationAlias.user_id.in_(subquery.users.user_ids),  # type: ignore[attr-defined]
+                return and_(AnnotationAlias.user_id.in_(subquery.users.user_ids),  # type: ignore[attr-defined, union-attr]
                             and_(*_inner_where(AnnotationAlias)))
 
             elif subquery.users.mode == 'ALL':
@@ -451,7 +451,7 @@ class NQLQuery:
                         AnnotationAlias,
                         self.Schema.item_id == AnnotationAlias.item_id)  # type: ignore[attr-defined]
                     _wheres = _inner_where(AnnotationAlias)
-                    _wheres += (AnnotationAlias.user_id == user,)  # type: ignore[attr-defined, operator]
+                    _wheres += (AnnotationAlias.user_id == user,)  # type: ignore[attr-defined, operator, union-attr]
                     wheres.append(and_(*_wheres))
                 return and_(*wheres)
             else:

@@ -243,7 +243,7 @@ def compute_krippendorff(annotations: dict[str, list[int | None]],
             return 1.0
 
     def delta_ordinal(v1: int, v2: int) -> float:
-        val = 0
+        val: float = 0
         for g in range(v1, v2 + 1):
             element1 = coincidence_matrix_sum[g]
             val += element1

@@ -92,13 +92,13 @@ def buscar_frontiers(df: 'pd.DataFrame',
     n_total = df.shape[0]
 
     # Compute H0
-    buscar = retrospective_h0(df[seen][key], n_total,
+    buscar = retrospective_h0(df[seen][key], n_total,  # type: ignore[arg-type]
                               batch_size=batch_size,
                               recall_target=recall_target,
                               bias=bias,
                               confidence_level=confidence_level)
     # Compute frontier
-    recall = recall_frontier(df[key].dropna(), df.shape[0], bias=bias)
+    recall = recall_frontier(df[key].dropna(), df.shape[0], bias=bias)  # type: ignore[arg-type]
 
     # Produce left panel
     ax1.set_ylabel('Relevant documents found')
@@ -170,7 +170,7 @@ def buscar_workload(df: 'pd.DataFrame',  # Assuming df is ordered by (scope_orde
             .rename(columns={'index': 'orig_order'}))
 
     # Compute H0
-    buscar = retrospective_h0(data['label'],
+    buscar = retrospective_h0(data['label'],  # type: ignore[arg-type]
                               num_total,
                               batch_size=batch_size,
                               recall_target=recall_target,

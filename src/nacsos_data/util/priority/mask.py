@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, TypedDict, Optional
+from typing import TYPE_CHECKING, TypedDict, Optional, Any
 
 from lark import Lark, Tree, Token
 
@@ -72,7 +72,7 @@ def parse_rule(rule: str) -> Tree[Token]:
 
 
 def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | None = None,
-                       ignore_missing: bool = False) -> 'pd.Series':
+                       ignore_missing: bool = False) -> 'pd.Series[bool]':
     import pandas as pd
     tree = parse_rule(rule)
 
@@ -98,28 +98,28 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
 
     logger.debug(f'Tree: {tree}')
 
-    def as_series(ret: Optional['pd.Series']) -> 'pd.Series':
+    def as_series(ret: Optional['pd.Series[Any]']) -> 'pd.Series[Any]':
         if ret is None:
             return pd.Series(pd.NA, index=df.index)
         return ret
 
-    def recurse(subtree: Tree | Token) -> Optional['pd.Series']:  # type: ignore[type-arg]
+    def recurse(subtree: Tree | Token) -> Optional['pd.Series[Any]']:  # type: ignore[type-arg]
         if isinstance(subtree, Tree):
             # -----------------------
             # combine AND/OR branches
             # -----------------------
             if subtree.data == 'and':
-                return anding([recurse(subtree.children[0]), recurse(subtree.children[1])])
+                return anding([recurse(subtree.children[0]), recurse(subtree.children[1])])  # type: ignore[return-value]
             if subtree.data == 'or':
-                return oring([recurse(subtree.children[0]), recurse(subtree.children[1])])
+                return oring([recurse(subtree.children[0]), recurse(subtree.children[1])])  # type: ignore[return-value]
 
             # ----------------------------------
             # combine lists of column statements
             # ----------------------------------
             if subtree.data == 'ored':
-                return oring([recurse(child) for child in subtree.children])
+                return oring([recurse(child) for child in subtree.children])  # type: ignore[return-value]
             if subtree.data == 'anded':
-                return anding([recurse(child) for child in subtree.children])
+                return anding([recurse(child) for child in subtree.children])  # type: ignore[return-value]
 
             # ------------------------
             # column statement to mask
@@ -140,29 +140,33 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
 
             # specific columns
             if subtree.data == 'maybeyes':
-                return df[col].astype('boolean')
+                return df[col].astype('boolean')  # type: ignore[no-any-return]
             if subtree.data == 'maybeno':
-                return df[col].astype('boolean') == False  # noqa: E712
+                return df[col].astype('boolean') == False  # type: ignore[no-any-return]  # noqa: E712
             if subtree.data == 'forceyes':
-                return df[col] == 1
+                return df[col] == 1  # type: ignore[no-any-return]
             if subtree.data == 'forceno':
-                return df[col] == 0
+                return df[col] == 0  # type: ignore[no-any-return]
 
             # any-user column
             if subtree.data == 'anyyes':
-                return oring([df[c].astype('boolean') for c in anycols[col]])
+                return oring([df[c].astype('boolean') for c in anycols[col]])  # type: ignore[return-value]
             if subtree.data == 'allyes':
-                return anding([oring([df[c].astype('boolean').isna() for c in anycols[col]]),
-                               anding([df[c].astype('boolean') | df[c].astype('boolean').isna() for c in anycols[col]])])
+                return anding([
+                    oring([df[c].astype('boolean').isna() for c in anycols[col]]),  # type: ignore[return-value,list-item]
+                    anding([df[c].astype('boolean') | df[c].astype('boolean').isna() for c in anycols[col]])  # type: ignore[list-item]
+                ])
             if subtree.data == 'forceallyes':
-                return anding([df[c] == 1 for c in anycols[col]])
+                return anding([df[c] == 1 for c in anycols[col]])  # type: ignore[return-value]
             if subtree.data == 'anyno':
-                return oring([df[c].astype('boolean') == False for c in anycols[col]])  # noqa: E712
+                return oring([df[c].astype('boolean') == False for c in anycols[col]])  # type: ignore[return-value,list-item]  # noqa: E712
             if subtree.data == 'allno':
-                return anding([oring([df[c].astype('boolean').isna() for c in anycols[col]]),
-                               anding([(df[c].astype('boolean') == False) | df[c].astype('boolean').isna() for c in anycols[col]])])  # noqa: E712
+                return anding([  # type: ignore[list-item]
+                    oring([df[c].astype('boolean').isna() for c in anycols[col]]),  # type: ignore[return-value,list-item]
+                    anding([(df[c].astype('boolean') == False) | df[c].astype('boolean').isna() for c in anycols[col]])  # type: ignore[list-item]  # noqa: E712
+                ])  # noqa: E712
             if subtree.data == 'forceallno':
-                return anding([df[c] == 0 for c in anycols[col]])
+                return anding([df[c] == 0 for c in anycols[col]])  # type: ignore[return-value]
 
             # any-user column (use resolution if available)
             if subtree.data == 'resanyyes':
@@ -170,8 +174,8 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
                     return ((df[resanycols[col]['res']].notna()
                              & df[resanycols[col]['res']] == True)  # noqa: E712
                             | (df[resanycols[col]['res']].isna()
-                               & oring([df[c].astype('boolean') for c in resanycols[col]['users']])))
-                return oring([df[c].astype('boolean') == True for c in anycols[col]])  # noqa: E712
+                               & oring([df[c].astype('boolean') for c in resanycols[col]['users']])))  # type: ignore[return-value]
+                return oring([df[c].astype('boolean') == True for c in anycols[col]])  # type: ignore[return-value]  # noqa: E712
 
             if subtree.data == 'resanyno':
                 if resanycols[col]['res']:
@@ -180,7 +184,7 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
                             | (df[resanycols[col]['res']].isna()
                                & oring([df[c].astype('boolean') == False for c in resanycols[col]['users']])))  # noqa: E712
 
-                return oring([df[c].astype('boolean') for c in anycols[col]])
+                return oring([df[c].astype('boolean') for c in anycols[col]])  # type: ignore[return-value]
 
         raise SyntaxError('You shouldn\'t end up here.')
 

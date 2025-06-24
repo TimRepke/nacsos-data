@@ -331,7 +331,7 @@ def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]) -> G
         for vi in val['multi']:  # type: ignore[union-attr]
             yield f'{key}:{vi}', True
     elif val['str'] is not None:
-        yield f'STR|{key}', val['str']
+        yield f'STR|{key}', val['str']  # type: ignore[misc]
     else:
         raise RuntimeError('No annotation in label')
 
@@ -349,51 +349,55 @@ async def wide_export_table(session: DBSession | AsyncSession,
         prefix = {}
 
     stmt_labels = sa.text('''
-        WITH
-            scopes as (
-                SELECT scope_id::uuid,
-                       row_number() OVER () AS scope_order
-                FROM unnest(:scopes ::uuid[]) as scope_id),
-            labels_flat as (
-                SELECT ba.item_id,
-                       ba."order",
-                       scope.scope_order,
-                       json_object_agg(ba.key, json_build_object('bool', ba.value_bool, 'int', ba.value_int, 'multi', ba.multi_int, 'str', ba.value_str)) as label
-                FROM bot_annotation ba
-                     JOIN scopes scope ON scope.scope_id = ba.bot_annotation_metadata_id
-                GROUP BY ba.item_id, ba."order", scope.scope_order),
-            labels as (
-                SELECT item_id,
-                       min(scope_order) as scope_order,
-                       min("order")     as item_order,
-                       json_agg(label)  as labels
-                FROM labels_flat
-                GROUP BY item_id),
-            ulabels_flat as (
-                SELECT ass.item_id,
-                       ass."order",
-                       scope.scope_order,
-                       u.username,
-                       json_object_agg(a.key, json_build_object('bool', a.value_bool, 'int', a.value_int, 'multi', a.multi_int, 'str', a.value_str)) as label
-                FROM annotation a
-                     JOIN "user" u ON u.user_id = a.user_id
-                     JOIN assignment ass ON a.item_id = ass.item_id
-                     JOIN scopes scope ON scope.scope_id = ass.assignment_scope_id
-                GROUP BY ass.item_id, ass."order", scope.scope_order, u.username),
-            ulabels as (
-                SELECT item_id,
-                       min(scope_order)                 as scope_order,
-                       min("order")                     as item_order,
-                       json_object_agg(username, label) as labels
-                FROM ulabels_flat
-                GROUP BY item_id)
-        SELECT labels.labels                                     as labels_resolved,
-               ulabels.labels                                    as labels_unresolved,
-               coalesce(labels.scope_order, ulabels.scope_order) as scope_order,
-               coalesce(labels.item_order, ulabels.item_order)   as item_order,
-               coalesce(labels.item_id, ulabels.item_id)         as item_id
-        FROM labels FULL OUTER JOIN ulabels ON labels.item_id = ulabels.item_id
-    ''').columns(
+                          WITH
+                              scopes as (
+                                  SELECT scope_id::uuid,
+                                         row_number() OVER () AS scope_order
+                                  FROM unnest(:scopes ::uuid[]) as scope_id),
+                              labels_flat as (
+                                  SELECT ba.item_id,
+                                         ba."order",
+                                         scope.scope_order,
+                                         json_object_agg(ba.key, json_build_object('bool', ba.value_bool, 'int', ba.value_int, 'multi',
+                                                                                   ba.multi_int, 'str', ba.value_str)) as label
+                                  FROM bot_annotation ba
+                                       JOIN scopes scope ON scope.scope_id = ba.bot_annotation_metadata_id
+                                  GROUP BY ba.item_id, ba."order", scope.scope_order),
+                              labels as (
+                                  SELECT item_id,
+                                         min(scope_order) as scope_order,
+                                         min("order")     as item_order,
+                                         json_agg(label)  as labels
+                                  FROM labels_flat
+                                  GROUP BY item_id),
+                              ulabels_flat as (
+                                  SELECT ass.item_id,
+                                         ass."order",
+                                         scope.scope_order,
+                                         u.username,
+                                         json_object_agg(a.key,
+                                                         json_build_object('bool', a.value_bool, 'int', a.value_int, 'multi', a.multi_int,
+                                                                           'str', a.value_str)) as label
+                                  FROM annotation a
+                                       JOIN "user" u ON u.user_id = a.user_id
+                                       JOIN assignment ass ON a.item_id = ass.item_id
+                                       JOIN scopes scope ON scope.scope_id = ass.assignment_scope_id
+                                  GROUP BY ass.item_id, ass."order", scope.scope_order, u.username),
+                              ulabels as (
+                                  SELECT item_id,
+                                         min(scope_order)                 as scope_order,
+                                         min("order")                     as item_order,
+                                         json_object_agg(username, label) as labels
+                                  FROM ulabels_flat
+                                  GROUP BY item_id)
+                          SELECT labels.labels                                     as labels_resolved,
+                                 ulabels.labels                                    as labels_unresolved,
+                                 coalesce(labels.scope_order, ulabels.scope_order) as scope_order,
+                                 coalesce(labels.item_order, ulabels.item_order)   as item_order,
+                                 coalesce(labels.item_id, ulabels.item_id)         as item_id
+                          FROM labels
+                               FULL OUTER JOIN ulabels ON labels.item_id = ulabels.item_id
+                          ''').columns(
         sa.column('scope_order', sa.Integer),
         sa.column('item_order', sa.Integer),
         sa.column('item_id', psa.UUID),
@@ -464,7 +468,7 @@ async def wide_export_table(session: DBSession | AsyncSession,
         logger.debug(f'Resolving implicit False values for {colgrp}: [{cols}]')
         base = anding([df[col].isna() for col in cols])
         if base is not None:
-            df[cols] = df[cols].where(~(df[cols].isna() & ~base.to_numpy()[:, None]), other=0)
+            df[cols] = df[cols].where(~(df[cols].isna() & ~base.to_numpy()[:, None]), other=0)  # type: ignore[union-attr]
 
     # df = df.replace({np.nan: None})
 
