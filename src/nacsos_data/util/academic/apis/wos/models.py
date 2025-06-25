@@ -1,0 +1,560 @@
+from __future__ import annotations
+
+from enum import Enum
+from typing import Annotated, Any, Literal
+
+from pydantic import BaseModel as PydanticBaseModel, Field, field_validator, ConfigDict, BeforeValidator
+
+from nacsos_data.util import clear_empty
+
+
+def int_to_str(v):
+    if type(v) is int:
+        return str(v)
+    return v
+
+
+def str_to_int(v):
+    if type(v) is str:
+        return int(v)
+    return v
+
+
+def ensure_list(v):
+    if type(v) is list:
+        return v
+    if v is None:
+        return None
+    return [v]
+
+
+def str_to_int_lst(v):
+    if type(v) is str:
+        if ' ' in v:
+            return [int(vi.strip()) for vi in v.split(' ')]
+    if type(v) is list:
+        return v
+    if v is None:
+        return None
+    return [v]
+
+
+class BaseModel(PydanticBaseModel):
+    model_config = ConfigDict(coerce_numbers_to_str=True, strict=False)
+
+    @field_validator('*')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == '':
+            return None
+        return v
+
+
+class QueryResultT(BaseModel):
+    QueryID: int | None = None
+    RecordsSearched: int | None = None
+    RecordsFound: int | None = None
+
+
+class ReferenceRecord(BaseModel):
+    UID: str | None = None
+    citedAuthor: str | None = None
+    timesCited: int | None = None
+    year: int | None = None
+    page: int | None = None
+    citedWork: str | None = None
+    citedTitle: str | None = None
+    doi: str | None = None
+
+
+class Page(BaseModel):
+    end: int | None = None
+    begin: int | None = None
+    page_count: int | None = None
+    content: str | None = None
+
+
+class PubInfo(BaseModel):
+    coverdate: Annotated[str | None, BeforeValidator(int_to_str)] = None
+    vol: Annotated[str | None, BeforeValidator(int_to_str)] = None
+    journal_oas_gold: str | None = None
+    has_citation_context: str | None = None
+    pubyear: int | None = None
+    issue: Annotated[str | None, BeforeValidator(int_to_str)] = None
+    special_issue: str | None = None
+    sortdate: str | None = None
+    has_abstract: str | None = None
+    pubmonth: str | None = None
+    pubtype: str | None = None
+    early_access_month: int | None = None
+    early_access_date: str | None = None
+    early_access_year: int | None = None
+    page: Page | None = None
+
+
+class DataItemId(BaseModel):
+    type: str | None = None
+    content: str | None = None
+
+
+class DataItemIds(BaseModel):
+    data_item_id: DataItemId | None = Field(None, alias='data-item-id')
+
+
+class PreferredName(BaseModel):
+    full_name: str | None = None
+    last_name: str | None = None
+    middle_name: str | None = None
+    first_name: str | None = None
+
+
+NameRole = Literal['author', 'publisher', 'editor']
+
+
+class NameItem(BaseModel):
+    seq_no: int | None = None
+    role: NameRole | None = None
+    claim_status: bool | None = None
+    full_name: str | None = None
+    addr_no: Annotated[list[int] | None, BeforeValidator(str_to_int_lst)] | None = None
+    reprint: str | None = None
+    last_name: str | None = None
+    display_name: str | None = None
+    wos_standard: str | None = None
+    r_id: str | None = None
+    daisng_id: int | None = None
+    orcid_id: str | None = None
+    noncore_startyear: int | None = None
+    noncore_endyear: int | None = None
+    first_name: str | None = None
+    data_item_ids: DataItemIds | None = Field(None, alias='data-item-ids')
+    preferred_name: PreferredName | None = None
+    unified_name: str | None = None
+
+
+class Names(BaseModel):
+    count: int | None = None
+    name: Annotated[list[NameItem] | None, BeforeValidator(ensure_list)] = None
+
+
+class Doctypes(BaseModel):
+    count: int | None = None
+    doctype: Annotated[list[str] | None, BeforeValidator(ensure_list)] = None
+
+
+class UrlSpec(BaseModel):
+    url: str | None = None
+
+
+class AddressSpec(BaseModel):
+    city: str | None = None
+    addr_no: int | None = None
+    full_address: str | None = None
+    url_spec: UrlSpec | None = None
+
+
+class Publisher(BaseModel):
+    names: Names | None = None
+    address_spec: AddressSpec | None = None
+
+
+class Publishers(BaseModel):
+    publisher: Publisher | None = None
+
+
+class WUIDT(BaseModel):
+    coll_id: str | None = None
+
+
+class EditionItem(BaseModel):
+    value: str | None = None
+
+
+class EWUIDT(BaseModel):
+    WUID: WUIDT | None = None
+    edition: Annotated[list[EditionItem] | None, BeforeValidator(ensure_list)] = None
+
+
+TitleType = Literal['source', 'source_abbrev', 'abbrev_11', 'abbrev_29', 'abbrev_iso', 'item']
+
+
+class TitleItem(BaseModel):
+    type: TitleType | None = None
+    content: str | None = None
+
+
+class Titles(BaseModel):
+    count: int | None = None
+    title: Annotated[list[TitleItem] | None, BeforeValidator(ensure_list)] = None
+
+
+class Summary(BaseModel):
+    pub_info: PubInfo | None = None
+    names: Names | None = None
+    doctypes: Doctypes | None = None
+    publishers: Publishers | None = None
+    EWUID: EWUIDT | None = None
+    titles: Titles | None = None
+
+
+class Ids(BaseModel):
+    avail: str | None = None
+    content: str | None = None
+
+
+class BibPagecount(BaseModel):
+    type: str | None = None
+    content: int | None = None
+
+
+class KeywordsPlus(BaseModel):
+    count: int | None = None
+    keyword: list[str] | None = None
+
+
+class AddressName(BaseModel):
+    names: Names | None = None
+    address_spec: AddressSpec | None = None
+
+
+class Item(BaseModel):
+    xsi_type: str | None = Field(None, alias='xsi:type')
+    coll_id: str | None = None
+    ids: Ids | None = None
+    xmlns_xsi: str | None = Field(None, alias='xmlns:xsi')
+    bib_pagecount: BibPagecount | None = None
+    keywords_plus: KeywordsPlus | None = None
+    bib_id: str | None = None
+
+
+class ReprintAddresses(BaseModel):
+    count: int | None = None
+    address_name: Annotated[list[AddressName] | None, BeforeValidator(ensure_list)] = None
+
+
+class AbstractText(BaseModel):
+    count: int | None = None
+    p: Annotated[list[str] | None, BeforeValidator(ensure_list)] = None
+
+
+class Abstract(BaseModel):
+    abstract_text: AbstractText | None = None
+
+
+class Abstracts(BaseModel):
+    count: int | None = None
+    abstract: Annotated[list[Abstract] | None, BeforeValidator(ensure_list)] = None
+
+
+class GrantAgencyName(BaseModel):
+    pref: str | None = None
+    content: str | None = None
+
+
+class GrantIds(BaseModel):
+    count: int | None = None
+    grant_id: Annotated[list[str] | None, BeforeValidator(ensure_list)] = None
+
+
+class PrincipalInvestigatorInstitution1(BaseModel):
+    lang_id: str | None = None
+    content: str | None = None
+
+
+class PrincipalInvestigatorInstitution(BaseModel):
+    principalInvestigatorInstitution: PrincipalInvestigatorInstitution1 | None = None
+
+
+class PrincipalInvestigatorItem(BaseModel):
+    seq_no: int | None = None
+    lang_id: str | None = None
+    content: str | None = None
+
+
+class PrincipalInvestigators(BaseModel):
+    principalInvestigatorInstitutions: list[PrincipalInvestigatorInstitution] | None = None
+    principalInvestigator: list[PrincipalInvestigatorItem] | None = None
+
+
+class GrantProjectTitle(BaseModel):
+    lang_id: str | None = None
+    content: str | None = None
+
+
+class StartDate(BaseModel):
+    startYear: int | None = None
+    content: str | None = None
+
+
+class GrantSummary(BaseModel):
+    lang_id: str | None = None
+    content: str | None = None
+
+
+class GrantDataItem(BaseModel):
+    principalInvestigators: PrincipalInvestigators | None = None
+    grantStatus: str | None = None
+    grantProjectTitle: GrantProjectTitle | None = None
+    endDate: str | None = None
+    totalAwardAmount: str | None = None
+    coPrincipalInvestigators: str | None = None
+    currency: str | None = None
+    grantType: str | None = Field(
+        None
+    )
+    startDate: StartDate | None = None
+    grantSummary: GrantSummary | None = None
+
+
+class GrantData(BaseModel):
+    count: int | None = None
+    grantDataItem: Annotated[list[GrantDataItem] | None, BeforeValidator(ensure_list)] = None
+
+
+class Grant(BaseModel):
+    grant_agency_names: Annotated[list[GrantAgencyName] | None, BeforeValidator(ensure_list)] = None
+    grant_ids: GrantIds | None = None
+    grant_source: str | None = None
+    grant_data: GrantData | None = None
+    grant_agency: str | None = None
+
+
+class Grants(BaseModel):
+    count: int | None = None
+    grant: Annotated[list[Grant] | None, BeforeValidator(ensure_list)] = None
+
+
+class FundText(BaseModel):
+    p: str | None = None
+
+
+class FundAck(BaseModel):
+    grants: Grants | None = None
+    fund_text: FundText | None = None
+
+
+class NormalizedDoctypes(BaseModel):
+    count: int | None = None
+    doctype: Annotated[list[str] | None, BeforeValidator(ensure_list)] = None
+
+
+class Addresses(BaseModel):
+    count: int | None = None
+    address_name: Annotated[list[AddressName] | None, BeforeValidator(ensure_list)] = None
+
+
+class Subheadings(BaseModel):
+    count: int | None = None
+    subheading: Annotated[list[str] | None, BeforeValidator(ensure_list)] = None
+
+
+class SubjectItem(BaseModel):
+    ascatype: str | None = None
+    code: str | None = None
+    content: str | None = None
+
+
+class Subjects(BaseModel):
+    count: int | None = None
+    subject: Annotated[list[SubjectItem] | None, BeforeValidator(ensure_list)] = None
+
+
+class Headings(BaseModel):
+    count: int | None = None
+    heading: Annotated[list[str] | None, BeforeValidator(ensure_list)] = None
+
+
+class CategoryInfo(BaseModel):
+    subheadings: Subheadings | None = None
+    subjects: Subjects | None = None
+    headings: Headings | None = None
+
+
+class Language(BaseModel):
+    type: str | None = None
+    content: str | None = None
+
+
+class Languages(BaseModel):
+    count: int | None = None
+    language: Annotated[list[Language] | None, BeforeValidator(ensure_list)] = None
+
+
+class Keywords(BaseModel):
+    count: int | None = None
+    keyword: Annotated[list[str] | None, BeforeValidator(ensure_list)] = None
+
+
+class Refs(BaseModel):
+    count: int | None = None
+
+
+class FullrecordMetadata(BaseModel):
+    addresses: Addresses | None = None
+    category_info: CategoryInfo | None = None
+    normalized_languages: Languages | None = None
+    languages: Languages | None = None
+    keywords: Keywords | None = None
+    refs: Refs | None = None
+    reprint_addresses: ReprintAddresses | None = None
+    abstracts: Abstracts | None = None
+    fund_ack: FundAck | None = None
+    normalized_doctypes: NormalizedDoctypes | None = None
+
+
+class Contributor(BaseModel):
+    name: NameItem | None = None
+
+
+class Contributors(BaseModel):
+    count: int | None = None
+    contributor: Annotated[list[Contributor] | None, BeforeValidator(ensure_list)] = None
+
+
+class StaticData(BaseModel):
+    summary: Summary | None = None
+    item: Item | None = None
+    fullrecord_metadata: FullrecordMetadata | None = None
+    contributors: Contributors | None = None
+
+
+class Dates(BaseModel):
+    date_modified: str | None = None
+    date_created: str | None = None
+    date_loaded: str | None = None
+
+
+class FuncClass(Enum):
+    background = 'background'
+    basis = 'basis'
+    discuss = 'discuss'
+    support = 'support'
+    differ = 'differ'
+
+
+class FunctionTcItem(BaseModel):
+    local_count: int | None = Field(
+        None, description='The number of citations in this context'
+    )
+    func_class: FuncClass | None = Field(
+        None,
+        description='* background - previously published research that orients the current study within a scholarly area.\n* basis - references that report the data sets, methods, concepts and ideas that the author is using for her work directly or on which the author bases her work\n* discuss - references mentioned because the current study is going into a more detailed discussion.\n* support - references which the current study reports to have similar results to. This may also refer to similarities in methodology or in some cases replication of results.\n* differ - references which the current study reports to have differing results to. This may also refer to differences in methodology or differences in sample sizes, affecting results.\n',
+    )
+
+
+class TcListCc(BaseModel):
+    dedup_total_count: int | None = Field(
+        None, description='Overall number of citing items with citation context'
+    )
+    function_tc: list[FunctionTcItem] | None = Field(
+        None, description='Breakdown of how this article has been mentioned'
+    )
+
+
+class SubjectItem1(BaseModel):
+    content_type: str | None = Field(None, alias='content-type')
+    content_id: str | None = Field(None, alias='content-id')
+    content: str | None = None
+
+
+class SubjGroup(BaseModel):
+    subject: list[SubjectItem1] | None = None
+
+
+class CitationTopics(BaseModel):
+    subj_group: SubjGroup | None = Field(None, alias='subj-group')
+
+
+class SiloTcItem(BaseModel):
+    coll_id: str | None = None
+    local_count: int | None = None
+
+
+class TcList(BaseModel):
+    silo_tc: list[SiloTcItem] | None = None
+
+
+class CitationRelated(BaseModel):
+    tc_list_cc: TcListCc | None = Field(
+        None,
+        description='Citation classifications - describe why it has beed cited. More details [here](https://clarivate.com/webofsciencegroup/release-notes/wos/new-wos-may-12-release-notes/)',
+    )
+    citation_topics: CitationTopics | None = None
+    tc_list: TcList | None = None
+
+
+IdentifierType = Literal['issn', 'eissn', 'doi', 'isbn']
+
+
+class IdentifierItem(BaseModel):
+    type: IdentifierType | None = None
+    value: str | None = None
+
+
+class Identifiers(BaseModel):
+    IdentifierItem: Annotated[list[IdentifierItem] | None, BeforeValidator(ensure_list)] = None
+
+
+class ClusterRelated(BaseModel):
+    identifiers: Identifiers | None = None
+
+
+class WosUsage(BaseModel):
+    last180days: int | None = None
+    alltime: int | None = None
+
+
+class DynamicData(BaseModel):
+    citation_related: Annotated[CitationRelated | None, Field(exclude=True)] = None
+    cluster_related: ClusterRelated | None = None
+    wos_usage: Annotated[WosUsage | None, Field(exclude=True)] = None
+
+
+class WosRecord(BaseModel):
+    model_config = ConfigDict(extra='allow')
+    UID: str = Field(...)
+    static_data: StaticData
+    dates: Dates | None = None
+    r_id_disclaimer: str = Field(...)
+    dynamic_data: DynamicData
+
+
+class Records2(BaseModel):
+    REC: list[WosRecord] | None = None
+
+
+class Records1(BaseModel):
+    records: Records2 | None = None
+
+
+class DataT(BaseModel):
+    Records: Records1 | None = None
+
+
+class WosSearchResponse(BaseModel):
+    Data: DataT | None = None
+    QueryResult: QueryResultT | None = None
+
+
+def dump_wos_record(record: WosRecord) -> dict[str, Any]:
+    return clear_empty(record.model_dump(exclude_none=True, exclude_defaults=True, exclude_unset=True))
+
+
+if __name__ == '__main__':
+    import json
+    from nacsos_data.util import get
+
+    for fp in [
+        'scratch/academic_apis/wos_response.json',
+        'scratch/academic_apis/response2.json',
+    ]:
+        with open(fp, 'r') as f:
+            data = json.load(f)
+            # response = CategoryContextResponse.model_validate(data)
+            # print(response)
+            records = get(data, 'Data', 'Records', 'records', 'REC', default=[])
+            for record in records:
+                wr = WosRecord.model_validate(record)
+                wrd = dump_wos_record(wr)
+                print(wr)
+                print(wrd)

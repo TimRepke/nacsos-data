@@ -1,4 +1,5 @@
 import logging
+import uuid
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from datetime import timedelta
@@ -9,6 +10,7 @@ if TYPE_CHECKING:
     import pandas as pd
 
 T = TypeVar('T')
+D = TypeVar('D')
 
 
 async def batched_async(lst: AsyncIterator[T] | AsyncGenerator[T, None], batch_size: int) \
@@ -187,3 +189,21 @@ def get(obj: dict[str, Any], *keys: str, default: Any = None) -> Any:  # type: i
         if obj is None:
             return default  # type: ignore[unreachable]
     return obj
+
+
+def get_value(val: Callable[[], T], default: D | None = None) -> T | D:
+    try:
+        ret = val()
+        if ret is None:
+            return default
+        return ret
+    except (KeyError, AttributeError):
+        return default
+
+
+def as_uuid(val: str | uuid.UUID | None = None) -> uuid.UUID | None:
+    if val is None:
+        return None
+    if type(val) == str:
+        return uuid.UUID(val)
+    return val  # type: ignore[return-value]
