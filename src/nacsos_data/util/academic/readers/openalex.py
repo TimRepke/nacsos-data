@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from ....models.items import AcademicItemModel
 from ....models.items.academic import AcademicAuthorModel, AffiliationModel
-from ....models.openalex.solr import WorkSolr, Work, Location, Authorship, Biblio, DefType, SearchField, OpType
+from ....models.openalex import WorkSolr, Work, Location, Authorship, Biblio, DefType, SearchField, OpType
 from ..clean import clear_empty
 from ..duplicate import str_to_title_slug
 

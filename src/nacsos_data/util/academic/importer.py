@@ -26,7 +26,7 @@ from ...db.schemas import AcademicItem, m2m_import_item_table
 from ...db.schemas.imports import ImportRevision
 from ...models.items import AcademicItemModel, ItemEntry
 from ...models.imports import M2MImportItemType, ImportRevisionModel
-from ...models.openalex.solr import DefType, SearchField, OpType
+from ...models.openalex import DefType, SearchField, OpType
 from .. import elapsed_timer
 from ..text import tokenise_item, extract_vocabulary, itm2txt
 from ..duplicate import MilvusDuplicateIndex, PynndescentDuplicateIndex
@@ -813,7 +813,7 @@ async def import_openalex_files(sources: list[Path],
     **import_id**
         The import_id to connect these tweets to
     """
-    from nacsos_data.models.openalex.solr import WorkSolr
+    from nacsos_data.models.openalex import WorkSolr
     from nacsos_data.util.academic.readers.openalex import translate_doc, translate_work
 
     logger = logging.getLogger('import_openalex_files') if logger is None else logger

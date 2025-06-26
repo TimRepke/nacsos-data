@@ -1,14 +1,13 @@
 import uuid
 import logging
-from pathlib import Path
-from typing import Any, Generator, Iterable, Annotated, Literal, TypeVar, Callable
+from typing import Any, Generator, Literal, TypeVar
 from httpx import HTTPError
 
 from nacsos_data.models.items import AcademicItemModel
 from nacsos_data.models.items.academic import AcademicAuthorModel
-from nacsos_data.util import get, as_uuid, get_value
-from nacsos_data.util.academic.apis.util import RequestClient, collect_jsonl, AbstractAPI
-from nacsos_data.util.academic.apis.wos.models import WosRecord, dump_wos_record
+from nacsos_data.models.web_of_science import WosRecord
+from nacsos_data.util import as_uuid, get_value, clear_empty
+from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
 
 # WOS - Web of Science Core collection
 # BIOABS - Biological Abstracts
@@ -29,6 +28,10 @@ Database = Literal['WOS', 'BCI', 'BIOABS', 'BIOSIS', 'CCC', 'DIIDW', 'DRCI', 'ME
 ViewOption = Literal['FR', 'SR', 'FS']
 
 T = TypeVar("T")
+
+
+def dump_wos_record(record: WosRecord) -> dict[str, Any]:
+    return clear_empty(record.model_dump(exclude_none=True, exclude_defaults=True, exclude_unset=True))
 
 
 def get_title(wr: WosRecord) -> str | None:

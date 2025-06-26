@@ -2,7 +2,7 @@ import logging
 import uuid
 from typing import Any, Generator
 
-from httpx import Client, codes, HTTPError, Response
+from httpx import codes, HTTPError, Response
 from nacsos_data.models.items import AcademicItemModel
 from nacsos_data.util import get, as_uuid
 from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
@@ -122,6 +122,6 @@ if __name__ == '__main__':
     app = DimensionsAPI.test_app(
         static_files=[
             # 'scratch/academic_apis/response_scopus1.json',
-            'scratch/academic_apis/response_scopus2.jsonl',
+            # 'scratch/academic_apis/response_scopus2.jsonl',
         ])
     app()
