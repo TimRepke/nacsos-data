@@ -180,7 +180,7 @@ class OpenAlexAPI(AbstractAPI):
         n_pages = 0
         n_works = 0
 
-        with RequestClient(timeout_rate=self.timeout_rate,
+        with RequestClient(backoff_rate=self.backoff_rate,
                            max_req_per_sec=self.max_req_per_sec,
                            max_retries=self.max_retries,
                            proxy=self.proxy) as request_client:
@@ -217,10 +217,10 @@ class OpenAlexSolrAPI(AbstractAPI):
                  proxy: str | None = None,
                  max_req_per_sec: int = 5,
                  max_retries: int = 5,
-                 timeout_rate: float = 5.,
+                 backoff_rate: float = 5.,
                  logger: logging.Logger | None = None):
         super().__init__(api_key=api_key, proxy=proxy, max_retries=max_retries,
-                         max_req_per_sec=max_req_per_sec, timeout_rate=timeout_rate, logger=logger)
+                         max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
         self.openalex_endpoint = openalex_endpoint
         self.batch_size = batch_size
 
@@ -236,7 +236,7 @@ class OpenAlexSolrAPI(AbstractAPI):
            :param query:
            :return:
            """
-        with RequestClient(timeout_rate=self.timeout_rate,
+        with RequestClient(backoff_rate=self.backoff_rate,
                            max_req_per_sec=self.max_req_per_sec,
                            max_retries=self.max_retries,
                            proxy=self.proxy) as request_client:
@@ -317,7 +317,7 @@ if __name__ == '__main__':
     ) -> None:
 
         if query_file:
-            with open(query, 'r') as qf:
+            with open(query_file, 'r') as qf:
                 query_str = qf.read()
         elif query:
             query_str = query
@@ -331,6 +331,16 @@ if __name__ == '__main__':
         else:
             raise AttributeError('Must provide either `openalex_endpoint` or `api_key`')
         api.download_raw(query=query_str, target=target)
+
+
+    @app.command()
+    def convert(
+            source: Annotated[Path, typer.Option(help='File to read results from')],
+            target: Annotated[Path, typer.Option(help='File to write results to')],
+            kind: Annotated[Literal['SOLR', 'API'], typer.Option(help='database to use')] = 'SOLR',
+    ):
+        cls = OpenAlexSolrAPI if kind == 'SOLR' else OpenAlexAPI
+        cls.convert_file(source=source, target=target)
 
 
     @app.command()

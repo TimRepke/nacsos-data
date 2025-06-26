@@ -1,10 +1,12 @@
 import uuid
 from typing import Any, Generator
 
+from httpx import codes
+
 from nacsos_data.models.items import AcademicItemModel
 from nacsos_data.models.items.academic import AcademicAuthorModel, AffiliationModel
 from nacsos_data.util import get, clear_empty, as_uuid
-from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
+from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI, response_logger
 
 
 def get_title(obj: dict[str, Any]) -> str | None:
@@ -69,10 +71,13 @@ class ScopusAPI(AbstractAPI):
         :param query:
         :return:
         """
-        with RequestClient(timeout_rate=self.timeout_rate,
+        with RequestClient(backoff_rate=self.backoff_rate,
                            max_req_per_sec=self.max_req_per_sec,
                            max_retries=self.max_retries,
                            proxy=self.proxy) as request_client:
+
+            request_client.on(status=codes.UNAUTHORIZED, func=response_logger(self.logger))
+
             next_cursor = '*'
             n_pages = 0
             n_records = 0

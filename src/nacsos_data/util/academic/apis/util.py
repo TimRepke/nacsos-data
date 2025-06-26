@@ -23,12 +23,21 @@ from httpx._types import (
 from nacsos_data.models.items import AcademicItemModel
 
 
+def response_logger(logger: logging.Logger) -> Callable[[Response], dict[str, Any]]:
+    def inner(response: Response) -> dict[str, Any]:
+        # nonlocal logger
+        logger.warning(response.text)
+        return {}
+
+    return inner
+
+
 class RequestClient(Client):
     def __init__(self,  # type: ignore[no-untyped-def]
                  *,
                  max_req_per_sec: int = 5,
                  max_retries: int = 5,
-                 timeout_rate: float = 5.,
+                 backoff_rate: float = 120.,
                  retry_on_status: list[int] | None = None,
                  **kwargs) -> None:
         super().__init__(**kwargs)
@@ -36,7 +45,7 @@ class RequestClient(Client):
         self.max_req_per_sec = max_req_per_sec
         self.time_per_request = 1 / max_req_per_sec
         self.max_retries = max_retries
-        self.timeout_rate = timeout_rate
+        self.backoff_rate = backoff_rate
         self.last_request: float | None = None
         self.retry_on_status = retry_on_status or [
             codes.INTERNAL_SERVER_ERROR,  # 500
@@ -63,9 +72,9 @@ class RequestClient(Client):
             params: QueryParamTypes | None = None,
             headers: HeaderTypes | None = None,
             cookies: CookieTypes | None = None,
-            auth: AuthTypes | UseClientDefault | None = USE_CLIENT_DEFAULT,
-            follow_redirects: bool | UseClientDefault = USE_CLIENT_DEFAULT,
-            timeout: TimeoutTypes | UseClientDefault = USE_CLIENT_DEFAULT,
+            auth: AuthTypes | UseClientDefault | None = None,
+            follow_redirects: bool | UseClientDefault = True,
+            timeout: TimeoutTypes | UseClientDefault = 120,
             extensions: RequestExtensions | None = None,
     ) -> Response:
         for retry in range(self.max_retries):
@@ -77,10 +86,22 @@ class RequestClient(Client):
 
             # Log latest request
             self.last_request = perf_counter()
-
-            response = super().request(method=method, url=url, content=content, data=data, files=files, json=json,
-                                       params=params, headers=headers, cookies=cookies, auth=auth,
-                                       follow_redirects=follow_redirects, timeout=timeout, extensions=extensions)
+            print(self.kwargs.get('headers', {}).update(headers or {}))
+            response = super().request(
+                method=method or self.kwargs.get('method'),
+                url=url or self.kwargs.get('url'),
+                content=content or self.kwargs.get('content'),
+                data=data or self.kwargs.get('data'),
+                files=files or self.kwargs.get('files'),
+                json=json or self.kwargs.get('json'),
+                params=params or self.kwargs.get('params'),
+                headers=self.kwargs.get('headers', {}) | (headers or {}),
+                cookies=self.kwargs.get('cookies', {}) | (cookies or {}),
+                auth=auth or self.kwargs.get('auth', USE_CLIENT_DEFAULT),
+                follow_redirects=follow_redirects or self.kwargs.get('follow_redirects', USE_CLIENT_DEFAULT),
+                timeout=timeout or self.kwargs.get('timeout', USE_CLIENT_DEFAULT),
+                extensions=extensions or self.kwargs.get('extensions'),
+            )
 
             try:
                 response.raise_for_status()
@@ -124,7 +145,7 @@ class RequestClient(Client):
                     logging.exception(e)
 
                     # grow the sleep time between requests
-                    self.time_per_request = (self.time_per_request + 1) * self.timeout_rate
+                    self.time_per_request = (self.time_per_request + 1) * self.backoff_rate
         else:
             raise RuntimeError('Maximum number of retries reached')
 
@@ -135,14 +156,14 @@ class AbstractAPI(ABC):
                  proxy: str | None = None,
                  max_req_per_sec: int = 5,
                  max_retries: int = 5,
-                 timeout_rate: float = 5.,
+                 backoff_rate: float = 5.,
                  logger: logging.Logger | None = None):
         self.api_key = api_key
         self.proxy = proxy
         self.logger = logger
         self.max_req_per_sec = max_req_per_sec
         self.max_retries = max_retries
-        self.timeout_rate = timeout_rate
+        self.backoff_rate = backoff_rate
 
         if self.logger is None:
             self.logger = logging.getLogger(type(self).__name__)
@@ -199,7 +220,7 @@ class AbstractAPI(ABC):
         ) -> None:
 
             if query_file:
-                with open(query, 'r') as qf:
+                with open(query_file, 'r') as qf:
                     query_str = qf.read()
             elif query:
                 query_str = query
@@ -208,6 +229,13 @@ class AbstractAPI(ABC):
 
             instance = cls(api_key=api_key, proxy=proxy, logger=logger)
             instance.download_raw(query=query_str, target=target)
+
+        @app.command()
+        def convert(
+                source: Annotated[Path, typer.Option(help='File to read results from')],
+                target: Annotated[Path, typer.Option(help='File to write results to')],
+        ):
+            cls.convert_file(source=source, target=target)
 
         @app.command()
         def translate():

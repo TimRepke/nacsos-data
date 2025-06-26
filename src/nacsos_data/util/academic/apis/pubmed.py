@@ -66,7 +66,7 @@ class PubmedAPI(AbstractAPI):
         """
         n_records = 0
         n_pages = 0
-        with RequestClient(timeout_rate=self.timeout_rate,
+        with RequestClient(backoff_rate=self.backoff_rate,
                            max_req_per_sec=self.max_req_per_sec,
                            max_retries=self.max_retries,
                            proxy=self.proxy) as request_client:

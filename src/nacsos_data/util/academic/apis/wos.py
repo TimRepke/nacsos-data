@@ -100,10 +100,10 @@ class WoSAPI(AbstractAPI):
                  proxy: str | None = None,
                  max_req_per_sec: int = 5,
                  max_retries: int = 5,
-                 timeout_rate: float = 5.,
+                 backoff_rate: float = 5.,
                  logger: logging.Logger | None = None):
         super().__init__(api_key=api_key, proxy=proxy, max_retries=max_retries,
-                         max_req_per_sec=max_req_per_sec, timeout_rate=timeout_rate, logger=logger)
+                         max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
         self.database = database
         self.page_size = page_size
 
@@ -122,7 +122,7 @@ class WoSAPI(AbstractAPI):
            :param query:
            :return:
            """
-        with RequestClient(timeout_rate=self.timeout_rate,
+        with RequestClient(backoff_rate=self.backoff_rate,
                            max_req_per_sec=self.max_req_per_sec,
                            max_retries=self.max_retries,
                            proxy=self.proxy) as request_client:

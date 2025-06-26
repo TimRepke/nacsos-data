@@ -1,5 +1,50 @@
 # Academic Search APIs
 
+*Added in nacsos_data:v0.22.0 (June 2025)*
+
+## Usage
+
+All API wrappers pretty much work the same way as shown here but might have varying parameters.
+
+```bash
+# Go to where the library is and activate environment
+cd /path/to/repository/root
+source /path/to/env/bin/activate
+
+python src/nacsos_data/util/academic/apis/scopus.py \
+       download \
+       --api-key "??" \
+       --query "TITLE-ABS-KEY(\"school uniform\")" \
+       --target data/scopus-raw.jsonl
+python src/nacsos_data/util/academic/apis/scopus.py \
+       convert \
+       --source data/scopus-raw.jsonl \
+       --target data/scopus-items.jsonl
+```
+
+If you installed the package, you also get a convenience method:
+
+```bash
+# Activate environment where nacsos_data is installed in
+source /path/to/env/bin/activate
+
+# See all options
+academic_api --help
+
+# Download from API
+academic_api SCOPUS \
+       download \
+       --api-key "??" \
+       --query "TITLE-ABS-KEY(\"school uniform\")" \
+       --target data/scopus-raw.jsonl
+
+# Convert to NACSOS AcademicItems
+academic_api SCOPUS \
+       convert \
+       --source "TITLE-ABS-KEY(\"school uniform\")" \
+       --target data/scopus-raw.jsonl
+```
+
 ### Comparison of PubMed, Scopus, Web of Science, and Google Scholar: strengths and weaknesses
 
 *Matthew E Falagas 1, Eleni I Pitsouni, George A Malietzis, Georgios Pappas*
