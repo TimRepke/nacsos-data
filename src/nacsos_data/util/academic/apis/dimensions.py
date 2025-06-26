@@ -1,12 +1,11 @@
 import logging
 import uuid
-from pathlib import Path
-from typing import Any, Generator, Iterable, Annotated
+from typing import Any, Generator
 
 from httpx import Client, codes, HTTPError, Response
 from nacsos_data.models.items import AcademicItemModel
 from nacsos_data.util import get, as_uuid
-from nacsos_data.util.academic.apis.util import RequestClient, collect_jsonl, AbstractAPI
+from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
 
 
 def get_title(obj: dict[str, Any]) -> str | None:
