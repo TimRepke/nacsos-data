@@ -1,7 +1,7 @@
 import json
 import logging
 import uuid
-from abc import ABC, abstractmethod, abstractclassmethod
+from abc import ABC, abstractmethod
 from typing import Any, Callable, Iterable, Generator, Annotated
 from pathlib import Path
 from time import perf_counter, sleep
@@ -143,7 +143,6 @@ class AbstractAPI(ABC):
         self.max_req_per_sec = max_req_per_sec
         self.max_retries = max_retries
         self.timeout_rate = timeout_rate
-        self.page_size = page_size
 
         if self.logger is None:
             self.logger = logging.getLogger(type(self).__name__)

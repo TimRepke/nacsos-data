@@ -1,7 +1,5 @@
-import logging
 import uuid
-from pathlib import Path
-from typing import Any, Generator, Iterable, Annotated
+from typing import Any, Generator
 
 from nacsos_data.models.items import AcademicItemModel
 from nacsos_data.models.items.academic import AcademicAuthorModel, AffiliationModel

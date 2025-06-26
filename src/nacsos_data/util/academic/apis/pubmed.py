@@ -2,38 +2,46 @@ import uuid
 from typing import Any, Generator
 from xml.etree.ElementTree import Element, fromstring as parse_xml
 
-from nacsos_data.models.items import AcademicItemModel
-from nacsos_data.util import as_uuid
+from httpx import codes, Response
+
+from nacsos_data.util import as_uuid, clear_empty
 from nacsos_data.util.xml import xml2dict
 from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
+from nacsos_data.models.items.academic import AcademicAuthorModel, AcademicItemModel, AffiliationModel
 
 
-def get_title(article: Element) -> str | None:
-    hits = article.findall('.//ArticleTitle')
-    if len(hits) > 0:
-        return ' '.join(hits[0].itertext())
-    return None
+def select(obj: dict[str, Any], *keys: str, default: Any = None) -> Any | None:  # type: ignore[var-annotated]
+    for key in keys:
+        obj = obj.get(key)  # type: ignore[assignment]
+        if obj is None or len(obj) == 0:
+            return default  # type: ignore[unreachable]
+        obj = obj[0]
+    return obj
 
 
-def get_abstract(article: Element) -> str | None:
-    hits = article.findall('.//Abstract')
-    if len(hits) > 0:
-        return '\n\n'.join(hits[0].itertext())
-    return None
+def get_ids(pm_info: dict[str, Any]) -> dict[str, str]:
+    ids = {}
+    for aid in select(pm_info, 'PubmedData', 'ArticleIdList', 'ArticleId', default=[]):
+        ids[aid['@IdType']] = aid['_text']
+    return ids
 
 
-def get_doi(article: Element) -> str | None:
-    hits = article.findall('.//ArticleId[@IdType="doi"]')
-    if len(hits) > 0:
-        return hits[0].text
-    return None
+def get_authors(citation: dict[str, Any]) -> Generator[AcademicAuthorModel, None, None]:
+    authors = select(citation, 'Article', 'AuthorList', default={}).get('Author', [])
+    for author in authors:
+        affiliations: list[AffiliationModel] | None = [
+            AffiliationModel(name=select(aff, 'Affiliation', default={}).get('_text'))
+            for aff in author.get('AffiliationInfo', [])
+        ]
+        affiliations = [aff for aff in affiliations if aff.name is not None]
+        if len(affiliations) == 0:
+            affiliations = None
 
-
-def get_id(article: Element) -> str | None:
-    hits = article.findall('.//PMID')
-    if len(hits) > 0:
-        return hits[0].text
-    return None
+        yield AcademicAuthorModel(
+            name=f'{select(author, 'ForeName', default={}).get('_text', '')} '
+                 f'{select(author, 'LastName', default={}).get('_text', '')}',
+            affiliations=affiliations,
+        )
 
 
 class PubmedAPI(AbstractAPI):
@@ -47,14 +55,13 @@ class PubmedAPI(AbstractAPI):
 
         API Documentation:
         https://www.ncbi.nlm.nih.gov/books/NBK25497/
+        https://www.ncbi.nlm.nih.gov/books/NBK25499/#chapter4.EFetch
 
         Works in two stages:
           1) Initiate query and get QueryKey
           2) Fetch result pages for QueryKey
 
-        :param api_key:
         :param query:
-        :param logger:
         :return:
         """
         n_records = 0
@@ -75,10 +82,26 @@ class PubmedAPI(AbstractAPI):
             tree = parse_xml(search_page.text)
             web_env = tree.find('WebEnv').text  # type: ignore[union-attr]
             query_key = tree.find('QueryKey').text  # type: ignore[union-attr]
-            # TODO: get total result size
 
-            while True:
-                # FIXME: paginate
+            self.logger.warning(f'Query translated to: {tree.find('QueryTranslation').text}')
+
+            errors = tree.find('ErrorList')
+            if errors is not None:
+                for error in errors.iter():
+                    self.logger.error(f'Error {error.tag}: {''.join(error.itertext())}')
+
+            n_total = int(tree.find('Count').text)
+            page_size = int(tree.find('RetMax').text)
+
+            done = False
+
+            def on_done(response: Response) -> dict[str, Any]:
+                self.logger.info('Seemed to have reached the end (BAD_REQUEST).')
+                done = True
+                return {}
+
+            request_client.on(codes.BAD_REQUEST, on_done)
+            while not done:
                 result_page = request_client.get(
                     'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi',
                     params={
@@ -86,15 +109,26 @@ class PubmedAPI(AbstractAPI):
                         'db': 'pubmed',
                         'WebEnv': web_env,
                         'query_key': query_key,
+                        'retmax': page_size,
+                        'retstart': n_records
                     },
                 )
+                rate_limit = result_page.headers.get('x-ratelimit-limit')
+                rate_left = result_page.headers.get('x-ratelimit-remaining')
 
                 tree = parse_xml(result_page.text)
-                for article in tree.findall('PubmedArticle'):
-                    yield article
-                    n_records += 1
-                self.logger.debug(f'Found {n_records:,} records after processing page {n_pages}')
-                break  # FIXME
+                articles = list(tree.findall('PubmedArticle'))
+
+                n_records += len(articles)
+                yield from articles
+
+                self.logger.info(f'Found {n_records:,}/{n_total:,} records after processing page {n_pages} ({page_size} per page)'
+                                 f' | rate-limit: {rate_limit}'
+                                 f' | rate-remaining: {rate_left}')
+
+                if n_records >= n_total or len(articles) == 0:
+                    self.logger.info('Seemed to have reached the end (count zero or total reached).')
+                    break
 
     def fetch_raw(self, query: str) -> Generator[dict[str, Any], None, None]:
         for entry in self._fetch_raw(query):
@@ -102,21 +136,36 @@ class PubmedAPI(AbstractAPI):
 
     @classmethod
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
+        citation = record.get('MedlineCitation')[0]
+        pm_info = record.get('PubmedData')[0]
+        pm_ids = get_ids(pm_info)
+        py: str | None = select(citation, 'Article', 'ArticleDate', 'Year', default={}).get('_text')
+        pyi: int | None = None if py is None else int(py)
+
+        if 'ReferenceList' in pm_info:
+            del pm_info['ReferenceList']
+
         return AcademicItemModel(
             item_id=uuid.uuid4(),
             project_id=as_uuid(project_id),
-            doi=get_doi(record),
-            title=get_title(record),
-            pubmed_id=get_id(record),
-            text=get_abstract(record),
-            # TODO
+            doi=pm_ids.get('doi'),
+            title=select(citation, 'Article', 'ArticleTitle', default={}).get('_text'),
+            pubmed_id=pm_ids.get('pubmed'),
+            text=select(citation, 'Article', 'Abstract', 'AbstractText', default={}).get('_text'),
+            publication_year=pyi,
+            authors=clear_empty(list(get_authors(citation))),
+            source=select(citation, 'Article', 'Journal', 'Title', default={}).get('_text'),
+            keywords=clear_empty([
+                kw.get('_text', '').strip()
+                for kw in select(citation, 'KeywordList', default={}).get('Keyword', [])
+            ]),
+            meta={'pubmed-api': record},
         )
 
 
 if __name__ == '__main__':
     app = PubmedAPI.test_app(
         static_files=[
-            # 'scratch/academic_apis/response_scopus1.json',
-            # 'scratch/academic_apis/response_scopus2.jsonl',
+            'scratch/academic_apis/response_pubmed.jsonl',
         ])
     app()
