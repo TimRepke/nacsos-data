@@ -76,9 +76,21 @@ def str_to_int(v):
     return v
 
 
+def ensure_bool_str(v):
+    if type(v) is bool:
+        return 'Y' if v else 'N'
+    return v
+
+
+def fix_name(v):
+    if type(v) is str:
+        return v
+    return None
+
+
 def ensure_list(v):
     if type(v) is list:
-        return v
+        return [vi for vi in v if vi is not None]
     if v is None:
         return None
     return [v]
@@ -164,10 +176,10 @@ class DataItemIds(BaseModel):
 
 
 class PreferredName(BaseModel):
-    full_name: str | None = None
-    last_name: str | None = None
-    middle_name: str | None = None
-    first_name: str | None = None
+    full_name: Annotated[str | None, BeforeValidator(fix_name)] = None
+    last_name: Annotated[str | None, BeforeValidator(fix_name)] = None
+    middle_name: Annotated[str | None, BeforeValidator(fix_name)] = None
+    first_name: Annotated[str | None, BeforeValidator(fix_name)] = None
 
 
 NameRole = Literal[
@@ -180,18 +192,18 @@ class NameItem(BaseModel):
     seq_no: int | None = None
     role: NameRole | None = None
     claim_status: bool | None = None
-    full_name: str | None = None
+    full_name: Annotated[str | None, BeforeValidator(fix_name)] = None
     addr_no: Annotated[list[int] | None, BeforeValidator(str_to_int_lst)] | None = None
     reprint: str | None = None
-    last_name: str | None = None
-    display_name: str | None = None
+    last_name: Annotated[str | None, BeforeValidator(fix_name)] = None
+    display_name: Annotated[str | None, BeforeValidator(fix_name)] = None
     wos_standard: str | None = None
     r_id: str | None = None
     daisng_id: int | None = None
     orcid_id: str | None = None
     noncore_startyear: int | None = None
     noncore_endyear: int | None = None
-    first_name: str | None = None
+    first_name: Annotated[str | None, BeforeValidator(fix_name)] = None
     data_item_ids: DataItemIds | None = Field(None, alias='data-item-ids')
     preferred_name: PreferredName | None = None
     unified_name: str | None = None
