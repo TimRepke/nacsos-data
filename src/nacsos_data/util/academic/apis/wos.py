@@ -89,7 +89,7 @@ def translate_authors(record: WosRecord):
     authors = get_value(lambda: record.static_data.summary.names.name)
     if not authors:
         return None
-    return [AcademicAuthorModel(name=author.full_name) for author in authors]
+    return [AcademicAuthorModel(name=author.full_name) for author in authors if author.full_name is not None]
 
 
 class WoSAPI(AbstractAPI):

@@ -22,18 +22,51 @@
 
 
 from __future__ import annotations
-
+import re
 from enum import Enum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel as PydanticBaseModel, Field, field_validator, ConfigDict, BeforeValidator
 
-from nacsos_data.util import clear_empty
+NUM = re.compile(r'[^0-9]+')
 
 
 def int_to_str(v):
     if type(v) is int:
         return str(v)
+    return v
+
+
+def force_int(v):
+    if type(v) is int:
+        return v
+    if type(v) is str:
+        v = NUM.sub('', v)
+        if len(v) == 0:
+            return None
+        return int(v)
+    return None
+
+
+def fix_lang(v):
+    if type(v) is str:
+        return {'content': v}
+    if type(v) is list:
+        return [fix_lang(vi) for vi in v]
+    return v
+
+
+def fix_title(v):
+    if type(v) is str:
+        return v
+    if type(v) is list:
+        return ' '.join(v)
+    return None
+
+
+def fix_page(v):
+    if type(v) is str:
+        return {'content': v}
     return v
 
 
@@ -60,6 +93,12 @@ def str_to_int_lst(v):
     if v is None:
         return None
     return [v]
+
+
+def assert_empty(v):
+    if v == '':
+        return None
+    return v
 
 
 class BaseModel(PydanticBaseModel):
@@ -91,8 +130,8 @@ class ReferenceRecord(BaseModel):
 
 
 class Page(BaseModel):
-    end: int | None = None
-    begin: int | None = None
+    end: Annotated[int | None, BeforeValidator(force_int)] = None
+    begin: Annotated[int | None, BeforeValidator(force_int)] = None
     page_count: int | None = None
     content: str | None = None
 
@@ -112,7 +151,7 @@ class PubInfo(BaseModel):
     early_access_month: int | None = None
     early_access_date: str | None = None
     early_access_year: int | None = None
-    page: Page | None = None
+    page: Annotated[Page | None, BeforeValidator(fix_page)] = None
 
 
 class DataItemId(BaseModel):
@@ -121,7 +160,7 @@ class DataItemId(BaseModel):
 
 
 class DataItemIds(BaseModel):
-    data_item_id: DataItemId | None = Field(None, alias='data-item-id')
+    data_item_id: Annotated[list[DataItemId | None] | None, BeforeValidator(ensure_list)] = Field(None, alias='data-item-id')
 
 
 class PreferredName(BaseModel):
@@ -131,7 +170,10 @@ class PreferredName(BaseModel):
     first_name: str | None = None
 
 
-NameRole = Literal['author', 'publisher', 'editor']
+NameRole = Literal[
+    'author', 'publisher', 'editor', 'researcher_id', 'inventor',
+    'assignee', 'book_editor', 'book_corp', 'anon', 'corp', 'foreign', 'book', 'subject'
+]
 
 
 class NameItem(BaseModel):
@@ -182,7 +224,7 @@ class Publisher(BaseModel):
 
 
 class Publishers(BaseModel):
-    publisher: Publisher | None = None
+    publisher: Annotated[list[Publisher] | None, BeforeValidator(ensure_list)] = None
 
 
 class WUIDT(BaseModel):
@@ -198,12 +240,15 @@ class EWUIDT(BaseModel):
     edition: Annotated[list[EditionItem] | None, BeforeValidator(ensure_list)] = None
 
 
-TitleType = Literal['source', 'source_abbrev', 'abbrev_11', 'abbrev_29', 'abbrev_iso', 'item']
+TitleType = Literal[
+    'source', 'source_abbrev', 'abbrev_11', 'abbrev_29', 'abbrev_iso',
+    'item', 'book_series', 'series', 'foreign', 'book_seriessub', 'book', 'book_subtitle'
+]
 
 
 class TitleItem(BaseModel):
     type: TitleType | None = None
-    content: str | None = None
+    content: Annotated[str | None, BeforeValidator(fix_title)] = None
 
 
 class Titles(BaseModel):
@@ -232,7 +277,7 @@ class BibPagecount(BaseModel):
 
 class KeywordsPlus(BaseModel):
     count: int | None = None
-    keyword: list[str] | None = None
+    keyword: Annotated[list[str] | None, BeforeValidator(ensure_list)] = None
 
 
 class AddressName(BaseModel):
@@ -348,7 +393,7 @@ class Grants(BaseModel):
 
 
 class FundText(BaseModel):
-    p: str | None = None
+    p: Annotated[list[str] | None, BeforeValidator(ensure_list)] = None
 
 
 class FundAck(BaseModel):
@@ -400,7 +445,7 @@ class Language(BaseModel):
 
 class Languages(BaseModel):
     count: int | None = None
-    language: Annotated[list[Language] | None, BeforeValidator(ensure_list)] = None
+    language: Annotated[list[Language] | None, BeforeValidator(ensure_list), BeforeValidator(fix_lang),] = None
 
 
 class Keywords(BaseModel):
@@ -519,7 +564,7 @@ class Identifiers(BaseModel):
 
 
 class ClusterRelated(BaseModel):
-    identifiers: Identifiers | None = None
+    identifiers: Annotated[Identifiers | None, BeforeValidator(assert_empty)] = None
 
 
 class WosUsage(BaseModel):
@@ -562,6 +607,7 @@ class WosSearchResponse(BaseModel):
 if __name__ == '__main__':
     import json
     from nacsos_data.util import get
+    from nacsos_data.util.academic.apis.wos import dump_wos_record
 
     for fp in [
         'scratch/academic_apis/wos_response.json',
