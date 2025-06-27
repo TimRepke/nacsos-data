@@ -6,7 +6,7 @@ from httpx import HTTPError
 from nacsos_data.models.items import AcademicItemModel
 from nacsos_data.models.items.academic import AcademicAuthorModel
 from nacsos_data.models.web_of_science import WosRecord
-from nacsos_data.util import as_uuid, get_value, clear_empty
+from nacsos_data.util import as_uuid, get_value, clear_empty, get
 from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
 
 # WOS - Web of Science Core collection
@@ -145,24 +145,33 @@ class WoSAPI(AbstractAPI):
 
             n_pages = 0
             n_records = 0
+
+            query_id = 0
+            records_searched = 0
+            records_found = 0
             while True:
+                n_pages += 1
                 self.logger.info(f'Fetching page {n_pages}...')
                 try:
                     data = page.json()
 
-                    # Gather info from meta-data
-                    query_id = data['QueryResult']['QueryID']
-                    records_searched = data['QueryResult']['RecordsSearched']
-                    records_found = data['QueryResult']['RecordsFound']
+                    # Gather info from meta-data (only on first page)
+                    if 'QueryResult' in data:
+                        query_id = data['QueryResult']['QueryID']
+                        records_searched = data['QueryResult']['RecordsSearched']
+                        records_found = data['QueryResult']['RecordsFound']
 
                     # Gather info from header
                     next_page = page.headers.get('x-paginate-by-query-id')
                     remaining_year = page.headers.get('x-rec-amtperyear-remaining')
                     remaining_sec = page.headers.get('x-req-reqpersec-remaining')
 
-                    records = get(data, 'Data', 'Records', 'records', 'REC', default=[])
+                    records = get(data, 'Records', 'records', 'REC', default=[])
+                    if len(records) == 0:  # Records are nested in Data on first page
+                        records = get(data, 'Data', 'Records', 'records', 'REC', default=[])
 
                     if len(records) == 0:
+                        self.logger.info('No more records received.')
                         break
 
                     yield from records
@@ -172,13 +181,22 @@ class WoSAPI(AbstractAPI):
                                      f'after processing page {n_pages} for query {query_id} '
                                      f'(remaining this year = {remaining_year} | remaining / second = {remaining_sec})')
 
-                    if next_page is None:
-                        self.logger.info('No more pages available.')
+                    if n_records >= records_found:
+                        self.logger.info('Reached num_results')
                         break
 
-                    page = request_client.get(next_page, headers={'X-ApiKey': self.api_key})
+                    page = request_client.get(
+                        f'https://api.clarivate.com/api/wos/query/{query_id}',
+                        params={
+                            'count': self.page_size,
+                            'sortField': 'LD+D',
+                            'optionView': 'FR',
+                            'firstRecord': n_records + 1,
+                        },
+                        headers={'X-ApiKey': self.api_key}
+                    )
 
-                except HTTPError as e:
+                except Exception as e:
                     logging.warning(f'Failed: {e}')
                     logging.warning(e.response.text)  # type: ignore[attr-defined]
                     logging.exception(e)
@@ -206,7 +224,6 @@ class WoSAPI(AbstractAPI):
 if __name__ == '__main__':
 
     import json
-    from nacsos_data.util import get
 
     app = WoSAPI.test_app(
         static_files=[
