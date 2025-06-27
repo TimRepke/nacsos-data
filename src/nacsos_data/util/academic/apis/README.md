@@ -46,6 +46,7 @@ academic_api SCOPUS \
 ```
 
 For larger queries, it might be easier to instead store them in a separate file and change the `--query` parameter to `--query-file="/path/to/file"`.
+For bulk execution, check out [this](https://gitlab.pik-potsdam.de/mcc-apsis/living-evidence-maps/cdr-map/living-cdr-map/-/blob/8a7314142cbff1686f35a6f8e41d93fb240b106a/01_Retrieve/01_FetchQueries.sh) and [this](https://gitlab.pik-potsdam.de/mcc-apsis/living-evidence-maps/cdr-map/living-cdr-map/-/blob/8a7314142cbff1686f35a6f8e41d93fb240b106a/01_Retrieve/02_ConvertQueries.sh).
 
 ### Comparison of PubMed, Scopus, Web of Science, and Google Scholar: strengths and weaknesses
 
