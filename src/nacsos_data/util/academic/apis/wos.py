@@ -95,7 +95,10 @@ def translate_authors(record: WosRecord):
 class WoSAPI(AbstractAPI):
     def __init__(self,
                  api_key: str,
+                 # Number of records to return, must be 0-100.
                  page_size: int = 5,
+                 # Database to search. WOK represents all databases.
+                 # Available values : WOS, BCI, BIOABS, BIOSIS, CABI, CCC, CSCD, DCI, DIIDW, FSTA, GRANTS, INSPEC, MEDLINE, PPRN, PQDT, SCIELO, WOK, ZOOREC
                  database: str = 'WOK',
                  proxy: str | None = None,
                  max_req_per_sec: int = 5,

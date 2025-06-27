@@ -84,9 +84,15 @@ class RequestClient(Client):
                 logging.debug(f'Sleeping to keep rate limit: {self.time_per_request - time:.4f} seconds')
                 sleep(self.time_per_request - time)
 
+            if auth == USE_CLIENT_DEFAULT:
+                auth = None
+            if follow_redirects == USE_CLIENT_DEFAULT:
+                follow_redirects = None
+            if timeout == USE_CLIENT_DEFAULT:
+                timeout = None
+
             # Log latest request
             self.last_request = perf_counter()
-            print(self.kwargs.get('headers', {}).update(headers or {}))
             response = super().request(
                 method=method or self.kwargs.get('method'),
                 url=url or self.kwargs.get('url'),
@@ -98,8 +104,8 @@ class RequestClient(Client):
                 headers=self.kwargs.get('headers', {}) | (headers or {}),
                 cookies=self.kwargs.get('cookies', {}) | (cookies or {}),
                 auth=auth or self.kwargs.get('auth', USE_CLIENT_DEFAULT),
-                follow_redirects=follow_redirects or self.kwargs.get('follow_redirects', USE_CLIENT_DEFAULT),
-                timeout=timeout or self.kwargs.get('timeout', USE_CLIENT_DEFAULT),
+                follow_redirects=follow_redirects or self.kwargs.get('follow_redirects', True),
+                timeout=timeout or self.kwargs.get('timeout', 120),
                 extensions=extensions or self.kwargs.get('extensions'),
             )
 
@@ -137,6 +143,7 @@ class RequestClient(Client):
 
                 # if this error is not on the list, pass on error right away; otherwise log and retry
                 elif e.response.status_code not in self.retry_on_status and len(self.retry_on_status) > 0:  # type: ignore[attr-defined]
+                    logging.warning(e.response.text)  # type: ignore[attr-defined]
                     raise e
 
                 else:

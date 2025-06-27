@@ -45,6 +45,8 @@ academic_api SCOPUS \
        --target data/scopus-raw.jsonl
 ```
 
+For larger queries, it might be easier to instead store them in a separate file and change the `--query` parameter to `--query-file="/path/to/file"`.
+
 ### Comparison of PubMed, Scopus, Web of Science, and Google Scholar: strengths and weaknesses
 
 *Matthew E Falagas 1, Eleni I Pitsouni, George A Malietzis, Georgios Pappas*
