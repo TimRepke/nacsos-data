@@ -210,6 +210,7 @@ class AbstractAPI(ABC):
     @classmethod
     def test_app(cls,
                  static_files: list[str],
+                 proxy: str | None = None,
                  logger: logging.Logger | None = None):
         import typer
 
@@ -223,7 +224,7 @@ class AbstractAPI(ABC):
                 target: Annotated[Path, typer.Option(help='File to write results to')],
                 query_file: Annotated[Path | None, typer.Option(help='File containing search query')] = None,
                 query: Annotated[str | None, typer.Option(help='Search query')] = None,
-                proxy: Annotated[str | None, typer.Option(help='Proxy to use, e.g. "socks5://127.0.0.1:1080')] = None,
+                alt_proxy: Annotated[str | None, typer.Option('--proxy', help='Proxy to use, e.g. "socks5://127.0.0.1:1080"')] = None,
         ) -> None:
 
             if query_file:
@@ -234,7 +235,7 @@ class AbstractAPI(ABC):
             else:
                 raise AttributeError('Must provide either `query_file` or `query`')
 
-            instance = cls(api_key=api_key, proxy=proxy, logger=logger)
+            instance = cls(api_key=api_key, proxy=proxy or alt_proxy, logger=logger)
             instance.download_raw(query=query_str, target=target)
 
         @app.command()
