@@ -210,7 +210,6 @@ class AbstractAPI(ABC):
     @classmethod
     def test_app(cls,
                  static_files: list[str],
-                 proxy: str | None = None,
                  logger: logging.Logger | None = None):
         import typer
 
@@ -224,6 +223,7 @@ class AbstractAPI(ABC):
                 target: Annotated[Path, typer.Option(help='File to write results to')],
                 query_file: Annotated[Path | None, typer.Option(help='File containing search query')] = None,
                 query: Annotated[str | None, typer.Option(help='Search query')] = None,
+                proxy: Annotated[str | None, typer.Option(help='Proxy to use, e.g. "socks5://127.0.0.1:1080')] = None,
         ) -> None:
 
             if query_file:
