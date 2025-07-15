@@ -1,7 +1,6 @@
 import uuid
 import logging
 from typing import Any, Generator, Literal, TypeVar
-from httpx import HTTPError
 
 from nacsos_data.models.items import AcademicItemModel
 from nacsos_data.models.items.academic import AcademicAuthorModel
@@ -31,10 +30,12 @@ T = TypeVar("T")
 
 
 def dump_wos_record(record: WosRecord) -> dict[str, Any]:
-    return clear_empty(record.model_dump(exclude_none=True, exclude_defaults=True, exclude_unset=True))
+    return clear_empty(record.model_dump(exclude_none=True, exclude_defaults=True, exclude_unset=True))  # type: ignore[return-value]
 
 
 def get_title(wr: WosRecord) -> str | None:
+    if not wr.static_data.summary or not wr.static_data.summary.titles or not wr.static_data.summary.titles.title:
+        return None
     for title in wr.static_data.summary.titles.title:
         if title.type == 'item':
             return title.content
@@ -42,11 +43,15 @@ def get_title(wr: WosRecord) -> str | None:
 
 
 def get_abstract(wr: WosRecord) -> str | None:
-    abstracts = get_value(lambda: wr.static_data.fullrecord_metadata.abstracts.abstract)
+    if (wr.static_data.fullrecord_metadata is None
+            or wr.static_data.fullrecord_metadata.abstracts is None
+            or wr.static_data.fullrecord_metadata.abstracts.abstract is None):
+        return None
+    abstracts = get_value(lambda: wr.static_data.fullrecord_metadata.abstracts.abstract)  # type: ignore[union-attr]
     if abstracts is None:
         return None
     for abstract in abstracts:
-        abstract_ = get_value(lambda: abstract.abstract_text.p)
+        abstract_ = get_value(lambda: abstract.abstract_text.p)  # type: ignore[union-attr]
         if abstract_ is None:
             return None
         for abstract__ in abstract_:
@@ -56,7 +61,11 @@ def get_abstract(wr: WosRecord) -> str | None:
 
 
 def get_doi(wr: WosRecord) -> str | None:
-    identifiers = get_value(lambda: wr.dynamic_data.cluster_related.identifiers.IdentifierItem)
+    if (wr.dynamic_data.cluster_related is None
+            or wr.dynamic_data.cluster_related.identifiers is None
+            or wr.dynamic_data.cluster_related.identifiers.IdentifierItem is None):
+        return None
+    identifiers = get_value(lambda: wr.dynamic_data.cluster_related.identifiers.IdentifierItem)  # type: ignore[union-attr]
     if identifiers is None:
         return None
     for identifier in identifiers:
@@ -66,6 +75,10 @@ def get_doi(wr: WosRecord) -> str | None:
 
 
 def get_source(wr: WosRecord) -> str | None:
+    if (wr.static_data.summary is None
+            or wr.static_data.summary.titles is None
+            or wr.static_data.summary.titles.title is None):
+        return None
     for title in wr.static_data.summary.titles.title:
         if title.type == 'source':
             return title.content
@@ -73,8 +86,17 @@ def get_source(wr: WosRecord) -> str | None:
 
 
 def get_keywords(wr: WosRecord) -> list[str] | None:
-    kw1 = get_value(lambda: wr.static_data.fullrecord_metadata.keywords.keyword)
-    kw2 = get_value(lambda: wr.static_data.item.keywords_plus.keyword)
+    if (wr.static_data.fullrecord_metadata is None
+            or wr.static_data.fullrecord_metadata.keywords is None
+            or wr.static_data.fullrecord_metadata.keywords.keyword is None):
+        return None
+
+    if (wr.static_data.item is None
+            or wr.static_data.item.keywords_plus is None
+            or wr.static_data.item.keywords_plus.keyword is None):
+        return None
+    kw1 = get_value(lambda: wr.static_data.fullrecord_metadata.keywords.keyword)  # type: ignore[union-attr]
+    kw2 = get_value(lambda: wr.static_data.item.keywords_plus.keyword)  # type: ignore[union-attr]
     if kw1 and kw2:
         return kw1 + kw2
     if kw1:
@@ -84,9 +106,11 @@ def get_keywords(wr: WosRecord) -> list[str] | None:
     return None
 
 
-def translate_authors(record: WosRecord):
+def translate_authors(record: WosRecord) -> list[AcademicAuthorModel] | None:
     # TODO: Switch to using AddressName via record.static_data.fullrecord_metadata.addresses.address_name
-    authors = get_value(lambda: record.static_data.summary.names.name)
+    if record.static_data.summary is None or record.static_data.summary.names is None or record.static_data.summary.names.name is None:
+        return None
+    authors = get_value(lambda: record.static_data.summary.names.name)  # type: ignore[union-attr]
     if not authors:
         return None
     return [AcademicAuthorModel(name=author.full_name) for author in authors if author.full_name is not None]
@@ -162,7 +186,7 @@ class WoSAPI(AbstractAPI):
                         records_found = data['QueryResult']['RecordsFound']
 
                     # Gather info from header
-                    next_page = page.headers.get('x-paginate-by-query-id')
+                    # next_page = page.headers.get('x-paginate-by-query-id')
                     remaining_year = page.headers.get('x-rec-amtperyear-remaining')
                     remaining_sec = page.headers.get('x-req-reqpersec-remaining')
 
@@ -213,7 +237,7 @@ class WoSAPI(AbstractAPI):
             # title_slug  # not required
             wos_id=wos_record.UID,
             text=get_abstract(wos_record),
-            publication_year=get_value(lambda: wos_record.static_data.summary.pub_info.pubyear),
+            publication_year=get_value(lambda: wos_record.static_data.summary.pub_info.pubyear),  # type: ignore[union-attr,arg-type,return-value]
             source=get_source(wos_record),
             keywords=get_keywords(wos_record),
             authors=translate_authors(wos_record),
@@ -231,9 +255,8 @@ if __name__ == '__main__':
             # 'scratch/academic_apis/response_scopus2.jsonl',
         ])
 
-
     @app.command()
-    def offline():
+    def offline() -> None:
         for fp in [
             'scratch/academic_apis/wos_response.json',
             'scratch/academic_apis/response2.json',
@@ -244,6 +267,5 @@ if __name__ == '__main__':
                 for record in records:
                     item = WoSAPI.translate_record(record)
                     print(item)
-
 
     app()

@@ -191,7 +191,7 @@ def get(obj: dict[str, Any], *keys: str, default: Any = None) -> Any:  # type: i
     return obj
 
 
-def get_value(val: Callable[[], T], default: D | None = None) -> T | D:
+def get_value(val: Callable[[], T], default: D | None = None) -> T | D | None:
     try:
         ret = val()
         if ret is None:

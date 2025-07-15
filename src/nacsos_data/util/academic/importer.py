@@ -61,11 +61,12 @@ async def _find_id_duplicates(
         new_items: AcademicItemGenerator,
         fp: IO[str],
         project_id: str,
-        logger: logging.Logger) -> tuple[int, int, dict[str, int], set[str]]:
+        logger: logging.Logger,
+        allow_empty_text: bool = False) -> tuple[int, int, dict[str, int], set[str]]:
     with elapsed_timer(logger, 'Fetching all known IDs from current project'):
         known_ids: dict[str, dict[str, str]]
         known_ids = {
-            id_field: await read_known_ids_map(session=session, project_id=project_id, field=id_field)
+            id_field: await read_known_ids_map(session=session, project_id=project_id, field=id_field, allow_empty_text=allow_empty_text)
             for id_field in ID_FIELDS
         }
 
@@ -298,7 +299,8 @@ async def import_academic_items(
         batch_size: int = 2000,
         max_features: int = 5000,
         dry_run: bool = True,
-        logger: logging.Logger | None = None
+        logger: logging.Logger | None = None,
+        allow_empty_text: bool = False,
 ) -> tuple[str, int | None]:
     """
     Helper function for programmatically importing `AcademicItem`s into the platform.
@@ -413,7 +415,9 @@ async def import_academic_items(
                     project_id=str(project_id),
                     new_items=new_items,
                     logger=logger,
-                    fp=duplicate_buffer
+                    fp=duplicate_buffer,
+                    # FIXME: deal with the case where old record has doi+title w/o abstract and new record has all three
+                    allow_empty_text=allow_empty_text,
                 )
             logger.info(f'Found {n_unknown_items:,} unknown items and {len(m2m_buffer):,} duplicates in first pass.')
 

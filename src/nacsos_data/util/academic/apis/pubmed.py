@@ -15,32 +15,30 @@ def select(obj: dict[str, Any], *keys: str, default: Any = None) -> Any | None: 
         obj = obj.get(key)  # type: ignore[assignment]
         if obj is None or len(obj) == 0:
             return default  # type: ignore[unreachable]
-        obj = obj[0]
+        obj = obj[0]  # type: ignore[index]
     return obj
 
 
 def get_ids(pm_info: dict[str, Any]) -> dict[str, str]:
     ids = {}
-    for aid in select(pm_info, 'PubmedData', 'ArticleIdList', 'ArticleId', default=[]):
+    for aid in select(pm_info, 'PubmedData', 'ArticleIdList', 'ArticleId', default=[]):  # type: ignore[union-attr]
         ids[aid['@IdType']] = aid['_text']
     return ids
 
 
 def get_authors(citation: dict[str, Any]) -> Generator[AcademicAuthorModel, None, None]:
-    authors = select(citation, 'Article', 'AuthorList', default={}).get('Author', [])
+    authors = select(citation, 'Article', 'AuthorList', default={}).get('Author', [])  # type: ignore[union-attr]
     for author in authors:
-        affiliations: list[AffiliationModel] | None = [
-            AffiliationModel(name=select(aff, 'Affiliation', default={}).get('_text'))
+        affiliations: list[AffiliationModel] = [
+            AffiliationModel(name=select(aff, 'Affiliation', default={}).get('_text'))  # type: ignore[union-attr]
             for aff in author.get('AffiliationInfo', [])
         ]
         affiliations = [aff for aff in affiliations if aff.name is not None]
-        if len(affiliations) == 0:
-            affiliations = None
 
         yield AcademicAuthorModel(
-            name=f'{select(author, 'ForeName', default={}).get('_text', '')} '
-                 f'{select(author, 'LastName', default={}).get('_text', '')}',
-            affiliations=affiliations,
+            name=f'{select(author, 'ForeName', default={}).get('_text', '')} '  # type: ignore[union-attr]
+                 f'{select(author, 'LastName', default={}).get('_text', '')}',  # type: ignore[union-attr]
+            affiliations=None if len(affiliations) == 0 else affiliations,
         )
 
 
@@ -83,21 +81,21 @@ class PubmedAPI(AbstractAPI):
             web_env = tree.find('WebEnv').text  # type: ignore[union-attr]
             query_key = tree.find('QueryKey').text  # type: ignore[union-attr]
 
-            self.logger.warning(f'Query translated to: {tree.find('QueryTranslation').text}')
+            self.logger.warning(f'Query translated to: {tree.find('QueryTranslation').text}')  # type: ignore[union-attr]
 
             errors = tree.find('ErrorList')
             if errors is not None:
                 for error in errors.iter():
                     self.logger.error(f'Error {error.tag}: {''.join(error.itertext())}')
 
-            n_total = int(tree.find('Count').text)
-            page_size = int(tree.find('RetMax').text)
+            n_total = int(tree.find('Count').text)  # type: ignore[union-attr,arg-type]
+            page_size = int(tree.find('RetMax').text)  # type: ignore[union-attr,arg-type]
 
             done = False
 
             def on_done(response: Response) -> dict[str, Any]:
                 self.logger.info('Seemed to have reached the end (BAD_REQUEST).')
-                done = True
+                done = True  # noqa: F841
                 return {}
 
             request_client.on(codes.BAD_REQUEST, on_done)
@@ -136,10 +134,10 @@ class PubmedAPI(AbstractAPI):
 
     @classmethod
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
-        citation = record.get('MedlineCitation')[0]
-        pm_info = record.get('PubmedData')[0]
+        citation = record.get('MedlineCitation')[0]  # type: ignore[index]
+        pm_info = record.get('PubmedData')[0]  # type: ignore[index]
         pm_ids = get_ids(pm_info)
-        py: str | None = select(citation, 'Article', 'ArticleDate', 'Year', default={}).get('_text')
+        py: str | None = select(citation, 'Article', 'ArticleDate', 'Year', default={}).get('_text')  # type: ignore[union-attr]
         pyi: int | None = None if py is None else int(py)
 
         if 'ReferenceList' in pm_info:
@@ -149,15 +147,15 @@ class PubmedAPI(AbstractAPI):
             item_id=uuid.uuid4(),
             project_id=as_uuid(project_id),
             doi=pm_ids.get('doi'),
-            title=select(citation, 'Article', 'ArticleTitle', default={}).get('_text'),
+            title=select(citation, 'Article', 'ArticleTitle', default={}).get('_text'),  # type: ignore[union-attr]
             pubmed_id=pm_ids.get('pubmed'),
-            text=select(citation, 'Article', 'Abstract', 'AbstractText', default={}).get('_text'),
+            text=select(citation, 'Article', 'Abstract', 'AbstractText', default={}).get('_text'),  # type: ignore[union-attr]
             publication_year=pyi,
             authors=clear_empty(list(get_authors(citation))),
-            source=select(citation, 'Article', 'Journal', 'Title', default={}).get('_text'),
+            source=select(citation, 'Article', 'Journal', 'Title', default={}).get('_text'),  # type: ignore[union-attr]
             keywords=clear_empty([
                 kw.get('_text', '').strip()
-                for kw in select(citation, 'KeywordList', default={}).get('Keyword', [])
+                for kw in select(citation, 'KeywordList', default={}).get('Keyword', [])  # type: ignore[union-attr]
             ]),
             meta={'pubmed-api': record},
         )

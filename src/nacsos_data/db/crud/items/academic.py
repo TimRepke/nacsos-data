@@ -56,7 +56,8 @@ IdField = Literal['item_id', 'doi', 'wos_id', 'scopus_id', 'openalex_id', 's2_id
 
 async def read_known_ids_map(session: AsyncSession,
                              project_id: str | uuid.UUID,
-                             field: IdField) -> dict[str, str]:
+                             field: IdField,
+                             allow_empty_text: bool = False) -> dict[str, str]:
     """
     Return a mapping from ID in field (e.g. DOI) to item_id
 
@@ -66,6 +67,7 @@ async def read_known_ids_map(session: AsyncSession,
     :param session:
     :param project_id:
     :param field:
+    :param allow_empty_text:
     :return:
     """
     if field not in {'item_id', 'doi', 'wos_id', 'scopus_id', 'openalex_id', 's2_id', 'pubmed_id', 'dimensions_id'}:
@@ -76,7 +78,8 @@ async def read_known_ids_map(session: AsyncSession,
             session=session,
             project_id=project_id,
             field=field,
-            log=logger
+            log=logger,
+            allow_empty_text=allow_empty_text,
         )))
 
 
@@ -113,23 +116,26 @@ async def read_ids_for_project(
         project_id: str | uuid.UUID,
         field: IdField,
         batch_size: int = 5000,
+        allow_empty_text: bool = False,
 ) -> AsyncGenerator[tuple[str, str], None]:
     if field not in {'item_id', 'doi', 'wos_id', 'scopus_id', 'openalex_id', 's2_id', 'pubmed_id', 'dimensions_id'}:
         raise KeyError(f'Invalid field `{field}`')
+    txt_where = '' if allow_empty_text else 'AND text IS NOT NULL'
 
     rslt = (
         await session.stream(
             text(f'''
-            SELECT aiv.{field} as identifier, item_id::text
+            SELECT aiv.{field} as identifier, aiv.item_id::text
             FROM academic_item_variant aiv
             JOIN import ON aiv.import_id = import.import_id
-            WHERE import.project_id = :project_id
+            WHERE import.project_id = :project_id {txt_where}
 
             UNION
 
-            SELECT ai.{field} as identifier, item_id::text
+            SELECT ai.{field} as identifier, ai.item_id::text
             FROM academic_item ai
-            WHERE ai.project_id = :project_id;
+            JOIN item i ON ai.item_id = i.item_id
+            WHERE ai.project_id = :project_id {txt_where};
         '''),
             {'project_id': project_id})
     ).mappings().partitions(batch_size)

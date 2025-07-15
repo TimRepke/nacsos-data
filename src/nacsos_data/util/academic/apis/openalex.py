@@ -304,7 +304,6 @@ if __name__ == '__main__':
 
     app = typer.Typer()
 
-
     @app.command()
     def download(
             target: Annotated[Path, typer.Option(help='File to write results to')],
@@ -323,7 +322,7 @@ if __name__ == '__main__':
             query_str = query
         else:
             raise AttributeError('Must provide either `query_file` or `query`')
-
+        api: OpenAlexSolrAPI | OpenAlexAPI
         if kind == 'SOLR' and openalex_endpoint is not None:
             api = OpenAlexSolrAPI(api_key='', openalex_endpoint=openalex_endpoint, batch_size=batch_size)
         elif kind == 'API' and api_key is not None:
@@ -332,20 +331,18 @@ if __name__ == '__main__':
             raise AttributeError('Must provide either `openalex_endpoint` or `api_key`')
         api.download_raw(query=query_str, target=target)
 
-
     @app.command()
     def convert(
             source: Annotated[Path, typer.Option(help='File to read results from')],
             target: Annotated[Path, typer.Option(help='File to write results to')],
             kind: Annotated[Literal['SOLR', 'API'], typer.Option(help='database to use')] = 'SOLR',
-    ):
+    ) -> None:
         cls = OpenAlexSolrAPI if kind == 'SOLR' else OpenAlexAPI
         cls.convert_file(source=source, target=target)
 
-
     @app.command()
-    def translate(kind: Annotated[Literal['SOLR', 'API'], typer.Option(help='database to use')] = 'SOLR', ):
+    def translate(kind: Annotated[Literal['SOLR', 'API'], typer.Option(help='database to use')] = 'SOLR') -> None:
         cls = OpenAlexSolrAPI if kind == 'SOLR' else OpenAlexAPI
-        for fp in []:
+        for fp in []:  # type: ignore[var-annotated]
             for item in cls.read_translated(Path(fp)):
                 print(item)

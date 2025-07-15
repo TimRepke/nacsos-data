@@ -24,20 +24,20 @@
 from __future__ import annotations
 import re
 from enum import Enum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Any
 
 from pydantic import BaseModel as PydanticBaseModel, Field, field_validator, ConfigDict, BeforeValidator
 
 NUM = re.compile(r'[^0-9]+')
 
 
-def int_to_str(v):
+def int_to_str(v: str | int) -> str:
     if type(v) is int:
         return str(v)
-    return v
+    return v  # type: ignore[return-value]
 
 
-def force_int(v):
+def force_int(v: str | int | None) -> int | None:
     if type(v) is int:
         return v
     if type(v) is str:
@@ -48,15 +48,15 @@ def force_int(v):
     return None
 
 
-def fix_lang(v):
+def fix_lang(v: str | list[dict[str, str]] | dict[str, str]) -> dict[str, str] | list[dict[str, str]] | None:
     if type(v) is str:
         return {'content': v}
     if type(v) is list:
-        return [fix_lang(vi) for vi in v]
-    return v
+        return [fix_lang(vi) for vi in v]  # type: ignore[misc]
+    return v  # type: ignore[return-value]
 
 
-def fix_title(v):
+def fix_title(v: str | list[str]) -> str | None:
     if type(v) is str:
         return v
     if type(v) is list:
@@ -64,39 +64,39 @@ def fix_title(v):
     return None
 
 
-def fix_page(v):
+def fix_page(v: dict[str, str] | str) -> dict[str, str] | None:
     if type(v) is str:
         return {'content': v}
-    return v
+    return v  # type: ignore[return-value]
 
 
-def str_to_int(v):
+def str_to_int(v: str | int) -> int:
     if type(v) is str:
         return int(v)
-    return v
+    return v  # type: ignore[return-value]
 
 
-def ensure_bool_str(v):
+def ensure_bool_str(v: str | bool) -> str:
     if type(v) is bool:
         return 'Y' if v else 'N'
     return v
 
 
-def fix_name(v):
+def fix_name(v: str | Any) -> str | None:
     if type(v) is str:
         return v
     return None
 
 
-def ensure_list(v):
+def ensure_list(v: list[str] | str | None) -> list[str] | None:
     if type(v) is list:
         return [vi for vi in v if vi is not None]
     if v is None:
         return None
-    return [v]
+    return [v]  # type: ignore[list-item]
 
 
-def str_to_int_lst(v):
+def str_to_int_lst(v: str | int | list[int] | None) -> list[int] | None:
     if type(v) is str:
         if ' ' in v:
             return [int(vi.strip()) for vi in v.split(' ')]
@@ -104,10 +104,10 @@ def str_to_int_lst(v):
         return v
     if v is None:
         return None
-    return [v]
+    return [v]  # type: ignore[list-item]
 
 
-def assert_empty(v):
+def assert_empty(v: str) -> str | None:
     if v == '':
         return None
     return v
@@ -118,7 +118,7 @@ class BaseModel(PydanticBaseModel):
 
     @field_validator('*')
     @classmethod
-    def empty_str_to_none(cls, v):
+    def empty_str_to_none(cls, v: str | None) -> str | None:
         if v == '':
             return None
         return v

@@ -73,7 +73,7 @@ class RequestClient(Client):
             headers: HeaderTypes | None = None,
             cookies: CookieTypes | None = None,
             auth: AuthTypes | UseClientDefault | None = None,
-            follow_redirects: bool | UseClientDefault = True,
+            follow_redirects: bool | UseClientDefault | None = True,
             timeout: TimeoutTypes | UseClientDefault = 120,
             extensions: RequestExtensions | None = None,
     ) -> Response:
@@ -94,8 +94,8 @@ class RequestClient(Client):
             # Log latest request
             self.last_request = perf_counter()
             response = super().request(
-                method=method or self.kwargs.get('method'),
-                url=url or self.kwargs.get('url'),
+                method=method or self.kwargs.get('method'),  # type: ignore[arg-type]
+                url=url or self.kwargs.get('url'),  # type: ignore[arg-type]
                 content=content or self.kwargs.get('content'),
                 data=data or self.kwargs.get('data'),
                 files=files or self.kwargs.get('files'),
@@ -158,6 +158,8 @@ class RequestClient(Client):
 
 
 class AbstractAPI(ABC):
+    logger: logging.Logger
+
     def __init__(self,
                  api_key: str,
                  proxy: str | None = None,
@@ -167,13 +169,14 @@ class AbstractAPI(ABC):
                  logger: logging.Logger | None = None):
         self.api_key = api_key
         self.proxy = proxy
-        self.logger = logger
         self.max_req_per_sec = max_req_per_sec
         self.max_retries = max_retries
         self.backoff_rate = backoff_rate
 
-        if self.logger is None:
+        if logger is None:
             self.logger = logging.getLogger(type(self).__name__)
+        else:
+            self.logger = logger
 
     @abstractmethod
     def fetch_raw(self, query: str) -> Generator[dict[str, Any], None, None]:
@@ -202,13 +205,13 @@ class AbstractAPI(ABC):
                 yield cls.translate_record(record=record, project_id=project_id)
 
     @classmethod
-    def convert_file(cls, source: Path, target: Path, project_id: str | uuid.UUID | None = None):
+    def convert_file(cls, source: Path, target: Path, project_id: str | uuid.UUID | None = None) -> None:
         with open(target, 'w') as f_out:
             for item in cls.read_translated(source=source, project_id=project_id):
                 f_out.write(item.model_dump_json(exclude_defaults=True) + '\n')
 
     @classmethod
-    def test_app(cls,
+    def test_app(cls,  # type: ignore[no-untyped-def]
                  static_files: list[str],
                  proxy: str | None = None,
                  logger: logging.Logger | None = None):
@@ -242,11 +245,11 @@ class AbstractAPI(ABC):
         def convert(
                 source: Annotated[Path, typer.Option(help='File to read results from')],
                 target: Annotated[Path, typer.Option(help='File to write results to')],
-        ):
+        ) -> None:
             cls.convert_file(source=source, target=target)
 
         @app.command()
-        def translate():
+        def translate() -> None:
             for fp in static_files or []:
                 for item in cls.read_translated(Path(fp)):
                     print(item)
@@ -254,7 +257,7 @@ class AbstractAPI(ABC):
         return app
 
 
-def _assert_target(target: Path):
+def _assert_target(target: Path) -> None:
     if target.exists():
         raise FileExistsError(f'File {target} already exists')
     target.parent.mkdir(parents=True, exist_ok=True)
