@@ -27,6 +27,8 @@ build-job:
   except:
     - schedules
   stage: build
+  tags:
+    - vm
   script:
     - python -V
     - pip install virtualenv
@@ -40,6 +42,8 @@ test-job1:
   except:
     - schedules
   stage: test
+  tags:
+    - vm
   script:
     - source venv/bin/activate
     - flake8 --config .flake8
@@ -48,6 +52,8 @@ test-job2:
   except:
     - schedules
   stage: test
+  tags:
+    - vm
   script:
     - source venv/bin/activate
     - mypy --config-file=pyproject.toml src/nacsos_data --show-traceback --no-incremental
