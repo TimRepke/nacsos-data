@@ -220,12 +220,14 @@ class PlainTextReader(Reader):
         except KeyError:
             msg = (
                 "\n------------ ERROR ------------\n"
-                'Seems that the tag "{}" is new and not yet handled by the wosfile library.\n'
+                f'Seems that the tag "{heading}" is new and not yet handled by the wosfile library.\n'
                 "Please report this error:\n"
                 "  https://github.com/rafguns/wosfile/issues\n"
                 "We are sorry for the inconvenience.\n"
             )
-            raise NotImplementedError(msg.format(heading))
+            #raise NotImplementedError(msg)
+            logger.warning(msg)
+            return " ".join(values)
 
     def __next__(self) -> Dict[str, str]:
         record = {}
