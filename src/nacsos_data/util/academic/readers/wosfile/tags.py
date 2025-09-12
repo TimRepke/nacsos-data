@@ -194,6 +194,7 @@ tags = (
     ("EF", "Magic undocumented tag", False, False),
     ("G1", "Magic undocumented tag", False, False),
     ("TO", "Magic undocumented tag", False, False),
+    ("D3", "Magic undocumented tag", False, False),
 )
 is_splittable = {abbr: iterable for abbr, _, iterable, _ in tags}
 has_item_per_line = {abbr: item_per_line for abbr, _, _, item_per_line in tags}
