@@ -423,12 +423,17 @@ async def wide_export_table(session: DBSession | AsyncSession,
         'scope_order': r.get('scope_order'),
         'item_order': r.get('item_order'),
         'item_id': str(r['item_id']),
-        'text': f"{r.get('title', '')} {r.get('text', '')} {r.get('teaser', '')}",
+        'title': r.get('title'),
+        'text': r.get('text'),
+        'authors': r.get('authors'),
+        'teaser': r.get('teaser'),
         'wos_id': r.get('wos_id'),
-        'oa_id': r.get('openalex_id'),
+        'openalex_id': r.get('openalex_id'),
+        'scopus_id': r.get('scopus_id'),
+        'source': r.get('source'),
+        'publication_date': r.get('publication_date'),
         'doi': r.get('doi'),
         'py': r.get('publication_year'),
-        'meta': r,
         **{
             f'res|{prefix.get(k, '')}{key}': val
             for resolution in get_attr(r, 'labels_resolved', [])  # type: ignore[union-attr]
@@ -444,7 +449,8 @@ async def wide_export_table(session: DBSession | AsyncSession,
     }
         for r in rslt
     ])
-    base_cols = ['scope_order', 'item_order', 'item_id', 'text', 'wos_id', 'oa_id', 'doi', 'py']
+    base_cols = ['scope_order', 'item_order', 'item_id', 'wos_id', 'openalex_id', 'doi',
+                 'title', 'text', 'teaser', 'authors', 'source', 'py']
     if include_meta:
         base_cols += ['meta']
     else:

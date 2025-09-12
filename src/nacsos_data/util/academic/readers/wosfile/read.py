@@ -225,7 +225,7 @@ class PlainTextReader(Reader):
                 "  https://github.com/rafguns/wosfile/issues\n"
                 "We are sorry for the inconvenience.\n"
             )
-            #raise NotImplementedError(msg)
+            # raise NotImplementedError(msg)
             logger.warning(msg)
             return " ".join(values)
 
