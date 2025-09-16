@@ -78,6 +78,18 @@ def _multi_label_columns(key: str, repeat: int | None, values: list[int], cte: s
     ]
 
 
+def _str_label_columns(key: str, repeat: int | None, cte: sa.CTE) \
+        -> list[sa.Label]:  # type: ignore[type-arg]
+    if repeat is None:
+        condition = cte.c.key == key
+        label = key
+    else:
+        condition = sa.and_(cte.c.key == key, cte.c.repeat == repeat)
+        label = f'{key}({repeat})'
+    # string_agg(value_str, ' || ') filter ( where key='com' )
+    return [sa.func.aggregate_strings(cte.c.value_str, ' || ').filter(condition).label(label)]
+
+
 def _get_label_selects(labels: dict[str, LabelOptions],
                        repeats: list[int] | None,
                        cte: sa.CTE) -> list[sa.Label]:  # type: ignore[type-arg]
@@ -91,6 +103,8 @@ def _get_label_selects(labels: dict[str, LabelOptions],
                 selects += _bool_label_columns(label.key, repeat=repeat, cte=cte)
             elif label.options_multi:
                 selects += _multi_label_columns(label.key, repeat=repeat, cte=cte, values=label.options_multi)
+            elif label.strings:
+                selects += _str_label_columns(label.key, repeat=repeat, cte=cte)
             else:
                 pass
                 # raise RuntimeError('Invalid state')
