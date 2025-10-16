@@ -270,7 +270,7 @@ PUBMED_RIS_KEYS = {
 }
 
 
-class ScopusParser(rispy.BaseParser):
+class ScopusParser(rispy.RisParser):
     START_TAG = "TY"
     PATTERN = r"^[A-Z][A-Z0-9]  - |^ER  -\s*$"
 
