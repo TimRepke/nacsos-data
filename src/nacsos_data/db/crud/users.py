@@ -1,8 +1,8 @@
 import uuid
 from uuid import uuid4
 
+import bcrypt
 from sqlalchemy import select, asc
-from passlib.context import CryptContext
 
 from nacsos_data.db import DatabaseEngineAsync
 from nacsos_data.db.engine import ensure_session_async, DBSession
@@ -10,17 +10,18 @@ from nacsos_data.db.schemas import User, ProjectPermissions
 from nacsos_data.models.users import UserInDBModel, UserModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
-
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str | None) -> bool:
     if hashed_password is None:
         return False
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(
+        plain_password.encode('utf-8'),
+        hashed_password.encode('utf-8'),
+    )
 
 
 async def read_user_by_id(user_id: str | uuid.UUID, engine: DatabaseEngineAsync) -> UserInDBModel | None:

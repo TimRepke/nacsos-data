@@ -296,57 +296,56 @@ async def import_academic_items_nodedup_forced(
     if project_id is None:
         raise AttributeError('You have to provide a project ID!')
 
-    with tempfile.NamedTemporaryFile('w+') as duplicate_buffer:
-        async with db_engine.session() as session:  # type: AsyncSession
-            await set_session_mutex(session, project_id=project_id, lock=True)
+    async with db_engine.session() as session:  # type: AsyncSession
+        await set_session_mutex(session, project_id=project_id, lock=True)
 
-            # Get the import and figure out what ids to deduplicate on, based on import type
-            import_orm = await get_or_create_import(session=session,
-                                                    project_id=project_id,
-                                                    user_id=user_id,
-                                                    import_name=name,
-                                                    description=description,
-                                                    i_type='script')
-            import_id = str(import_orm.import_id)
+        # Get the import and figure out what ids to deduplicate on, based on import type
+        import_orm = await get_or_create_import(session=session,
+                                                project_id=project_id,
+                                                user_id=user_id,
+                                                import_name=name,
+                                                description=description,
+                                                i_type='script')
+        import_id = str(import_orm.import_id)
 
-            revision_id = str(uuid.uuid4())
+        revision_id = str(uuid.uuid4())
 
-            # Create a new revision
-            session.add(ImportRevision(
-                import_revision_id=revision_id,
-                import_id=import_id,
-                import_revision_counter=1,
-            ))
-            n_items = 0
-            for item in new_items():
-                try:
-                    async with session.begin_nested():
-                        with elapsed_timer(logger, f'Importing AcademicItem with doi {item.doi} and title "{item.title}"'):
-                            # Make sure the item fields are complete and clean
-                            item = _ensure_clean_item(item, project_id=str(project_id))
+        # Create a new revision
+        session.add(ImportRevision(
+            import_revision_id=revision_id,
+            import_id=import_id,
+            import_revision_counter=1,
+        ))
+        n_items = 0
+        for item in new_items():
+            try:
+                async with session.begin_nested():
+                    with elapsed_timer(logger, f'Importing AcademicItem with doi {item.doi} and title "{item.title}"'):
+                        # Make sure the item fields are complete and clean
+                        item = _ensure_clean_item(item, project_id=str(project_id))
 
-                            # Insert a new item or an item variant
-                            item_id, has_changes = await _insert_item(session=session, item=item, import_id=import_id,
-                                                                      import_revision=1, dry_run=False, logger=logger)
+                        # Insert a new item or an item variant
+                        item_id, has_changes = await _insert_item(session=session, item=item, import_id=import_id,
+                                                                  import_revision=1, dry_run=False, logger=logger)
 
-                            # UPSERT m2m
-                            await _upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=1,
-                                              logger=logger, dry_run=False)
-                            n_items += 1
+                        # UPSERT m2m
+                        await _upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=1,
+                                          logger=logger, dry_run=False)
+                        n_items += 1
 
-                except (UniqueViolation, IntegrityError, OperationalError) as e:
-                    logger.exception(e)
+            except (UniqueViolation, IntegrityError, OperationalError) as e:
+                logger.exception(e)
 
-            logger.info('Writing statistics!')
-            await _update_statistics(session=session, project_id=project_id, import_id=import_id, revision_id=revision_id,
-                                     latest_revision=1, num_new_items=n_items, num_updated=0, logger=logger)
+        logger.info('Writing statistics!')
+        await _update_statistics(session=session, project_id=project_id, import_id=import_id, revision_id=revision_id,
+                                 latest_revision=1, num_new_items=n_items, num_updated=0, logger=logger)
 
-            logger.info('Free our import mutex!')
-            await set_session_mutex(session, project_id=project_id, lock=False)
+        logger.info('Free our import mutex!')
+        await set_session_mutex(session, project_id=project_id, lock=False)
 
-            # All done, commit and finalise import transaction.
-            logger.info('Finally committing all changes to the database!')
-            await session.commit()
+        # All done, commit and finalise import transaction.
+        logger.info('Finally committing all changes to the database!')
+        await session.commit()
 
     logger.info('Import complete, returning to initiator!')
     return import_id, 1
