@@ -164,13 +164,15 @@ def _ensure_clean_item(item: AcademicItemModel, project_id: str) -> AcademicItem
     return item
 
 
-async def _insert_item(session: AsyncSession,
-                       item: AcademicItemModel,
-                       import_id: str,
-                       import_revision: int,
-                       existing_id: str | None,
-                       dry_run: bool,
-                       logger: logging.Logger) -> tuple[str, bool]:
+async def _insert_item(
+        session: AsyncSession,
+        item: AcademicItemModel,
+        import_id: str,
+        import_revision: int,
+        dry_run: bool,
+        logger: logging.Logger,
+        existing_id: str | None = None,
+) -> tuple[str, bool]:
     """
     Returns the item_id of the item that was inserted. This might be the existing ID or a new one.
     The second return value is
@@ -325,7 +327,7 @@ async def import_academic_items_nodedup_forced(
                         item = _ensure_clean_item(item, project_id=str(project_id))
 
                         # Insert a new item or an item variant
-                        item_id, has_changes = await _insert_item(session=session, item=item, import_id=import_id,
+                        item_id, has_changes = await _insert_item(session=session, item=item, import_id=import_id, existing_id=None,
                                                                   import_revision=1, dry_run=False, logger=logger)
 
                         # UPSERT m2m
