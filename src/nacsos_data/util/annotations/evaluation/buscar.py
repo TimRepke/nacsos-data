@@ -282,7 +282,7 @@ def retrospective_h0(
 
         batch_ps.append(p_h0)
 
-        if p_h0 is not None and p_h0 < (1.0 - confidence_level):
+        if p_h0 is not None:
             break
 
     batch_sizes = batch_sizes[:len(batch_ps)]
