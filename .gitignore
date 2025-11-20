@@ -10,3 +10,5 @@ build/
 venv/
 backups/
 alembic.secret.ini
+
+uv.lock

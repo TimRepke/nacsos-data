@@ -16,9 +16,10 @@ sudo milvus/scripts/standalone_embed.sh start
 
 ## Setup for development
 ```bash
-python3.13 -m venv venv
-source venv/bin/activate
-pip install -e ".[testing,utils,priority,scripts]"
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install uv
+uv pip install -e ".[testing,utils,priority,scripts]"
 ```
 You can leave out the extras that you don't need.
 The minimal installation for development is probably `pip install -e ".[utils]"` but it mostly also works with no extras!
