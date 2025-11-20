@@ -224,7 +224,11 @@ class OpenAlexSolrAPI(AbstractAPI):
         self.openalex_endpoint = openalex_endpoint
         self.batch_size = batch_size
 
-    def fetch_raw(self, query: str) -> Generator[dict[str, Any], None, None]:
+    def fetch_raw(
+            self,
+            query: str,
+            params: dict[str, Any] | None = None,
+    ) -> Generator[dict[str, Any], None, None]:
         """
            OpenAlex via solr wrapper for downloading all records for a given query.
 
@@ -233,7 +237,6 @@ class OpenAlexSolrAPI(AbstractAPI):
            https://solr.apache.org/guide/solr/latest/query-guide/common-query-parameters.html
            https://solr.apache.org/guide/solr/latest/query-guide/other-parsers.html#surround-query-parser
 
-           :param query:
            :return:
            """
         with RequestClient(backoff_rate=self.backoff_rate,
@@ -250,7 +253,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                 'df': 'title_abstract',
                 'defType': 'lucene',
                 'cursorMark': '*'
-            }
+            } | (params or {})
 
             t0 = time()
             self.logger.info(f'Querying endpoint with batch_size={self.batch_size:,}: {self.openalex_endpoint}')

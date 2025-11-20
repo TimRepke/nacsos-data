@@ -38,7 +38,11 @@ class DimensionsAPI(AbstractAPI):
                          max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
         self.page_size = page_size
 
-    def fetch_raw(self, query: str) -> Generator[dict[str, Any], None, None]:
+    def fetch_raw(
+            self,
+            query: str,
+            params: dict[str, Any] | None = None,
+    ) -> Generator[dict[str, Any], None, None]:
         """
         dimensions.ai API wrapper for downloading all records for a given query.
 

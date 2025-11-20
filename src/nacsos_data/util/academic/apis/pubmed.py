@@ -44,7 +44,11 @@ def get_authors(citation: dict[str, Any]) -> Generator[AcademicAuthorModel, None
 
 class PubmedAPI(AbstractAPI):
 
-    def _fetch_raw(self, query: str) -> Generator[Element, None, None]:
+    def _fetch_raw(
+            self,
+            query: str,
+            params: dict[str, Any] | None = None,
+    ) -> Generator[Element, None, None]:
         """
         Pubmed API wrapper for downloading all records for a given query.
 
@@ -68,14 +72,15 @@ class PubmedAPI(AbstractAPI):
                            max_req_per_sec=self.max_req_per_sec,
                            max_retries=self.max_retries,
                            proxy=self.proxy) as request_client:
-            search_page = request_client.get(
+            search_page = request_client.post(
                 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi',
-                params={
-                    'api_key': self.api_key,
-                    'db': 'pubmed',
-                    'term': query,
-                    'usehistory': 'y',
-                },
+                data={
+                         'api_key': self.api_key,
+                         'db': 'pubmed',
+                         'term': query,
+                         'usehistory': 'y',
+                     },
+                params=params,
             )
             tree = parse_xml(search_page.text)
             web_env = tree.find('WebEnv').text  # type: ignore[union-attr]
@@ -128,8 +133,12 @@ class PubmedAPI(AbstractAPI):
                     self.logger.info('Seemed to have reached the end (count zero or total reached).')
                     break
 
-    def fetch_raw(self, query: str) -> Generator[dict[str, Any], None, None]:
-        for entry in self._fetch_raw(query):
+    def fetch_raw(
+            self,
+            query: str,
+            params: dict[str, Any] | None = None,
+    ) -> Generator[dict[str, Any], None, None]:
+        for entry in self._fetch_raw(query, params=params):
             yield xml2dict(entry)
 
     @classmethod
@@ -157,7 +166,7 @@ class PubmedAPI(AbstractAPI):
                 kw.get('_text', '').strip()
                 for kw in select(citation, 'KeywordList', default={}).get('Keyword', [])  # type: ignore[union-attr]
             ]),
-            meta={'pubmed-api': record},
+            meta={'pubmed-api': clear_empty(record)},
         )
 
 

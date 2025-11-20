@@ -134,7 +134,7 @@ class WoSAPI(AbstractAPI):
         self.database = database
         self.page_size = page_size
 
-    def fetch_raw(self, query: str) -> Generator[dict[str, Any], None, None]:
+    def fetch_raw(self, query: str, params: dict[str, Any] | None=None) -> Generator[dict[str, Any], None, None]:
         """
            Web of Science ExpandedAPI wrapper for downloading all records for a given query.
 
@@ -146,7 +146,6 @@ class WoSAPI(AbstractAPI):
            https://webofscience.help.clarivate.com/en-us/Content/advanced-search.html
            https://webofscience.help.clarivate.com/en-us/Content/wos-core-collection/woscc-search-field-tags.htm
 
-           :param query:
            :return:
            """
         with RequestClient(backoff_rate=self.backoff_rate,

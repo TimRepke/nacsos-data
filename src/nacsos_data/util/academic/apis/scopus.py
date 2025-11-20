@@ -58,7 +58,11 @@ def translate_authors(record: dict[str, Any]) -> list[AcademicAuthorModel] | Non
 
 class ScopusAPI(AbstractAPI):
 
-    def fetch_raw(self, query: str) -> Generator[dict[str, Any], None, None]:
+    def fetch_raw(
+            self,
+            query: str,
+            params: dict[str, Any] | None = None,
+    ) -> Generator[dict[str, Any], None, None]:
         """
         Scopus API wrapper for downloading all records for a given query.
 

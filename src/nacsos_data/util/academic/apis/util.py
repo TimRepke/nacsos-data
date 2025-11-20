@@ -179,7 +179,11 @@ class AbstractAPI(ABC):
             self.logger = logger
 
     @abstractmethod
-    def fetch_raw(self, query: str) -> Generator[dict[str, Any], None, None]:
+    def fetch_raw(
+            self,
+            query: str,
+            params: dict[str, Any] | None = None,
+    ) -> Generator[dict[str, Any], None, None]:
         raise NotImplementedError
 
     @classmethod
@@ -187,15 +191,27 @@ class AbstractAPI(ABC):
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
         raise NotImplementedError
 
-    def fetch_translated(self, query: str, project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
-        for record in self.fetch_raw(query):
+    def fetch_translated(
+            self,
+            query: str,
+            project_id: str | uuid.UUID | None = None,
+            params: dict[str, Any] | None = None,
+    ) -> Generator[AcademicItemModel, None, None]:
+        for record in self.fetch_raw(query, params=params):
             yield self.translate_record(record, project_id)
 
-    def download_raw(self, query: str, target: Path) -> None:
-        collect_raw_jsonl(target=target, items=self.fetch_raw(query))
+    def download_raw(self, query: str, target: Path, params: dict[str, Any] | None = None) -> None:
+        collect_raw_jsonl(target=target, items=self.fetch_raw(query, params=params))
 
-    def download_translated(self, query: str, target: Path, project_id: str | uuid.UUID | None = None) -> None:
-        collect_jsonl(target=target, items=self.fetch_translated(query=query, project_id=project_id))
+    def download_translated(
+            self,
+            query: str,
+            target: Path,
+            project_id: str | uuid.UUID | None = None,
+            params: dict[str, Any] | None = None,
+    ) -> None:
+        collect_jsonl(target=target,
+                      items=self.fetch_translated(query=query, project_id=project_id, params=params))
 
     @classmethod
     def read_translated(cls, source: Path, project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
