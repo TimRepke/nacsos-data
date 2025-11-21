@@ -6,12 +6,17 @@
 
 # Official language image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/python/tags/
-image: python:3.12
+image: python:3.13
 
 # Change pip's cache directory to be inside the project directory since we can
 # only cache local items.
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  # GitLab CI creates a separate mountpoint for the build directory,
+  # so we need to copy instead of using hard links.
+  UV_LINK_MODE: copy
+  UV_PROJECT_ENVIRONMENT: "venv"
+  UV_CACHE_DIR: .uv-cache
 
 # Pip's cache doesn't store the python packages
 # https://pip.pypa.io/en/stable/reference/pip_install/#caching
@@ -22,28 +27,31 @@ cache:
   paths:
     - .cache/pip
     - venv/
+    - $UV_CACHE_DIR
 
 build-job:
   except:
     - schedules
   stage: build
   tags:
-    - vm,docker
+    - se164-docker
   script:
     - python -V
     - pip install virtualenv
     - virtualenv venv
     - source venv/bin/activate
+    - pip install uv
     - pwd
     - ls -lisah
-    - pip install -e ".[testing,utils]"
+    - uv pip install -e ".[testing,utils]"
+    - uv cache prune --ci
 
 test-job1:
   except:
     - schedules
   stage: test
   tags:
-    - vm,docker
+    - se164-docker
   script:
     - source venv/bin/activate
     - flake8 --config .flake8
@@ -53,44 +61,25 @@ test-job2:
     - schedules
   stage: test
   tags:
-    - vm,docker
+    - se164-docker
   script:
     - source venv/bin/activate
     - mypy --config-file=pyproject.toml src/nacsos_data --show-traceback --no-incremental
-
-sync-staging:
-  script:
-    - pg_dump -C -Fd -Z 9 -j 12 -p 5432 -f pgstash -d nacsos_core -h 0.0.0.0
-    - pg_lsclusters
-    - sudo mv pgstash /var/lib/postgresql
-    - sudo chmod -R ug+x /var/lib/postgresql/pgstash
-    - sudo chown -R postgres:postgres /var/lib/postgresql/pgstash
-    - sudo -u postgres bash
-    - cd /var/lib/postgresql
-    #- createdb -p 8010 -U postgres nacsos_core
-    # TODO: clear old staging db
-    - /usr/lib/postgresql/16/bin/pg_restore -F d -j 12 -p 8010 -C -d nacsos_core pgstash/
-  when: manual
-  tags:
-    - vm,bare-metal
 
 backup-nacsos:
   only:
     - schedules
   tags:
-    - vm,bare-metal
+    - se164-bare
   script:
     - export BACKUP_NAME="backup_$(date +"%Y-%m-%dT%H-%M-%S")"
     - export BACKUP_PATH="${BACKUP_LOCATION}/${BACKUP_NAME}"
     #
     - echo "Echo some variables, just for debug purposes"
-    - echo $REMOTE_TARGET
-    - echo $REMOTE_DAY
     - echo $BACKUP_LOCATION
     - echo $BACKUP_NAME
     - echo $BACKUP_PATH
     - echo $KEEP_DAILY
-    - echo $KEEP_WEEKLY
     - echo $DB_DATABASE
     - echo $DB_HOST
     - echo $DB_PORT
@@ -113,20 +102,23 @@ backup-nacsos:
     - rm -r ${BACKUP_PATH}
     - ls -lisah .
     #
-    - echo "Keep the six most recent backups and drop the rest"
+    - echo "Keep the N most recent backups and drop the rest"
     - ls -tp | grep -v '/$' | tail -n +$KEEP_DAILY | xargs -I {} rm -- {}
     - ls -lisah .
-    # On Sunday, move the backup
-    - |-
-      if [ $(date +"%u") = $REMOTE_DAY ]; then
-        echo "Time for a remote backup, syncing to MCC Synology"
-        scp ${BACKUP_PATH}.tar.gz apsis-backup@${REMOTE_ADDR}:${REMOTE_TARGET}
-        echo "remote ls of ${REMOTE_TARGET}" 
-        ssh apsis-backup@${REMOTE_ADDR} "ls -lisah ${REMOTE_TARGET}"
-        echo "dropping older files"
-        ssh apsis-backup@${REMOTE_ADDR} "cd ${REMOTE_TARGET}; ls -tp | grep -v '/$' | tail -n +${KEEP_WEEKLY} | xargs -I {} rm -- {}"
-        echo "remote ls of ${REMOTE_TARGET} (after rm tail)"
-        ssh apsis-backup@${REMOTE_ADDR} "ls -lisah ${REMOTE_TARGET}"
-      else
-        echo "Not syncing backup with remote."
-      fi
+
+
+#sync-staging:
+#  script:
+#    - pg_dump -C -Fd -Z 9 -j 12 -p 5432 -f pgstash -d nacsos_core -h 0.0.0.0
+#    - pg_lsclusters
+#    - sudo mv pgstash /var/lib/postgresql
+#    - sudo chmod -R ug+x /var/lib/postgresql/pgstash
+#    - sudo chown -R postgres:postgres /var/lib/postgresql/pgstash
+#    - sudo -u postgres bash
+#    - cd /var/lib/postgresql
+#    #- createdb -p 8010 -U postgres nacsos_core
+#    # TODO: clear old staging db
+#    - /usr/lib/postgresql/16/bin/pg_restore -F d -j 12 -p 8010 -C -d nacsos_core pgstash/
+#  when: manual
+#  tags:
+#    - vm,bare-metal
