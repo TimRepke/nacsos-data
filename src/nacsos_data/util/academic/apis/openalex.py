@@ -163,7 +163,11 @@ def translate_record(work: Work, project_id: str | uuid.UUID | None = None) -> A
 
 class OpenAlexAPI(AbstractAPI):
 
-    def fetch_raw(self, query: str) -> Generator[dict[str, Any], None, None]:
+    def fetch_raw(
+            self,
+            query: str,
+            params: dict[str, Any] | None = None,
+    ) -> Generator[dict[str, Any], None, None]:
         """
            OpenAlex via API wrapper for downloading all records for a given query.
 
@@ -172,9 +176,6 @@ class OpenAlexAPI(AbstractAPI):
 
            https://docs.openalex.org/api-entities/works/filter-works#from_created_date
            --> https://api.openalex.org/works?filter=from_created_date:2023-01-12&api_key=myapikey
-
-           :param query:
-           :return:
            """
         cursor = '*'
         n_pages = 0
@@ -190,11 +191,11 @@ class OpenAlexAPI(AbstractAPI):
                 page = request_client.get(
                     'https://api.openalex.org/works',
                     params={
-                        'filter': query,
-                        'select': ','.join(FIELDS_API),
-                        'cursor': cursor,
-                        'per-page': 50
-                    },
+                               'filter': query,
+                               'select': ','.join(FIELDS_API),
+                               'cursor': cursor,
+                               'per-page': 50
+                           } | (params or {}),
                     headers={'api_key': self.api_key},
                 ).json()
                 cursor = page['meta']['next_cursor']
@@ -245,15 +246,15 @@ class OpenAlexSolrAPI(AbstractAPI):
                            proxy=self.proxy) as request_client:
 
             params = {
-                'q': query,
-                'q.op': 'AND',
-                'sort': 'id desc',
-                'fl': ','.join(FIELDS_SOLR),
-                'rows': self.batch_size,
-                'df': 'title_abstract',
-                'defType': 'lucene',
-                'cursorMark': '*'
-            } | (params or {})
+                         'q': query,
+                         'q.op': 'AND',
+                         'sort': 'id desc',
+                         'fl': ','.join(FIELDS_SOLR),
+                         'rows': self.batch_size,
+                         'df': 'title_abstract',
+                         'defType': 'lucene',
+                         'cursorMark': '*'
+                     } | (params or {})
 
             t0 = time()
             self.logger.info(f'Querying endpoint with batch_size={self.batch_size:,}: {self.openalex_endpoint}')
@@ -307,6 +308,7 @@ if __name__ == '__main__':
 
     app = typer.Typer()
 
+
     @app.command()
     def download(
             target: Annotated[Path, typer.Option(help='File to write results to')],
@@ -334,6 +336,7 @@ if __name__ == '__main__':
             raise AttributeError('Must provide either `openalex_endpoint` or `api_key`')
         api.download_raw(query=query_str, target=target)
 
+
     @app.command()
     def convert(
             source: Annotated[Path, typer.Option(help='File to read results from')],
@@ -342,6 +345,7 @@ if __name__ == '__main__':
     ) -> None:
         cls = OpenAlexSolrAPI if kind == 'SOLR' else OpenAlexAPI
         cls.convert_file(source=source, target=target)
+
 
     @app.command()
     def translate(kind: Annotated[Literal['SOLR', 'API'], typer.Option(help='database to use')] = 'SOLR') -> None:

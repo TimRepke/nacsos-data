@@ -232,7 +232,7 @@ def recall_frontier(
         p_scores.append(p)
         recall_targets.append(recall_target)
         recall_target -= 0.005
-        if p is None or p < 0.01:
+        if p is None:
             break
 
     return recall_targets, p_scores
@@ -282,7 +282,7 @@ def retrospective_h0(
 
         batch_ps.append(p_h0)
 
-        if p_h0 is not None and p_h0 < (1.0 - confidence_level):
+        if p_h0 is not None:
             break
 
     batch_sizes = batch_sizes[:len(batch_ps)]
