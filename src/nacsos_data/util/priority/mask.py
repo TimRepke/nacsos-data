@@ -71,8 +71,12 @@ def parse_rule(rule: str) -> Tree[Token]:
     return tree
 
 
-def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | None = None,
-                       ignore_missing: bool = False) -> 'pd.Series[bool]':
+def get_inclusion_mask(  # noqa: C901
+        rule: str,
+        df: 'pd.DataFrame',
+        label_cols: list[str] | None = None,
+        ignore_missing: bool = False,
+) -> 'pd.Series[bool]':
     import pandas as pd
     tree = parse_rule(rule)
 
@@ -85,12 +89,13 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
 
     resanycols: dict[str, ColSet] = defaultdict(lambda: ColSet(res=None, users=[]))
     for col in columns:
-        if '|' in col:
-            parts = col.split('|')
-            if parts[0] == 'res':
-                resanycols['|'.join(parts[1:])]['res'] = col
-            else:
-                resanycols['|'.join(parts[1:])]['users'].append(col)
+        if '|' not in col:
+            continue
+        parts = col.split('|')
+        if parts[0] == 'res':
+            resanycols['|'.join(parts[1:])]['res'] = col
+        else:
+            resanycols['|'.join(parts[1:])]['users'].append(col)
 
     logger.debug(f'Query: {rule}')
     logger.debug(f'Allowed columns: {columns}')
@@ -103,88 +108,90 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
             return pd.Series(pd.NA, index=df.index)
         return ret
 
-    def recurse(subtree: Tree | Token) -> Optional['pd.Series[Any]']:  # type: ignore[type-arg]
-        if isinstance(subtree, Tree):
-            # -----------------------
-            # combine AND/OR branches
-            # -----------------------
-            if subtree.data == 'and':
-                return anding([recurse(subtree.children[0]), recurse(subtree.children[1])])
-            if subtree.data == 'or':
-                return oring([recurse(subtree.children[0]), recurse(subtree.children[1])])
+    def recurse(subtree: Tree | Token) -> Optional['pd.Series[Any]']:  # type: ignore[type-arg] # noqa: C901
+        if not isinstance(subtree, Tree):
+            raise SyntaxError('This is not a tree!')
 
-            # ----------------------------------
-            # combine lists of column statements
-            # ----------------------------------
-            if subtree.data == 'ored':
-                return oring([recurse(child) for child in subtree.children])
-            if subtree.data == 'anded':
-                return anding([recurse(child) for child in subtree.children])
+        # -----------------------
+        # combine AND/OR branches
+        # -----------------------
+        if subtree.data == 'and':
+            return anding([recurse(subtree.children[0]), recurse(subtree.children[1])])
+        if subtree.data == 'or':
+            return oring([recurse(subtree.children[0]), recurse(subtree.children[1])])
 
-            # ------------------------
-            # column statement to mask
-            # ------------------------
-            # column type
-            ctp = subtree.children[0].type  # type: ignore[union-attr]
-            # column name
-            col = subtree.children[0].value  # type: ignore[union-attr]
+        # ----------------------------------
+        # combine lists of column statements
+        # ----------------------------------
+        if subtree.data == 'ored':
+            return oring([recurse(child) for child in subtree.children])
+        if subtree.data == 'anded':
+            return anding([recurse(child) for child in subtree.children])
 
-            if ctp == 'SRC' and col not in columns:
-                if not ignore_missing:
-                    raise KeyError(f'`{col}` not in dataframe!')
-                return None
-            elif ctp == 'ANYSRC' and col not in anycols:
-                if not ignore_missing:
-                    raise KeyError(f'`*|{col}` not in dataframe!')
-                return None
+        # ------------------------
+        # column statement to mask
+        # ------------------------
+        # column type
+        ctp = subtree.children[0].type  # type: ignore[union-attr]
+        # column name
+        col = subtree.children[0].value  # type: ignore[union-attr]
 
-            # specific columns
-            if subtree.data == 'maybeyes':
-                return df[col].astype('boolean')
-            if subtree.data == 'maybeno':
-                return df[col].astype('boolean') == False  # noqa: E712
-            if subtree.data == 'forceyes':
-                return df[col] == 1
-            if subtree.data == 'forceno':
-                return df[col] == 0
+        if ctp == 'SRC' and col not in columns:
+            if not ignore_missing:
+                raise KeyError(f'`{col}` not in dataframe!')
+            return None
+        elif ctp == 'ANYSRC' and col not in anycols:
+            if not ignore_missing:
+                raise KeyError(f'`*|{col}` not in dataframe!')
+            return None
 
-            # any-user column
-            if subtree.data == 'anyyes':
-                return oring([df[c].astype('boolean') for c in anycols[col]])
-            if subtree.data == 'allyes':
-                return anding([
-                    oring([df[c].astype('boolean').isna() for c in anycols[col]]),
-                    anding([df[c].astype('boolean') | df[c].astype('boolean').isna() for c in anycols[col]])
-                ])
-            if subtree.data == 'forceallyes':
-                return anding([df[c] == 1 for c in anycols[col]])
-            if subtree.data == 'anyno':
-                return oring([df[c].astype('boolean') == False for c in anycols[col]])  # ruff: noqa, noqa: E712
-            if subtree.data == 'allno':
-                return anding([
-                    oring([df[c].astype('boolean').isna() for c in anycols[col]]),
-                    anding([(df[c].astype('boolean') == False) | df[c].astype('boolean').isna() for c in anycols[col]])  # noqa: E712
-                ])  # noqa: E712
-            if subtree.data == 'forceallno':
-                return anding([df[c] == 0 for c in anycols[col]])
+        # specific columns
+        if subtree.data == 'maybeyes':
+            return df[col].astype('boolean')
+        if subtree.data == 'maybeno':
+            return df[col].astype('boolean') == False  # noqa: E712
+        if subtree.data == 'forceyes':
+            return df[col] == 1
+        if subtree.data == 'forceno':
+            return df[col] == 0
 
-            # any-user column (use resolution if available)
-            if subtree.data == 'resanyyes':
-                if resanycols[col]['res']:
-                    return ((df[resanycols[col]['res']].notna()
-                             & df[resanycols[col]['res']] == True)  # noqa: E712
-                            | (df[resanycols[col]['res']].isna()
-                               & oring([df[c].astype('boolean') for c in resanycols[col]['users']])))
-                return oring([df[c].astype('boolean') == True for c in anycols[col]])  # ruff: noqa, noqa: E712
+        # any-user column
+        if subtree.data == 'anyyes':
+            return oring([df[c].astype('boolean') for c in anycols[col]])
+        if subtree.data == 'allyes':
+            return anding([
+                oring([df[c].astype('boolean').isna() for c in anycols[col]]),
+                anding([df[c].astype('boolean') | df[c].astype('boolean').isna() for c in anycols[col]])
+            ])
+        if subtree.data == 'forceallyes':
+            return anding([df[c] == 1 for c in anycols[col]])
+        if subtree.data == 'anyno':
+            return oring([df[c].astype('boolean') == False for c in anycols[col]])  # noqa: E712
+        if subtree.data == 'allno':
+            return anding([
+                oring([df[c].astype('boolean').isna() for c in anycols[col]]),
+                anding([(df[c].astype('boolean') == False) | df[c].astype('boolean').isna() for c in anycols[col]])  # noqa: E712
+            ])  # noqa: E712
+        if subtree.data == 'forceallno':
+            return anding([df[c] == 0 for c in anycols[col]])
 
-            if subtree.data == 'resanyno':
-                if resanycols[col]['res']:
-                    return ((df[resanycols[col]['res']].notna()
-                             & df[resanycols[col]['res']] == False)  # ruff: noqa, noqa: E712
-                            | (df[resanycols[col]['res']].isna()
-                               & oring([df[c].astype('boolean') == False for c in resanycols[col]['users']])))  # noqa: E712
+        # any-user column (use resolution if available)
+        if subtree.data == 'resanyyes':
+            if resanycols[col]['res']:
+                return ((df[resanycols[col]['res']].notna()
+                         & df[resanycols[col]['res']] == True)  # noqa: E712
+                        | (df[resanycols[col]['res']].isna()
+                           & oring([df[c].astype('boolean') for c in resanycols[col]['users']])))
+            return oring([df[c].astype('boolean') == True for c in anycols[col]])  # noqa: E712
 
-                return oring([df[c].astype('boolean') for c in anycols[col]])
+        if subtree.data == 'resanyno':
+            if resanycols[col]['res']:
+                return ((df[resanycols[col]['res']].notna()
+                         & df[resanycols[col]['res']] == False)  # noqa: E712
+                        | (df[resanycols[col]['res']].isna()
+                           & oring([df[c].astype('boolean') == False for c in resanycols[col]['users']])))  # noqa: E712
+
+            return oring([df[c].astype('boolean') for c in anycols[col]])
 
         raise SyntaxError('You shouldn\'t end up here.')
 

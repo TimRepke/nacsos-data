@@ -407,7 +407,7 @@ async def delete_assignment_scope(session: DBSession,
 async def upsert_annotations(annotations: list[AnnotationModel],
                              assignment_id: str | uuid.UUID | None,
                              db_engine: DatabaseEngineAsync) -> AssignmentStatus | None:
-    if not all([annotation is not None and annotation.annotation_id is not None for annotation in annotations]):
+    if not all([annotation is not None and annotation.annotation_id is not None for annotation in annotations]):  # noqa: C419
         raise ValueError('One or more annotations have no ID, this an undefined behaviour.')
 
     if assignment_id is not None:

@@ -51,7 +51,7 @@ def get_abstract(wr: WosRecord) -> str | None:
     if abstracts is None:
         return None
     for abstract in abstracts:
-        abstract_ = get_value(lambda: abstract.abstract_text.p)  # type: ignore[union-attr]
+        abstract_ = get_value(lambda: abstract.abstract_text.p)  # noqa: B023  # type: ignore[union-attr]
         if abstract_ is None:
             return None
         for abstract__ in abstract_:

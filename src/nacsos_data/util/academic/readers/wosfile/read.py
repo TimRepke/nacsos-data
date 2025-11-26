@@ -195,8 +195,8 @@ class PlainTextReader(Reader):
         while True:
             try:
                 line = self._next_nonempty_line()
-            except StopIteration:
-                raise ReadError("Encountered EOF before 'EF' marker")
+            except StopIteration as err:
+                raise ReadError("Encountered EOF before 'EF' marker") from err
             if line.startswith("EF"):
                 if lines:  # We're in the middle of a record!
                     raise ReadError(

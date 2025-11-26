@@ -145,15 +145,10 @@ def elapsed_timer(logger: logging.Logger, tn: str = 'Task') -> Generator[Callabl
     # https://stackoverflow.com/questions/7370801/how-do-i-measure-elapsed-time-in-python
     logger.info(f'{tn}...')
     start = default_timer()
-
-    def elapser() -> float:
-        return default_timer() - start
-
-    yield lambda: elapser()
+    elapser = lambda: default_timer() - start  # noqa: E731
+    yield lambda: elapser()  # type: ignore[no-untyped-call]
     end = default_timer()
-
-    def elapser():
-        return end - start
+    elapser = lambda: end - start  # noqa: E731
 
     logger.debug(f'{tn} took {timedelta(seconds=end - start)} to execute.')
 
@@ -210,6 +205,6 @@ def get_value(val: Callable[[], T], default: D | None = None) -> T | D | None:
 def as_uuid(val: str | uuid.UUID | None = None) -> uuid.UUID | None:
     if val is None:
         return None
-    if type(val) == str:
+    if type(val) is str:
         return uuid.UUID(val)
     return val  # type: ignore[return-value]

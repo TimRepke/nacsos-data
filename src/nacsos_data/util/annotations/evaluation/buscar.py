@@ -44,9 +44,9 @@ def calculate_h0(labels_: ArrayOrList, n_docs: int, recall_target: float = .95, 
     # in each of our urns for the urn to be in keeping with our null hypothesis
     # that we have missed our target
     k_hat = np.floor(
-        r_seen / recall_target + 1 -  # Divide num of relevant documents by our recall target and add 1  # noqa: W504
+        r_seen / recall_target + 1 -  # Divide num of relevant documents by our recall target and add 1  # noqa
         (
-                r_seen -  # from this we subtract the total relevant documents seen  # noqa: W504
+                r_seen -  # from this we subtract the total relevant documents seen  # noqa
                 urns.cumsum()  # before each urn
         )
     )

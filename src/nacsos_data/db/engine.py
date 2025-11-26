@@ -215,7 +215,7 @@ def ensure_connection_async(func: Callable[..., Awaitable[R]]) -> Callable[..., 
                 raise e
             finally:
                 await conn.close()
-                return ret
+                return ret  # noqa: B012
 
         raise RuntimeError('Unsupported connection type!')
 
