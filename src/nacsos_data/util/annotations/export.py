@@ -41,8 +41,8 @@ def _bool_label_columns(key: str, repeat: int | None, cte: sa.CTE) -> list[sa.La
         label = lambda x: f'{key}({repeat})|{x}'  # noqa: E731
     return [
         sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0, sa.func.max(sa.case((sa.and_(cte.c.value_bool == vb, *conditions), 1), else_=0)))).label(
-            label(vs)
-        )  # type: ignore[no-untyped-call]
+            label(vs)  # type: ignore[no-untyped-call]
+        )
         for vs, vb in [('0', False), ('1', True)]
     ]
 
@@ -55,8 +55,8 @@ def _single_label_columns(key: str, repeat: int | None, values: list[int], cte: 
         label = lambda x: f'{key}({repeat})|{x}'  # noqa: E731
     return [
         sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0, sa.func.max(sa.case((sa.and_(cte.c.value_int == v, *conditions), 1), else_=0)))).label(
-            label(v)
-        )  # type: ignore[no-untyped-call]
+            label(v)  # type: ignore[no-untyped-call]
+        )
         for v in values
     ]
 
