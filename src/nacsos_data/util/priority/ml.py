@@ -62,7 +62,7 @@ def training(  # type: ignore[no-untyped-def]
     logger.info(f'Training data has {df_train.shape[0]:,} entries / {df_test.shape[0]:,} for testing')
     logger.info(f'Training labels: {df_train["label"].value_counts()} / Testing labels: {df_test["label"].value_counts()}')
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name, max_length=max_len, model_max_length=max_len)  # type: ignore[no-untyped-call]
+    tokenizer = AutoTokenizer.from_pretrained(model_name, max_length=max_len, model_max_length=max_len)  # type: ignore[no-untyped-call,unused-ignore]
 
     train_dataset = Dataset.from_pandas(df_train)
     train_dataset = train_dataset.map(lambda rows: tokenizer(rows[text], padding='max_length', truncation=True), batched=True)
