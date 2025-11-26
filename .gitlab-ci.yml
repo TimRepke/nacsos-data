@@ -63,6 +63,7 @@ test-mypy:
     - se164-docker
   script:
     - uv run mypy
+    - uv cache prune --ci
 
 backup-nacsos:
   only:
