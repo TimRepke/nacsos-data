@@ -168,8 +168,16 @@ async def import_lexis_nexis(session: DBSession,
     :param log:
     :return:
     """
-    # import pynndescent
-    # from scipy.sparse import vstack
+
+    # Create revision
+    # Check for ID duplicates (LexisNexisItemSource.lexis_id)
+    # Create milvus index
+    # Initialise milvus index with existing LexisNexisItem.text and new ones
+    # for each new item
+    #   check for ID duplicate
+    #   check for duplicate in index
+    #     -> attach source (and check first that LexisNexisItemSource.lexis_id is not there already)
+    #   else: create new item, lexis_item, and lexis_item_source and m2m
 
     raise NotImplementedError('This method is currently unsupported. This needs revision support!')
 
