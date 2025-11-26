@@ -50,7 +50,12 @@ def _check_known_identifiers(item: AcademicItemModel, known_ids: dict[str, dict[
 
 
 async def _find_id_duplicates(
-    session: AsyncSession, new_items: AcademicItemGenerator, fp: IO[str], project_id: str, logger: logging.Logger, allow_empty_text: bool = False
+    session: AsyncSession,
+    new_items: AcademicItemGenerator,
+    fp: IO[str],
+    project_id: str,
+    logger: logging.Logger,
+    allow_empty_text: bool = False,
 ) -> tuple[int, int, dict[str, int], set[str]]:
     with elapsed_timer(logger, 'Fetching all known IDs from current project'):
         known_ids: dict[str, dict[str, str]]
@@ -221,7 +226,8 @@ async def _get_latest_revision(session: AsyncSession, import_id: str | uuid.UUID
     rslt = (
         (
             await session.execute(
-                text('SELECT * FROM import_revision WHERE import_id=:import_id ORDER BY import_revision_counter DESC LIMIT 1;'), {'import_id': import_id}
+                text('SELECT * FROM import_revision WHERE import_id=:import_id ORDER BY import_revision_counter DESC LIMIT 1;'),
+                {'import_id': import_id},
             )
         )
         .mappings()
@@ -242,7 +248,7 @@ def _revision_required(num_new_items: int | None, last_revision: ImportRevisionM
     ):
         logger.warning(
             f'Expected a difference of {min_update_size} between {num_new_items:,} new items in query and '
-            f'{last_revision.num_items_retrieved:,} items in latest revision. Ending here!'
+            f'{last_revision.num_items_retrieved:,} items in latest revision. Ending here!',
         )
         return False
     return True
@@ -305,7 +311,12 @@ async def import_academic_items_nodedup_forced(
 
         # Get the import and figure out what ids to deduplicate on, based on import type
         import_orm = await get_or_create_import(
-            session=session, project_id=project_id, user_id=user_id, import_name=name, description=description, i_type='script'
+            session=session,
+            project_id=project_id,
+            user_id=user_id,
+            import_name=name,
+            description=description,
+            i_type='script',
         )
         import_id = str(import_orm.import_id)
 
@@ -317,7 +328,7 @@ async def import_academic_items_nodedup_forced(
                 import_revision_id=revision_id,
                 import_id=import_id,
                 import_revision_counter=1,
-            )
+            ),
         )
         n_items = 0
         for item in new_items():
@@ -329,7 +340,13 @@ async def import_academic_items_nodedup_forced(
 
                         # Insert a new item or an item variant
                         item_id, has_changes = await _insert_item(
-                            session=session, item=item, import_id=import_id, existing_id=None, import_revision=1, dry_run=False, logger=logger
+                            session=session,
+                            item=item,
+                            import_id=import_id,
+                            existing_id=None,
+                            import_revision=1,
+                            dry_run=False,
+                            logger=logger,
                         )
 
                         # UPSERT m2m
@@ -458,7 +475,13 @@ async def import_academic_items(
 
             # Get the import and figure out what ids to deduplicate on, based on import type
             import_orm = await get_or_create_import(
-                session=session, project_id=project_id, import_id=import_id, user_id=user_id, import_name=import_name, description=description, i_type='script'
+                session=session,
+                project_id=project_id,
+                import_id=import_id,
+                user_id=user_id,
+                import_name=import_name,
+                description=description,
+                i_type='script',
             )
             import_id = str(import_orm.import_id)
 
@@ -482,7 +505,7 @@ async def import_academic_items(
                     import_id=import_id,
                     import_revision_counter=latest_revision,
                     pipeline_task_id=pipeline_task_id,
-                )
+                ),
             )
             await session.commit()  # Note, committing instead of flushing here, so this is persisted for reference even on error
 
@@ -520,7 +543,11 @@ async def import_academic_items(
             async with db_engine.session() as session:  # type: AsyncSession
                 index = MilvusDuplicateIndex(
                     existing_items=read_item_entries_from_db(
-                        session=session, batch_size=batch_size, project_id=project_id, min_text_len=min_text_len, log=logger
+                        session=session,
+                        batch_size=batch_size,
+                        project_id=project_id,
+                        min_text_len=min_text_len,
+                        log=logger,
                     ),
                     new_items=gen_academic_entries(_read_buffered_items(duplicate_buffer)),
                     project_id=project_id,
@@ -576,7 +603,12 @@ async def import_academic_items(
 
                             # Search for duplicates in the index and the database
                             existing_id = await _find_duplicate(
-                                session=session, item=item, project_id=str(project_id), min_text_len=min_text_len, index=index, logger=logger
+                                session=session,
+                                item=item,
+                                project_id=str(project_id),
+                                min_text_len=min_text_len,
+                                index=index,
+                                logger=logger,
                             )
 
                             # Insert a new item or an item variant
@@ -593,7 +625,12 @@ async def import_academic_items(
 
                             # UPSERT m2m
                             await _upsert_m2m(
-                                session=session, item_id=item_id, import_id=import_id, latest_revision=latest_revision, logger=logger, dry_run=dry_run
+                                session=session,
+                                item_id=item_id,
+                                import_id=import_id,
+                                latest_revision=latest_revision,
+                                logger=logger,
+                                dry_run=dry_run,
                             )
 
                 except (UniqueViolation, IntegrityError, OperationalError) as e:
@@ -819,7 +856,6 @@ async def import_academic_db(
 
 async def import_openalex(
     query: str,
-    openalex_url: str,
     nacsos_config: Path,
     def_type: DefType = 'lucene',
     field: SearchField = 'title_abstract',

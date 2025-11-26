@@ -153,7 +153,7 @@ def _labels_subquery(  # noqa: C901
                 Annotation.multi_int,
             )
             .join(Annotation, Annotation.assignment_id == Assignment.assignment_id, isouter=True)
-            .where(*where)
+            .where(*where),
         )
 
     if bot_annotation_metadata_ids is not None:
@@ -176,7 +176,7 @@ def _labels_subquery(  # noqa: C901
                 BotAnnotation.value_bool,
                 BotAnnotation.value_str,
                 BotAnnotation.multi_int,
-            ).where(*where)
+            ).where(*where),
         )
 
     if len(sub_queries) > 1:
@@ -238,7 +238,7 @@ async def get_labels(stmt_labels: sa.CTE, db_engine: DatabaseEngineAsync) -> dic
         ),
         sa.select(
             stmt_labels.c.key, stmt_labels.c.value_int, stmt_labels.c.value_bool, stmt_labels.c.value_str,
-            sa.literal(None, type_=sa.Integer).label('multis')
+            sa.literal(None, type_=sa.Integer).label('multis'),
         ),
     ).subquery()
 
@@ -274,7 +274,7 @@ async def get_project_labels(project_id: str | uuid.UUID, db_engine: DatabaseEng
 
     stmt_labels = _labels_subquery(
         bot_annotation_metadata_ids=bot_annotation_metadata_ids, assignment_scope_ids=assignment_scope_ids, user_ids=user_ids, labels=None,
-        ignore_repeat=True
+        ignore_repeat=True,
     )
 
     return await get_labels(stmt_labels=stmt_labels, db_engine=db_engine)
@@ -482,7 +482,7 @@ async def wide_export_table(
                 },
             }
             for r in rslt
-        ]
+        ],
     )
     base_cols = ['scope_order', 'item_order', 'item_id', 'wos_id', 'openalex_id', 'doi', 'title', 'text', 'teaser', 'authors', 'source',
                  'py']

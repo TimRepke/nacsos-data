@@ -108,12 +108,12 @@ def test_model(
 @ensure_session_async
 async def get_predictions(
     session: DBSession,
-        inclusion_rule: str,
-        project_id: str,
-        source_ids: list[str],
-        model: str,
-        features: str,
-        majority_on_conflict: bool = True,
+    inclusion_rule: str,
+    project_id: str,
+    source_ids: list[str],
+    model: str,
+    features: str,
+    majority_on_conflict: bool = True,
 ) -> tuple[Scores, list[THScores] | None, Predictions]:
     item_ids_seen, texts_seen, labels = await get_labelled_texts(
         session=session, inclusion_rule=inclusion_rule, source_ids=source_ids, majority_on_conflict=majority_on_conflict
