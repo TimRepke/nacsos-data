@@ -183,11 +183,11 @@ def anding(arr: list[Optional['pd.Series[bool]']]) -> 'bool | pd.Series[bool]':
     return ret
 
 
-def get(obj: dict[str, Any], *keys: str, default: Any = None) -> Any:  # type: ignore[var-annotated]
+def get(obj: object, *keys: str, default: Any = None) -> Any:  # type: ignore[var-annotated]
     for key in keys:
-        obj = obj.get(key)  # type: ignore[assignment]
-        if obj is None:
-            return default  # type: ignore[unreachable]
+        if not hasattr(obj, key):
+            return default
+        obj = getattr(obj, key)
     return obj
 
 

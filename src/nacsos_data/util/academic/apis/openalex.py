@@ -1,18 +1,22 @@
 import json
+import re
 import uuid
 import logging
 from pathlib import Path
 from time import time
 from datetime import timedelta
-from typing import Any, Generator, Annotated, Literal
+from typing import Any, Generator, Annotated, Literal, get_args
+
+from httpx import Response, BasicAuth
+from pydantic import BaseModel
 
 from nacsos_data.models.items import AcademicItemModel
 from nacsos_data.models.items.academic import AcademicAuthorModel, AffiliationModel
-from nacsos_data.models.openalex import WorkSolr, Authorship, Biblio, Work, Location
-from nacsos_data.util import clear_empty, as_uuid
+from nacsos_data.models.openalex import WorksSchema, AuthorshipsSchema, DefType, SearchField, OpType
+from nacsos_data.util import clear_empty, as_uuid, get
 from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
 
-FIELDS_API = [
+FIELDS_API = {
     'id',
     'doi',
     'title',
@@ -22,39 +26,47 @@ FIELDS_API = [
     'ids',
     'language',
     'primary_location',
+    # 'sources',
     'type',
     'type_crossref',
     'indexed_in',
     'open_access',
     'authorships',
     # 'institution_assertions',
+    # 'institutions',
     # 'countries_distinct_count',
     # 'institutions_distinct_count',
     # 'corresponding_author_ids',
     # 'corresponding_institution_ids',
-    'apc_list',
-    'apc_paid',
+    # 'apc_list',
+    # 'apc_paid',
     'fwci',
+    # 'is_authors_truncated',
     'has_fulltext',
-    'fulltext_origin',
+    # 'fulltext_origin',
+    # 'fulltext',
     # 'cited_by_count',
     # 'citation_normalized_percentile',
     # 'cited_by_percentile_year',
     # 'biblio',
     'is_retracted',
     'is_paratext',
+    'is_xpac',
     # 'primary_topic',
     'topics',
     'keywords',
-    # 'concepts',
+    'concepts',
     # 'mesh',
     # 'locations_count',
     'locations',
-    'best_oa_location',
-    # 'sustainable_development_goals',
+    # 'best_oa_location',
+    'sustainable_development_goals',
     'grants',
-    'datasets',
+    # 'awards',
+    # 'funders',
+    # 'datasets',
     # 'versions',
+    'has_content',
     # 'referenced_works_count',
     'referenced_works',
     # 'related_works',
@@ -62,43 +74,47 @@ FIELDS_API = [
     # 'cited_by_api_url',
     # 'counts_by_year',
     'updated_date',
-    'created_date'
-]
-FIELDS_SOLR = [
-    'id', 'title', 'abstract', 'display_name',  # 'title_abstract',
-    'publication_year', 'publication_date',
-    'created_date', 'updated_date',
-    'cited_by_count', 'type', 'doi', 'mag', 'pmid', 'pmcid',
-    'is_oa', 'is_paratext', 'is_retracted',
-    'locations', 'authorships', 'biblio', 'language'
-]
+    'created_date',
+}
+FIELDS_SOLR: set[str] = FIELDS_API - {'abstract_inverted_index'} | {
+    'abstract',
+    'title_abstract',
+    'abstract_source',
+    'is_published',
+    'is_accepted',
+    'is_open_access',
+    'publisher',
+    'publisher_id',
+    'source',
+    'source_id',
+    'id_mag',
+    'id_pmid',
+    'id_pmcid',
+}
+FIELDS_META = set(FIELDS_SOLR) - {'abstract', 'abstract_inverted_index'}
+
+NESTED_FIELDS = set([
+    field
+    for field, dtype in WorksSchema.model_fields.items()
+    if get_args(dtype.annotation)[0] not in {str, int, float, bool}
+])
+
+NON_ALPHA = re.compile(r'[^a-zA-Z]')
 
 
-def translate_doc(doc: WorkSolr) -> Work:
-    locations = None
-    if doc.locations is not None:
-        raw = json.loads(doc.locations)
-        locations = [
-            Location.model_validate(loc)
-            for loc in raw
-        ]
-    authorships = None
-    if doc.authorships is not None:
-        raw = json.loads(doc.authorships)
-        authorships = [
-            Authorship.model_validate(loc)
-            for loc in raw
-        ]
-
-    return Work.model_validate({
-        **doc.model_dump(),
-        'locations': locations,
-        'authorships': authorships,
-        'biblio': Biblio.model_validate(json.loads(doc.biblio)) if doc.biblio is not None else None
-    })
+def translate_work_to_solr(work: WorksSchema) -> dict[str, str | bool | int | float]:
+    doc = work.model_dump(include=FIELDS_SOLR, exclude_none=True, exclude_unset=True)
+    return doc | {
+        'title_abstract': NON_ALPHA.sub(f'{work.title} {work.abstract}', ' '),
+        'abstract_source': 'OpenAlex' if work.abstract else None,
+    } | {
+        field: json.dumps(doc[field])
+        for field in NESTED_FIELDS
+        if field in doc
+    }
 
 
-def translate_authorship(author: Authorship) -> AcademicAuthorModel:
+def translate_authorship(author: AuthorshipsSchema) -> AcademicAuthorModel:
     ret = AcademicAuthorModel(name='[missing]')
     if author.author is not None:
         if author.author.display_name is not None:
@@ -112,13 +128,13 @@ def translate_authorship(author: Authorship) -> AcademicAuthorModel:
                              country=inst.country_code)
             for inst in author.institutions
         ]
-    elif author.raw_affiliation_string is not None:
-        ret.affiliations = [AffiliationModel(name=author.raw_affiliation_string)]
+    elif author.raw_affiliation_strings is not None:
+        ret.affiliations = [AffiliationModel(name=affil) for affil in author.raw_affiliation_strings]
 
     return ret
 
 
-def translate_record(work: Work, project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
+def translate_work_to_item(work: WorksSchema, project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
     source = None
     if work.locations is not None and len(work.locations) > 0:
         # find the first location with a source name
@@ -127,16 +143,12 @@ def translate_record(work: Work, project_id: str | uuid.UUID | None = None) -> A
                 source = loc.source.display_name
                 break
 
-    doi: str | None = None
-    if work.doi is not None:
-        doi = work.doi.replace('https://doi.org/', '')
-
     return AcademicItemModel(
         item_id=uuid.uuid4(),
-        doi=doi,
+        doi=work.doi,
         project_id=as_uuid(project_id),
         openalex_id=work.id,
-        pubmed_id=work.pmid,
+        pubmed_id=work.id_pmid,
         title=work.title,
         text=work.abstract,
         publication_year=work.publication_year,
@@ -144,20 +156,8 @@ def translate_record(work: Work, project_id: str | uuid.UUID | None = None) -> A
         authors=[translate_authorship(a) for a in work.authorships] if work.authorships is not None else None,
 
         meta=clear_empty({
-            'openalex': {
-                'locations': work.locations,
-                'type': work.type,
-                'updated_date': work.updated_date,
-                'mag': work.mag,
-                'pmid': work.pmid,
-                'pmcid': work.pmcid,
-                'display_name': work.display_name,
-                'is_oa': work.is_oa,
-                'is_paratext': work.is_paratext,
-                'is_retracted': work.is_retracted,
-                'language': work.language
-            }
-        })
+            'openalex': work.model_dump(include=FIELDS_META, exclude_none=True, exclude_unset=True),
+        }),
     )
 
 
@@ -206,24 +206,59 @@ class OpenAlexAPI(AbstractAPI):
 
     @classmethod
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
-        work = Work.model_validate(record)
-        return translate_record(work=work, project_id=project_id)
+        work = WorksSchema.model_validate(record)
+        return translate_work_to_item(work=work, project_id=project_id)
+
+
+class SearchResult(BaseModel):
+    query_time: int
+    num_found: int
+    docs: list[AcademicItemModel]
+    histogram: dict[str, int] | None = None
 
 
 class OpenAlexSolrAPI(AbstractAPI):
     def __init__(self,
-                 api_key: str,
                  openalex_endpoint: str,
+                 username: str | None = None,
+                 password: str | None = None,
                  batch_size: int = 5000,
+                 export_fields: list[str] | None = None,
+                 include_histogram: bool = False,
+                 histogram_from: int = 1990,
+                 histogram_to: int = 2026,
+                 def_type: DefType = 'lucene',
+                 field: SearchField = 'title_abstract',
+                 op: OpType = 'AND',
                  proxy: str | None = None,
                  max_req_per_sec: int = 5,
                  max_retries: int = 5,
                  backoff_rate: float = 5.,
                  logger: logging.Logger | None = None):
-        super().__init__(api_key=api_key, proxy=proxy, max_retries=max_retries,
+        super().__init__(api_key='', proxy=proxy, max_retries=max_retries,
                          max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
         self.openalex_endpoint = openalex_endpoint
+        self.auth = BasicAuth(username=username, password=password) if username is not None and password is not None else None
+
+        self.def_type = def_type
+        self.field = field
+        self.op = op
+
         self.batch_size = batch_size
+
+        self.histogram: dict[str, int] | None = None
+        self.include_histogram = include_histogram
+        self.histogram_from = histogram_from
+        self.histogram_to = histogram_to
+        self.num_found: int | None = None
+        self.query_time: int | None = None
+
+        if export_fields is not None:
+            self.export_fields = export_fields
+        else:
+            self.export_fields = FIELDS_SOLR
+
+        self.export_fields = [f'{field}:[json]' if field in NESTED_FIELDS else field for field in self.export_fields]
 
     def fetch_raw(
             self,
@@ -243,46 +278,68 @@ class OpenAlexSolrAPI(AbstractAPI):
         with RequestClient(backoff_rate=self.backoff_rate,
                            max_req_per_sec=self.max_req_per_sec,
                            max_retries=self.max_retries,
-                           proxy=self.proxy) as request_client:
+                           proxy=self.proxy,
+                           auth=self.auth) as request_client:
 
-            params = {
-                         'q': query,
-                         'q.op': 'AND',
-                         'sort': 'id desc',
-                         'fl': ','.join(FIELDS_SOLR),
-                         'rows': self.batch_size,
-                         'df': 'title_abstract',
-                         'defType': 'lucene',
-                         'cursorMark': '*'
-                     } | (params or {})
+            params_ = {
+                'q': query,
+                'q.op': self.op,
+                'sort': 'id desc',
+                'fl': ','.join(FIELDS_SOLR),
+                'rows': self.batch_size,
+                'cursorMark': '*'
+            }
+
+            if self.def_type == 'lucene':
+                params_ |= {'df': self.field, 'defType': 'lucene'}
+            else:
+                params_ |= {'qf': self.field, 'defType': self.def_type}
+
+            if self.include_histogram:
+                params_ |= {
+                    'facet': 'true',
+                    'facet.range': 'publication_year',
+                    'facet.sort': 'index',
+                    'facet.range.gap': '1',
+                    'facet.range.start': self.histogram_from,
+                    'facet.range.end': self.histogram_to
+                }
+
+            # overrides
+            if params:
+                params_ |= params
 
             t0 = time()
             self.logger.info(f'Querying endpoint with batch_size={self.batch_size:,}: {self.openalex_endpoint}')
-            self.logger.info(f'Request parameters: {params}')
+            self.logger.info(f'Request parameters: {params_}')
 
             batch_i = 0
             num_docs_cum = 0
             while True:
                 t1 = time()
                 batch_i += 1
-                self.logger.info(f'Running query for batch {batch_i} with cursor "{params["cursorMark"]}"')
+                self.logger.info(f'Running query for batch {batch_i} with cursor "{params_["cursorMark"]}"')
                 t2 = time()
-                res = request_client.post(f'{self.openalex_endpoint}/select', data=params, timeout=60).json()
+                res = request_client.post(f'{self.openalex_endpoint}/select', data=params_, timeout=60).json()
 
                 next_curser = res.get('nextCursorMark')
-                params['cursorMark'] = next_curser
-                n_docs_total = res['response']['numFound']
+                params_['cursorMark'] = next_curser
                 batch_docs = res['response']['docs']
                 n_docs_batch = len(batch_docs)
                 num_docs_cum += n_docs_batch
+                self.num_found = res['response']['numFound']
+                self.query_time = res['responseHeader']['QTime'],
 
                 self.logger.debug(f'Query took {timedelta(seconds=time() - t2)}h and yielded {n_docs_batch:,} docs')
-                if n_docs_total > 0:
-                    self.logger.debug(f'Current progress: {num_docs_cum:,}/{n_docs_total:,}={num_docs_cum / n_docs_total:.2%} docs')
+                if self.num_found > 0:
+                    self.logger.debug(f'Current progress: {num_docs_cum:,}/{self.num_found:,}={num_docs_cum / self.num_found:.2%} docs')
 
                 if len(batch_docs) == 0:
                     self.logger.info('No documents in this batch, assuming to be done!')
                     break
+
+                if self.include_histogram and batch_i < 2:
+                    self.histogram = self._prepare_histogram(res)
 
                 self.logger.debug('Yielding documents...')
                 yield from batch_docs
@@ -294,14 +351,63 @@ class OpenAlexSolrAPI(AbstractAPI):
                     self.logger.info('Did not receive a `nextCursorMark`, assuming to be done!')
                     break
 
+            self.logger.info(f'Reached end of result set after {timedelta(seconds=time() - t1)}h')
+
+    @classmethod
+    def _prepare_histogram(cls, response: Response):
+        hist_facets = get(response, 'facet_counts', 'facet_ranges', 'publication_year', 'counts', default=None)
+        if hist_facets is None:
+            return None
+
+        return {
+            hist_facets[i]: hist_facets[i + 1]
+            for i in range(0, len(hist_facets), 2)
+        }
+
     @classmethod
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
-        doc = WorkSolr.model_validate(record)
-        work = translate_doc(doc)
-        return translate_record(work, project_id=project_id)
+        work = WorksSchema.model_validate(record)
+        return translate_work_to_item(work, project_id=project_id)
+
+    def query(
+            self,
+            query: str,
+            limit: int = 20,
+            offset: int = 0,
+    ) -> SearchResult:
+        docs = list(
+            self.fetch_translated(
+                query=query,
+                params={
+                    'rows': limit,
+                    'start': offset,
+                    'cursorMark': None,
+                },
+            )
+        )
+
+        return SearchResult(
+            num_found=self.num_found,
+            query_time=self.query_time,
+            docs=docs,
+            histogram=self.histogram,
+        )
+
+    def get_count(self, query: str):
+        return self.query(query, limit=1)
 
 
 if __name__ == '__main__':
+    with open('../../../../../scratch/snippet.jsonl') as f:
+        for li, line in enumerate(f):
+            print(li)
+            work = WorksSchema.model_validate_json(line)
+            translate_work_to_item(work, project_id=uuid.uuid4())
+            translate_work_to_solr(work)
+
+            # print(work.model_dump(exclude_unset=True, exclude_none=True))
+            # print(work.model_dump())
+
     import typer
 
     logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s (%(process)d): %(message)s', level='DEBUG')
@@ -329,7 +435,7 @@ if __name__ == '__main__':
             raise AttributeError('Must provide either `query_file` or `query`')
         api: OpenAlexSolrAPI | OpenAlexAPI
         if kind == 'SOLR' and openalex_endpoint is not None:
-            api = OpenAlexSolrAPI(api_key='', openalex_endpoint=openalex_endpoint, batch_size=batch_size)
+            api = OpenAlexSolrAPI(openalex_endpoint=openalex_endpoint, batch_size=batch_size)
         elif kind == 'API' and api_key is not None:
             api = OpenAlexAPI(api_key=api_key)
         else:
