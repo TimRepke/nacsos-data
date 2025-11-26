@@ -563,9 +563,9 @@ async def compute_irr_scores(  # noqa: C901
                     project_id=project_id,
                     resolution_id=resolution_id,
                     assignment_scope_id=assignment_scope_id,
-                    user_annotations_raw=user_annotations_raw,
+                    user_annotations_raw=user_annotations_raw,  # type: ignore[arg-type] # FIXME
                 )
-            )  # type: ignore[arg-type] # FIXME
+            )
         for label_value, label_choice_qualities in choice_qualities.items():
             qualities.append(
                 aggregate_qualities(
@@ -576,8 +576,8 @@ async def compute_irr_scores(  # noqa: C901
                     project_id=project_id,
                     resolution_id=resolution_id,
                     assignment_scope_id=assignment_scope_id,
-                    user_annotations_raw=user_annotations_raw,
+                    user_annotations_raw=user_annotations_raw,  # type: ignore[arg-type] # FIXME
                 )
-            )  # type: ignore[arg-type] # FIXME
+            )
 
     return qualities

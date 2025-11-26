@@ -32,8 +32,8 @@ def _convert_authors(authors: list[object]) -> list[AcademicAuthorModel] | None:
                 for src in ['AU', 'AF', 'surname', 'initials']
                 if a.get(src) is not None and len(a.get(src)) > 0  # type: ignore[arg-type]
             ],
-            key=lambda n: len(n),
-        )  # type: ignore[arg-type]
+            key=lambda n: len(n), # type: ignore[arg-type]
+        )
 
         # Get all author fields in this aggregate, keep non-empty ones
         name_initials = [

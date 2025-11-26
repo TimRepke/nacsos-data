@@ -240,8 +240,8 @@ def test_entry(
                 return cmp(
                     subtree.children[1],  # type: ignore[arg-type]
                     value,
-                    subtree.children[2].value,
-                )  # type: ignore[union-attr]
+                    subtree.children[2].value,  # type: ignore[union-attr]
+                )
 
         if subtree.data == 'bool_clause':
             key = str(subtree.children[0])
@@ -250,8 +250,8 @@ def test_entry(
                 return cmp(
                     subtree.children[1],  # type: ignore[arg-type]
                     value,
-                    subtree.children[2].value,
-                )  # type: ignore[union-attr]
+                    subtree.children[2].value,  # type: ignore[union-attr]
+                )
 
         # if subtree.data == 'float_clause': TODO
         # if subtree.data == 'multi_clause': TODO

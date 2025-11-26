@@ -264,8 +264,8 @@ def ensure_session_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awa
 
 def ensure_session(func):  # type: ignore[no-untyped-def]
     @wraps(func)
-    def wrapper(
-        *args,  # type: ignore[no-untyped-def]
+    def wrapper(  # type: ignore[no-untyped-def]
+        *args,
         session: Session | None = None,
         db_engine: DatabaseEngine | None = None,
         **kwargs,

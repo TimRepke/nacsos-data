@@ -43,7 +43,7 @@ build-job:
     - pip install uv
     - pwd
     - ls -lisah
-    - uv pip install -e ".[testing,utils]"
+    - uv pip install -e ".[utils]"
     - uv cache prune --ci
 
 test-job1:

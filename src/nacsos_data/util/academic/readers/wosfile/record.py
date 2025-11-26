@@ -52,9 +52,9 @@ class Record(dict[str, str | list[str]]):
         doi = 'DOI ' + self['DI'] if 'DI' in self else None  # type: ignore[operator]
 
         return ', '.join(
-            item
+            item  # type: ignore[misc]
             for item in (first_author, year, journal, volume, page, doi)
-            if item  # type: ignore[misc]
+            if item
         )
 
     @property

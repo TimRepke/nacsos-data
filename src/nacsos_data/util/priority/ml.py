@@ -22,8 +22,8 @@ def compute_metrics(p: tuple[np.ndarray, np.ndarray]) -> dict[str, np.ndarray]:
     }
 
 
-def training(
-    df: 'pd.DataFrame',  # type: ignore[no-untyped-def]
+def training(  # type: ignore[no-untyped-def]
+    df: 'pd.DataFrame',
     text: str = 'text',
     source: str = 'incl',
     target: str = 'pred|incl',

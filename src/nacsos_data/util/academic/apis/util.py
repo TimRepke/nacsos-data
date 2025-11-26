@@ -33,8 +33,8 @@ def response_logger(logger: logging.Logger) -> Callable[[Response], dict[str, An
 
 
 class RequestClient(Client):
-    def __init__(
-        self,  # type: ignore[no-untyped-def]
+    def __init__(  # type: ignore[no-untyped-def]
+        self,
         *,
         max_req_per_sec: int = 5,
         max_retries: int = 5,
@@ -230,8 +230,8 @@ class AbstractAPI(ABC):
                 f_out.write(item.model_dump_json(exclude_defaults=True) + '\n')
 
     @classmethod
-    def test_app(
-        cls,  # type: ignore[no-untyped-def]
+    def test_app(  # type: ignore[no-untyped-def]
+        cls,
         static_files: list[str],
         proxy: str | None = None,
         logger: logging.Logger | None = None,
