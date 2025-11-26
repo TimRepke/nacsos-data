@@ -53,7 +53,9 @@ dev = [
     "mypy[faster-cache]==1.18.2",
     "types-passlib==1.7.7.20250602",
     "types-requests==2.32.4.20250913",
+    "nacsos-data[utils,scripts,priority]",
 ]
+
 
 [project.scripts]
 nacsos_migrate = "nacsos_data.scripts.migrations:run"
@@ -61,6 +63,14 @@ academic_api = "nacsos_data.scripts.academic_apis:run"
 
 [tool.uv]
 package = true
+
+[tool.uv.workspace]
+members = [
+    ".",
+]
+
+[tool.uv.sources]
+nacsos-data = { workspace = true, editable = true }
 
 [build-system]
 requires = ["uv-build>=0.9.10,<0.10.0"]

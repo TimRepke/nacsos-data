@@ -19,7 +19,7 @@ sudo milvus/scripts/standalone_embed.sh start
 python3.13 -m venv .venv
 source .venv/bin/activate
 pip install uv
-uv sync --all-extras
+uv sync --group dev
 ```
 You can leave out the extras that you don't need.
 The minimal installation for development is probably `uv pip install -e ".[utils]"` but it mostly also works with no extras!
