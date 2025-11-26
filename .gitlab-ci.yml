@@ -24,10 +24,11 @@ variables:
 # If you want to also cache the installed packages, you have to install
 # them in a virtualenv and cache it as well.
 cache:
-  paths:
-    - .cache/pip
-    - venv/
-    - $UV_CACHE_DIR
+  - key:
+      files:
+        - uv.lock
+    paths:
+      - $UV_CACHE_DIR
 
 build-job:
   except:
@@ -37,33 +38,30 @@ build-job:
     - se164-docker
   script:
     - python -V
-    - pip install virtualenv
-    - virtualenv venv
-    - source venv/bin/activate
     - pip install uv
     - pwd
     - ls -lisah
     - uv sync --group dev
     - uv cache prune --ci
 
-test-job1:
+test-ruff:
   except:
     - schedules
   stage: test
   tags:
     - se164-docker
   script:
-    - source venv/bin/activate
     - uv run ruff check
+    - uv run ruff format --check
+    - uv cache prune --ci
 
-test-job2:
+test-mypy:
   except:
     - schedules
   stage: test
   tags:
     - se164-docker
   script:
-    - source venv/bin/activate
     - uv run mypy
 
 backup-nacsos:
