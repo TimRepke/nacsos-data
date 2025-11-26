@@ -43,7 +43,7 @@ def _bool_label_columns(key: str, repeat: int | None, cte: sa.CTE) \
     return [
         sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0,
                  sa.func.max(sa.case((sa.and_(cte.c.value_bool == vb, *conditions), 1), else_=0))))
-        .label(label(vs))
+        .label(label(vs))  # type: ignore[no-untyped-call]
         for vs, vb in [('0', False), ('1', True)]
     ]
 
@@ -58,7 +58,7 @@ def _single_label_columns(key: str, repeat: int | None, values: list[int], cte: 
     return [
         sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0,
                  sa.func.max(sa.case((sa.and_(cte.c.value_int == v, *conditions), 1), else_=0))))
-        .label(label(v))
+        .label(label(v))  # type: ignore[no-untyped-call]
         for v in values
     ]
 
@@ -73,7 +73,7 @@ def _multi_label_columns(key: str, repeat: int | None, values: list[int], cte: s
     return [
         sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0,
                  sa.func.max(sa.case((sa.and_(sa.any_(cte.c.multi_int) == v, *conditions), 1), else_=0))))
-        .label(label(v))
+        .label(label(v))  # type: ignore[no-untyped-call]
         for v in values
     ]
 
@@ -118,7 +118,7 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
                      labels: dict[str, LabelOptions] | None,
                      ignore_repeat: bool) -> sa.CTE:
     def _label_filter(Schema: Type[Annotation] | Type[BotAnnotation],
-                      label: LabelOptions) -> sa.ColumnElement[bool] | None:  # type: ignore[type-arg]
+                      label: LabelOptions) -> sa.ColumnElement[bool] | None:
         if label.options_int:
             return sa.and_(Schema.key == label.key,
                            Schema.value_int.in_(label.options_int))
@@ -129,7 +129,7 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
             return sa.and_(Schema.key == label.key,
                            Schema.multi_int.overlap(label.options_multi))
         if label.strings:
-            return Schema.key == label.key  # type: ignore[no-any-return]
+            return Schema.key == label.key
 
         return None
 

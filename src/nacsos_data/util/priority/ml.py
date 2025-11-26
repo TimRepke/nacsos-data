@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger('nacsos_data.util.priority.labels')
 
 
-def compute_metrics(p: tuple[np.ndarray, np.ndarray]) -> dict[str, np.ndarray]:  # type: ignore[type-arg]
+def compute_metrics(p: tuple[np.ndarray, np.ndarray]) -> dict[str, np.ndarray]:
     import evaluate
     logits, labels = p
     predictions = np.argmax(logits, axis=-1)
@@ -71,7 +71,7 @@ def training(df: 'pd.DataFrame',  # type: ignore[no-untyped-def]
     logger.info(f'Training labels: {df_train['label'].value_counts()} / '
                 f'Testing labels: {df_test['label'].value_counts()}')
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name, max_length=max_len, model_max_length=max_len)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, max_length=max_len, model_max_length=max_len)  # type: ignore[no-untyped-call]
 
     train_dataset = Dataset.from_pandas(df_train)
     train_dataset = train_dataset.map(lambda rows: tokenizer(rows[text], padding='max_length', truncation=True),

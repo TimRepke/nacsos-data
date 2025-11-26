@@ -168,7 +168,7 @@ async def get_predictions(session: DBSession,
     scores, th_scores = test_model(pre=pre, clf=clf, texts=texts_seen, labels=labels)
 
     predictions: Predictions
-    predictions = []  # type: ignore
+    predictions = []
 
     async for batch_ids, batch_texts in project_texts_batched(session=session, project_id=project_id,
                                                               item_ids_skip=set(item_ids_seen)):

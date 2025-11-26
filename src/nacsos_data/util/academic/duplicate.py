@@ -308,7 +308,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
 
         log.debug(f'Created first variant of item {orig_item_id} at {variant.item_variant_id}')
         # use this new variant for further value thinning
-        variants = [variant.model_dump()]  # type: ignore[list-item]
+        variants = [variant.model_dump()]
 
     # Object to keep track of previously unseen values
     new_variant = {}

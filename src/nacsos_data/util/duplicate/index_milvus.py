@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger('nacsos_data.util.deduplicate.index')
 
 
-def _get_vector_rep(x: csr_matrix, i: int) -> dict[str, int | np.ndarray]:  # type: ignore[type-arg]
+def _get_vector_rep(x: csr_matrix, i: int) -> dict[str, int | np.ndarray]:
     if x.nnz > 0:
         return {
             'id': i,

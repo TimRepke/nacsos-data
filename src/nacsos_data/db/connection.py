@@ -43,7 +43,7 @@ def _get_settings(conf_file: str | None = None) -> DatabaseConfig:
         conf_file = os.environ.get('NACSOS_CONFIG', 'config/default.env')
 
     # FIXME: get rid of ignore here
-    return DatabaseConfig(_env_file=conf_file, _env_file_encoding='utf-8')  # type: ignore[call-arg]
+    return DatabaseConfig(_env_file=conf_file, _env_file_encoding='utf-8')
 
 
 def get_engine(conf_file: str | None = None,

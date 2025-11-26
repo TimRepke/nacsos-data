@@ -888,8 +888,7 @@ async def import_openalex_files(sources: list[Path],
     **import_id**
         The import_id to connect these tweets to
     """
-    from nacsos_data.models.openalex import WorkSolr
-    from nacsos_data.util.academic.readers.openalex import translate_doc, translate_work
+    from nacsos_data.models.openalex import WorksSchema
 
     logger = logging.getLogger('import_openalex_files') if logger is None else logger
 

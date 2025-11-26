@@ -236,7 +236,7 @@ class WoSAPI(AbstractAPI):
             # title_slug  # not required
             wos_id=wos_record.UID,
             text=get_abstract(wos_record),
-            publication_year=get_value(lambda: wos_record.static_data.summary.pub_info.pubyear),  # type: ignore[union-attr,arg-type,return-value]
+            publication_year=get_value(lambda: wos_record.static_data.summary.pub_info.pubyear),  # type: ignore[union-attr]
             source=get_source(wos_record),
             keywords=get_keywords(wos_record),
             authors=translate_authors(wos_record),
@@ -254,7 +254,7 @@ if __name__ == '__main__':
             # 'scratch/academic_apis/response_scopus2.jsonl',
         ])
 
-    @app.command()
+    @app.command()  # type: ignore[misc]
     def offline() -> None:
         for fp in [
             'scratch/academic_apis/wos_response.json',

@@ -145,7 +145,7 @@ def elapsed_timer(logger: logging.Logger, tn: str = 'Task') -> Generator[Callabl
     # https://stackoverflow.com/questions/7370801/how-do-i-measure-elapsed-time-in-python
     logger.info(f'{tn}...')
     start = default_timer()
-    elapser = lambda: default_timer() - start
+    elapser: Callable[[], float] = lambda: default_timer() - start
     yield lambda: elapser()
     end = default_timer()
     elapser = lambda: end - start
@@ -183,7 +183,7 @@ def anding(arr: list[Optional['pd.Series[bool]']]) -> 'bool | pd.Series[bool]':
     return ret
 
 
-def get(obj: object, *keys: str, default: Any = None) -> Any:  # type: ignore[var-annotated]
+def get(obj: object, *keys: str, default: Any = None) -> Any:
     for key in keys:
         if not hasattr(obj, key):
             return default

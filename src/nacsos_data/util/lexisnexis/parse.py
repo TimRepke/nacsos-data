@@ -49,7 +49,7 @@ def parse_document(document: str) -> LexisNexisDocument:
     def get_md(xpath: str) -> str | None:
         base = tree.xpath(xpath, namespaces=prefix_map)
         if len(base) > 0:
-            return md(etree.tostring(base[0]))  # type: ignore[no-any-return]
+            return md(etree.tostring(base[0]))
         return None
 
     def fuse_lsts(lst1: list[str] | None, lst2: list[str] | None) -> list[str] | None:

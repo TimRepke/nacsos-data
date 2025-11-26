@@ -43,8 +43,8 @@ def get_value_raw(annotation: SortedAnnotationLabel | None, label: FlatLabel) ->
 
 def get_overlap(annotations_base: AnnotationsRaw, annotations_target: AnnotationsRaw) \
         -> tuple[Annotations, Annotations]:
-    base: Annotations = []  # type: ignore[assignment]
-    target: Annotations = []  # type: ignore[assignment]
+    base: Annotations = []
+    target: Annotations = []
     for annotation_base, annotation_target in zip(annotations_base, annotations_target):
         if annotation_base is not None and annotation_target is not None:
             base.append(annotation_base)  # type: ignore[arg-type] # FIXME
@@ -70,7 +70,7 @@ def compute_cohen(base: list[int], target: list[int]) -> float | None:
         warnings.simplefilter('error')
         try:
             base, target = compress_annotations(base, target)
-            return fix(cohen_kappa_score(base, target))  # type: ignore[no-any-return]  # FIXME
+            return fix(cohen_kappa_score(base, target))  # FIXME
         except RuntimeWarning as e:
             logger.error(e)
             return None
@@ -378,7 +378,7 @@ def precision_recall_f1(base: list[int], target: list[int], average: str) \
 
 
 def fix(val: float | None) -> float | None:
-    return float(val) if val is not None and not np.isnan(val) else None  # type: ignore[call-overload]
+    return float(val) if val is not None and not np.isnan(val) else None
 
 
 @ensure_session_async
@@ -447,7 +447,7 @@ async def compute_irr_scores(session: DBSession,
             annotator: [
                 get_value_raw(annotation_map[item_id]
                               .get(annotator, {})
-                              .get(label.key), label)  # type: ignore[call-overload]
+                              .get(label.key), label)
                 for item_id in item_order
             ]
             for annotator in annotators
@@ -514,15 +514,15 @@ async def compute_irr_scores(session: DBSession,
                     if label.choices:
                         for choice in label.choices:
                             if label.kind == 'multi':
-                                base_ = [int(choice.value in bi)  # type: ignore[operator, arg-type] # FIXME
-                                         for bi in base]  # type: ignore[operator, arg-type] # FIXME
-                                target_ = [int(choice.value in ti)  # type: ignore[operator, arg-type] # FIXME
-                                           for ti in target]  # type: ignore[operator, arg-type] # FIXME
+                                base_ = [int(choice.value in bi)  # type: ignore[operator] # FIXME
+                                         for bi in base]  # FIXME
+                                target_ = [int(choice.value in ti)  # type: ignore[operator] # FIXME
+                                           for ti in target]  # FIXME
                             else:
-                                base_ = [int(int(bi) == int(choice.value))  # type: ignore[operator, arg-type] # FIXME
-                                         for bi in base]  # type: ignore[operator, arg-type] # FIXME
-                                target_ = [int(int(ti) == int(choice.value))  # type: ignore[operator, arg-type] # FIXME
-                                           for ti in target]  # type: ignore[operator, arg-type] # FIXME
+                                base_ = [int(int(bi) == int(choice.value))  # type: ignore[arg-type] # FIXME
+                                         for bi in base]  # FIXME
+                                target_ = [int(int(ti) == int(choice.value))  # type: ignore[arg-type] # FIXME
+                                           for ti in target]  # FIXME
 
                             num_agree, num_disagree, perc_agree = compute_agreement(base_, target_)
                             pearson, pearson_p = compute_correlation(base_, target_, 'pearson')

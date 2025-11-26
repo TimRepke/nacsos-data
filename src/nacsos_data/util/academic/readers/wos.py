@@ -33,7 +33,7 @@ def read_wos_file(filepath: str,
 
         pub_year = record.get('PY')
         if pub_year and type(pub_year) is str and len(pub_year) > 0:
-            item.publication_year = int(pub_year)  # type: ignore[assignment]
+            item.publication_year = int(pub_year)
 
         abstract = record.get('AB', record.get('AE'))
         if abstract and len(abstract) > 0:
@@ -52,7 +52,7 @@ def read_wos_file(filepath: str,
 
         keywords = [sci for sc in [record.get('ID', []), record.get('DE', [])] for sci in sc]
         if len(keywords) > 0:
-            item.keywords = keywords  # type: ignore[assignment]
+            item.keywords = keywords
 
         authors = {
             author: AcademicAuthorModel(name=author)

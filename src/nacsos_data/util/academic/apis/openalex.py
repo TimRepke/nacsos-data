@@ -190,7 +190,7 @@ class OpenAlexAPI(AbstractAPI):
 
                 page = request_client.get(
                     'https://api.openalex.org/works',
-                    params={
+                    params={  # type: ignore[arg-type]
                                'filter': query,
                                'select': ','.join(FIELDS_API),
                                'cursor': cursor,
@@ -256,7 +256,7 @@ class OpenAlexSolrAPI(AbstractAPI):
         if export_fields is not None:
             self.export_fields = export_fields
         else:
-            self.export_fields = FIELDS_SOLR
+            self.export_fields = list(FIELDS_SOLR)
 
         self.export_fields = [f'{field}:[json]' if field in NESTED_FIELDS else field for field in self.export_fields]
 
@@ -328,7 +328,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                 n_docs_batch = len(batch_docs)
                 num_docs_cum += n_docs_batch
                 self.num_found = res['response']['numFound']
-                self.query_time = res['responseHeader']['QTime'],
+                self.query_time = res['responseHeader']['QTime']
 
                 self.logger.debug(f'Query took {timedelta(seconds=time() - t2)}h and yielded {n_docs_batch:,} docs')
                 if self.num_found > 0:
@@ -354,7 +354,7 @@ class OpenAlexSolrAPI(AbstractAPI):
             self.logger.info(f'Reached end of result set after {timedelta(seconds=time() - t1)}h')
 
     @classmethod
-    def _prepare_histogram(cls, response: Response):
+    def _prepare_histogram(cls, response: Response) -> dict[str, int] | None:
         hist_facets = get(response, 'facet_counts', 'facet_ranges', 'publication_year', 'counts', default=None)
         if hist_facets is None:
             return None
@@ -387,13 +387,13 @@ class OpenAlexSolrAPI(AbstractAPI):
         )
 
         return SearchResult(
-            num_found=self.num_found,
-            query_time=self.query_time,
+            num_found=self.num_found or 0,
+            query_time=self.query_time or 0,
             docs=docs,
             histogram=self.histogram,
         )
 
-    def get_count(self, query: str):
+    def get_count(self, query: str) -> SearchResult:
         return self.query(query, limit=1)
 
 

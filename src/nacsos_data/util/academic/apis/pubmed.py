@@ -10,11 +10,11 @@ from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
 from nacsos_data.models.items.academic import AcademicAuthorModel, AcademicItemModel, AffiliationModel
 
 
-def select(obj: dict[str, Any], *keys: str, default: Any = None) -> Any | None:  # type: ignore[var-annotated]
+def select(obj: dict[str, Any], *keys: str, default: Any = None) -> Any | None:
     for key in keys:
         obj = obj.get(key)  # type: ignore[assignment]
         if obj is None or len(obj) == 0:
-            return default  # type: ignore[unreachable]
+            return default
         obj = obj[0]  # type: ignore[index]
     return obj
 

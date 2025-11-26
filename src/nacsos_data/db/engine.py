@@ -65,7 +65,7 @@ class DatabaseEngineAsync:
             'json_serializer': DictLikeEncoder().encode,
             **(kw_engine or {}),
         })
-        self._session: async_sessionmaker[AsyncSession] = async_sessionmaker(**{  # type: ignore[type-arg]
+        self._session: async_sessionmaker[AsyncSession] = async_sessionmaker(**{
             'bind': self.engine,
             'autoflush': False,
             'autocommit': False,
@@ -132,8 +132,7 @@ class DatabaseEngine:
         )
         self.engine = create_engine(self._connection_str, echo=debug, future=True,
                                     json_serializer=DictLikeEncoder().encode)
-        self._session: sessionmaker[Session] = sessionmaker(  # type: ignore[type-arg]
-            bind=self.engine, autoflush=False, autocommit=False)
+        self._session: sessionmaker[Session] = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
 
     def startup(self) -> None:
         """
@@ -256,12 +255,12 @@ def ensure_session(func):  # type: ignore[no-untyped-def]
                 db_engine: DatabaseEngine | None = None,
                 **kwargs):
         if session is not None:
-            return func(*args, session=session, **kwargs)  # type: ignore[arg-type]
+            return func(*args, session=session, **kwargs)
         if db_engine is not None:
             logger.debug(f'Opening a new session to execute {func}')
             fresh_session: Session
             with db_engine.session() as fresh_session:
-                return func(*args, session=fresh_session, **kwargs)  # type: ignore[arg-type]
+                return func(*args, session=fresh_session, **kwargs)
 
         raise RuntimeError('I need a session or an engine to get a session!')
 

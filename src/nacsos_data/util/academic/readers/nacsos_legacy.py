@@ -18,7 +18,7 @@ def _convert_authors(authors: list[object]) -> list[AcademicAuthorModel] | None:
     # iterate list of authors and aggregate by "position"
     # authors with the same position are assumed to be identical with varying affiliation
     for author in authors:
-        aggregate[author.position].append(author.__dict__)  # type: ignore[arg-type,attr-defined]
+        aggregate[author.position].append(author.__dict__)  # type: ignore[attr-defined]
 
     ret = []
 
@@ -283,7 +283,7 @@ def read_nacsos1_annotations(
                                 .filter(query__project=p, doc__query=q, relevant__gt=0)
                                 .distinct('doc_id')
                                 .values('doc_id', 'id')),
-                           key=lambda x: x['id'])  # type: ignore[arg-type, no-any-return]
+                           key=lambda x: x['id'])
     ]
 
     assignments_new = []

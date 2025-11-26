@@ -52,17 +52,17 @@ def _field_cmp(cmp: ComparatorExt,
                value: int | float | bool | str,
                field: InstrumentedAttribute | Function) -> ColumnExpressionArgument:  # type: ignore[type-arg]
     if cmp == '>':
-        return and_(field > value, field.isnot(None))  # type: ignore[no-any-return]
+        return and_(field > value, field.isnot(None))
     if cmp == '>=':
-        return and_(field >= value, field.isnot(None))  # type: ignore[no-any-return]
+        return and_(field >= value, field.isnot(None))
     if cmp == '=':
-        return and_(field == value, field.isnot(None))  # type: ignore[no-any-return]
+        return and_(field == value, field.isnot(None))
     if cmp == '<':
-        return and_(field < value, field.isnot(None))  # type: ignore[no-any-return]
+        return and_(field < value, field.isnot(None))
     if cmp == '<=':
-        return and_(field <= value, field.isnot(None))  # type: ignore[no-any-return]
+        return and_(field <= value, field.isnot(None))
     if cmp == '!=':
-        return and_(field != value, field.isnot(None))  # type: ignore[no-any-return]
+        return and_(field != value, field.isnot(None))
     if cmp == 'LIKE':
         return and_(field.ilike(f'%{value}%'), field.isnot(None))
     if cmp == 'SIMILAR':
@@ -75,13 +75,13 @@ def _field_cmp_lst(cmp: SetComparator,
                    values: list[int],
                    field: MappedColumn) -> ColumnExpressionArgument:  # type: ignore[type-arg]
     if cmp == '==':
-        return and_(field == values, field.isnot(None))  # type: ignore[no-any-return]
+        return and_(field == values, field.isnot(None))
     if cmp == '@>':
-        return and_(field.contains(values), field.isnot(None))  # type: ignore[no-any-return]
+        return and_(field.contains(values), field.isnot(None))
     if cmp == '!>':
-        return and_(not_(field.overlap(values)), field.isnot(None))  # type: ignore[no-any-return,attr-defined]
+        return and_(not_(field.overlap(values)), field.isnot(None))  # type: ignore[attr-defined]
     if cmp == '&&':
-        return and_(field.overlap(values), field.isnot(None))  # type: ignore[no-any-return,attr-defined]
+        return and_(field.overlap(values), field.isnot(None))  # type: ignore[attr-defined]
 
     raise InvalidNQLError(f'Unexpected comparator "{cmp}".')
 
@@ -353,7 +353,7 @@ class NQLQuery:
             if isinstance(subquery, LabelFilterBool):
                 if subquery.value_bool is None:
                     raise InvalidNQLError('Missing value!')
-                return Alias.value_bool == subquery.value_bool  # type: ignore[union-attr]
+                return Alias.value_bool == subquery.value_bool
             if isinstance(subquery, LabelFilterInt):
                 if subquery.value_int is None:
                     raise InvalidNQLError('Missing value!')
@@ -366,7 +366,7 @@ class NQLQuery:
 
         def _inner_where(Schema) -> Sequence[ColumnExpressionArgument]:  # type: ignore[type-arg,no-untyped-def]
             inner_wheres = (Schema.key == subquery.key,
-                            _value_where(Schema))
+                            _value_where(Schema))  # type: ignore[no-untyped-call]
             if subquery.repeats is not None:
                 Schema.repeats.in_(subquery.repeats)
 
@@ -381,7 +381,7 @@ class NQLQuery:
                             BAMAlias.kind == 'RESOLVE'
                         ),
                     )
-                elif subquery.scheme is not None:  # type: ignore[unreachable]
+                elif subquery.scheme is not None:
                     inner_wheres += (
                         and_(  # type: ignore[assignment]
                             BAMAlias.annotation_scheme_id == subquery.scheme,
@@ -389,7 +389,7 @@ class NQLQuery:
                         ),
                     )
                 else:
-                    inner_wheres += (  # type: ignore[unreachable, assignment]
+                    inner_wheres += (  # type: ignore[assignment]
                         BAMAlias.kind == 'RESOLVE',
                     )
             elif subquery.type == 'bot':
@@ -411,7 +411,7 @@ class NQLQuery:
                         ),
                     )
                 else:
-                    inner_wheres += (  # type: ignore[unreachable, assignment]
+                    inner_wheres += (  # type: ignore[assignment]
                         BAMAlias.kind != 'RESOLVE',
                     )
             elif subquery.type == 'user':
@@ -421,7 +421,7 @@ class NQLQuery:
                     inner_wheres += (  # type: ignore[assignment]
                         AssignmentAlias.assignment_scope_id.in_(subquery.scopes),
                     )
-                elif subquery.scheme is not None:  # type: ignore[unreachable]
+                elif subquery.scheme is not None:
                     AssignmentAlias = aliased(Assignment)
                     self._stmt = self.stmt.join(Assignment, Assignment.assignment_id == Schema.assignment_id)
                     inner_wheres += (  # type: ignore[assignment]
@@ -438,9 +438,9 @@ class NQLQuery:
                 AnnotationAlias = aliased(Annotation_)
                 self._stmt = self._stmt.join(
                     AnnotationAlias,
-                    self.Schema.item_id == AnnotationAlias.item_id  # type: ignore[attr-defined]
+                    self.Schema.item_id == AnnotationAlias.item_id
                 )
-                return and_(AnnotationAlias.user_id.in_(subquery.users.user_ids),  # type: ignore[attr-defined, union-attr]
+                return and_(AnnotationAlias.user_id.in_(subquery.users.user_ids),  # type: ignore[union-attr]
                             and_(*_inner_where(AnnotationAlias)))
 
             elif subquery.users.mode == 'ALL':
@@ -449,18 +449,18 @@ class NQLQuery:
                     AnnotationAlias = aliased(Annotation_)
                     self._stmt = self._stmt.join(
                         AnnotationAlias,
-                        self.Schema.item_id == AnnotationAlias.item_id)  # type: ignore[attr-defined]
+                        self.Schema.item_id == AnnotationAlias.item_id)
                     _wheres = _inner_where(AnnotationAlias)
-                    _wheres += (AnnotationAlias.user_id == user,)  # type: ignore[attr-defined, operator, union-attr]
+                    _wheres += (AnnotationAlias.user_id == user,)  # type: ignore[operator, union-attr]
                     wheres.append(and_(*_wheres))
                 return and_(*wheres)
             else:
                 raise ValueError(f'Unexpected mode {subquery.users.mode}')
 
         else:
-            AnnotationAlias = aliased(Annotation_)  # type: ignore[unreachable]
+            AnnotationAlias = aliased(Annotation_)
             self._stmt = self._stmt.join(AnnotationAlias,
-                                         self.Schema.item_id == AnnotationAlias.item_id,  # type: ignore[attr-defined]
+                                         self.Schema.item_id == AnnotationAlias.item_id,
                                          isouter=True)
             return and_(*_inner_where(AnnotationAlias))
 
@@ -470,7 +470,7 @@ class NQLQuery:
         return session.execute(cnt_stmt).scalar()  # type: ignore[return-value]
 
     def _transform_results(self,
-                           rslt: Sequence[RowMapping]  # type: ignore[type-arg,no-untyped-def]
+                           rslt: Sequence[RowMapping]
                            ) -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
         if self.project_type == ItemType.lexis:
             return lexis_orm_to_model(rslt)

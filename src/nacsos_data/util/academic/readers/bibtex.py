@@ -15,7 +15,7 @@ from ..duplicate import str_to_title_slug
 logger = logging.getLogger('nacsos_data.util.academic.bibtex')
 
 
-class EnsureUniqKeyMiddleware(BlockMiddleware):
+class EnsureUniqKeyMiddleware(BlockMiddleware):  # type: ignore[misc]
     """Sorts the fields of an entry alphabetically by key."""
 
     def __init__(self, allow_inplace_modification: bool = True):

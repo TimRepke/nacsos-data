@@ -149,7 +149,7 @@ class AuthenticationCache:
 
         try:
             user = await self.get_user(username, user_id, user)
-            token_id = self._token_lookup[str(user.username).lower().strip()]  # type: ignore[index,union-attr]
+            token_id = self._token_lookup[str(user.username).lower().strip()]
             return self._token_cache[str(token_id).lower().strip()]
         except Exception as e:
             if not retry:

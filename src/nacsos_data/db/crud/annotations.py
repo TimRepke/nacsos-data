@@ -232,7 +232,7 @@ async def read_next_assignment_for_scope_for_user(current_assignment_id: str | u
                  'assignment_id': current_assignment_id})
         ).mappings().one_or_none()
         if result is not None:
-            return AssignmentModel(**result)  # type: ignore[misc]
+            return AssignmentModel(**result)
 
     # Try to fall back on next open assignment (apparently we reached the end of the list here).
     ret: AssignmentModel | None = await read_next_open_assignment_for_scope_for_user(
@@ -498,7 +498,7 @@ async def read_item_ids_with_assignment_count_for_project(session: DBSession,
     GROUP BY assignment.item_id;
     """)
     result = (await session.execute(stmt, {'project_id': project_id})).mappings().all()
-    return [ItemWithCount(**res) for res in result]  # type: ignore[misc]
+    return [ItemWithCount(**res) for res in result]
 
 
 class AssignmentCounts(BaseModel):
@@ -525,7 +525,7 @@ async def read_assignment_counts_for_scope(session: DBSession,
     if result is None:
         return AssignmentCounts(num_full=0, num_open=0, num_total=0, num_partial=0)
 
-    return AssignmentCounts(**result)  # type: ignore[misc]
+    return AssignmentCounts(**result)
 
 
 @ensure_session_async

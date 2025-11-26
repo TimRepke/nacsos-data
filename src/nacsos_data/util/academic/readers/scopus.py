@@ -152,7 +152,7 @@ def read_scopus_csv_file(filepath: str,
 
             py: int | None = None
             if _get(row, 'Year') is not None:
-                py = int(_get(row, 'Year'))  # type: ignore[union-attr,arg-type]
+                py = int(_get(row, 'Year'))  # type: ignore[arg-type]
 
             doc = AcademicItemModel(project_id=project_id,
                                     scopus_id=_get(row, 'EID'),
@@ -270,7 +270,7 @@ PUBMED_RIS_KEYS = {
 }
 
 
-class ScopusParser(rispy.RisParser):
+class ScopusParser(rispy.RisParser):  # type: ignore[misc]
     START_TAG = "TY"
     PATTERN = r"^[A-Z][A-Z0-9]  - |^ER  -\s*$"
 
