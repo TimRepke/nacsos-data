@@ -145,10 +145,16 @@ def elapsed_timer(logger: logging.Logger, tn: str = 'Task') -> Generator[Callabl
     # https://stackoverflow.com/questions/7370801/how-do-i-measure-elapsed-time-in-python
     logger.info(f'{tn}...')
     start = default_timer()
-    elapser: Callable[[], float] = lambda: default_timer() - start
+
+    def elapser() -> float:
+        return default_timer() - start
+
     yield lambda: elapser()
     end = default_timer()
-    elapser = lambda: end - start
+
+    def elapser():
+        return end - start
+
     logger.debug(f'{tn} took {timedelta(seconds=end - start)} to execute.')
 
 

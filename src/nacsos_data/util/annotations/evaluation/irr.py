@@ -45,7 +45,7 @@ def get_overlap(annotations_base: AnnotationsRaw, annotations_target: Annotation
         -> tuple[Annotations, Annotations]:
     base: Annotations = []
     target: Annotations = []
-    for annotation_base, annotation_target in zip(annotations_base, annotations_target):
+    for annotation_base, annotation_target in zip(annotations_base, annotations_target, strict=False):
         if annotation_base is not None and annotation_target is not None:
             base.append(annotation_base)  # type: ignore[arg-type] # FIXME
             target.append(annotation_target)  # type: ignore[arg-type] # FIXME
@@ -58,9 +58,9 @@ def get_partial_overlap(annotations: dict[str, AnnotationsRaw], users: list[str]
         users = list(annotations.keys())
 
     annotations_filtered: dict[str, AnnotationsRaw] = {user: [] for user in users}
-    for row in zip(*[annotations[user] for user in users]):
+    for row in zip(*[annotations[user] for user in users], strict=False):
         if len([1 for v in row if v is not None]) > 0:
-            for user, v in zip(users, row):
+            for user, v in zip(users, row, strict=False):
                 annotations_filtered[user].append(v)
     return annotations_filtered  # type: ignore[return-value] # FIXME
 
@@ -122,10 +122,10 @@ def get_values(annotations: dict[str, list[T | None]],
     if users is None:
         users = list(annotations.keys())
 
-    return {v: i for i, v in enumerate(set([annotation
+    return {v: i for i, v in enumerate({annotation
                                             for user in users
                                             for annotation in annotations[user]
-                                            if include_none or annotation is not None]))}
+                                            if include_none or annotation is not None})}
 
 
 def get_coincidence_matrix(annotations: dict[str, list[int | None]], users: list[str] | None = None) \
@@ -135,7 +135,7 @@ def get_coincidence_matrix(annotations: dict[str, list[int | None]], users: list
 
     values: dict[int, int] = get_values(annotations=annotations, users=users)  # type: ignore[assignment]
     coincidence_matrix = np.zeros((len(values), len(values)))
-    for row in zip(*[annotations[user] for user in users]):
+    for row in zip(*[annotations[user] for user in users], strict=False):
         row_values = [values[r] for r in row if r is not None]
         num_annotations = len(row_values)
         perms = itertools.permutations(row_values, 2)
@@ -296,7 +296,7 @@ def compute_krippendorff(annotations: dict[str, list[int | None]],
 
 def compute_multi_overlap(base: list[list[int]], target: list[list[int]]) -> tuple[float, float, float]:
     overlaps = []
-    for b, t in zip(base, target):
+    for b, t in zip(base, target, strict=False):
         bs = set(b)
         ts = set(t)
         overlaps.append(len(bs & ts) / len(bs | ts))
@@ -305,8 +305,8 @@ def compute_multi_overlap(base: list[list[int]], target: list[list[int]]) -> tup
 
 
 def compute_agreement(base: Annotations, target: Annotations) -> tuple[int, int, float]:
-    num_agree = len([1 for b, t in zip(base, target) if b == t])
-    num_disagree = len([1 for b, t in zip(base, target) if b != t])
+    num_agree = len([1 for b, t in zip(base, target, strict=False) if b == t])
+    num_disagree = len([1 for b, t in zip(base, target, strict=False) if b != t])
 
     return num_agree, num_disagree, fix((num_agree / len(base)) * 100)  # type: ignore[return-value] # FIXME
 
@@ -427,7 +427,7 @@ async def compute_irr_scores(session: DBSession,
             annotation_map[item_id][user_key][include_key] = SortedAnnotationLabel(value_bool=bool(inclusions[ai]),
                                                                                    values_bool=[bool(inclusions[ai])])
 
-    annotators = list(sorted(set(annotators)))
+    annotators = sorted(set(annotators))
     item_order = list(dict.fromkeys(item_order).keys())
 
     logger.debug(annotators)

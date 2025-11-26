@@ -94,11 +94,11 @@ FIELDS_SOLR: set[str] = FIELDS_API - {'abstract_inverted_index'} | {
 }
 FIELDS_META = set(FIELDS_SOLR) - {'abstract', 'abstract_inverted_index'}
 
-NESTED_FIELDS = set([
+NESTED_FIELDS = {
     field
     for field, dtype in WorksSchema.model_fields.items()
     if get_args(dtype.annotation)[0] not in {str, int, float, bool}
-])
+}
 
 NON_ALPHA = re.compile(r'[^a-zA-Z]')
 

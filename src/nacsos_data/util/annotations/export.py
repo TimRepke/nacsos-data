@@ -471,7 +471,7 @@ async def wide_export_table(session: DBSession | AsyncSession,
         df.drop(columns=['meta'], inplace=True)
     str_cols = [col for col in df.columns if '|STR|' in col]
     base_cols += str_cols
-    label_cols = list(sorted(set(df.columns) - set(base_cols)))
+    label_cols = sorted(set(df.columns) - set(base_cols))
 
     df[label_cols] = df[label_cols].astype('Int8')
     df['py'] = df['py'].astype('Int16')

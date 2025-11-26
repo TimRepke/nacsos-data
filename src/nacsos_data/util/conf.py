@@ -1,12 +1,11 @@
 import os
-from functools import cached_property
 from pathlib import Path
 from urllib.parse import quote
 
 from httpx import BasicAuth
 from pydantic_settings import SettingsConfigDict, BaseSettings
-from pydantic.networks import PostgresDsn, AnyHttpUrl
-from pydantic import field_validator, ValidationInfo, computed_field
+from pydantic.networks import PostgresDsn
+from pydantic import field_validator, ValidationInfo
 
 
 class DatabaseConfig(BaseSettings):

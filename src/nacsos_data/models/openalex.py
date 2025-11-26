@@ -66,10 +66,7 @@ def invert_abstract(v: str | None, handler: ValidatorFunctionWrapHandler, info: 
     return ' '.join(abstract)
 
 
-class MetaSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class MetaSchema(BaseModel, extra='allow'):
     count: int | None = None
     q: str | None = None
     db_response_time_ms: int | None = None
@@ -82,20 +79,14 @@ class MetaSchema(BaseModel):
     cited_by_count_sum: int | None = None
 
 
-class CountsByYearSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class CountsByYearSchema(BaseModel, extra='allow'):
     year: int | None = None
     works_count: int | None = None
     oa_works_count: int | None = None
     cited_by_count: int | None = None
 
 
-class XConceptsSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class XConceptsSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     wikidata: Annotated[str | None, AfterValidator(strip_url)] = None
     display_name: str | None = None
@@ -103,19 +94,13 @@ class XConceptsSchema(BaseModel):
     score: float | None = None
 
 
-class SummaryStatsSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class SummaryStatsSchema(BaseModel, extra='allow'):
     two_mean_citedness: float | None = None
     h_index: int | None = None
     i10_index: int | None = None
 
 
-class ValuesSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class ValuesSchema(BaseModel, extra='allow'):
     value: str | None = None
     display_name: str | None = None
     count: int | None = None
@@ -123,18 +108,12 @@ class ValuesSchema(BaseModel):
     db_response_time_ms: int | None = None
 
 
-class TopicHierarchySchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class TopicHierarchySchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     display_name: str | None = None
 
 
-class TopicSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class TopicSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     display_name: str | None = None
     count: int | None = None
@@ -145,27 +124,18 @@ class TopicSchema(BaseModel):
     domain: TopicHierarchySchema | None = None
 
 
-class RolesSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class RolesSchema(BaseModel, extra='allow'):
     role: str | None = None
     id: str | None = None
     works_count: int | None = None
 
 
-class PercentilesSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class PercentilesSchema(BaseModel, extra='allow'):
     percentile: float | None = None
     value: float | None = None
 
 
-class StatsMetaSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class StatsMetaSchema(BaseModel, extra='allow'):
     count: int | None = None
     entity: str | None = None
     # filters :list[fields.Dict(]|None=None)
@@ -173,36 +143,24 @@ class StatsMetaSchema(BaseModel):
     db_response_time_ms: int | None = None
 
 
-class StatsSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class StatsSchema(BaseModel, extra='allow'):
     key: str | None = None
     percentiles: dict[int, int] | None = None
     sum: int | None = None
 
 
-class StatsWrapperSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class StatsWrapperSchema(BaseModel, extra='allow'):
     meta: StatsMetaSchema | None = None
     stats: list[StatsSchema] | None = None
 
 
-class AuthorSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class AuthorSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     display_name: str | None = None
     orcid: Annotated[str | None, AfterValidator(strip_url)] = None
 
 
-class InstitutionsSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class InstitutionsSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     display_name: str | None = None
     ror: Annotated[str | None, AfterValidator(strip_url)] = None
@@ -211,18 +169,12 @@ class InstitutionsSchema(BaseModel):
     lineage: Annotated[list[str] | None, AfterValidator(strip_urls)] = None
 
 
-class AffiliationsSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class AffiliationsSchema(BaseModel, extra='allow'):
     raw_affiliation_string: str | None = None
     institution_ids: Annotated[list[str] | None, AfterValidator(strip_urls)] = None
 
 
-class AuthorshipsSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class AuthorshipsSchema(BaseModel, extra='allow'):
     author_position: str | None = None
     author: AuthorSchema | None = None
     institutions: Annotated[list[InstitutionsSchema] | None, BeforeValidator(ensure_clean_list)] = None
@@ -233,10 +185,7 @@ class AuthorshipsSchema(BaseModel):
     affiliations: Annotated[list[AffiliationsSchema] | None, BeforeValidator(ensure_clean_list)] = None
 
 
-class APCSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class APCSchema(BaseModel, extra='allow'):
     value: int | None = None
     price: int | None = None
     currency: str | None = None
@@ -244,20 +193,14 @@ class APCSchema(BaseModel):
     provenance: str | None = None
 
 
-class BiblioSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class BiblioSchema(BaseModel, extra='allow'):
     volume: str | None = None
     issue: str | None = None
     first_page: str | None = None
     last_page: str | None = None
 
 
-class ConceptsSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class ConceptsSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     wikidata: Annotated[str | None, AfterValidator(strip_url)] = None
     display_name: str | None = None
@@ -265,36 +208,24 @@ class ConceptsSchema(BaseModel):
     score: float | None = None
 
 
-class CitationNormalizedPercentileSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class CitationNormalizedPercentileSchema(BaseModel, extra='allow'):
     value: float | None = None
     is_in_top_1_percent: bool | None = None
     is_in_top_10_percent: bool | None = None
 
 
-class GrantsSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class GrantsSchema(BaseModel, extra='allow'):
     funder: Annotated[str | None, AfterValidator(strip_url)] = None
     funder_display_name: str | None = None
     award_id: str | None = None
 
 
-class HasContentSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class HasContentSchema(BaseModel, extra='allow'):
     pdf: bool | None = None
     grobid_xml: bool | None = None
 
 
-class AwardsSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class AwardsSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     funder_award_id: str | None = None
     funder_id: Annotated[str | None, AfterValidator(strip_url)] = None
@@ -302,19 +233,13 @@ class AwardsSchema(BaseModel):
     doi: Annotated[str | None, AfterValidator(strip_url)] = None
 
 
-class FundersSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class FundersSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     display_name: str | None = None
     ror: Annotated[str | None, AfterValidator(strip_url)] = None
 
 
-class SourceSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class SourceSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     display_name: str | None = None
     issn_l: str | None = None
@@ -331,10 +256,7 @@ class SourceSchema(BaseModel):
     raw_type: str | None = None
 
 
-class HostOrganizationSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class HostOrganizationSchema(BaseModel, extra='allow'):
     """
     New schema for Walden, replace host_organization in locations.
     """
@@ -342,10 +264,7 @@ class HostOrganizationSchema(BaseModel):
     display_name: str | None = None
 
 
-class SourcesLocationsSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class SourcesLocationsSchema(BaseModel, extra='allow'):
     """
     New schema for Walden, replaces locations.
     """
@@ -353,10 +272,7 @@ class SourcesLocationsSchema(BaseModel):
     content_type: str | None = None
 
 
-class SourcesSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class SourcesSchema(BaseModel, extra='allow'):
     """
     New schema for Walden, replaces locations.
     """
@@ -373,10 +289,7 @@ class SourcesSchema(BaseModel):
     type: str | None = None
 
 
-class LocationSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class LocationSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     is_oa: bool | None = None
     landing_page_url: str | None = None
@@ -405,20 +318,14 @@ class LocationSchema(BaseModel):
     # url_sort_score: int
 
 
-class OpenAccessSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class OpenAccessSchema(BaseModel, extra='allow'):
     is_oa: bool | None = None
     oa_status: str | None = None
     oa_url: str | None = None
     any_repository_has_fulltext: bool | None = None
 
 
-class IDsSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class IDsSchema(BaseModel, extra='allow'):
     openalex: Annotated[str | None, AfterValidator(strip_url)] = None
     doi: Annotated[str | None, AfterValidator(strip_url)] = None
     mag: str | None = None
@@ -426,10 +333,7 @@ class IDsSchema(BaseModel):
     pmcid: str | None = None
 
 
-class MeshSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class MeshSchema(BaseModel, extra='allow'):
     descriptor_ui: str | None = None
     descriptor_name: str | None = None
     qualifier_ui: str | None = None
@@ -437,36 +341,24 @@ class MeshSchema(BaseModel):
     is_major_topic: bool | None = None
 
 
-class SDGSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class SDGSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     display_name: str | None = None
     score: float | None = None
 
 
-class CitedByPercentileYearSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class CitedByPercentileYearSchema(BaseModel, extra='allow'):
     min: int | None = None
     max: int | None = None
 
 
-class KeywordsSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class KeywordsSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     display_name: str | None = None
     score: float | None = None
 
 
-class WorksSchema(BaseModel):
-    class Config:
-        extra = 'allow'
-
+class WorksSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     doi: Annotated[str | None, AfterValidator(strip_url)] = None
     title: str | None = None

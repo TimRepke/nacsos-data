@@ -178,13 +178,13 @@ async def get_predictions(session: DBSession,
             y_bin = y_sft.argmax(axis=1)
             predictions += [
                 (bid, int(yb), float(ys))  # type: ignore  # FIXME
-                for ys, yb, bid in zip(y_sft, y_bin, batch_ids)
+                for ys, yb, bid in zip(y_sft, y_bin, batch_ids, strict=False)
             ]
         else:
             y_bin = clf.predict(X)
             predictions += [
                 (bid, int(yb))  # type: ignore  # FIXME
-                for yb, bid in zip(y_bin, batch_ids)
+                for yb, bid in zip(y_bin, batch_ids, strict=False)
             ]
     return scores, th_scores, predictions
 

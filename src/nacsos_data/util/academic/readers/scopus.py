@@ -129,10 +129,10 @@ def read_scopus_csv_file(filepath: str,
             # Unfortunately, there's no good way to associate affiliations to authors,
             # so at least remember all unique affiliations in the meta-data
             if _get(row, 'Affiliations') is not None:
-                meta_info['affiliations'] = list(set([
+                meta_info['affiliations'] = list({
                     aff.strip()
                     for aff in _get(row, 'Affiliations').split(';')  # type: ignore[union-attr]
-                ]))
+                })
 
             keywords = None
             if _get(row, 'Author Keywords') is not None:

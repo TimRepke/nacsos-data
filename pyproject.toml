@@ -39,17 +39,20 @@ priority = [
     "datasets==4.4.1",
     "evaluate==0.4.6",
 ]
-testing = [
+scripts = [
+    "typer==0.20.0",
+    "alembic==1.17.2",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.6",
     "tox==4.32.0",
     "pytest==9.0.1",
     "pytest-cov==7.0.0",
     "mypy[faster-cache]==1.18.2",
     "types-passlib==1.7.7.20250602",
     "types-requests==2.32.4.20250913",
-]
-scripts = [
-    "typer==0.20.0",
-    "alembic==1.17.2",
 ]
 
 [project.scripts]
@@ -70,21 +73,15 @@ testpaths = [
 ]
 
 [tool.ruff]
-max-line-length = 160
+line-length = 160
 indent-width = 4
 target-version = "py313"
-exclude = [
-    "__init__.py",
-    "venv/",
-    ".venv/",
-    "scratch",
-    "build",
-    "src/nacsos_data/scripts/"
-]
+include = ["pyproject.toml", "src/nacsos_data/**/*.py"]
+exclude = ["scripts/"]
 
 [tool.ruff.lint]
-select = [ "C","E","F","W","B","B9"]
-ignore = ["E203", "E501", "W503", "E126"]
+select = ["C", "E", "F", "W", "B", "B9"]
+ignore = ["E203", "E501"]  # , "E126", "W503",
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
@@ -119,6 +116,9 @@ docstring-code-format = false
 # This only has an effect when the `docstring-code-format` setting is
 # enabled.
 docstring-code-line-length = "dynamic"
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
 
 [tool.mypy]
 plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]

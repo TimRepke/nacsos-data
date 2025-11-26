@@ -322,7 +322,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
         # Cleaned value from the new item for `field`
         new_value = getattr(new_item, field).strip()
         # Get all non-empty values for the field across variants
-        field_values = set([var[field].strip() for var in variants if var[field] is not None and len(var[field].strip()) > 0])
+        field_values = {var[field].strip() for var in variants if var[field] is not None and len(var[field].strip()) > 0}
 
         # Check if we have seen this value before
         if new_value not in field_values:
@@ -347,7 +347,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     new_pub_year = getattr(new_item, 'publication_year')
     if new_pub_year is not None:
         # Get all non-empty publication_year across variants
-        pub_yrs = set([var['publication_year'] for var in variants if var['publication_year'] is not None])
+        pub_yrs = {var['publication_year'] for var in variants if var['publication_year'] is not None}
 
         # Check if we have seen this value before
         if new_pub_year not in pub_yrs:
@@ -361,7 +361,7 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     new_keywords = getattr(new_item, 'keywords')
     if new_keywords is not None and len(new_keywords) > 0:
         # Get all keywords across variants
-        keywords = set([kw for var in variants if var['keywords'] is not None for kw in var['keywords']])
+        keywords = {kw for var in variants if var['keywords'] is not None for kw in var['keywords']}
 
         # Check if there are new keywords
         if len(set(new_keywords) - keywords) > 0:

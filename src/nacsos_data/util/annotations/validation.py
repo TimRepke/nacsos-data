@@ -193,7 +193,7 @@ def validate_annotated_assignment(annotation_scheme: AnnotationSchemeModel,
                 for annotation in annotations_map[label.key]:
                     if annotation.parent == parent:
                         cnt += 1
-                        for ci, choice in enumerate(label.choices or []):
+                        for _ci, choice in enumerate(label.choices or []):
                             if choice.children is not None and choice.value == annotation.value_int:
                                 child_state = recurse(choice.children,
                                                       repeat=repeat,
@@ -233,7 +233,7 @@ def merge_scheme_and_annotations(annotation_scheme: AnnotationSchemeModel,
                         label_cpy = label.model_copy(deep=True)
                         label_cpy.annotation = annotation
 
-                        for ci, choice in enumerate(label_cpy.choices or []):
+                        for _ci, choice in enumerate(label_cpy.choices or []):
                             if choice.children is not None:
                                 choice.children = recurse(choice.children,
                                                           repeat=repeat,

@@ -159,7 +159,7 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
             if subtree.data == 'forceallyes':
                 return anding([df[c] == 1 for c in anycols[col]])
             if subtree.data == 'anyno':
-                return oring([df[c].astype('boolean') == False for c in anycols[col]])   # noqa: E712
+                return oring([df[c].astype('boolean') == False for c in anycols[col]])  # ruff: noqa, noqa: E712
             if subtree.data == 'allno':
                 return anding([
                     oring([df[c].astype('boolean').isna() for c in anycols[col]]),
@@ -175,12 +175,12 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
                              & df[resanycols[col]['res']] == True)  # noqa: E712
                             | (df[resanycols[col]['res']].isna()
                                & oring([df[c].astype('boolean') for c in resanycols[col]['users']])))
-                return oring([df[c].astype('boolean') == True for c in anycols[col]])    # noqa: E712
+                return oring([df[c].astype('boolean') == True for c in anycols[col]])  # ruff: noqa, noqa: E712
 
             if subtree.data == 'resanyno':
                 if resanycols[col]['res']:
                     return ((df[resanycols[col]['res']].notna()
-                             & df[resanycols[col]['res']] == False)  # noqa: E712
+                             & df[resanycols[col]['res']] == False)  # ruff: noqa, noqa: E712
                             | (df[resanycols[col]['res']].isna()
                                & oring([df[c].astype('boolean') == False for c in resanycols[col]['users']])))  # noqa: E712
 

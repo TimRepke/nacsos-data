@@ -41,10 +41,10 @@ def left_join(data_a: list[tuple[str, str]],
     texts_b = [t for t in _texts_b if len(t) >= MIN_TEXT_LEN]
 
     logger.info('Filtering data ids...')
-    ids_a = [i for (i, _), t in zip(data_a, _texts_a) if len(t) >= MIN_TEXT_LEN]
-    ids_b = [i for (i, _), t in zip(data_b, _texts_b) if len(t) >= MIN_TEXT_LEN]
-    ignored_ids_a = [i for (i, _), t in zip(data_a, _texts_a) if len(t) < MIN_TEXT_LEN]
-    ignored_ids_b = [i for (i, _), t in zip(data_b, _texts_b) if len(t) < MIN_TEXT_LEN]
+    ids_a = [i for (i, _), t in zip(data_a, _texts_a, strict=False) if len(t) >= MIN_TEXT_LEN]
+    ids_b = [i for (i, _), t in zip(data_b, _texts_b, strict=False) if len(t) >= MIN_TEXT_LEN]
+    ignored_ids_a = [i for (i, _), t in zip(data_a, _texts_a, strict=False) if len(t) < MIN_TEXT_LEN]
+    ignored_ids_b = [i for (i, _), t in zip(data_b, _texts_b, strict=False) if len(t) < MIN_TEXT_LEN]
 
     logger.info('Building ID lookup maps...')
     id_lookup_a = {i: idx for idx, i in enumerate(ids_a)}
@@ -69,9 +69,9 @@ def left_join(data_a: list[tuple[str, str]],
 
     logger.info('Proceeding with post-processing...')
     matches: dict[str, list[str]] = {}
-    for i, near_idxs, near_similarities in zip(ids_b, indices, similarities):
+    for i, near_idxs, near_similarities in zip(ids_b, indices, similarities, strict=False):
         logger.debug(f'Checking match for {i}: {near_similarities}')
-        for idx, similarity in zip(near_idxs, near_similarities):
+        for idx, similarity in zip(near_idxs, near_similarities, strict=False):
             # Too dissimilar, we can stop right here (note: list is sorted asc)
             if similarity > MAX_SLOP:
                 logger.debug(f' -> No close text match with >{1 - MAX_SLOP} overlap')

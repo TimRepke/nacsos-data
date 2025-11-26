@@ -115,33 +115,33 @@ async def read_item_annotations(session: DBSession,
         repeat = '1'
     if ignore_hierarchy:
         stmt = text(f'''
-            SELECT array_to_json(ARRAY[(a.key, {repeat})::annotation_label]) as label, 
+            SELECT array_to_json(ARRAY[(a.key, {repeat})::annotation_label]) as label,
                    a.*
-            FROM annotation AS a 
-                     JOIN assignment ass ON a.assignment_id = ass.assignment_id 
+            FROM annotation AS a
+                     JOIN assignment ass ON a.assignment_id = ass.assignment_id
             WHERE ass.assignment_scope_id = :scope_id;
         ''')
     else:
         stmt = text(f'''
-            WITH RECURSIVE ctename AS ( 
-                  SELECT a.annotation_id, a.time_created, a.time_updated, a.assignment_id, a.user_id, a.item_id, 
-                         a.annotation_scheme_id, a.key, a.repeat,  a.value_bool, a.value_int,a.value_float, 
-                         a.value_str, a.multi_int, a.parent, a.parent as recurse_join, 
-                        ARRAY[(a.key, {repeat})::annotation_label] as path 
-                  FROM annotation AS a 
-                           JOIN assignment ass ON a.assignment_id = ass.assignment_id 
+            WITH RECURSIVE ctename AS (
+                  SELECT a.annotation_id, a.time_created, a.time_updated, a.assignment_id, a.user_id, a.item_id,
+                         a.annotation_scheme_id, a.key, a.repeat,  a.value_bool, a.value_int,a.value_float,
+                         a.value_str, a.multi_int, a.parent, a.parent as recurse_join,
+                        ARRAY[(a.key, {repeat})::annotation_label] as path
+                  FROM annotation AS a
+                           JOIN assignment ass ON a.assignment_id = ass.assignment_id
                   WHERE ass.assignment_scope_id = :scope_id
-               UNION ALL 
+               UNION ALL
                   SELECT ctename.annotation_id, ctename.time_created, ctename.time_updated,ctename.assignment_id,
-                         ctename.user_id, ctename.item_id, ctename.annotation_scheme_id, ctename.key, 
-                         ctename.repeat, ctename.value_bool, ctename.value_int,ctename.value_float, 
-                         ctename.value_str, ctename.multi_int, ctename.parent, a.parent as recurse_join, 
-                        array_append(ctename.path, ((a.key, {repeat})::annotation_label)) 
-                  FROM annotation a 
-                     JOIN ctename ON a.annotation_id = ctename.recurse_join 
-            ) 
+                         ctename.user_id, ctename.item_id, ctename.annotation_scheme_id, ctename.key,
+                         ctename.repeat, ctename.value_bool, ctename.value_int,ctename.value_float,
+                         ctename.value_str, ctename.multi_int, ctename.parent, a.parent as recurse_join,
+                        array_append(ctename.path, ((a.key, {repeat})::annotation_label))
+                  FROM annotation a
+                     JOIN ctename ON a.annotation_id = ctename.recurse_join
+            )
             SELECT array_to_json(path) as label, ctename.*
-            FROM ctename 
+            FROM ctename
             WHERE recurse_join is NULL;
         ''')
 
@@ -156,28 +156,28 @@ async def read_item_annotations(session: DBSession,
 @ensure_session_async
 async def read_bot_annotations(session: DBSession,
                                bot_annotation_metadata_id: str) -> list[BotItemAnnotation]:
-    stmt = text(f'''
-        WITH RECURSIVE ctename AS ( 
+    stmt = text('''
+        WITH RECURSIVE ctename AS (
               SELECT a.bot_annotation_id, a.bot_annotation_metadata_id,
                      a.time_created, a.time_updated, a.item_id,
                      a.key, a.repeat, a.confidence, a.order,
                      a.value_bool, a.value_int, a.value_float, a.multi_int, a.value_str,
-                     a.parent, a.parent as recurse_join, 
-                    ARRAY[(a.key, a.repeat)::annotation_label] as path 
-              FROM bot_annotation AS a 
+                     a.parent, a.parent as recurse_join,
+                    ARRAY[(a.key, a.repeat)::annotation_label] as path
+              FROM bot_annotation AS a
               WHERE a.bot_annotation_metadata_id = :bot_annotation_metadata_id
-           UNION ALL 
+           UNION ALL
               SELECT ctename.bot_annotation_id,  a.bot_annotation_metadata_id,
-                     ctename.time_created, ctename.time_updated, ctename.item_id, 
+                     ctename.time_created, ctename.time_updated, ctename.item_id,
                      ctename.key, ctename.repeat, ctename.confidence, ctename.order,
                      ctename.value_bool, ctename.value_int, ctename.value_float, ctename.multi_int, ctename.value_str,
-                     ctename.parent, a.parent as recurse_join, 
-                    array_append(ctename.path, ((a.key, a.repeat)::annotation_label)) 
-              FROM bot_annotation AS a 
-                 JOIN ctename ON a.bot_annotation_id = ctename.recurse_join 
-        ) 
+                     ctename.parent, a.parent as recurse_join,
+                    array_append(ctename.path, ((a.key, a.repeat)::annotation_label))
+              FROM bot_annotation AS a
+                 JOIN ctename ON a.bot_annotation_id = ctename.recurse_join
+        )
         SELECT array_to_json(path) as label, ctename.*
-        FROM ctename 
+        FROM ctename
         WHERE recurse_join is NULL
         ORDER BY ctename.order;
     ''')

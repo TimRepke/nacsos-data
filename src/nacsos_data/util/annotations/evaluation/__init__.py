@@ -16,7 +16,7 @@ def get_new_label_batches(old_seq: list[list[int]], new_seq: list[list[int]]) ->
         raise ValueError('The old sequence should never be longer than the new sequence of labels!')
 
     if len(old_seq) < len(new_seq):  # We have more batches than before
-        for old_batch, new_batch in zip(old_seq[:-1], new_seq[:len(old_seq) - 1]):
+        for old_batch, new_batch in zip(old_seq[:-1], new_seq[:len(old_seq) - 1], strict=False):
             if old_batch != new_batch:
                 raise ValueError('Labels in the beginning of the sequence changed, please recompute fully.')
     # We have the same number of batches than before (or more)
@@ -26,7 +26,7 @@ def get_new_label_batches(old_seq: list[list[int]], new_seq: list[list[int]]) ->
     if len(last_old_seq) > len(last_new_seq):  # Last batch has smaller respective new batch
         raise ValueError('The old sequence should never be longer than the new sequence of labels!')
     # Check if labels are fine up to the length of the last batch of the old data
-    for old_batch_v, new_batch_v in zip(last_old_seq, last_new_seq):
+    for old_batch_v, new_batch_v in zip(last_old_seq, last_new_seq, strict=False):
         if old_batch_v != new_batch_v:
             raise ValueError('Labels in the beginning of the sequence changed, please recompute fully.')
 

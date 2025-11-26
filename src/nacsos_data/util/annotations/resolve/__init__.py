@@ -69,7 +69,7 @@ async def read_labels(session: DBSession,
                     FROM (
                     SELECT DISTINCT ARRAY[(a.key, {repeat})::annotation_label] as label
                     FROM annotation AS a
-                            JOIN assignment ass ON a.assignment_id = ass.assignment_id 
+                            JOIN assignment ass ON a.assignment_id = ass.assignment_id
                     WHERE ass.assignment_scope_id = :scope_id;
                     '''),
                 {'scope_id': assignment_scope_id})).scalars()]
@@ -145,9 +145,9 @@ async def read_annotators(session: DBSession, assignment_scope_id: str | uuid.UU
     return [UserModel.model_validate(user) for user in (await session.execute(text(
         "SELECT DISTINCT u.* "
         "FROM annotation AS a "
-        f"   JOIN assignment ass ON a.assignment_id = ass.assignment_id "
+        "   JOIN assignment ass ON a.assignment_id = ass.assignment_id "
         "    JOIN \"user\" u on u.user_id = a.user_id "
-        f"WHERE ass.assignment_scope_id = :scope_id;"
+        "WHERE ass.assignment_scope_id = :scope_id;"
     ), {'scope_id': assignment_scope_id})).mappings().all()]
 
 
@@ -338,7 +338,7 @@ async def get_resolved_item_annotations(session: DBSession,
                 # Note: It might be, that the first old would match the second new annotation,
                 #       then the comparison is not aligned and wrong. More than one annotation
                 #       per user and item is rare, so we ignore the issue for simplicity.
-                for ai, elem in enumerate(annotation_map[entry.order_key][entry.path_key].labels[entry.user_id]):
+                for _ai, elem in enumerate(annotation_map[entry.order_key][entry.path_key].labels[entry.user_id]):
                     anno = elem.annotation
                     if anno is not None:
                         anno.old = AnnotationValue.model_validate(entry)
@@ -350,7 +350,7 @@ async def get_resolved_item_annotations(session: DBSession,
 
         # Drop items that were not in the previous resolution
         if not include_new and len(bot_meta.meta.snapshot) > 0:
-            known_keys = set([entry.item_id for entry in bot_meta.meta.snapshot])  # FIXME: used to be entry.order_key
+            known_keys = {entry.item_id for entry in bot_meta.meta.snapshot}  # FIXME: used to be entry.order_key
             current_keys = set(annotation_map.keys())
             drop_keys = current_keys - known_keys
             for key in drop_keys:
@@ -370,7 +370,7 @@ async def get_resolved_item_annotations(session: DBSession,
 
     # If requested, drop items without annotation from the matrix and the order
     if not include_empty:
-        items_with_annotation = set([str(anno.item_id) for anno in annotations])
+        items_with_annotation = {str(anno.item_id) for anno in annotations}
         item_id_to_key = {str(o.item_id): o.item_id for o in item_order}
         item_ids = set(item_id_to_key.keys())
         empty_items = item_ids - items_with_annotation

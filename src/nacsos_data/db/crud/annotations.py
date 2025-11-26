@@ -412,8 +412,8 @@ async def upsert_annotations(annotations: list[AnnotationModel],
 
     if assignment_id is not None:
         existing_annotations = await read_annotations_for_assignment(assignment_id=assignment_id, db_engine=db_engine)
-        existing_ids = set([str(annotation.annotation_id) for annotation in existing_annotations])
-        submitted_ids = set([str(annotation.annotation_id) for annotation in annotations])
+        existing_ids = {str(annotation.annotation_id) for annotation in existing_annotations}
+        submitted_ids = {str(annotation.annotation_id) for annotation in annotations}
 
         ids_to_remove = existing_ids - submitted_ids
         ids_to_update = existing_ids - ids_to_remove
@@ -421,7 +421,7 @@ async def upsert_annotations(annotations: list[AnnotationModel],
     else:
         ids_to_remove = set()
         ids_to_update = set()
-        ids_to_create = set([str(annotation.annotation_id) for annotation in annotations])
+        ids_to_create = {str(annotation.annotation_id) for annotation in annotations}
 
     logger.debug(f'[upsert_annotations] CREATING new annotations with ids: {ids_to_create}')
     logger.debug(f'[upsert_annotations] UPDATING existing annotations with ids: {ids_to_update}')
@@ -663,8 +663,8 @@ async def update_resolved_bot_annotations(session: DBSession,
         .scalars().all())
 
     # Figure out which ones we have to delete, update, and create
-    existing_ids = set([str(ba) for ba in existing_ids_uuid])
-    submitted_ids = set([str(res.ba_id) for res in resolutions])
+    existing_ids = {str(ba) for ba in existing_ids_uuid}
+    submitted_ids = {str(res.ba_id) for res in resolutions}
 
     ids_to_remove = existing_ids - submitted_ids
     ids_to_update = existing_ids - ids_to_remove

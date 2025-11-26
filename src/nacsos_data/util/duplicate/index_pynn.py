@@ -125,7 +125,7 @@ class DuplicateIndex:
             vector = self.vectoriser.transform([item.text])
             indices, similarities = self.index.query(vector, k=self.N_CANDIDATES)
 
-            for vec_index, similarity in zip(indices[0], similarities[0]):
+            for vec_index, similarity in zip(indices[0], similarities[0], strict=False):
                 # Too dissimilar, we can stop right here (note: list is sorted asc)
                 if similarity > self.max_slop:
                     logger.debug(f' -> No close text match with >{1 - self.max_slop} overlap')

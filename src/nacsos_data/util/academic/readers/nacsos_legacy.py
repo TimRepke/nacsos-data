@@ -25,12 +25,12 @@ def _convert_authors(authors: list[object]) -> list[AcademicAuthorModel] | None:
     for key in sorted(aggregate.keys()):
         # Get all names from all possible fields for this author, so we have a fallback to pick
         # Sort by length of string, so the longest name will be the last in the list
-        names = list(sorted([
+        names = sorted([
             a.get(src)
             for a in aggregate[key]
             for src in ['AU', 'AF', 'surname', 'initials']
             if a.get(src) is not None and len(a.get(src)) > 0  # type: ignore[arg-type]
-        ], key=lambda n: len(n)))  # type: ignore[arg-type]
+        ], key=lambda n: len(n))  # type: ignore[arg-type]
 
         # Get all author fields in this aggregate, keep non-empty ones
         name_initials = [
@@ -279,10 +279,10 @@ def read_nacsos1_annotations(
     # all unique doc_ids sorted in order of assignment
     doc_ids = [
         doid['doc_id']
-        for doid in sorted(list(models.DocOwnership.objects
+        for doid in sorted(models.DocOwnership.objects
                                 .filter(query__project=p, doc__query=q, relevant__gt=0)
                                 .distinct('doc_id')
-                                .values('doc_id', 'id')),
+                                .values('doc_id', 'id'),
                            key=lambda x: x['id'])
     ]
 
