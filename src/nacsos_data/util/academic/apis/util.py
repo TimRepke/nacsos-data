@@ -161,7 +161,7 @@ class AbstractAPI(ABC):
     logger: logging.Logger
 
     def __init__(self,
-                 api_key: str,
+                 api_key: str | None = None,
                  proxy: str | None = None,
                  max_req_per_sec: int = 5,
                  max_retries: int = 5,

@@ -92,13 +92,13 @@ def buscar_frontiers(df: 'pd.DataFrame',
     n_total = df.shape[0]
 
     # Compute H0
-    buscar = retrospective_h0(df[seen][key], n_total,
-                              batch_size=batch_size,
-                              recall_target=recall_target,
-                              bias=bias,
-                              confidence_level=confidence_level)
+    buscar_seen, buscar_ps = retrospective_h0(df[seen][key], n_total,
+                                              batch_size=batch_size,
+                                              recall_target=recall_target,
+                                              bias=bias,
+                                              confidence_level=confidence_level)
     # Compute frontier
-    recall = recall_frontier(df[key].dropna(), df.shape[0], bias=bias)
+    recall_targets, recall_ps = recall_frontier(df[key].dropna(), df.shape[0], bias=bias)
 
     # Produce left panel
     ax1.set_ylabel('Relevant documents found')
@@ -108,12 +108,12 @@ def buscar_frontiers(df: 'pd.DataFrame',
     ax1.set_xlim(xmax=n_seen)
 
     ax1t = ax1.twinx()
-    ax1t.scatter(buscar[0], buscar[1])
+    ax1t.scatter(buscar_seen, buscar_ps)
     ax1t.set_ylim(ymax=1, ymin=0)
     ax1t.set_ylabel('p score')
     ax1t.grid()
 
-    ax2.plot(recall[0], recall[1], marker='o')
+    ax2.plot(recall_targets, recall_ps, marker='o')
     ax2.set_ylabel('p score')
     ax2.set_xlabel('recall target')
     ax2.set_yticks([0.01, 0.05, 0.1, 0.25, 0.33, 0.5])
@@ -121,8 +121,8 @@ def buscar_frontiers(df: 'pd.DataFrame',
 
     fig.tight_layout()
     return (fig,
-            pd.DataFrame({'batch_size': buscar[0], 'p': buscar[1]}),
-            pd.DataFrame({'recall': recall[0], 'p': recall[1]}))
+            pd.DataFrame({'batch_size': buscar_seen, 'p': buscar_ps}),
+            pd.DataFrame({'recall': recall_targets, 'p': recall_ps}))
 
 
 def buscar_workload(df: 'pd.DataFrame',  # Assuming df is ordered by (scope_order, item_order)!
@@ -170,7 +170,7 @@ def buscar_workload(df: 'pd.DataFrame',  # Assuming df is ordered by (scope_orde
             .rename(columns={'index': 'orig_order'}))
 
     # Compute H0
-    buscar = retrospective_h0(data['label'],  # type: ignore[arg-type]
+    buscar = retrospective_h0(data['label'],
                               num_total,
                               batch_size=batch_size,
                               recall_target=recall_target,
@@ -191,7 +191,7 @@ def buscar_workload(df: 'pd.DataFrame',  # Assuming df is ordered by (scope_orde
     ax1.plot(data[data['seen'] == 0]['n_incl'], color='C0', ls='--')
 
     ax2.set_ylabel('p score')
-    ax2.scatter(data['buscar'].index, data['buscar'])  # type: ignore[arg-type]
+    ax2.scatter(data['buscar'].index, data['buscar'])
     ax2.set_ylim(ymin=0, ymax=1)
     ax2.grid()
 

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 from psycopg.errors import UniqueViolation, OperationalError
 from sklearn.feature_extraction.text import CountVectorizer
 
+from ..conf import load_settings
 from ...db import DatabaseEngineAsync, get_engine_async
 from ...db.crud.imports import get_or_create_import, set_session_mutex
 from ...db.crud.items.academic import (
@@ -787,7 +788,7 @@ async def import_academic_db(sources: list[Path],
 
 async def import_openalex(query: str,
                           openalex_url: str,
-                          db_config: Path,
+                          nacsos_config: Path,
                           def_type: DefType = 'lucene',
                           field: SearchField = 'title_abstract',
                           op: OpType = 'AND',
@@ -816,21 +817,27 @@ async def import_openalex(query: str,
     **import_id**
         The import_id to connect these items to (required)
     """
-    from nacsos_data.util.academic.readers.openalex import generate_items_from_openalex, get_count_from_openalex
+    from nacsos_data.util.academic.apis import OpenAlexSolrAPI
     logger = logging.getLogger('import_openalex') if logger is None else logger
 
+    settings = load_settings(nacsos_config)
+    solr_client = OpenAlexSolrAPI(
+        openalex_conf=settings.OPENALEX,
+        def_type=def_type,
+        field=field,
+        op=op,
+        batch_size=1000,
+        logger=logger,
+    )
+
     def from_source() -> Generator[AcademicItemModel, None, None]:
-        for itm in generate_items_from_openalex(
+        yield from (
+            solr_client
+            .fetch_translated(
                 query=query,
-                openalex_endpoint=openalex_url,
-                def_type=def_type,
-                field=field,
-                op=op,
-                batch_size=1000,
-                log=logger
-        ):
-            itm.item_id = uuid.uuid4()
-            yield itm
+                project_id=project_id,
+            )
+        )
 
     logger.info('Importing articles from OpenAlex-solr')
     if import_id is None:
@@ -841,11 +848,9 @@ async def import_openalex(query: str,
     num_new_items = None
     # In case we are going to check it, fetch the item count
     if min_update_size is not None:
-        num_new_items = (
-            await get_count_from_openalex(query=query, openalex_endpoint=openalex_url, op=op, field=field, def_type=def_type)
-        ).num_found
+        num_new_items = solr_client.get_count(query).num_found
 
-    db_engine = get_engine_async(conf_file=str(db_config))
+    db_engine = get_engine_async(settings=settings.DB)
 
     return await import_academic_items(
         db_engine=db_engine,
@@ -888,17 +893,13 @@ async def import_openalex_files(sources: list[Path],
     **import_id**
         The import_id to connect these tweets to
     """
-    from nacsos_data.models.openalex import WorksSchema
+    from nacsos_data.util.academic.apis import OpenAlexSolrAPI
 
     logger = logging.getLogger('import_openalex_files') if logger is None else logger
 
     def from_sources() -> Generator[AcademicItemModel, None, None]:
         for source in sources:
-            with open(source, 'r') as f:
-                for line in f:
-                    itm = translate_work(translate_doc(WorkSolr.model_validate_json(line)))
-                    itm.item_id = uuid.uuid4()
-                    yield itm
+            yield from OpenAlexSolrAPI.read_translated(source=source, project_id=project_id)
 
     logger.info(f'Importing articles (WorkSolr-formatted) from files: {sources}')
     if import_id is None:

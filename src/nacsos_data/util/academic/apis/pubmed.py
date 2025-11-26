@@ -66,6 +66,10 @@ class PubmedAPI(AbstractAPI):
         :param query:
         :return:
         """
+
+        if self.api_key is None:
+            raise AssertionError('Missing API key!')
+
         n_records = 0
         n_pages = 0
         with RequestClient(backoff_rate=self.backoff_rate,

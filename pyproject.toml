@@ -40,7 +40,6 @@ priority = [
     "evaluate==0.4.6",
 ]
 testing = [
-    "flake8==7.3.0",
     "tox==4.32.0",
     "pytest==9.0.1",
     "pytest-cov==7.0.0",
@@ -70,8 +69,56 @@ testpaths = [
     "tests",
 ]
 
-[tool.flake8]
+[tool.ruff]
 max-line-length = 160
+indent-width = 4
+target-version = "py313"
+exclude = [
+    "__init__.py",
+    "venv/",
+    ".venv/",
+    "scratch",
+    "build",
+    "src/nacsos_data/scripts/"
+]
+
+[tool.ruff.lint]
+select = [ "C","E","F","W","B","B9"]
+ignore = ["E203", "E501", "W503", "E126"]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "single"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+# Enable auto-formatting of code examples in docstrings. Markdown,
+# reStructuredText code/literal blocks and doctests are all supported.
+#
+# This is currently disabled by default, but it is planned for this
+# to be opt-out in the future.
+docstring-code-format = false
+
+# Set the line length limit used when formatting code snippets in
+# docstrings.
+#
+# This only has an effect when the `docstring-code-format` setting is
+# enabled.
+docstring-code-line-length = "dynamic"
 
 [tool.mypy]
 plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]

@@ -161,7 +161,7 @@ def get_inclusion_mask(rule: str, df: 'pd.DataFrame', label_cols: list[str] | No
             if subtree.data == 'anyno':
                 return oring([df[c].astype('boolean') == False for c in anycols[col]])   # noqa: E712
             if subtree.data == 'allno':
-                return anding([  # type: ignore[list-item]
+                return anding([
                     oring([df[c].astype('boolean').isna() for c in anycols[col]]),
                     anding([(df[c].astype('boolean') == False) | df[c].astype('boolean').isna() for c in anycols[col]])  # noqa: E712
                 ])  # noqa: E712

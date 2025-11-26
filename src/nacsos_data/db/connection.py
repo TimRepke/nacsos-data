@@ -1,49 +1,5 @@
-import os
-from urllib.parse import quote
-
-from pydantic_settings import SettingsConfigDict, BaseSettings
-from pydantic.networks import PostgresDsn
-from pydantic import field_validator, ValidationInfo
-
 from .engine import DatabaseEngine, DatabaseEngineAsync
-
-
-class DatabaseConfig(BaseSettings):
-    SCHEME: str = 'postgresql'
-    SCHEMA: str = 'public'
-    HOST: str = 'localhost'  # host of the db server
-    PORT: int = 5432  # port of the db server
-    USER: str = 'nacsos'  # username for the database
-    PASSWORD: str = 'secr€t_passvvord'  # password for the database user
-    DATABASE: str = 'nacsos_core'  # name of the database
-
-    CONNECTION_STR: PostgresDsn | None = None
-
-    @field_validator('CONNECTION_STR', mode='before')
-    def build_connection_string(cls, v: str | None, info: ValidationInfo) -> PostgresDsn:
-        assert info.config is not None
-
-        if isinstance(v, str):
-            raise ValueError('This field will be generated automatically, please do not use it.')
-
-        return PostgresDsn.build(
-            scheme=info.data.get('SCHEME', 'postgresql'),
-            username=info.data.get('USER'),
-            password=quote(info.data.get('PASSWORD')),  # type: ignore[arg-type]
-            host=info.data.get('HOST'),
-            port=info.data.get('PORT'),
-            path=f'{info.data.get("DATABASE", "")}',
-        )
-
-    model_config = SettingsConfigDict(env_prefix='NACSOS_DB__', extra='allow')
-
-
-def _get_settings(conf_file: str | None = None) -> DatabaseConfig:
-    if conf_file is None:
-        conf_file = os.environ.get('NACSOS_CONFIG', 'config/default.env')
-
-    # FIXME: get rid of ignore here
-    return DatabaseConfig(_env_file=conf_file, _env_file_encoding='utf-8')
+from ..util.conf import DatabaseConfig, load_settings
 
 
 def get_engine(conf_file: str | None = None,
@@ -83,7 +39,7 @@ def get_engine(conf_file: str | None = None,
     if settings is None:
         if conf_file is None:
             raise AssertionError('Neither `settings` not `conf_file` specified.')
-        settings = _get_settings(conf_file)
+        settings = load_settings(conf_file).DB
 
     return DatabaseEngine(host=settings.HOST, port=settings.PORT, user=settings.USER, password=settings.PASSWORD,
                           database=settings.DATABASE, debug=debug)
@@ -106,7 +62,7 @@ def get_engine_async(conf_file: str | None = None,
     if settings is None:
         if conf_file is None:
             raise AssertionError('Neither `settings` not `conf_file` specified.')
-        settings = _get_settings(conf_file)
+        settings = load_settings(conf_file).DB
 
     return DatabaseEngineAsync(host=settings.HOST, port=settings.PORT, user=settings.USER, password=settings.PASSWORD,
                                database=settings.DATABASE, debug=debug)

@@ -7,7 +7,7 @@ from time import time
 from datetime import timedelta
 from typing import Any, Generator, Annotated, Literal, get_args
 
-from httpx import Response, BasicAuth
+from httpx import Response
 from pydantic import BaseModel
 
 from nacsos_data.models.items import AcademicItemModel
@@ -15,6 +15,7 @@ from nacsos_data.models.items.academic import AcademicAuthorModel, AffiliationMo
 from nacsos_data.models.openalex import WorksSchema, AuthorshipsSchema, DefType, SearchField, OpType
 from nacsos_data.util import clear_empty, as_uuid, get
 from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
+from nacsos_data.util.conf import OpenAlexConfig, load_settings
 
 FIELDS_API = {
     'id',
@@ -180,7 +181,7 @@ class OpenAlexAPI(AbstractAPI):
         cursor = '*'
         n_pages = 0
         n_works = 0
-
+        headers = {'api_key': self.api_key} if self.api_key else None
         with RequestClient(backoff_rate=self.backoff_rate,
                            max_req_per_sec=self.max_req_per_sec,
                            max_retries=self.max_retries,
@@ -196,7 +197,7 @@ class OpenAlexAPI(AbstractAPI):
                                'cursor': cursor,
                                'per-page': 50
                            } | (params or {}),
-                    headers={'api_key': self.api_key},
+                    headers=headers,
                 ).json()
                 cursor = page['meta']['next_cursor']
                 self.logger.info(f'Retrieved {n_works:,} / {page['meta']['count']:,} | currently on page {n_pages:,}')
@@ -219,9 +220,7 @@ class SearchResult(BaseModel):
 
 class OpenAlexSolrAPI(AbstractAPI):
     def __init__(self,
-                 openalex_endpoint: str,
-                 username: str | None = None,
-                 password: str | None = None,
+                 openalex_conf: OpenAlexConfig,
                  batch_size: int = 5000,
                  export_fields: list[str] | None = None,
                  include_histogram: bool = False,
@@ -237,8 +236,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                  logger: logging.Logger | None = None):
         super().__init__(api_key='', proxy=proxy, max_retries=max_retries,
                          max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
-        self.openalex_endpoint = openalex_endpoint
-        self.auth = BasicAuth(username=username, password=password) if username is not None and password is not None else None
+        self.openalex_conf = openalex_conf
 
         self.def_type = def_type
         self.field = field
@@ -279,7 +277,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                            max_req_per_sec=self.max_req_per_sec,
                            max_retries=self.max_retries,
                            proxy=self.proxy,
-                           auth=self.auth) as request_client:
+                           auth=self.openalex_conf.auth) as request_client:
 
             params_ = {
                 'q': query,
@@ -310,7 +308,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                 params_ |= params
 
             t0 = time()
-            self.logger.info(f'Querying endpoint with batch_size={self.batch_size:,}: {self.openalex_endpoint}')
+            self.logger.info(f'Querying endpoint with batch_size={self.batch_size:,}: {self.openalex_conf.SOLR_URL}')
             self.logger.info(f'Request parameters: {params_}')
 
             batch_i = 0
@@ -320,7 +318,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                 batch_i += 1
                 self.logger.info(f'Running query for batch {batch_i} with cursor "{params_["cursorMark"]}"')
                 t2 = time()
-                res = request_client.post(f'{self.openalex_endpoint}/select', data=params_, timeout=60).json()
+                res = request_client.post(f'{self.openalex_conf.SOLR_URL}/select', data=params_, timeout=60).json()
 
                 next_curser = res.get('nextCursorMark')
                 params_['cursorMark'] = next_curser
@@ -398,16 +396,6 @@ class OpenAlexSolrAPI(AbstractAPI):
 
 
 if __name__ == '__main__':
-    with open('../../../../../scratch/snippet.jsonl') as f:
-        for li, line in enumerate(f):
-            print(li)
-            work = WorksSchema.model_validate_json(line)
-            translate_work_to_item(work, project_id=uuid.uuid4())
-            translate_work_to_solr(work)
-
-            # print(work.model_dump(exclude_unset=True, exclude_none=True))
-            # print(work.model_dump())
-
     import typer
 
     logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s (%(process)d): %(message)s', level='DEBUG')
@@ -420,7 +408,7 @@ if __name__ == '__main__':
             target: Annotated[Path, typer.Option(help='File to write results to')],
             api_key: Annotated[str | None, typer.Option(help='Valid API key')] = None,
             kind: Annotated[Literal['SOLR', 'API'], typer.Option(help='database to use')] = 'SOLR',
-            openalex_endpoint: Annotated[str | None, typer.Option(help='solr endpoint')] = None,
+            openalex_conf: Annotated[str | None, typer.Option(help='NACSOS config with solr settings')] = None,
             batch_size: Annotated[int, typer.Option(help='File to write results to')] = 5,
             query_file: Annotated[Path | None, typer.Option(help='File containing search query')] = None,
             query: Annotated[str | None, typer.Option(help='Search query')] = None,
@@ -433,13 +421,16 @@ if __name__ == '__main__':
             query_str = query
         else:
             raise AttributeError('Must provide either `query_file` or `query`')
+
+        conf = load_settings(conf_file=openalex_conf)
+
         api: OpenAlexSolrAPI | OpenAlexAPI
-        if kind == 'SOLR' and openalex_endpoint is not None:
-            api = OpenAlexSolrAPI(openalex_endpoint=openalex_endpoint, batch_size=batch_size)
-        elif kind == 'API' and api_key is not None:
-            api = OpenAlexAPI(api_key=api_key)
+        if kind == 'SOLR':
+            api = OpenAlexSolrAPI(openalex_conf=conf.OPENALEX, batch_size=batch_size)
+        elif kind == 'API':
+            api = OpenAlexAPI(api_key=api_key or conf.OPENALEX.API_KEY)
         else:
-            raise AttributeError('Must provide either `openalex_endpoint` or `api_key`')
+            raise AttributeError(f'Unknown API type: {kind}')
         api.download_raw(query=query_str, target=target)
 
 

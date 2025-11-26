@@ -75,6 +75,9 @@ class ScopusAPI(AbstractAPI):
         :param query:
         :return:
         """
+        if self.api_key is None:
+            raise AssertionError('Missing API key!')
+
         with RequestClient(backoff_rate=self.backoff_rate,
                            max_req_per_sec=self.max_req_per_sec,
                            max_retries=self.max_retries,

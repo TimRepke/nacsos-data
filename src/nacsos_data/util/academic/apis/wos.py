@@ -134,7 +134,7 @@ class WoSAPI(AbstractAPI):
         self.database = database
         self.page_size = page_size
 
-    def fetch_raw(self, query: str, params: dict[str, Any] | None=None) -> Generator[dict[str, Any], None, None]:
+    def fetch_raw(self, query: str, params: dict[str, Any] | None = None) -> Generator[dict[str, Any], None, None]:
         """
            Web of Science ExpandedAPI wrapper for downloading all records for a given query.
 
@@ -148,6 +148,9 @@ class WoSAPI(AbstractAPI):
 
            :return:
            """
+        if self.api_key is None:
+            raise AssertionError('Missing API key!')
+
         with RequestClient(backoff_rate=self.backoff_rate,
                            max_req_per_sec=self.max_req_per_sec,
                            max_retries=self.max_retries,
@@ -254,6 +257,7 @@ if __name__ == '__main__':
             # 'scratch/academic_apis/response_scopus2.jsonl',
         ])
 
+
     @app.command()  # type: ignore[misc]
     def offline() -> None:
         for fp in [
@@ -266,5 +270,6 @@ if __name__ == '__main__':
                 for record in records:
                     item = WoSAPI.translate_record(record)
                     print(item)
+
 
     app()

@@ -133,9 +133,6 @@ def calculate_h0s_for_batches(labels: list[list[int]],
         pos += len(batch_labels)
         yield pos, p_h0
 
-        if p_h0 is not None and p_h0 < (1.0 - recall_target):
-            break
-
 
 def calculate_stopping_metric_for_batches(labels: list[list[int]],
                                           n_docs: int,
@@ -201,7 +198,7 @@ def recall_frontier(
         n_docs: int,
         bias: float = 1.0,
         max_iter: int = 150,
-) -> tuple[list[float], list[float | None]]:
+) -> tuple[list[float], list[float]]:
     """
     Calculates a p-score for our null hypothesis h0, that we have missed our recall target `recall_target`, across a range of recall_targets.
 
@@ -221,7 +218,7 @@ def recall_frontier(
 
     recall_target = 0.99
     recall_targets: list[float] = []
-    p_scores: list[float | None] = []
+    p_scores: list[float] = []
     it = 0
     while recall_target > 0:
         it += 1
@@ -229,11 +226,11 @@ def recall_frontier(
             break
         p = calculate_h0(labels_, n_docs, recall_target, bias)
 
-        p_scores.append(p)
-        recall_targets.append(recall_target)
+        if p is not None:
+            p_scores.append(p)
+            recall_targets.append(recall_target)
+
         recall_target -= 0.005
-        if p is None:
-            break
 
     return recall_targets, p_scores
 
@@ -245,7 +242,7 @@ def retrospective_h0(
         bias: float = 1.,
         batch_size: int = 1000,
         confidence_level: float = 0.95
-) -> tuple[list[int], list[float | None]]:
+) -> tuple[list[int], list[float]]:
     """
     Calculates a p-score for our null hypothesis h0, that we have missed our recall target `recall_target`, every `batch_size` documents
 
@@ -271,20 +268,14 @@ def retrospective_h0(
     labels: npt.NDArray[np.int_] = (labels_ if type(labels_) is np.ndarray
                                     else np.array(labels_, dtype=np.int8))
 
-    batches = np.arange(labels.shape[0])[batch_size::batch_size]
-    batch_sizes: list[int] = np.append(batches, labels.shape[0]).tolist()
+    n_seen_batch: list[int] =[]
+    batch_ps: list[float] = []
 
-    batch_ps: list[float | None] = []
+    for n_seen in list(range(0, labels.shape[0], batch_size))[1:] +[ labels.shape[0]]:
+        batch_labels = labels[:n_seen]
+        p = calculate_h0(batch_labels, n_docs=n_docs, recall_target=recall_target, bias=bias)
+        if p is not None:
+            n_seen_batch.append(n_seen)
+            batch_ps.append(p)
 
-    for n_seen_batch in batch_sizes:
-        batch_labels = labels[:n_seen_batch]
-        p_h0 = calculate_h0(batch_labels, n_docs=n_docs, recall_target=recall_target, bias=bias)
-
-        batch_ps.append(p_h0)
-
-        if p_h0 is not None:
-            break
-
-    batch_sizes = batch_sizes[:len(batch_ps)]
-
-    return batch_sizes, batch_ps
+    return n_seen_batch, batch_ps

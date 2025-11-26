@@ -107,11 +107,11 @@ def naive_majority_vote(annotation_map: ResolutionMatrix,
                 if same_values(value, cell.resolution):
                     cell.status = ResolutionStatus.UNCHANGED
                 else:
-                    cell.resolution.value_bool = value.value_bool  # type: ignore[assignment]
-                    cell.resolution.value_int = value.value_int  # type: ignore[assignment]
-                    cell.resolution.value_str = value.value_str  # type: ignore[assignment]
-                    cell.resolution.value_float = value.value_float  # type: ignore[assignment]
-                    cell.resolution.multi_int = value.multi_int  # type: ignore[assignment]
+                    cell.resolution.value_bool = value.value_bool
+                    cell.resolution.value_int = value.value_int
+                    cell.resolution.value_str = value.value_str
+                    cell.resolution.value_float = value.value_float
+                    cell.resolution.multi_int = value.multi_int
 
                     if not has_values(cell.resolution):
                         cell.status = ResolutionStatus.NEW
