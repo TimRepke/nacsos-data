@@ -47,8 +47,7 @@ class Candidate(BaseModel):
 YEAR_PATTERN = re.compile(r'\d{4}')
 
 
-def _are_actually_duplicate(item: AcademicItemModel,
-                            candidate: Candidate) -> bool:
+def _are_actually_duplicate(item: AcademicItemModel, candidate: Candidate) -> bool:
     """
     Return True if the `candidate` looks like a true duplicate of `item` after looking at it more closely.
     :param item:
@@ -77,10 +76,8 @@ def _are_actually_duplicate(item: AcademicItemModel,
 
         # The non-empty title-slugs match, let's dig deeper
         if tslug_item == tslug_cand:
-
             # This looks like an annual report (contains year pattern), always assume not-duplicate
-            if ((item.title is not None and YEAR_PATTERN.match(item.title))
-                    and (candidate.title is not None and YEAR_PATTERN.match(candidate.title))):
+            if (item.title is not None and YEAR_PATTERN.match(item.title)) and (candidate.title is not None and YEAR_PATTERN.match(candidate.title)):
                 if REGEX_NON_ALPHNUM.sub(item.title.lower(), '') == REGEX_NON_ALPHNUM.sub(candidate.title.lower(), ''):
                     return True
 
@@ -108,19 +105,21 @@ def _are_actually_duplicate(item: AcademicItemModel,
     return True
 
 
-async def find_duplicates(item: AcademicItemModel,
-                          project_id: str | None = None,
-                          check_tslug: bool = False,
-                          check_tslug_advanced: bool = False,
-                          check_doi: bool = False,
-                          check_wos_id: bool = False,
-                          check_oa_id: bool = False,
-                          check_pubmed_id: bool = False,
-                          check_dimensions_id: bool = False,
-                          check_scopus_id: bool = False,
-                          check_s2_id: bool = False,
-                          db_engine: DatabaseEngineAsync | None = None,
-                          session: AsyncSession | None = None) -> list[Candidate] | None:
+async def find_duplicates(  # noqa: C901
+    item: AcademicItemModel,
+    project_id: str | None = None,
+    check_tslug: bool = False,
+    check_tslug_advanced: bool = False,
+    check_doi: bool = False,
+    check_wos_id: bool = False,
+    check_oa_id: bool = False,
+    check_pubmed_id: bool = False,
+    check_dimensions_id: bool = False,
+    check_scopus_id: bool = False,
+    check_s2_id: bool = False,
+    db_engine: DatabaseEngineAsync | None = None,
+    session: AsyncSession | None = None,
+) -> list[Candidate] | None:
     """
     Checks in the database, if there is a duplicate of this AcademicItem.
     Optionally (if `project_id` is not None), this will search only within one project.
@@ -148,12 +147,7 @@ async def find_duplicates(item: AcademicItemModel,
     if not item.title_slug:
         item.title_slug = get_title_slug(item)
 
-    stmt = select(AcademicItem.item_id,
-                  AcademicItem.doi,
-                  AcademicItem.openalex_id,
-                  AcademicItem.publication_year,
-                  AcademicItem.title,
-                  AcademicItem.title_slug)
+    stmt = select(AcademicItem.item_id, AcademicItem.doi, AcademicItem.openalex_id, AcademicItem.publication_year, AcademicItem.title, AcademicItem.title_slug)
 
     if project_id is not None:
         stmt = stmt.where(AcademicItem.project_id == project_id)
@@ -240,12 +234,14 @@ def _safe_lower(s: str | None) -> str | None:
     return None
 
 
-async def duplicate_insertion(new_item: AcademicItemModel,
-                              orig_item_id: str | uuid.UUID,
-                              import_id: str | uuid.UUID | None,
-                              import_revision: int | None,
-                              session: AsyncSession,
-                              log: logging.Logger | None = None) -> bool:
+async def duplicate_insertion(  # noqa: C901
+    new_item: AcademicItemModel,
+    orig_item_id: str | uuid.UUID,
+    import_id: str | uuid.UUID | None,
+    import_revision: int | None,
+    session: AsyncSession,
+    log: logging.Logger | None = None,
+) -> bool:
     """
     This method handles insertion of an item for which we found a duplicate in the database with `item_id`
 
@@ -270,17 +266,23 @@ async def duplicate_insertion(new_item: AcademicItemModel,
     editable = orig_item_orm.time_edited is None
 
     # Get prior variants of that AcademicItem
-    variants = [v.__dict__
-                for v in (await session.execute(select(AcademicItemVariant)
-                                                .where(AcademicItemVariant.item_id == orig_item_id))).scalars().all()]
+    variants = [v.__dict__ for v in (await session.execute(select(AcademicItemVariant).where(AcademicItemVariant.item_id == orig_item_id))).scalars().all()]
 
     # If we have no prior variant, we need to create one
     if len(variants) == 0:
         # For the first variant, we need to fetch the original import_id
-        orig_import = (await session.execute(select(m2m_import_item_table.c.import_id, m2m_import_item_table.c.first_revision)
-                                             .where(m2m_import_item_table.c.item_id == orig_item_id)
-                                             .order_by(m2m_import_item_table.c.first_revision)
-                                             .limit(1))).mappings().one_or_none()
+        orig_import = (
+            (
+                await session.execute(
+                    select(m2m_import_item_table.c.import_id, m2m_import_item_table.c.first_revision)
+                    .where(m2m_import_item_table.c.item_id == orig_item_id)
+                    .order_by(m2m_import_item_table.c.first_revision)
+                    .limit(1)
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
         # Note, we are not checking for "not None", because it might be a valid case where no import_id exists
         variant = AcademicItemVariantModel(
             item_variant_id=uuid.uuid4(),
@@ -300,7 +302,8 @@ async def duplicate_insertion(new_item: AcademicItemModel,
             keywords=orig_item.keywords,
             authors=orig_item.authors,
             text=orig_item.text,
-            meta=orig_item.meta)
+            meta=orig_item.meta,
+        )
 
         # add to database
         session.add(AcademicItemVariant(**variant.model_dump()))

@@ -94,25 +94,21 @@ FIELDS_SOLR: set[str] = FIELDS_API - {'abstract_inverted_index'} | {
 }
 FIELDS_META = set(FIELDS_SOLR) - {'abstract', 'abstract_inverted_index'}
 
-NESTED_FIELDS = {
-    field
-    for field, dtype in WorksSchema.model_fields.items()
-    if get_args(dtype.annotation)[0] not in {str, int, float, bool}
-}
+NESTED_FIELDS = {field for field, dtype in WorksSchema.model_fields.items() if get_args(dtype.annotation)[0] not in {str, int, float, bool}}
 
 NON_ALPHA = re.compile(r'[^a-zA-Z]')
 
 
 def translate_work_to_solr(work: WorksSchema) -> dict[str, str | bool | int | float]:
     doc = work.model_dump(include=FIELDS_SOLR, exclude_none=True, exclude_unset=True)
-    return doc | {
-        'title_abstract': NON_ALPHA.sub(f'{work.title} {work.abstract}', ' '),
-        'abstract_source': 'OpenAlex' if work.abstract else None,
-    } | {
-        field: json.dumps(doc[field])
-        for field in NESTED_FIELDS
-        if field in doc
-    }
+    return (
+        doc
+        | {
+            'title_abstract': NON_ALPHA.sub(f'{work.title} {work.abstract}', ' '),
+            'abstract_source': 'OpenAlex' if work.abstract else None,
+        }
+        | {field: json.dumps(doc[field]) for field in NESTED_FIELDS if field in doc}
+    )
 
 
 def translate_authorship(author: AuthorshipsSchema) -> AcademicAuthorModel:
@@ -124,9 +120,7 @@ def translate_authorship(author: AuthorshipsSchema) -> AcademicAuthorModel:
         ret.orcid = author.author.orcid
     if author.institutions is not None:
         ret.affiliations = [
-            AffiliationModel(name=inst.display_name if inst.display_name is not None else '[missing]',
-                             openalex_id=inst.id,
-                             country=inst.country_code)
+            AffiliationModel(name=inst.display_name if inst.display_name is not None else '[missing]', openalex_id=inst.id, country=inst.country_code)
             for inst in author.institutions
         ]
     elif author.raw_affiliation_strings is not None:
@@ -155,52 +149,52 @@ def translate_work_to_item(work: WorksSchema, project_id: str | uuid.UUID | None
         publication_year=work.publication_year,
         source=source,
         authors=[translate_authorship(a) for a in work.authorships] if work.authorships is not None else None,
-
-        meta=clear_empty({
-            'openalex': work.model_dump(include=FIELDS_META, exclude_none=True, exclude_unset=True),
-        }),
+        meta=clear_empty(
+            {
+                'openalex': work.model_dump(include=FIELDS_META, exclude_none=True, exclude_unset=True),
+            }
+        ),
     )
 
 
 class OpenAlexAPI(AbstractAPI):
-
     def fetch_raw(
-            self,
-            query: str,
-            params: dict[str, Any] | None = None,
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         """
-           OpenAlex via API wrapper for downloading all records for a given query.
+        OpenAlex via API wrapper for downloading all records for a given query.
 
-           Documentation:
-           https://docs.openalex.org/
+        Documentation:
+        https://docs.openalex.org/
 
-           https://docs.openalex.org/api-entities/works/filter-works#from_created_date
-           --> https://api.openalex.org/works?filter=from_created_date:2023-01-12&api_key=myapikey
-           """
+        https://docs.openalex.org/api-entities/works/filter-works#from_created_date
+        --> https://api.openalex.org/works?filter=from_created_date:2023-01-12&api_key=myapikey
+        """
         cursor = '*'
         n_pages = 0
         n_works = 0
         headers = {'api_key': self.api_key} if self.api_key else None
-        with RequestClient(backoff_rate=self.backoff_rate,
-                           max_req_per_sec=self.max_req_per_sec,
-                           max_retries=self.max_retries,
-                           proxy=self.proxy) as request_client:
+        with RequestClient(
+            backoff_rate=self.backoff_rate, max_req_per_sec=self.max_req_per_sec, max_retries=self.max_retries, proxy=self.proxy
+        ) as request_client:
             while cursor is not None:
                 n_pages += 1
 
                 page = request_client.get(
                     'https://api.openalex.org/works',
                     params={  # type: ignore[arg-type]
-                               'filter': query,
-                               'select': ','.join(FIELDS_API),
-                               'cursor': cursor,
-                               'per-page': 50
-                           } | (params or {}),
+                        'filter': query,
+                        'select': ','.join(FIELDS_API),
+                        'cursor': cursor,
+                        'per-page': 50,
+                    }
+                    | (params or {}),
                     headers=headers,
                 ).json()
                 cursor = page['meta']['next_cursor']
-                self.logger.info(f'Retrieved {n_works:,} / {page['meta']['count']:,} | currently on page {n_pages:,}')
+                self.logger.info(f'Retrieved {n_works:,} / {page["meta"]["count"]:,} | currently on page {n_pages:,}')
 
                 yield from page['results']
                 n_works += len(page['results'])
@@ -219,23 +213,24 @@ class SearchResult(BaseModel):
 
 
 class OpenAlexSolrAPI(AbstractAPI):
-    def __init__(self,
-                 openalex_conf: OpenAlexConfig,
-                 batch_size: int = 5000,
-                 export_fields: list[str] | None = None,
-                 include_histogram: bool = False,
-                 histogram_from: int = 1990,
-                 histogram_to: int = 2026,
-                 def_type: DefType = 'lucene',
-                 field: SearchField = 'title_abstract',
-                 op: OpType = 'AND',
-                 proxy: str | None = None,
-                 max_req_per_sec: int = 5,
-                 max_retries: int = 5,
-                 backoff_rate: float = 5.,
-                 logger: logging.Logger | None = None):
-        super().__init__(api_key='', proxy=proxy, max_retries=max_retries,
-                         max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
+    def __init__(
+        self,
+        openalex_conf: OpenAlexConfig,
+        batch_size: int = 5000,
+        export_fields: list[str] | None = None,
+        include_histogram: bool = False,
+        histogram_from: int = 1990,
+        histogram_to: int = 2026,
+        def_type: DefType = 'lucene',
+        field: SearchField = 'title_abstract',
+        op: OpType = 'AND',
+        proxy: str | None = None,
+        max_req_per_sec: int = 5,
+        max_retries: int = 5,
+        backoff_rate: float = 5.0,
+        logger: logging.Logger | None = None,
+    ):
+        super().__init__(api_key='', proxy=proxy, max_retries=max_retries, max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
         self.openalex_conf = openalex_conf
 
         self.def_type = def_type
@@ -259,34 +254,24 @@ class OpenAlexSolrAPI(AbstractAPI):
         self.export_fields = [f'{field}:[json]' if field in NESTED_FIELDS else field for field in self.export_fields]
 
     def fetch_raw(
-            self,
-            query: str,
-            params: dict[str, Any] | None = None,
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         """
-           OpenAlex via solr wrapper for downloading all records for a given query.
+        OpenAlex via solr wrapper for downloading all records for a given query.
 
-           Documentation:
-           https://solr.apache.org/guide/solr/latest/query-guide/standard-query-parser.html
-           https://solr.apache.org/guide/solr/latest/query-guide/common-query-parameters.html
-           https://solr.apache.org/guide/solr/latest/query-guide/other-parsers.html#surround-query-parser
+        Documentation:
+        https://solr.apache.org/guide/solr/latest/query-guide/standard-query-parser.html
+        https://solr.apache.org/guide/solr/latest/query-guide/common-query-parameters.html
+        https://solr.apache.org/guide/solr/latest/query-guide/other-parsers.html#surround-query-parser
 
-           :return:
-           """
-        with RequestClient(backoff_rate=self.backoff_rate,
-                           max_req_per_sec=self.max_req_per_sec,
-                           max_retries=self.max_retries,
-                           proxy=self.proxy,
-                           auth=self.openalex_conf.auth) as request_client:
-
-            params_ = {
-                'q': query,
-                'q.op': self.op,
-                'sort': 'id desc',
-                'fl': ','.join(FIELDS_SOLR),
-                'rows': self.batch_size,
-                'cursorMark': '*'
-            }
+        :return:
+        """
+        with RequestClient(
+            backoff_rate=self.backoff_rate, max_req_per_sec=self.max_req_per_sec, max_retries=self.max_retries, proxy=self.proxy, auth=self.openalex_conf.auth
+        ) as request_client:
+            params_ = {'q': query, 'q.op': self.op, 'sort': 'id desc', 'fl': ','.join(FIELDS_SOLR), 'rows': self.batch_size, 'cursorMark': '*'}
 
             if self.def_type == 'lucene':
                 params_ |= {'df': self.field, 'defType': 'lucene'}
@@ -300,7 +285,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                     'facet.sort': 'index',
                     'facet.range.gap': '1',
                     'facet.range.start': self.histogram_from,
-                    'facet.range.end': self.histogram_to
+                    'facet.range.end': self.histogram_to,
                 }
 
             # overrides
@@ -342,8 +327,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                 self.logger.debug('Yielding documents...')
                 yield from batch_docs
 
-                self.logger.debug(f'Done with batch {batch_i} in {timedelta(seconds=time() - t1)}h; '
-                                  f'{timedelta(seconds=time() - t0)}h passed overall')
+                self.logger.debug(f'Done with batch {batch_i} in {timedelta(seconds=time() - t1)}h; {timedelta(seconds=time() - t0)}h passed overall')
 
                 if next_curser is None:
                     self.logger.info('Did not receive a `nextCursorMark`, assuming to be done!')
@@ -357,10 +341,7 @@ class OpenAlexSolrAPI(AbstractAPI):
         if hist_facets is None:
             return None
 
-        return {
-            hist_facets[i]: hist_facets[i + 1]
-            for i in range(0, len(hist_facets), 2)
-        }
+        return {hist_facets[i]: hist_facets[i + 1] for i in range(0, len(hist_facets), 2)}
 
     @classmethod
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
@@ -368,10 +349,10 @@ class OpenAlexSolrAPI(AbstractAPI):
         return translate_work_to_item(work, project_id=project_id)
 
     def query(
-            self,
-            query: str,
-            limit: int = 20,
-            offset: int = 0,
+        self,
+        query: str,
+        limit: int = 20,
+        offset: int = 0,
     ) -> SearchResult:
         docs = list(
             self.fetch_translated(
@@ -402,18 +383,16 @@ if __name__ == '__main__':
 
     app = typer.Typer()
 
-
     @app.command()
     def download(
-            target: Annotated[Path, typer.Option(help='File to write results to')],
-            api_key: Annotated[str | None, typer.Option(help='Valid API key')] = None,
-            kind: Annotated[Literal['SOLR', 'API'], typer.Option(help='database to use')] = 'SOLR',
-            openalex_conf: Annotated[str | None, typer.Option(help='NACSOS config with solr settings')] = None,
-            batch_size: Annotated[int, typer.Option(help='File to write results to')] = 5,
-            query_file: Annotated[Path | None, typer.Option(help='File containing search query')] = None,
-            query: Annotated[str | None, typer.Option(help='Search query')] = None,
+        target: Annotated[Path, typer.Option(help='File to write results to')],
+        api_key: Annotated[str | None, typer.Option(help='Valid API key')] = None,
+        kind: Annotated[Literal['SOLR', 'API'], typer.Option(help='database to use')] = 'SOLR',
+        openalex_conf: Annotated[str | None, typer.Option(help='NACSOS config with solr settings')] = None,
+        batch_size: Annotated[int, typer.Option(help='File to write results to')] = 5,
+        query_file: Annotated[Path | None, typer.Option(help='File containing search query')] = None,
+        query: Annotated[str | None, typer.Option(help='Search query')] = None,
     ) -> None:
-
         if query_file:
             with open(query_file, 'r') as qf:
                 query_str = qf.read()
@@ -433,16 +412,14 @@ if __name__ == '__main__':
             raise AttributeError(f'Unknown API type: {kind}')
         api.download_raw(query=query_str, target=target)
 
-
     @app.command()
     def convert(
-            source: Annotated[Path, typer.Option(help='File to read results from')],
-            target: Annotated[Path, typer.Option(help='File to write results to')],
-            kind: Annotated[Literal['SOLR', 'API'], typer.Option(help='database to use')] = 'SOLR',
+        source: Annotated[Path, typer.Option(help='File to read results from')],
+        target: Annotated[Path, typer.Option(help='File to write results to')],
+        kind: Annotated[Literal['SOLR', 'API'], typer.Option(help='database to use')] = 'SOLR',
     ) -> None:
         cls = OpenAlexSolrAPI if kind == 'SOLR' else OpenAlexAPI
         cls.convert_file(source=source, target=target)
-
 
     @app.command()
     def translate(kind: Annotated[Literal['SOLR', 'API'], typer.Option(help='database to use')] = 'SOLR') -> None:

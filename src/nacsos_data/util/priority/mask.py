@@ -14,7 +14,7 @@ logger = logging.getLogger('nacsos_data.util.priority.labels')
 # https://www.lark-parser.org/ide/
 # add `start: clause`
 
-GRAMMAR = '''
+GRAMMAR = """
 ?clause: cols
        | clause _and  clause            -> and
        | clause _or  clause            -> or
@@ -55,7 +55,7 @@ _or: "OR"i | "|"
 %import common.WS
 
 %ignore WS
-'''
+"""
 
 
 class ColSet(TypedDict):
@@ -72,12 +72,13 @@ def parse_rule(rule: str) -> Tree[Token]:
 
 
 def get_inclusion_mask(  # noqa: C901
-        rule: str,
-        df: 'pd.DataFrame',
-        label_cols: list[str] | None = None,
-        ignore_missing: bool = False,
+    rule: str,
+    df: 'pd.DataFrame',
+    label_cols: list[str] | None = None,
+    ignore_missing: bool = False,
 ) -> 'pd.Series[bool]':
     import pandas as pd
+
     tree = parse_rule(rule)
 
     columns: set[str] = set(df.columns) if label_cols is None else set(label_cols)
@@ -159,40 +160,44 @@ def get_inclusion_mask(  # noqa: C901
         if subtree.data == 'anyyes':
             return oring([df[c].astype('boolean') for c in anycols[col]])
         if subtree.data == 'allyes':
-            return anding([
-                oring([df[c].astype('boolean').isna() for c in anycols[col]]),
-                anding([df[c].astype('boolean') | df[c].astype('boolean').isna() for c in anycols[col]])
-            ])
+            return anding(
+                [
+                    oring([df[c].astype('boolean').isna() for c in anycols[col]]),
+                    anding([df[c].astype('boolean') | df[c].astype('boolean').isna() for c in anycols[col]]),
+                ]
+            )
         if subtree.data == 'forceallyes':
             return anding([df[c] == 1 for c in anycols[col]])
         if subtree.data == 'anyno':
             return oring([df[c].astype('boolean') == False for c in anycols[col]])  # noqa: E712
         if subtree.data == 'allno':
-            return anding([
-                oring([df[c].astype('boolean').isna() for c in anycols[col]]),
-                anding([(df[c].astype('boolean') == False) | df[c].astype('boolean').isna() for c in anycols[col]])  # noqa: E712
-            ])  # noqa: E712
+            return anding(
+                [
+                    oring([df[c].astype('boolean').isna() for c in anycols[col]]),
+                    anding([(df[c].astype('boolean') == False) | df[c].astype('boolean').isna() for c in anycols[col]]),  # noqa: E712
+                ]
+            )  # noqa: E712
         if subtree.data == 'forceallno':
             return anding([df[c] == 0 for c in anycols[col]])
 
         # any-user column (use resolution if available)
         if subtree.data == 'resanyyes':
             if resanycols[col]['res']:
-                return ((df[resanycols[col]['res']].notna()
-                         & df[resanycols[col]['res']] == True)  # noqa: E712
-                        | (df[resanycols[col]['res']].isna()
-                           & oring([df[c].astype('boolean') for c in resanycols[col]['users']])))
+                return (
+                    (df[resanycols[col]['res']].notna() & df[resanycols[col]['res']] == True)  # noqa: E712
+                    | (df[resanycols[col]['res']].isna() & oring([df[c].astype('boolean') for c in resanycols[col]['users']]))
+                )
             return oring([df[c].astype('boolean') == True for c in anycols[col]])  # noqa: E712
 
         if subtree.data == 'resanyno':
             if resanycols[col]['res']:
-                return ((df[resanycols[col]['res']].notna()
-                         & df[resanycols[col]['res']] == False)  # noqa: E712
-                        | (df[resanycols[col]['res']].isna()
-                           & oring([df[c].astype('boolean') == False for c in resanycols[col]['users']])))  # noqa: E712
+                return (
+                    (df[resanycols[col]['res']].notna() & df[resanycols[col]['res']] == False)  # noqa: E712
+                    | (df[resanycols[col]['res']].isna() & oring([df[c].astype('boolean') == False for c in resanycols[col]['users']]))
+                )  # noqa: E712
 
             return oring([df[c].astype('boolean') for c in anycols[col]])
 
-        raise SyntaxError('You shouldn\'t end up here.')
+        raise SyntaxError("You shouldn't end up here.")
 
     return as_series(recurse(tree))

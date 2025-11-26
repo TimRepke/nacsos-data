@@ -24,6 +24,7 @@ class UserBaseModel(DehydratedUser):
     Most entries in the database will be (indirectly) linked to user accounts, so this is
     at the core of access management and ownership.
     """
+
     # Contact information for that user
     email: EmailStr | None = None
 

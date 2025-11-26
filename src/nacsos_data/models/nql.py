@@ -58,9 +58,7 @@ class MetaFilterStr(_MetaFilter):
     value: str
 
 
-MetaFilter = Annotated[MetaFilterBool
-                       | MetaFilterInt
-                       | MetaFilterStr, PField(discriminator='value_type')]
+MetaFilter = Annotated[MetaFilterBool | MetaFilterInt | MetaFilterStr, PField(discriminator='value_type')]
 
 
 class ImportFilter(BaseModel):
@@ -104,9 +102,7 @@ class LabelFilterMulti(_LabelFilter):
     comp: SetComparator
 
 
-LabelFilter = Annotated[LabelFilterInt
-                        | LabelFilterBool
-                        | LabelFilterMulti, PField(discriminator='value_type')]
+LabelFilter = Annotated[LabelFilterInt | LabelFilterBool | LabelFilterMulti, PField(discriminator='value_type')]
 
 
 class AssignmentFilter(BaseModel):
@@ -140,19 +136,22 @@ class SubQuery(BaseModel):
     not_: NQLFilter | None = None
 
 
-NQLFilter = Annotated[FieldFilter
-                      | FieldFilters
-                      | LabelFilterMulti
-                      | LabelFilterBool
-                      | LabelFilterInt
-                      | AssignmentFilter
-                      | AnnotationFilter
-                      | AbstractFilter
-                      | ImportFilter
-                      | MetaFilterBool
-                      | MetaFilterInt
-                      | MetaFilterStr
-                      | SubQuery, PField(discriminator='filter')]
+NQLFilter = Annotated[
+    FieldFilter
+    | FieldFilters
+    | LabelFilterMulti
+    | LabelFilterBool
+    | LabelFilterInt
+    | AssignmentFilter
+    | AnnotationFilter
+    | AbstractFilter
+    | ImportFilter
+    | MetaFilterBool
+    | MetaFilterInt
+    | MetaFilterStr
+    | SubQuery,
+    PField(discriminator='filter'),
+]
 
 SubQuery.model_rebuild()
 

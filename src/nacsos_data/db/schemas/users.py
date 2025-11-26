@@ -17,11 +17,11 @@ class User(Base):
     Most entries in the database will be (indirectly) linked to user accounts, so this is
     at the core of access management and ownership.
     """
+
     __tablename__ = 'user'
 
     # Unique identifier for this user.
-    user_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                            nullable=False, unique=True, index=True)
+    user_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # Username for that user
     # -> nicer than using email and allows us to have multiple accounts per email
@@ -64,15 +64,13 @@ class AuthToken(Base):
     Stores the JSON Web Tokens for user authentication.
     A user might have multiple tokens, e.g. in order to use as API tokens.
     """
+
     __tablename__ = 'auth_tokens'
 
-    token_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                             nullable=False, unique=True, index=True)
+    token_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # Refers to the User this auth token belongs to
-    username = mapped_column(String,
-                             ForeignKey(User.username),
-                             nullable=False, index=True, unique=False)
+    username = mapped_column(String, ForeignKey(User.username), nullable=False, index=True, unique=False)
 
     # Date and time when this token was created (or last updated)
     time_created = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

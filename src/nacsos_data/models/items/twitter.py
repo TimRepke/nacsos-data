@@ -62,6 +62,7 @@ class ContextAnnotation(BaseModel):
     NOTE: Under the assumption that we could always recover the `description`
           of the domain and entity, this information is not stored to save space.
     """
+
     # ID of the top level context (aka domain)
     domain_id: str
     # Name of the top level context
@@ -81,6 +82,7 @@ class TwitterUserModel(BaseModel):
         - In the context of a `TwitterItemModel`, the `id` is not set as it can be inferred from `twitter_author_id`
         - `name` is None if `name` == `username` to save space
     """
+
     # The unique identifier of this user.
     id: str | None = None
     # The UTC datetime that the user account was created on Twitter.
@@ -116,6 +118,7 @@ class TwitterItemModel(ItemModel):
     For more in-depth documentation, please refer to:
     https://developer.twitter.com/en/docs/twitter-api/data-dictionary/object-model/tweet
     """
+
     type: ItemType = ItemType.twitter
     # Unique identifier for this TwitterItem, corresponds to Item
     item_id: str | UUID | None = None
@@ -176,6 +179,7 @@ class TwitterMetaObject(BaseModel):
     """
     This object contains information about the number of users returned in the current request and pagination details.
     """
+
     # The number of Tweet results returned in the response.
     count: int
     # The Tweet ID of the most recent Tweet returned in the response.

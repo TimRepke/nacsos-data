@@ -10,6 +10,7 @@ class GenericItemModel(ItemModel):
     """
     Corresponds to db.models.items.generic.GenericItem
     """
+
     type: ItemType = ItemType.generic
     # any kind of meta-data
     #   For project marked as "basic" this information may be shown to the user.

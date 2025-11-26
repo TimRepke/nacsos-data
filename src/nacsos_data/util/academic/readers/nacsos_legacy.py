@@ -25,12 +25,15 @@ def _convert_authors(authors: list[object]) -> list[AcademicAuthorModel] | None:
     for key in sorted(aggregate.keys()):
         # Get all names from all possible fields for this author, so we have a fallback to pick
         # Sort by length of string, so the longest name will be the last in the list
-        names = sorted([
-            a.get(src)
-            for a in aggregate[key]
-            for src in ['AU', 'AF', 'surname', 'initials']
-            if a.get(src) is not None and len(a.get(src)) > 0  # type: ignore[arg-type]
-        ], key=lambda n: len(n))  # type: ignore[arg-type]
+        names = sorted(
+            [
+                a.get(src)
+                for a in aggregate[key]
+                for src in ['AU', 'AF', 'surname', 'initials']
+                if a.get(src) is not None and len(a.get(src)) > 0  # type: ignore[arg-type]
+            ],
+            key=lambda n: len(n),
+        )  # type: ignore[arg-type]
 
         # Get all author fields in this aggregate, keep non-empty ones
         name_initials = [
@@ -48,11 +51,13 @@ def _convert_authors(authors: list[object]) -> list[AcademicAuthorModel] | None:
 
         # If we have at least one non-empty name for this author, add them
         if len(names) > 0:
-            ret.append(AcademicAuthorModel(
-                name=names[-1],  # type: ignore[arg-type]
-                surname_initials=name_initials[0] if len(name_initials) > 0 else None,
-                affiliations=affiliations if len(affiliations) > 0 else None
-            ))
+            ret.append(
+                AcademicAuthorModel(
+                    name=names[-1],  # type: ignore[arg-type]
+                    surname_initials=name_initials[0] if len(name_initials) > 0 else None,
+                    affiliations=affiliations if len(affiliations) > 0 else None,
+                )
+            )
 
     if len(ret) > 0:
         return ret
@@ -60,7 +65,7 @@ def _convert_authors(authors: list[object]) -> list[AcademicAuthorModel] | None:
     return None
 
 
-def fetch_nacsos_legacy_doc(doc_id: int, project_id: str | None, models: Any) -> AcademicItemModel | None:
+def fetch_nacsos_legacy_doc(doc_id: int, project_id: str | None, models: Any) -> AcademicItemModel | None:  # noqa: C901
     """
     This function can be used to fetch a document from NACSOS-legacy and convert it to an `AcademicItemModel`.
     We assume, that this function will only be used on the VM and the necessary Django setup is in its context.
@@ -236,14 +241,14 @@ def fetch_nacsos_legacy_doc(doc_id: int, project_id: str | None, models: Any) ->
 
 
 def read_nacsos1_annotations(
-        query_id: int,
-        models: Any,
-        assignment_scope_id: str | uuid.UUID,
-        annotation_scheme_id: str | uuid.UUID,
-        user_map: dict[int, str | uuid.UUID],
-        label_map: dict[int, str],
-        relevance_key: str | None,
-        item_map: dict[int, str | uuid.UUID]
+    query_id: int,
+    models: Any,
+    assignment_scope_id: str | uuid.UUID,
+    annotation_scheme_id: str | uuid.UUID,
+    user_map: dict[int, str | uuid.UUID],
+    label_map: dict[int, str],
+    relevance_key: str | None,
+    item_map: dict[int, str | uuid.UUID],
 ) -> tuple[list[AssignmentModel], list[AnnotationModel]]:
     """
     We'll assume you are running this on the VM and have the necessary connections open.
@@ -279,11 +284,9 @@ def read_nacsos1_annotations(
     # all unique doc_ids sorted in order of assignment
     doc_ids = [
         doid['doc_id']
-        for doid in sorted(models.DocOwnership.objects
-                                .filter(query__project=p, doc__query=q, relevant__gt=0)
-                                .distinct('doc_id')
-                                .values('doc_id', 'id'),
-                           key=lambda x: x['id'])
+        for doid in sorted(
+            models.DocOwnership.objects.filter(query__project=p, doc__query=q, relevant__gt=0).distinct('doc_id').values('doc_id', 'id'), key=lambda x: x['id']
+        )
     ]
 
     assignments_new = []
@@ -315,7 +318,8 @@ def read_nacsos1_annotations(
                 item_id=item_map[assignment.doc_id],
                 annotation_scheme_id=annotation_scheme_id,
                 status=AssignmentStatus.FULL,
-                order=order)
+                order=order,
+            )
             assignments_new.append(assignment_new)
 
             # assignment: ('id', 'doc_id', 'docpar_id', 'utterance_id', 'tweet_id', 'document_linked',

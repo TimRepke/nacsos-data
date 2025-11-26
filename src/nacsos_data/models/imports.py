@@ -44,12 +44,9 @@ class ScopusAPIImport(BaseModel):
     date: str
 
 
-ImportConfig = Annotated[ScopusImport
-                         | ScopusAPIImport
-                         | AcademicItemImport
-                         | OpenAlexFileImport
-                         | OpenAlexSolrImport
-                         | WoSImport, PField(discriminator='kind')]
+ImportConfig = Annotated[
+    ScopusImport | ScopusAPIImport | AcademicItemImport | OpenAlexFileImport | OpenAlexSolrImport | WoSImport, PField(discriminator='kind')
+]
 
 
 class ImportModel(BaseModel):
@@ -87,6 +84,7 @@ class M2MImportItemType(str, Enum):
         For example: A tweet is part of the conversation that contained a specified keyword or an
                      article that is referenced by an article that is included "explicitly" in the query.
     """
+
     explicit = 'explicit'
     implicit = 'implicit'
 

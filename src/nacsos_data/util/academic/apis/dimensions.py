@@ -25,23 +25,23 @@ def get_id(obj: dict[str, Any]) -> str | None:
 
 
 class DimensionsAPI(AbstractAPI):
-
-    def __init__(self,
-                 api_key: str,
-                 page_size: int = 5,
-                 proxy: str | None = None,
-                 max_req_per_sec: int = 5,
-                 max_retries: int = 5,
-                 backoff_rate: float = 5.,
-                 logger: logging.Logger | None = None):
-        super().__init__(api_key=api_key, proxy=proxy, max_retries=max_retries,
-                         max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
+    def __init__(
+        self,
+        api_key: str,
+        page_size: int = 5,
+        proxy: str | None = None,
+        max_req_per_sec: int = 5,
+        max_retries: int = 5,
+        backoff_rate: float = 5.0,
+        logger: logging.Logger | None = None,
+    ):
+        super().__init__(api_key=api_key, proxy=proxy, max_retries=max_retries, max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
         self.page_size = page_size
 
     def fetch_raw(
-            self,
-            query: str,
-            params: dict[str, Any] | None = None,
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         """
         dimensions.ai API wrapper for downloading all records for a given query.
@@ -63,10 +63,9 @@ class DimensionsAPI(AbstractAPI):
         if self.api_key is None:
             raise AssertionError('Missing API key!')
 
-        with RequestClient(backoff_rate=self.backoff_rate,
-                           max_req_per_sec=self.max_req_per_sec,
-                           max_retries=self.max_retries,
-                           proxy=self.proxy) as request_client:
+        with RequestClient(
+            backoff_rate=self.backoff_rate, max_req_per_sec=self.max_req_per_sec, max_retries=self.max_retries, proxy=self.proxy
+        ) as request_client:
             jwt = 'empty'
             logger = self.logger
             api_key = self.api_key
@@ -131,5 +130,6 @@ if __name__ == '__main__':
         static_files=[
             # 'scratch/academic_apis/response_scopus1.json',
             # 'scratch/academic_apis/response_scopus2.jsonl',
-        ])
+        ]
+    )
     app()

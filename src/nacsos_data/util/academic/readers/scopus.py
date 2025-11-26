@@ -59,32 +59,16 @@ def _parse_authors(row: dict[str, str]) -> list[AcademicAuthorModel] | None:
             author_ids = [s.strip() for s in _get(row, 'Author(s) ID').split(';')]  # type: ignore[union-attr]
 
     # in case we have all the information, let's use it
-    if (fn_authors is not None
-            and authors is not None
-            and fn_author_ids is not None
-            and len(fn_authors) == len(authors)):
-        return [
-            AcademicAuthorModel(name=author,
-                                scopus_id=fn_author_ids[ai],
-                                surname_initials=authors[ai])
-            for ai, author in enumerate(fn_authors)
-        ]
+    if fn_authors is not None and authors is not None and fn_author_ids is not None and len(fn_authors) == len(authors):
+        return [AcademicAuthorModel(name=author, scopus_id=fn_author_ids[ai], surname_initials=authors[ai]) for ai, author in enumerate(fn_authors)]
 
     # try the next best thing: full names with IDs!
     if fn_authors is not None and fn_author_ids is not None and len(fn_authors) == len(fn_author_ids):
-        return [
-            AcademicAuthorModel(name=author,
-                                scopus_id=fn_author_ids[ai])
-            for ai, author in enumerate(fn_authors)
-        ]
+        return [AcademicAuthorModel(name=author, scopus_id=fn_author_ids[ai]) for ai, author in enumerate(fn_authors)]
 
     # do we at least have the short names with IDs?
     if authors is not None and author_ids is not None and len(authors) == len(author_ids):
-        return [
-            AcademicAuthorModel(name=author,
-                                scopus_id=author_ids[ai])
-            for ai, author in enumerate(authors)
-        ]
+        return [AcademicAuthorModel(name=author, scopus_id=author_ids[ai]) for ai, author in enumerate(authors)]
 
     # getting, desperate, do we have full names?
     if fn_authors is not None:
@@ -98,8 +82,7 @@ def _parse_authors(row: dict[str, str]) -> list[AcademicAuthorModel] | None:
     return None
 
 
-def read_scopus_csv_file(filepath: str,
-                         project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
+def read_scopus_csv_file(filepath: str, project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
     """
     This function will read a scopus csv line by line and return a generator of parsed `AcademicItemModel`.
 
@@ -118,21 +101,36 @@ def read_scopus_csv_file(filepath: str,
 
             meta_info: dict[str, str | list[str]] = {
                 key: _get(row, key)  # type: ignore[misc]
-                for key in ['Volume', 'Issue', 'Art. No.', 'Page start',
-                            'Page end', 'Page count', 'Cited by', 'Editors',
-                            'Publisher', 'ISSN', 'ISBN', 'CODEN',
-                            'Language of Original Document',
-                            'Document Type', 'Publication Stage', 'Open Access']
+                for key in [
+                    'Volume',
+                    'Issue',
+                    'Art. No.',
+                    'Page start',
+                    'Page end',
+                    'Page count',
+                    'Cited by',
+                    'Editors',
+                    'Publisher',
+                    'ISSN',
+                    'ISBN',
+                    'CODEN',
+                    'Language of Original Document',
+                    'Document Type',
+                    'Publication Stage',
+                    'Open Access',
+                ]
                 if _get(row, key) is not None
             }
 
             # Unfortunately, there's no good way to associate affiliations to authors,
             # so at least remember all unique affiliations in the meta-data
             if _get(row, 'Affiliations') is not None:
-                meta_info['affiliations'] = list({
-                    aff.strip()
-                    for aff in _get(row, 'Affiliations').split(';')  # type: ignore[union-attr]
-                })
+                meta_info['affiliations'] = list(
+                    {
+                        aff.strip()
+                        for aff in _get(row, 'Affiliations').split(';')  # type: ignore[union-attr]
+                    }
+                )
 
             keywords = None
             if _get(row, 'Author Keywords') is not None:
@@ -154,18 +152,20 @@ def read_scopus_csv_file(filepath: str,
             if _get(row, 'Year') is not None:
                 py = int(_get(row, 'Year'))  # type: ignore[arg-type]
 
-            doc = AcademicItemModel(project_id=project_id,
-                                    scopus_id=_get(row, 'EID'),
-                                    doi=doi,
-                                    title=title,
-                                    text=_get(row, 'Abstract'),
-                                    publication_year=py,
-                                    keywords=keywords,
-                                    pubmed_id=_get(row, 'PubMed ID'),
-                                    title_slug=title_slug,
-                                    source=_get(row, 'Source title'),
-                                    authors=authors,
-                                    meta=clear_empty(meta_info))
+            doc = AcademicItemModel(
+                project_id=project_id,
+                scopus_id=_get(row, 'EID'),
+                doi=doi,
+                title=title,
+                text=_get(row, 'Abstract'),
+                publication_year=py,
+                keywords=keywords,
+                pubmed_id=_get(row, 'PubMed ID'),
+                title_slug=title_slug,
+                source=_get(row, 'Source title'),
+                authors=authors,
+                meta=clear_empty(meta_info),
+            )
             yield doc
 
 
@@ -271,8 +271,8 @@ PUBMED_RIS_KEYS = {
 
 
 class ScopusParser(rispy.RisParser):  # type: ignore[misc]
-    START_TAG = "TY"
-    PATTERN = r"^[A-Z][A-Z0-9]  - |^ER  -\s*$"
+    START_TAG = 'TY'
+    PATTERN = r'^[A-Z][A-Z0-9]  - |^ER  -\s*$'
 
     DEFAULT_LIST_TAGS = [
         'A1',
@@ -289,7 +289,7 @@ class ScopusParser(rispy.RisParser):  # type: ignore[misc]
     DEFAULT_MAPPING = {**rispy.config.TAG_KEY_MAPPING, **PUBMED_RIS_KEYS}
     DEFAULT_DELIMITER_MAPPING = rispy.config.DELIMITED_TAG_MAPPING
 
-    counter_re = re.compile("^[0-9]+.")
+    counter_re = re.compile('^[0-9]+.')
 
     def get_content(self, line: str) -> str:
         return line[6:].strip()
@@ -299,8 +299,7 @@ class ScopusParser(rispy.RisParser):  # type: ignore[misc]
         return bool(none_or_match)
 
 
-def read_scopus_ris_file(filepath: str,
-                         project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
+def read_scopus_ris_file(filepath: str, project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
     """
     This function will read a Scopus RIS file and return a generator of parsed `AcademicItemModel`s.
 
@@ -313,7 +312,6 @@ def read_scopus_ris_file(filepath: str,
         entries = ScopusParser().parse(text=fin.read())
 
         for entry in entries:
-
             scopus_id = None
             scopus_url: str | None = entry.get('scopus_url')
             if scopus_url is not None:
@@ -323,31 +321,52 @@ def read_scopus_ris_file(filepath: str,
 
             meta = {
                 k: _get(entry, k)
-                for k in
-                ['abbreviated_source_title', 'article_number', 'editors', 'issn', 'issue', 'language', 'first_page',
-                 'last_page', 'conference_name', 'conference_date', 'conference_location', 'pmid', 'proceedings_title',
-                 'publication_year', 'publisher', 'scopus_db', 'scopus_url', 'second_article_title',
-                 'type_of_reference', 'document_type', 'conference_sponsors', 'volume']
+                for k in [
+                    'abbreviated_source_title',
+                    'article_number',
+                    'editors',
+                    'issn',
+                    'issue',
+                    'language',
+                    'first_page',
+                    'last_page',
+                    'conference_name',
+                    'conference_date',
+                    'conference_location',
+                    'pmid',
+                    'proceedings_title',
+                    'publication_year',
+                    'publisher',
+                    'scopus_db',
+                    'scopus_url',
+                    'second_article_title',
+                    'type_of_reference',
+                    'document_type',
+                    'conference_sponsors',
+                    'volume',
+                ]
             }
             authors = None
             s_authors = _get(entry, 'authors')
             if s_authors is not None and len(s_authors) > 0:
-                authors = [
-                    AcademicAuthorModel(name=au)
-                    for au in s_authors
-                ]
+                authors = [AcademicAuthorModel(name=au) for au in s_authors]
 
-            doc = AcademicItemModel(project_id=project_id,
-                                    scopus_id=scopus_id,
-                                    doi=_get(entry, 'doi'),
-                                    title=_get(entry, 'article_title'),
-                                    text=_get(entry, 'abstract'),
-                                    publication_year=(int(_get(entry, 'publication_year'))  # type: ignore[arg-type]
-                                                      if _get(entry, 'publication_year') is not None else None),
-                                    keywords=_get(entry, 'keywords'),  # type: ignore[arg-type]
-                                    pubmed_id=_get(entry, 'pmid'),
-                                    title_slug=str_to_title_slug(_get(entry, 'article_title')),
-                                    source=_get(entry, 'abbreviated_source_title'),
-                                    authors=authors,
-                                    meta=clear_empty(meta))
+            doc = AcademicItemModel(
+                project_id=project_id,
+                scopus_id=scopus_id,
+                doi=_get(entry, 'doi'),
+                title=_get(entry, 'article_title'),
+                text=_get(entry, 'abstract'),
+                publication_year=(
+                    int(_get(entry, 'publication_year'))  # type: ignore[arg-type]
+                    if _get(entry, 'publication_year') is not None
+                    else None
+                ),
+                keywords=_get(entry, 'keywords'),  # type: ignore[arg-type]
+                pubmed_id=_get(entry, 'pmid'),
+                title_slug=str_to_title_slug(_get(entry, 'article_title')),
+                source=_get(entry, 'abbreviated_source_title'),
+                authors=authors,
+                meta=clear_empty(meta),
+            )
             yield doc

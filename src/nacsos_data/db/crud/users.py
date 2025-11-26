@@ -55,9 +55,7 @@ async def read_user_by_name(username: str, engine: DatabaseEngineAsync) -> UserI
     return None
 
 
-async def read_users(engine: DatabaseEngineAsync,
-                     project_id: str | None = None,
-                     order_by_username: bool = False) -> list[UserInDBModel] | None:
+async def read_users(engine: DatabaseEngineAsync, project_id: str | None = None, order_by_username: bool = False) -> list[UserInDBModel] | None:
     """
     Returns a list of all users (if `project_id` is None) or a list of users that
     are part of a project (have an existing `project_permission` with that `project_id`).
@@ -91,10 +89,7 @@ async def read_users(engine: DatabaseEngineAsync,
 async def user_ids_to_names(session: DBSession) -> dict[str, str]:
     stmt = select(User.user_id, User.username)
     result = (await session.execute(stmt)).mappings().all()
-    return {
-        str(user.user_id): str(user.username)
-        for user in result
-    }
+    return {str(user.user_id): str(user.username) for user in result}
 
 
 async def create_or_update_user(user: UserModel | UserInDBModel, engine: DatabaseEngineAsync) -> str:
@@ -113,9 +108,7 @@ async def create_or_update_user(user: UserModel | UserInDBModel, engine: Databas
 
     session: AsyncSession
     async with engine.session() as session:
-        user_db: User | None = (
-            await session.execute(select(User).where(User.user_id == user.user_id))
-        ).scalars().one_or_none()
+        user_db: User | None = (await session.execute(select(User).where(User.user_id == user.user_id))).scalars().one_or_none()
 
         password: str | None = getattr(user, 'password', None)
         hashed_password: str | None = None

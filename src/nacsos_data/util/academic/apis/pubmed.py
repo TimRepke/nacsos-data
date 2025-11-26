@@ -36,18 +36,17 @@ def get_authors(citation: dict[str, Any]) -> Generator[AcademicAuthorModel, None
         affiliations = [aff for aff in affiliations if aff.name is not None]
 
         yield AcademicAuthorModel(
-            name=f'{select(author, 'ForeName', default={}).get('_text', '')} '  # type: ignore[union-attr]
-                 f'{select(author, 'LastName', default={}).get('_text', '')}',  # type: ignore[union-attr]
+            name=f'{select(author, "ForeName", default={}).get("_text", "")} '  # type: ignore[union-attr]
+            f'{select(author, "LastName", default={}).get("_text", "")}',  # type: ignore[union-attr]
             affiliations=None if len(affiliations) == 0 else affiliations,
         )
 
 
 class PubmedAPI(AbstractAPI):
-
     def _fetch_raw(
-            self,
-            query: str,
-            params: dict[str, Any] | None = None,
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
     ) -> Generator[Element, None, None]:
         """
         Pubmed API wrapper for downloading all records for a given query.
@@ -72,30 +71,29 @@ class PubmedAPI(AbstractAPI):
 
         n_records = 0
         n_pages = 0
-        with RequestClient(backoff_rate=self.backoff_rate,
-                           max_req_per_sec=self.max_req_per_sec,
-                           max_retries=self.max_retries,
-                           proxy=self.proxy) as request_client:
+        with RequestClient(
+            backoff_rate=self.backoff_rate, max_req_per_sec=self.max_req_per_sec, max_retries=self.max_retries, proxy=self.proxy
+        ) as request_client:
             search_page = request_client.post(
                 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi',
                 data={
-                         'api_key': self.api_key,
-                         'db': 'pubmed',
-                         'term': query,
-                         'usehistory': 'y',
-                     },
+                    'api_key': self.api_key,
+                    'db': 'pubmed',
+                    'term': query,
+                    'usehistory': 'y',
+                },
                 params=params,
             )
             tree = parse_xml(search_page.text)
             web_env = tree.find('WebEnv').text  # type: ignore[union-attr]
             query_key = tree.find('QueryKey').text  # type: ignore[union-attr]
 
-            self.logger.warning(f'Query translated to: {tree.find('QueryTranslation').text}')  # type: ignore[union-attr]
+            self.logger.warning(f'Query translated to: {tree.find("QueryTranslation").text}')  # type: ignore[union-attr]
 
             errors = tree.find('ErrorList')
             if errors is not None:
                 for error in errors.iter():
-                    self.logger.error(f'Error {error.tag}: {''.join(error.itertext())}')
+                    self.logger.error(f'Error {error.tag}: {"".join(error.itertext())}')
 
             n_total = int(tree.find('Count').text)  # type: ignore[union-attr,arg-type]
             page_size = int(tree.find('RetMax').text)  # type: ignore[union-attr,arg-type]
@@ -111,14 +109,7 @@ class PubmedAPI(AbstractAPI):
             while not done:
                 result_page = request_client.get(
                     'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi',
-                    params={
-                        'api_key': self.api_key,
-                        'db': 'pubmed',
-                        'WebEnv': web_env,
-                        'query_key': query_key,
-                        'retmax': page_size,
-                        'retstart': n_records
-                    },
+                    params={'api_key': self.api_key, 'db': 'pubmed', 'WebEnv': web_env, 'query_key': query_key, 'retmax': page_size, 'retstart': n_records},
                 )
                 rate_limit = result_page.headers.get('x-ratelimit-limit')
                 rate_left = result_page.headers.get('x-ratelimit-remaining')
@@ -129,18 +120,20 @@ class PubmedAPI(AbstractAPI):
                 n_records += len(articles)
                 yield from articles
 
-                self.logger.info(f'Found {n_records:,}/{n_total:,} records after processing page {n_pages} ({page_size} per page)'
-                                 f' | rate-limit: {rate_limit}'
-                                 f' | rate-remaining: {rate_left}')
+                self.logger.info(
+                    f'Found {n_records:,}/{n_total:,} records after processing page {n_pages} ({page_size} per page)'
+                    f' | rate-limit: {rate_limit}'
+                    f' | rate-remaining: {rate_left}'
+                )
 
                 if n_records >= n_total or len(articles) == 0:
                     self.logger.info('Seemed to have reached the end (count zero or total reached).')
                     break
 
     def fetch_raw(
-            self,
-            query: str,
-            params: dict[str, Any] | None = None,
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         for entry in self._fetch_raw(query, params=params):
             yield xml2dict(entry)
@@ -166,10 +159,12 @@ class PubmedAPI(AbstractAPI):
             publication_year=pyi,
             authors=clear_empty(list(get_authors(citation))),
             source=select(citation, 'Article', 'Journal', 'Title', default={}).get('_text'),  # type: ignore[union-attr]
-            keywords=clear_empty([
-                kw.get('_text', '').strip()
-                for kw in select(citation, 'KeywordList', default={}).get('Keyword', [])  # type: ignore[union-attr]
-            ]),
+            keywords=clear_empty(
+                [
+                    kw.get('_text', '').strip()
+                    for kw in select(citation, 'KeywordList', default={}).get('Keyword', [])  # type: ignore[union-attr]
+                ]
+            ),
             meta={'pubmed-api': clear_empty(record)},
         )
 
@@ -178,5 +173,6 @@ if __name__ == '__main__':
     app = PubmedAPI.test_app(
         static_files=[
             'scratch/academic_apis/response_pubmed.jsonl',
-        ])
+        ]
+    )
     app()

@@ -66,20 +66,18 @@ class DocumentObj(BaseModel):
     DocumentIdType: Optional[str] = Field(
         None,
         description='Modifies the interpretation of the `DocumentId` property for various classes of document '
-                    'identifier. If absent, a default value is applied which is appropriate for all of the document '
-                    'identifiers exposed by LexisNexis Web Services API. Potential values are found in the '
-                    'DocumentIdType enumeration, but OData protocol restrictions prevent this enumeration from being '
-                    'referenced directly.',
+        'identifier. If absent, a default value is applied which is appropriate for all of the document '
+        'identifiers exposed by LexisNexis Web Services API. Potential values are found in the '
+        'DocumentIdType enumeration, but OData protocol restrictions prevent this enumeration from being '
+        'referenced directly.',
     )
     Content: Optional[str] = Field(
         None,
-        description='If the Document is not being queried as a Media Link Entry, the Content property contains the '
-                    'XML body of the document.',
+        description='If the Document is not being queried as a Media Link Entry, the Content property contains the XML body of the document.',
     )
     Citation: Optional[str] = Field(
         None,
-        description='The Citation property can be used in order to look up document results by citation. This can '
-                    'result in zero or more document results.',
+        description='The Citation property can be used in order to look up document results by citation. This can result in zero or more document results.',
     )
 
 
@@ -99,9 +97,7 @@ class TopicObj(BaseModel):
 
 
 class PracticeAreaObj(BaseModel):
-    Id: Optional[str] = Field(
-        None, description='The identifier for this practice area.'
-    )
+    Id: Optional[str] = Field(None, description='The identifier for this practice area.')
     Name: Optional[str] = Field(None, description='The name of the practice area.')
     Topics_odata_navigationLink: Optional[str] = Field(
         None,
@@ -111,12 +107,8 @@ class PracticeAreaObj(BaseModel):
 
 
 class AppliedPostFilterObj(BaseModel):
-    PostFilterName: Optional[str] = Field(
-        None, description='The Name of the Postfilter for this AppliedFilter.'
-    )
-    Name: Optional[str] = Field(
-        None, description='The name of the Postfilter Item for this AppliedFilter.'
-    )
+    PostFilterName: Optional[str] = Field(None, description='The Name of the Postfilter for this AppliedFilter.')
+    Name: Optional[str] = Field(None, description='The name of the Postfilter Item for this AppliedFilter.')
     Id: Optional[str] = Field(
         None,
         description='The identifier of the Postfilter Item for this AppliedFilter.',
@@ -129,9 +121,7 @@ class AppliedPostFilterObj(BaseModel):
 
 class PostFilterItem(BaseModel):
     Id: Optional[str] = Field(None, description='The identifier for the post filter.')
-    Name: Optional[str] = Field(
-        None, description='The textual description of the filter.'
-    )
+    Name: Optional[str] = Field(None, description='The textual description of the filter.')
     Count: Optional[int] = Field(
         None,
         description='Number of documents which would be matched if this post filter is added to the current search.',
@@ -149,12 +139,8 @@ class SummaryType(str, Enum):
 
 
 class SourceFilterItem(BaseModel):
-    FilterId: Optional[str] = Field(
-        None, description='The identifier which is used to filter the source list.'
-    )
-    FilterValue: Optional[str] = Field(
-        None, description='The textual description of the filter.'
-    )
+    FilterId: Optional[str] = Field(None, description='The identifier which is used to filter the source list.')
+    FilterValue: Optional[str] = Field(None, description='The textual description of the filter.')
     FilterCount: Optional[int] = Field(
         None,
         description='Number of documents which would be matched if this source filter is added to the current search.',
@@ -178,9 +164,7 @@ class NewsPostFilter(BaseModel):
 
 class SummaryDetails(BaseModel):
     Type: Optional[SummaryType] = None
-    SummaryText: Optional[str] = Field(
-        None, description='The matched relevant extract within the document.'
-    )
+    SummaryText: Optional[str] = Field(None, description='The matched relevant extract within the document.')
 
 
 class SourceFilter(BaseModel):
@@ -193,42 +177,29 @@ class SourceObj(BaseModel):
     Id: Optional[str] = Field(None, description='The identifier for this source.')
     Geography: Optional[str] = Field(
         None,
-        description="Region of the Source. Property will be used to filter the Source Content by Geography. "
-                    "Filter can be applied by either using the text or Id eg:($filter= Geography eq 'US' or "
-                    "Geography eq 'dXJuOnBjdDo0MzY'). Use $expand=Filters to get the list of available Geographies "
-                    "for the user.",
+        description='Region of the Source. Property will be used to filter the Source Content by Geography. '
+        "Filter can be applied by either using the text or Id eg:($filter= Geography eq 'US' or "
+        "Geography eq 'dXJuOnBjdDo0MzY'). Use $expand=Filters to get the list of available Geographies "
+        'for the user.',
     )
     Name: Optional[str] = Field(None, description='The name for this source.')
-    ContentType: Optional[str] = Field(
-        None, description='The content type for this source.'
-    )
+    ContentType: Optional[str] = Field(None, description='The content type for this source.')
     Jurisdiction: Optional[str] = Field(
         None,
-        description="The jurisdiction for this source. This property is only used for filtering, "
-                    "and won't be populated in the source results.",
+        description="The jurisdiction for this source. This property is only used for filtering, and won't be populated in the source results.",
     )
     Publisher: Optional[str] = Field(
         None,
-        description="The publisher for this source. This property is only used for filtering, "
-                    "and won't be populated in the source results.",
+        description="The publisher for this source. This property is only used for filtering, and won't be populated in the source results.",
     )
     AlphaCategory: Optional[str] = Field(
         None,
-        description="The alphabetical category for this source. This property is only used for filtering, "
-                    "and won't be populated in the source results.",
+        description="The alphabetical category for this source. This property is only used for filtering, and won't be populated in the source results.",
     )
-    PublishFrequency: Optional[str] = Field(
-        None, description='The frequency at which this source gets published.'
-    )
-    Coverage: Optional[str] = Field(
-        None, description='The dates covered by content from this source.'
-    )
-    UpdateSchedule: Optional[str] = Field(
-        None, description='The schedule for when this source is updated.'
-    )
-    Description: Optional[str] = Field(
-        None, description='The description for this source.'
-    )
+    PublishFrequency: Optional[str] = Field(None, description='The frequency at which this source gets published.')
+    Coverage: Optional[str] = Field(None, description='The dates covered by content from this source.')
+    UpdateSchedule: Optional[str] = Field(None, description='The schedule for when this source is updated.')
+    Description: Optional[str] = Field(None, description='The description for this source.')
     PracticeArea: Optional[PracticeAreaObj] = None
     Filters: Optional[List[SourceFilter]] = None
 
@@ -236,61 +207,51 @@ class SourceObj(BaseModel):
 class NewsSearchResult(BaseModel):
     Jurisdiction: Optional[str] = Field(
         None,
-        description="The jurisdiction filter shows the locations in US and for the international locations, "
-                    "please refer 'InternationalLocation' filter.",
+        description="The jurisdiction filter shows the locations in US and for the international locations, please refer 'InternationalLocation' filter.",
     )
     Location: Optional[str] = Field(
         None,
-        description="The location of the publication. This property is typically only used for filtering, "
-                    "and won't be populated in the search results.",
+        description="The location of the publication. This property is typically only used for filtering, and won't be populated in the search results.",
     )
-    ContentType: Optional[str] = Field(
-        None, description='The content type of the news article.'
-    )
+    ContentType: Optional[str] = Field(None, description='The content type of the news article.')
     Byline: Optional[str] = Field(None, description='The author of the news article.')
-    WordLength: Optional[int] = Field(
-        None, description='The number of words in the news article.'
-    )
-    WebNewsUrl: Optional[str] = Field(
-        None, description='The external URL source of news article.'
-    )
+    WordLength: Optional[int] = Field(None, description='The number of words in the news article.')
+    WebNewsUrl: Optional[str] = Field(None, description='The external URL source of news article.')
     Geography: Optional[str] = Field(
         None,
-        description="The location of the news article. This property is typically only used for filtering, "
-                    "and won't be populated in the search results.",
+        description="The location of the news article. This property is typically only used for filtering, and won't be populated in the search results.",
     )
     NegativeNews: Optional[NegativeNewsType] = None
     Language: Optional[LanguageEnum] = None
     Industry: Optional[str] = Field(
         None,
-        description="The industry associated with the news article. This property is typically only used for "
-                    "filtering, and won't be populated in the search results.",
+        description='The industry associated with the news article. This property is typically only used for '
+        "filtering, and won't be populated in the search results.",
     )
     People: Optional[str] = Field(
         None,
-        description="Well-known people referenced by the news article. This property is typically only used for "
-                    "filtering, and won't be populated in the search results.",
+        description='Well-known people referenced by the news article. This property is typically only used for '
+        "filtering, and won't be populated in the search results.",
     )
     Subject: Optional[str] = Field(
         None,
-        description="The subject matter of the news article. This property is typically only used for filtering, "
-                    "and won't be populated in the search results.",
+        description="The subject matter of the news article. This property is typically only used for filtering, and won't be populated in the search results.",
     )
     Section: Optional[str] = Field(None, description='The section of the news article.')
     Company: Optional[str] = Field(
         None,
-        description="The company or companies associated with the news article. This property is typically only "
-                    "used for filtering, and won't be populated in the search results.",
+        description='The company or companies associated with the news article. This property is typically only '
+        "used for filtering, and won't be populated in the search results.",
     )
     PublicationType: Optional[str] = Field(
         None,
-        description="The publication type associated with the news article. This property is typically only "
-                    "used for filtering, and won't be populated in the search results.",
+        description='The publication type associated with the news article. This property is typically only '
+        "used for filtering, and won't be populated in the search results.",
     )
     Publisher: Optional[str] = Field(
         None,
-        description="The Publisher associated with the news article. This property is typically only used for "
-                    "filtering, and won't be populated in the search results.",
+        description='The Publisher associated with the news article. This property is typically only used for '
+        "filtering, and won't be populated in the search results.",
     )
     Document: Optional[DocumentObj] = None
     GroupDuplicates: Optional[GroupDuplicatesEnum] = None
@@ -303,24 +264,20 @@ class NewsSearchResult(BaseModel):
         None,
         description='List of Legal Entity Identifier of the company releated to the News.',
     )
-    CompanyName: Optional[List[str]] = Field(
-        None, description='List of CompanyNames related to the News.'
-    )
+    CompanyName: Optional[List[str]] = Field(None, description='List of CompanyNames related to the News.')
     LNGI: Optional[List[LexisNexisGlobalIdentifier]] = None
     SearchWithinResults: Optional[str] = Field(
         None,
-        description="SearchWithinResults which is used to further narrow down the results after the initial search. "
-                    "This property is typically only used for filtering, and won't be populated in the search results.",
+        description='SearchWithinResults which is used to further narrow down the results after the initial search. '
+        "This property is typically only used for filtering, and won't be populated in the search results.",
     )
     Exclusions: Optional[str] = Field(
         None,
-        description="The Exclusions of the News. This property is typically only used for filtering, "
-                    "and won't be populated in the search results.",
+        description="The Exclusions of the News. This property is typically only used for filtering, and won't be populated in the search results.",
     )
     ResultId: Optional[str] = Field(
         None,
-        description='The search result identifier.  This will typically also be the identity of the document '
-                    'associated with this search result.',
+        description='The search result identifier.  This will typically also be the identity of the document associated with this search result.',
     )
     SearchType: SearchTypeEnum | None = None
     Source: Optional[SourceObj] = None
@@ -330,14 +287,12 @@ class NewsSearchResult(BaseModel):
     Keyword: Optional[str] = Field(
         None,
         description='A keyword which is used to refine the search.  Search terms should typically be entered '
-                    'using the $search query string parameter, and the set of available keywords is returned in '
-                    'the PostFilter collection.',
+        'using the $search query string parameter, and the set of available keywords is returned in '
+        'the PostFilter collection.',
     )
     PostFilters: Optional[List[NewsPostFilter]] = None
     AppliedPostFilter: Optional[List[AppliedPostFilterObj]] = None
-    Title: Optional[str] = Field(
-        None, description="The title of the search result's document."
-    )
+    Title: Optional[str] = Field(None, description="The title of the search result's document.")
     DocumentContent_odata_mediaContentType: Optional[str] = Field(
         None,
         alias='DocumentContent@odata.mediaContentType',
@@ -348,9 +303,7 @@ class NewsSearchResult(BaseModel):
         alias='DocumentContent@odata.mediaReadLink',
         description='A reference to the content of the document associated with this search result.',
     )
-    Overview: Optional[str] = Field(
-        None, description='Contains the overview of the contents within the document.'
-    )
+    Overview: Optional[str] = Field(None, description='Contains the overview of the contents within the document.')
     Extracts: Optional[List[SummaryDetails]] = None
     IsCitationMatch: Optional[bool] = Field(
         None,

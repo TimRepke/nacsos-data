@@ -25,10 +25,10 @@ MAX_SLOP = 0.02
 # TODO: do full cross-join incl self deduplication
 # TODO: go beyond text matching; also use other checks
 
+
 # Datasets to match
 # Assuming you have some sort of index (first entry in each tuple) and text (second entry in tuple)
-def left_join(data_a: list[tuple[str, str]],
-              data_b: list[tuple[str, str]]) -> tuple[dict[str, list[str]], list[str], list[str]]:
+def left_join(data_a: list[tuple[str, str]], data_b: list[tuple[str, str]]) -> tuple[dict[str, list[str]], list[str], list[str]]:
     from sklearn.feature_extraction.text import CountVectorizer
     import pynndescent
 

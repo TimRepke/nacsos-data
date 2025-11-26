@@ -17,21 +17,21 @@ def itm2txt(r: object) -> str:
 
 
 def preprocess_text(x: str | None) -> str:
-    '''
+    """
     Preprocesses text by removing html tags (like <sub> <sup>) and lowering the case
     :param x: a string to be preprocessed
     :return: preprocessed string
-    '''
+    """
     return re.sub(CLEAN_HTML, '', str(x)).lower()
 
 
 def tokenise_text(txt: str | None, lowercase: bool = True, max_tokens: int = 80) -> list[str]:
-    '''
+    """
     :param txt: a text string to be tokenized
     :param lowercase: lowercase or not, no reasons why not normally
     :param max_tokens: only return the first max_tokens tokens (to deal with truncated abstracts)
     :return: a list of tokens
-    '''
+    """
     if txt is None:
         return []
     if lowercase:

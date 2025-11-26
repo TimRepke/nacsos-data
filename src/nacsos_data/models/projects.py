@@ -45,12 +45,19 @@ class ProjectModel(BaseModel):
 
 ProjectPermission = Literal[
     'owner',
-    'dataset_read', 'dataset_edit',
-    'imports_read', 'imports_edit',
-    'annotations_read', 'annotations_edit', 'annotations_prio',
-    'pipelines_read', 'pipelines_edit',
-    'artefacts_read', 'artefacts_edit',
-    'search_dimensions', 'search_oa'
+    'dataset_read',
+    'dataset_edit',
+    'imports_read',
+    'imports_edit',
+    'annotations_read',
+    'annotations_edit',
+    'annotations_prio',
+    'pipelines_read',
+    'pipelines_edit',
+    'artefacts_read',
+    'artefacts_edit',
+    'search_dimensions',
+    'search_oa',
 ]
 
 
@@ -64,6 +71,7 @@ class ProjectPermissionsModel(BaseModel):
     It is assumed, that a user can always see and edit their own contributions (e.g. annotations) but
     by giving them permission to view annotations, they can also see other users' annotations.
     """
+
     # Unique identifier for this set of permissions
     project_permission_id: str | UUID | None = None
 
@@ -117,12 +125,23 @@ class ProjectPermissionsModel(BaseModel):
 
     @classmethod
     def get_virtual_admin(cls, project_id: str | uuid.UUID, user_id: str | uuid.UUID) -> 'ProjectPermissionsModel':
-        return cls(project_permission_id=None, project_id=project_id,
-                   user_id=user_id, owner=True,
-                   dataset_read=True, dataset_edit=True,
-                   imports_read=True, imports_edit=True,
-                   annotations_read=True, annotations_edit=True, annotations_prio=True,
-                   pipelines_read=True, pipelines_edit=True,
-                   artefacts_read=True, artefacts_edit=True,
-                   search_oa=True, search_dimensions=True,
-                   import_limit_oa=10000)
+        return cls(
+            project_permission_id=None,
+            project_id=project_id,
+            user_id=user_id,
+            owner=True,
+            dataset_read=True,
+            dataset_edit=True,
+            imports_read=True,
+            imports_edit=True,
+            annotations_read=True,
+            annotations_edit=True,
+            annotations_prio=True,
+            pipelines_read=True,
+            pipelines_edit=True,
+            artefacts_read=True,
+            artefacts_edit=True,
+            search_oa=True,
+            search_dimensions=True,
+            import_limit_oa=10000,
+        )

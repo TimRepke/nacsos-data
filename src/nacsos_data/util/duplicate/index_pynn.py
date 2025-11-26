@@ -28,13 +28,14 @@ class DuplicateIndex:
     # Number of candidates to look at during query time
     N_CANDIDATES = 5
 
-    def __init__(self,
-                 existing_items: AsyncGenerator[list[ItemEntry], None],
-                 new_items: Generator[ItemEntry, None, None],
-                 vectoriser: CountVectorizer | None = None,
-                 max_slop: float = 0.02,
-                 batch_size: int = 10000):
-
+    def __init__(
+        self,
+        existing_items: AsyncGenerator[list[ItemEntry], None],
+        new_items: Generator[ItemEntry, None, None],
+        vectoriser: CountVectorizer | None = None,
+        max_slop: float = 0.02,
+        batch_size: int = 10000,
+    ):
         self.existing_items = existing_items
         self.new_items = new_items
         self.max_slop = max_slop
@@ -52,15 +53,13 @@ class DuplicateIndex:
 
         self.saved: dict[str, str] = {}
 
-    async def _load_vectors_batched_async(self, generator: AsyncGenerator[list[ItemEntry], None]) \
-            -> AsyncGenerator[tuple[list[str], csr_matrix], None]:
+    async def _load_vectors_batched_async(self, generator: AsyncGenerator[list[ItemEntry], None]) -> AsyncGenerator[tuple[list[str], csr_matrix], None]:
         async for batch in generator:
             logger.debug(f'Received batch with {len(batch)} entries.')
             item_ids = [str(r.item_id) for r in batch]
             texts = [r.text.lower() for r in batch]
 
-            if not hasattr(self.vectoriser, 'vocabulary') and not hasattr(self.vectoriser, 'vocabulary_') and len(
-                    texts) > self.MIN_DF:
+            if not hasattr(self.vectoriser, 'vocabulary') and not hasattr(self.vectoriser, 'vocabulary_') and len(texts) > self.MIN_DF:
                 logger.debug('Vectoriser has no vocabulary, fitting it now on the first batch.')
                 self.vectoriser.fit(texts)
 
@@ -68,8 +67,7 @@ class DuplicateIndex:
 
             yield item_ids, vectors
 
-    def _load_vectors_sync(self, generator: Generator[ItemEntry, None, None]) \
-            -> Generator[tuple[list[str], csr_matrix], None, None]:
+    def _load_vectors_sync(self, generator: Generator[ItemEntry, None, None]) -> Generator[tuple[list[str], csr_matrix], None, None]:
         for bi, batch in enumerate(batched(generator, batch_size=self.batch_size)):
             logger.debug(f'Received batch with {len(batch)} entries.')
             item_ids = [str(r.item_id) for r in batch]
@@ -103,14 +101,12 @@ class DuplicateIndex:
         logger.info('Loading items from new source...')
         nw_data = list(self._load_vectors_sync(self.new_items))
 
-        self.item_ids_nw = {r: i + offset for i, r in
-                            enumerate(bid for batch_ids, _ in nw_data for bid in batch_ids)}
+        self.item_ids_nw = {r: i + offset for i, r in enumerate(bid for batch_ids, _ in nw_data for bid in batch_ids)}
         self.item_ids_nw_inv = {v: k for k, v in self.item_ids_nw.items()}
         logger.info(f'Found {len(self.item_ids_nw):,} ({len(nw_data):,}) documents in the file.')
 
         logger.info('Constructing nearest neighbour lookup...')
-        vectors = vstack([batch_vectors for _, batch_vectors in db_data]
-                         + [batch_vectors for _, batch_vectors in nw_data])
+        vectors = vstack([batch_vectors for _, batch_vectors in db_data] + [batch_vectors for _, batch_vectors in nw_data])
         # Using Jaccard dissimilarity, defined as: 1 - (token set intersection divided by token set union)
         logger.info(f'document-word matrix has shape: {vectors.shape}')
         self.index = pynndescent.NNDescent(vectors, metric='jaccard')

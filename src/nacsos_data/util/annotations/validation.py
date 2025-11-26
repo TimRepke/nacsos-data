@@ -12,18 +12,16 @@ from nacsos_data.models.annotations import (
     FlatLabelChoice,
     FlatLabel,
     Label,
-    AnnotationValue
+    AnnotationValue,
 )
 from nacsos_data.models.bot_annotations import ResolutionMatrix, ResolutionCell  # noqa: F401
 
 logger = logging.getLogger('nacsos_data.annotation.validation')
 
 
-def labels_from_scheme(scheme: AnnotationSchemeModel,
-                       ignore_hierarchy: bool = False,
-                       ignore_repeat: bool = False,
-                       keys: list[str] | None = None,
-                       repeats: list[int] | None = None) -> list[FlatLabel]:
+def labels_from_scheme(
+    scheme: AnnotationSchemeModel, ignore_hierarchy: bool = False, ignore_repeat: bool = False, keys: list[str] | None = None, repeats: list[int] | None = None
+) -> list[FlatLabel]:
     """
     This method generates all possible label paths from the annotation scheme.
     It respects the applied filters to exclude paths that would not exist under these conditions.
@@ -37,11 +35,9 @@ def labels_from_scheme(scheme: AnnotationSchemeModel,
     """
     run = 0
 
-    def recurse(labels: list[AnnotationSchemeLabel],
-                prefix: list[Label],
-                parent: int | None = None,
-                parent_key: str | None = None,
-                parent_value: int | None = None) -> list[FlatLabel]:
+    def recurse(
+        labels: list[AnnotationSchemeLabel], prefix: list[Label], parent: int | None = None, parent_key: str | None = None, parent_value: int | None = None
+    ) -> list[FlatLabel]:
         nonlocal run
         ret = []
         for label in labels:
@@ -53,21 +49,23 @@ def labels_from_scheme(scheme: AnnotationSchemeModel,
                     if keys is None or label.key in keys:
                         run += 1
                         path = [Label(key=label.key, repeat=repeat + 1)] + prefix
-                        ret.append(FlatLabel(path=path,
-                                             path_key=path_to_string(path),
-                                             repeat=repeat + 1,
-                                             parent_int=parent,
-                                             parent_key=parent_key,
-                                             parent_value=parent_value,
-                                             name=label.name,
-                                             hint=label.hint,
-                                             key=label.key,
-                                             required=label.required,
-                                             max_repeat=label.max_repeat,
-                                             kind=label.kind,
-                                             choices=[FlatLabelChoice(**c.model_dump())
-                                                      for c in label.choices]
-                                             if label.choices is not None else None))
+                        ret.append(
+                            FlatLabel(
+                                path=path,
+                                path_key=path_to_string(path),
+                                repeat=repeat + 1,
+                                parent_int=parent,
+                                parent_key=parent_key,
+                                parent_value=parent_value,
+                                name=label.name,
+                                hint=label.hint,
+                                key=label.key,
+                                required=label.required,
+                                max_repeat=label.max_repeat,
+                                kind=label.kind,
+                                choices=[FlatLabelChoice(**c.model_dump()) for c in label.choices] if label.choices is not None else None,
+                            )
+                        )
                     if label.choices and (ignore_hierarchy or keys is None or label.key in keys):
                         next_parent = run - 1
                         for choice in label.choices:
@@ -76,11 +74,13 @@ def labels_from_scheme(scheme: AnnotationSchemeModel,
                                     next_prefix = [Label(key=label.key, repeat=repeat + 1, value=choice.value)]
                                 else:
                                     next_prefix = []
-                                sublabels = recurse(labels=choice.children,
-                                                    prefix=next_prefix + prefix,
-                                                    parent=next_parent,
-                                                    parent_key=path_to_string(next_prefix + prefix),
-                                                    parent_value=choice.value)
+                                sublabels = recurse(
+                                    labels=choice.children,
+                                    prefix=next_prefix + prefix,
+                                    parent=next_parent,
+                                    parent_key=path_to_string(next_prefix + prefix),
+                                    parent_value=choice.value,
+                                )
                                 ret += sublabels
         return ret
 
@@ -92,8 +92,7 @@ def path_to_string(path: list[Label]) -> str:
     return '|'.join([f'{pl.key}-{pl.repeat}' for pl in path])
 
 
-def resolve_bot_annotation_parents(annotation_map: ResolutionMatrix,
-                                   label_map: dict[str, FlatLabel]) -> ResolutionMatrix:
+def resolve_bot_annotation_parents(annotation_map: ResolutionMatrix, label_map: dict[str, FlatLabel]) -> ResolutionMatrix:
     # Loop to back-fill parent_ids
     # NOTICE: This does *not* check for validity!
     #         (e.g. the parent might have been resolved to a choice where the current sub-label is not a child)
@@ -109,14 +108,14 @@ def resolve_bot_annotation_parents(annotation_map: ResolutionMatrix,
                         cell.resolution.parent = parent.bot_annotation_id
                     else:
                         logger.debug(  # type: ignore[unreachable]
-                            f'Looks like I have no parent for {row_key} -> {label_key}')
+                            f'Looks like I have no parent for {row_key} -> {label_key}'
+                        )
     return annotation_map
 
 
-def scheme_flattening_recursion(labels: list[AnnotationSchemeLabel],
-                                parent_choice: int | None = None,
-                                parent_label: str | None = None,
-                                parent_repeat: int = 1) -> list[FlattenedAnnotationSchemeLabel]:
+def scheme_flattening_recursion(
+    labels: list[AnnotationSchemeLabel], parent_choice: int | None = None, parent_label: str | None = None, parent_repeat: int = 1
+) -> list[FlattenedAnnotationSchemeLabel]:
     ret = []
 
     choices: list[AnnotationSchemeLabelChoiceFlat] | None
@@ -126,35 +125,36 @@ def scheme_flattening_recursion(labels: list[AnnotationSchemeLabel],
         else:
             choices = []
             for choice in label.choices:
-                choices.append(AnnotationSchemeLabelChoiceFlat(name=choice.name,
-                                                               hint=choice.hint,
-                                                               value=choice.value))
+                choices.append(AnnotationSchemeLabelChoiceFlat(name=choice.name, hint=choice.hint, value=choice.value))
                 if choice.children is not None:
-                    ret += scheme_flattening_recursion(choice.children,
-                                                       parent_choice=choice.value,
-                                                       parent_label=label.key,
-                                                       parent_repeat=label.max_repeat)
+                    ret += scheme_flattening_recursion(choice.children, parent_choice=choice.value, parent_label=label.key, parent_repeat=label.max_repeat)
 
-        ret.append(FlattenedAnnotationSchemeLabel(key=label.key,
-                                                  name=label.name,
-                                                  hint=label.hint,
-                                                  required=label.required,
-                                                  max_repeat=label.max_repeat,
-                                                  implicit_max_repeat=label.max_repeat * parent_repeat,
-                                                  kind=label.kind,
-                                                  choices=choices,
-                                                  parent_label=parent_label,
-                                                  parent_choice=parent_choice))
+        ret.append(
+            FlattenedAnnotationSchemeLabel(
+                key=label.key,
+                name=label.name,
+                hint=label.hint,
+                required=label.required,
+                max_repeat=label.max_repeat,
+                implicit_max_repeat=label.max_repeat * parent_repeat,
+                kind=label.kind,
+                choices=choices,
+                parent_label=parent_label,
+                parent_choice=parent_choice,
+            )
+        )
 
     return ret
 
 
 def flatten_annotation_scheme(annotation_scheme: AnnotationSchemeModel) -> AnnotationSchemeModelFlat:
-    return AnnotationSchemeModelFlat(annotation_scheme_id=annotation_scheme.annotation_scheme_id,
-                                     project_id=annotation_scheme.project_id,
-                                     name=annotation_scheme.name,
-                                     description=annotation_scheme.description,
-                                     labels=scheme_flattening_recursion(annotation_scheme.labels))
+    return AnnotationSchemeModelFlat(
+        annotation_scheme_id=annotation_scheme.annotation_scheme_id,
+        project_id=annotation_scheme.project_id,
+        name=annotation_scheme.name,
+        description=annotation_scheme.description,
+        labels=scheme_flattening_recursion(annotation_scheme.labels),
+    )
 
 
 AnnotationModelLookupType = dict[str, list[AnnotationModel]]
@@ -173,15 +173,13 @@ def create_annotations_lookup(annotations: list[AnnotationModel]) -> AnnotationM
     return annotations_map
 
 
-def validate_annotated_assignment(annotation_scheme: AnnotationSchemeModel,
-                                  annotations: list[AnnotationModel]) -> AssignmentStatus:
+def validate_annotated_assignment(annotation_scheme: AnnotationSchemeModel, annotations: list[AnnotationModel]) -> AssignmentStatus:  # noqa: C901
     if annotations is None or len(annotations) == 0:
         return AssignmentStatus.OPEN
 
     annotations_map = create_annotations_lookup(annotations)
 
-    def recurse(labels: list[AnnotationSchemeLabel], repeat: int = 1, parent: str | UUID | None = None) \
-            -> AssignmentStatus:
+    def recurse(labels: list[AnnotationSchemeLabel], repeat: int = 1, parent: str | UUID | None = None) -> AssignmentStatus:
         status = AssignmentStatus.FULL
 
         for label in labels:
@@ -195,9 +193,7 @@ def validate_annotated_assignment(annotation_scheme: AnnotationSchemeModel,
                         cnt += 1
                         for _ci, choice in enumerate(label.choices or []):
                             if choice.children is not None and choice.value == annotation.value_int:
-                                child_state = recurse(choice.children,
-                                                      repeat=repeat,
-                                                      parent=annotation.annotation_id)
+                                child_state = recurse(choice.children, repeat=repeat, parent=annotation.annotation_id)
                                 if child_state != AssignmentStatus.FULL:
                                     status = child_state
                 if label.required and cnt == 0:
@@ -211,15 +207,13 @@ def validate_annotated_assignment(annotation_scheme: AnnotationSchemeModel,
     return recurse(annotation_scheme.labels)
 
 
-def merge_scheme_and_annotations(annotation_scheme: AnnotationSchemeModel,
-                                 annotations: list[AnnotationModel]) -> AnnotationSchemeModel:
+def merge_scheme_and_annotations(annotation_scheme: AnnotationSchemeModel, annotations: list[AnnotationModel]) -> AnnotationSchemeModel:
     if annotations is None or len(annotations) == 0:
         return annotation_scheme
 
     annotations_map = create_annotations_lookup(annotations)
 
-    def recurse(labels: list[AnnotationSchemeLabel], repeat: int = 1, parent: str | UUID | None = None) \
-            -> list[AnnotationSchemeLabel]:
+    def recurse(labels: list[AnnotationSchemeLabel], repeat: int = 1, parent: str | UUID | None = None) -> list[AnnotationSchemeLabel]:
         ret = []
 
         for label in labels:
@@ -235,9 +229,7 @@ def merge_scheme_and_annotations(annotation_scheme: AnnotationSchemeModel,
 
                         for _ci, choice in enumerate(label_cpy.choices or []):
                             if choice.children is not None:
-                                choice.children = recurse(choice.children,
-                                                          repeat=repeat,
-                                                          parent=annotation.annotation_id)
+                                choice.children = recurse(choice.children, repeat=repeat, parent=annotation.annotation_id)
                         ret.append(label_cpy)
         return ret
 
@@ -246,28 +238,33 @@ def merge_scheme_and_annotations(annotation_scheme: AnnotationSchemeModel,
 
 
 def has_annotation(label: AnnotationSchemeLabel) -> bool:
-    return label.annotation is not None \
-        and (label.annotation.value_int is not None
-             or label.annotation.value_str is not None
-             or label.annotation.value_bool is not None
-             or label.annotation.value_float is not None
-             or (label.annotation.multi_int is not None and len(label.annotation.multi_int) > 0))
+    return label.annotation is not None and (
+        label.annotation.value_int is not None
+        or label.annotation.value_str is not None
+        or label.annotation.value_bool is not None
+        or label.annotation.value_float is not None
+        or (label.annotation.multi_int is not None and len(label.annotation.multi_int) > 0)
+    )
 
 
 def has_values(anno: AnnotationValue) -> bool:
-    return (anno.value_int is not None
-            or anno.value_bool is not None
-            or anno.value_float is not None
-            or anno.value_str is not None
-            or (anno.multi_int is not None and len(anno.multi_int) > 0))
+    return (
+        anno.value_int is not None
+        or anno.value_bool is not None
+        or anno.value_float is not None
+        or anno.value_str is not None
+        or (anno.multi_int is not None and len(anno.multi_int) > 0)
+    )
 
 
 def same_values(anno_a: AnnotationValue, anno_b: AnnotationValue) -> bool:
-    return (anno_a.value_int == anno_b.value_int
-            and anno_a.value_str == anno_b.value_str
-            and anno_a.value_float == anno_b.value_float
-            and anno_a.value_bool == anno_b.value_bool
-            and (set(anno_a.multi_int or []) == set(anno_b.multi_int or [])))
+    return (
+        anno_a.value_int == anno_b.value_int
+        and anno_a.value_str == anno_b.value_str
+        and anno_a.value_float == anno_b.value_float
+        and anno_a.value_bool == anno_b.value_bool
+        and (set(anno_a.multi_int or []) == set(anno_b.multi_int or []))
+    )
 
 
 def annotated_scheme_to_annotations(scheme: AnnotationSchemeModel) -> list[AnnotationModel]:

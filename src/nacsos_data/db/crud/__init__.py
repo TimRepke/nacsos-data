@@ -16,8 +16,7 @@ M = TypeVar('M', bound=BaseModel)
 
 
 @ensure_session_async
-async def update_orm(session: DBSession, updated_model: BaseModel, Model: Type[M], Schema: Type[Base],
-                     filter_by: dict[str, Any], skip_update: list[str]) -> M:
+async def update_orm(session: DBSession, updated_model: BaseModel, Model: Type[M], Schema: Type[Base], filter_by: dict[str, Any], skip_update: list[str]) -> M:
     stmt = select(Schema).filter_by(**filter_by)
     orm_model = (await session.execute(stmt)).scalars().one_or_none()
     if orm_model is not None:
@@ -33,9 +32,7 @@ async def update_orm(session: DBSession, updated_model: BaseModel, Model: Type[M
 
 
 @ensure_session_async
-async def upsert_orm(session: DBSession,
-                     upsert_model: BaseModel, Schema: Type[S], primary_key: str,
-                     skip_update: list[str] | None = None) -> str | UUID | None:
+async def upsert_orm(session: DBSession, upsert_model: BaseModel, Schema: Type[S], primary_key: str, skip_update: list[str] | None = None) -> str | UUID | None:
     # returns id of inserted or updated assignment scope
     logger.debug(f'UPSERT "{Schema}" with keys: {list(upsert_model.model_dump().keys())}')
 
@@ -50,8 +47,7 @@ async def upsert_orm(session: DBSession,
         stmt = select(Schema).filter_by(**{primary_key: p_key})
         orm_model: S | None = (await session.scalars(stmt)).one_or_none()
 
-        logger.debug(f'"{Schema}" with {primary_key}={p_key} found, '
-                     f'attempting to UPDATE!')
+        logger.debug(f'"{Schema}" with {primary_key}={p_key} found, attempting to UPDATE!')
 
         # check if it actually already exists in the database
         # if so, update all fields and commit
@@ -68,8 +64,7 @@ async def upsert_orm(session: DBSession,
         # else: does not exist, create item
         # TODO: would it be a better behaviour to raise an error if key does not exist?
 
-    logger.debug(f'"{Schema}" with {primary_key}={p_key} does not exist yet, '
-                 f'attempting to INSERT!')
+    logger.debug(f'"{Schema}" with {primary_key}={p_key} does not exist yet, attempting to INSERT!')
     orm_model = Schema(**upsert_model.model_dump())
     session.add(orm_model)
     await session.flush_or_commit()

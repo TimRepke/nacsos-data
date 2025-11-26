@@ -42,9 +42,17 @@ class DatabaseEngineAsync:
     It handles the connection, engine, and session.
     """
 
-    def __init__(self, host: str, port: int, user: str, password: str,
-                 database: str = 'nacsos_core', debug: bool = False,
-                 kw_engine: dict[str, Any] | None = None, kw_session: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        user: str,
+        password: str,
+        database: str = 'nacsos_core',
+        debug: bool = False,
+        kw_engine: dict[str, Any] | None = None,
+        kw_session: dict[str, Any] | None = None,
+    ):
         self._host = host
         self._port = port
         self._user = user
@@ -59,20 +67,25 @@ class DatabaseEngineAsync:
             port=self._port,
             database=self._database,
         )
-        self.engine = create_async_engine(self._connection_str, **{
-            'echo': debug,
-            'future': True,
-            'json_serializer': DictLikeEncoder().encode,
-            **(kw_engine or {}),
-        })
-        self._session: async_sessionmaker[AsyncSession] = async_sessionmaker(**{
-            'bind': self.engine,
-            'autoflush': False,
-            'autocommit': False,
-            'expire_on_commit': True,
-            'class_': DBSession,
-            **(kw_session or {}),
-        })
+        self.engine = create_async_engine(
+            self._connection_str,
+            **{
+                'echo': debug,
+                'future': True,
+                'json_serializer': DictLikeEncoder().encode,
+                **(kw_engine or {}),
+            },
+        )
+        self._session: async_sessionmaker[AsyncSession] = async_sessionmaker(
+            **{
+                'bind': self.engine,
+                'autoflush': False,
+                'autocommit': False,
+                'expire_on_commit': True,
+                'class_': DBSession,
+                **(kw_session or {}),
+            }
+        )
 
     async def startup(self) -> None:
         """
@@ -94,6 +107,7 @@ class DatabaseEngineAsync:
 
         if logger.isEnabledFor(logging.DEBUG):
             import inspect
+
             curframe = inspect.currentframe()
             calframe = inspect.getouterframes(curframe, 2)
             logger.debug('New session for: ' + ' <- '.join([fr[3] for fr in calframe[2:6]]))
@@ -114,8 +128,7 @@ class DatabaseEngine:
     It handles the connection, engine, and session.
     """
 
-    def __init__(self, host: str, port: int, user: str, password: str,
-                 database: str = 'nacsos_core', debug: bool = False):
+    def __init__(self, host: str, port: int, user: str, password: str, database: str = 'nacsos_core', debug: bool = False):
         self._host = host
         self._port = port
         self._user = user
@@ -130,8 +143,7 @@ class DatabaseEngine:
             port=self._port,
             database=self._database,
         )
-        self.engine = create_engine(self._connection_str, echo=debug, future=True,
-                                    json_serializer=DictLikeEncoder().encode)
+        self.engine = create_engine(self._connection_str, echo=debug, future=True, json_serializer=DictLikeEncoder().encode)
         self._session: sessionmaker[Session] = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
 
     def startup(self) -> None:
@@ -173,13 +185,15 @@ def flush_or_commit(session: AsyncSession, use_commit: bool) -> CommitFunc:
 
 
 class DBSession(AsyncSession):
-    def __init__(self,
-                 bind: Any | None = None,
-                 *,
-                 binds: dict[str, Any] | None = None,
-                 sync_session_class: Type[Session] | None = None,
-                 use_commit: bool = False,
-                 **kw: Any):
+    def __init__(
+        self,
+        bind: Any | None = None,
+        *,
+        binds: dict[str, Any] | None = None,
+        sync_session_class: Type[Session] | None = None,
+        use_commit: bool = False,
+        **kw: Any,
+    ):
         super().__init__(bind=bind, binds=binds, sync_session_class=sync_session_class)  # type: ignore[arg-type]
         self.use_commit = use_commit
 
@@ -195,9 +209,7 @@ DBConnection: TypeAlias = AsyncConnection | AsyncSession | DBSession
 
 def ensure_connection_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awaitable[R]]:
     @wraps(func)
-    async def wrapper(*args: Any,
-                      connection: DatabaseEngineAsync | AsyncConnection | AsyncSession | DBSession,
-                      **kwargs: dict[str, Any]) -> R:
+    async def wrapper(*args: Any, connection: DatabaseEngineAsync | AsyncConnection | AsyncSession | DBSession, **kwargs: dict[str, Any]) -> R:
         if isinstance(connection, AsyncConnection):
             return await func(*args, db_conn=connection, **kwargs)
 
@@ -224,12 +236,14 @@ def ensure_connection_async(func: Callable[..., Awaitable[R]]) -> Callable[..., 
 
 def ensure_session_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awaitable[R]]:
     @wraps(func)
-    async def wrapper(*args: Any,
-                      session: AsyncSession | DBSession | None = None,
-                      db_engine: DatabaseEngineAsync | None = None,
-                      engine: DatabaseEngineAsync | None = None,
-                      use_commit: bool = False,
-                      **kwargs: dict[str, Any]) -> R:
+    async def wrapper(
+        *args: Any,
+        session: AsyncSession | DBSession | None = None,
+        db_engine: DatabaseEngineAsync | None = None,
+        engine: DatabaseEngineAsync | None = None,
+        use_commit: bool = False,
+        **kwargs: dict[str, Any],
+    ) -> R:
         if session is not None:
             # FIXME: In theory, we could give this a normal AsyncSession and a func using `session.flush_or_commit()` would blow up.
             # if isinstance(session, AsyncSession):
@@ -250,10 +264,12 @@ def ensure_session_async(func: Callable[..., Awaitable[R]]) -> Callable[..., Awa
 
 def ensure_session(func):  # type: ignore[no-untyped-def]
     @wraps(func)
-    def wrapper(*args,  # type: ignore[no-untyped-def]
-                session: Session | None = None,
-                db_engine: DatabaseEngine | None = None,
-                **kwargs):
+    def wrapper(
+        *args,  # type: ignore[no-untyped-def]
+        session: Session | None = None,
+        db_engine: DatabaseEngine | None = None,
+        **kwargs,
+    ):
         if session is not None:
             return func(*args, session=session, **kwargs)
         if db_engine is not None:

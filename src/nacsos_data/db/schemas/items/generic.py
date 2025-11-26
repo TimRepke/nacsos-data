@@ -10,9 +10,9 @@ from . import ItemType
 
 class GenericItem(Item):
     __tablename__ = 'generic_item'
-    item_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(Item.item_id, ondelete='CASCADE'),
-                            default=uuid.uuid4, nullable=False, index=True, primary_key=True, unique=True)
+    item_id = mapped_column(
+        UUID(as_uuid=True), ForeignKey(Item.item_id, ondelete='CASCADE'), default=uuid.uuid4, nullable=False, index=True, primary_key=True, unique=True
+    )
 
     # any kind of (json-formatted) meta-data
     #   For project marked as "basic" this information may be shown to the user.

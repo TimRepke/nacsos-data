@@ -23,11 +23,13 @@ def ensure_clean_list(v: list[T] | None) -> list[T] | None:
     return v
 
 
-URLS = re.compile(r'(https://openalex.org/'
-                  r'|https://orcid.org/'
-                  r'|https://doi.org/'
-                  r'|https://www.wikidata.org/wiki/'
-                  r'|https://ror.org/)')
+URLS = re.compile(
+    r'(https://openalex.org/'
+    r'|https://orcid.org/'
+    r'|https://doi.org/'
+    r'|https://www.wikidata.org/wiki/'
+    r'|https://ror.org/)'
+)
 
 
 def strip_url(url: str | None) -> str | None:
@@ -260,6 +262,7 @@ class HostOrganizationSchema(BaseModel, extra='allow'):
     """
     New schema for Walden, replace host_organization in locations.
     """
+
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     display_name: str | None = None
 
@@ -268,6 +271,7 @@ class SourcesLocationsSchema(BaseModel, extra='allow'):
     """
     New schema for Walden, replaces locations.
     """
+
     url: str | None = None
     content_type: str | None = None
 
@@ -276,6 +280,7 @@ class SourcesSchema(BaseModel, extra='allow'):
     """
     New schema for Walden, replaces locations.
     """
+
     native_id: Annotated[str | None, AfterValidator(strip_url)] = None
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     display_name: str | None = None

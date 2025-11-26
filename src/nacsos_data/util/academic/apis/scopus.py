@@ -57,11 +57,10 @@ def translate_authors(record: dict[str, Any]) -> list[AcademicAuthorModel] | Non
 
 
 class ScopusAPI(AbstractAPI):
-
     def fetch_raw(
-            self,
-            query: str,
-            params: dict[str, Any] | None = None,
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         """
         Scopus API wrapper for downloading all records for a given query.
@@ -78,11 +77,9 @@ class ScopusAPI(AbstractAPI):
         if self.api_key is None:
             raise AssertionError('Missing API key!')
 
-        with RequestClient(backoff_rate=self.backoff_rate,
-                           max_req_per_sec=self.max_req_per_sec,
-                           max_retries=self.max_retries,
-                           proxy=self.proxy) as request_client:
-
+        with RequestClient(
+            backoff_rate=self.backoff_rate, max_req_per_sec=self.max_req_per_sec, max_retries=self.max_retries, proxy=self.proxy
+        ) as request_client:
             request_client.on(status=codes.UNAUTHORIZED, func=response_logger(self.logger))
 
             next_cursor = '*'
@@ -101,7 +98,7 @@ class ScopusAPI(AbstractAPI):
                     },
                     headers={
                         'Accept': 'application/json',
-                        "X-ELS-APIKey": self.api_key,
+                        'X-ELS-APIKey': self.api_key,
                     },
                 )
 
@@ -124,10 +121,12 @@ class ScopusAPI(AbstractAPI):
                 yield from entries
 
                 n_records += len(entries)
-                self.logger.debug(f'Found {n_records}/{n_results} records after processing page {n_pages} '
-                                  f'(rate limit = {scopus_requests_limit} '
-                                  f'| remaining = {scopus_requests_remaining} '
-                                  f'| reset = {scopus_requests_reset})')
+                self.logger.debug(
+                    f'Found {n_records}/{n_results} records after processing page {n_pages} '
+                    f'(rate limit = {scopus_requests_limit} '
+                    f'| remaining = {scopus_requests_remaining} '
+                    f'| reset = {scopus_requests_reset})'
+                )
 
     @classmethod
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
@@ -143,7 +142,7 @@ class ScopusAPI(AbstractAPI):
             source=record.get('prism:publicationName'),
             keywords=get_keywords(record),
             authors=translate_authors(record),
-            meta={'scopus-api': clear_empty(record)}
+            meta={'scopus-api': clear_empty(record)},
         )
 
 
@@ -153,5 +152,6 @@ if __name__ == '__main__':
             # 'scratch/academic_apis/response_scopus1.json',
             'scratch/academic_apis/response_scopus2.jsonl',
         ],
-        proxy='socks5://127.0.0.1:1080')
+        proxy='socks5://127.0.0.1:1080',
+    )
     app()

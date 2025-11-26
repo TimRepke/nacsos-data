@@ -11,13 +11,10 @@ class Priority(Base):
     __tablename__ = 'priorities'
 
     # Unique identifier for this task.
-    priority_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                nullable=False, unique=True, index=True)
+    priority_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # Project this task is attached to
-    project_id = mapped_column(UUID(as_uuid=True),
-                               ForeignKey(Project.project_id, ondelete='CASCADE'),
-                               nullable=False, index=True, primary_key=False)
+    project_id = mapped_column(UUID(as_uuid=True), ForeignKey(Project.project_id, ondelete='CASCADE'), nullable=False, index=True, primary_key=False)
 
     # Name of this setup for reference
     name = mapped_column(String, nullable=False, unique=False, index=False)

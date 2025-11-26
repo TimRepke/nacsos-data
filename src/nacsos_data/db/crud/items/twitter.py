@@ -18,12 +18,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger('nacsos-data.crud.twitter')
 
 
-async def import_tweet(tweet: TwitterItemModel,
-                       engine: DatabaseEngineAsync,
-                       project_id: str | UUID | None = None,
-                       import_id: UUID | str | None = None,
-                       import_type: M2MImportItemType | None = None) \
-        -> TwitterItemModel:
+async def import_tweet(
+    tweet: TwitterItemModel,
+    engine: DatabaseEngineAsync,
+    project_id: str | UUID | None = None,
+    import_id: UUID | str | None = None,
+    import_type: M2MImportItemType | None = None,
+) -> TwitterItemModel:
     """
     Get or create Tweet (and optionally keep track of how it ended up in the database)
     1) Will try to find a TwitterItem in the database with tweet.twitter_id and
@@ -50,13 +51,11 @@ async def import_tweet(tweet: TwitterItemModel,
             session.add(orm_tweet)
             await session.flush()
         except IntegrityError:
-            logger.debug(f'Tweet with twitter_id="{orm_tweet.twitter_id}" '
-                         f'already exists in project "{orm_tweet.project_id}".')
+            logger.debug(f'Tweet with twitter_id="{orm_tweet.twitter_id}" already exists in project "{orm_tweet.project_id}".')
             # First, rollback all previously attempted actions (bring transaction to initial state)
             await session.rollback()
 
-            stmt = select(TwitterItem).where(TwitterItem.twitter_id == orm_tweet.twitter_id,
-                                             TwitterItem.project_id == orm_tweet.project_id)
+            stmt = select(TwitterItem).where(TwitterItem.twitter_id == orm_tweet.twitter_id, TwitterItem.project_id == orm_tweet.project_id)
             # FIXME: mypy "Optional[TwitterItem]", variable has type "TwitterItem"
             orm_tweet = (await session.execute(stmt)).scalars().one_or_none()  # type: ignore[assignment]
 
@@ -64,8 +63,7 @@ async def import_tweet(tweet: TwitterItemModel,
             raise RuntimeError('Failed in unclear state, undetermined tweet!')
 
         if import_id is not None:
-            stmt_m2m = insert(m2m_import_item_table) \
-                .values(item_id=orm_tweet.item_id, import_id=import_id, type=import_type)
+            stmt_m2m = insert(m2m_import_item_table).values(item_id=orm_tweet.item_id, import_id=import_id, type=import_type)
             try:
                 await session.execute(stmt_m2m)
             except IntegrityError:
@@ -77,29 +75,32 @@ async def import_tweet(tweet: TwitterItemModel,
         return TwitterItemModel.model_validate(orm_tweet.__dict__)
 
 
-async def import_tweets(tweets: list[TwitterItemModel], engine: DatabaseEngineAsync,
-                        project_id: str | UUID | None = None, import_id: str | UUID | None = None) \
-        -> list[str | UUID]:
+async def import_tweets(
+    tweets: list[TwitterItemModel], engine: DatabaseEngineAsync, project_id: str | UUID | None = None, import_id: str | UUID | None = None
+) -> list[str | UUID]:
     # FIXME: mypy List comprehension has incompatible type List[Union[str, UUID, None]]; expected List[Union[str, UUID]]
-    return [(await import_tweet(tweet, engine=engine,  # type: ignore[misc]
-                                project_id=project_id, import_id=import_id)).item_id
-            for tweet in tweets]
+    return [
+        (
+            await import_tweet(
+                tweet,
+                engine=engine,  # type: ignore[misc]
+                project_id=project_id,
+                import_id=import_id,
+            )
+        ).item_id
+        for tweet in tweets
+    ]
 
 
-async def read_all_twitter_items_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) \
-        -> list[TwitterItemModel]:
-    tweets: list[TwitterItemModel] = await read_all_for_project(project_id=project_id,
-                                                                Schema=TwitterItem, Model=TwitterItemModel,
-                                                                engine=engine)
+async def read_all_twitter_items_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) -> list[TwitterItemModel]:
+    tweets: list[TwitterItemModel] = await read_all_for_project(project_id=project_id, Schema=TwitterItem, Model=TwitterItemModel, engine=engine)
     return tweets
 
 
-async def read_all_twitter_items_for_project_paged(project_id: str | UUID, page: int, page_size: int,
-                                                   engine: DatabaseEngineAsync) -> list[TwitterItemModel]:
-    tweets: list[TwitterItemModel] = await read_paged_for_project(project_id=project_id,
-                                                                  page=page, page_size=page_size,
-                                                                  Schema=TwitterItem, Model=TwitterItemModel,
-                                                                  engine=engine)
+async def read_all_twitter_items_for_project_paged(project_id: str | UUID, page: int, page_size: int, engine: DatabaseEngineAsync) -> list[TwitterItemModel]:
+    tweets: list[TwitterItemModel] = await read_paged_for_project(
+        project_id=project_id, page=page, page_size=page_size, Schema=TwitterItem, Model=TwitterItemModel, engine=engine
+    )
     return tweets
 
 
@@ -112,23 +113,19 @@ async def read_twitter_item_by_item_id(item_id: str | UUID, engine: DatabaseEngi
     return None
 
 
-async def read_twitter_item_by_twitter_id(twitter_id: str, project_id: str,
-                                          engine: DatabaseEngineAsync) -> TwitterItemModel | None:
+async def read_twitter_item_by_twitter_id(twitter_id: str, project_id: str, engine: DatabaseEngineAsync) -> TwitterItemModel | None:
     session: AsyncSession
     async with engine.session() as session:
-        stmt = select(TwitterItem).where(TwitterItem.twitter_id == twitter_id,
-                                         TwitterItem.project_id == project_id)
+        stmt = select(TwitterItem).where(TwitterItem.twitter_id == twitter_id, TwitterItem.project_id == project_id)
         result = (await session.execute(stmt)).scalars().one_or_none()
         if result is not None:
             return TwitterItemModel.model_validate(result.__dict__)
     return None
 
 
-async def read_twitter_items_by_author_id(twitter_author_id: str, project_id: str,
-                                          engine: DatabaseEngineAsync) -> list[TwitterItemModel]:
+async def read_twitter_items_by_author_id(twitter_author_id: str, project_id: str, engine: DatabaseEngineAsync) -> list[TwitterItemModel]:
     session: AsyncSession
     async with engine.session() as session:
-        stmt = select(TwitterItem).where(TwitterItem.twitter_author_id == twitter_author_id,
-                                         TwitterItem.project_id == project_id)
+        stmt = select(TwitterItem).where(TwitterItem.twitter_author_id == twitter_author_id, TwitterItem.project_id == project_id)
         result = (await session.execute(stmt)).scalars().all()
         return [TwitterItemModel(**res.__dict__) for res in result]

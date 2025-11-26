@@ -16,27 +16,91 @@ from nacsos_data.models.items.lexis_nexis import NewsSearchResult
 logger = logging.getLogger('nacsos_data.util.LexisNexis')
 
 ContentType = Literal[
-    'News', 'LegalNews', 'CompanyAndFinancial', 'SecondaryMaterials',
-    'Cases', 'CodeRegulations', 'Directories', 'Dockets', 'Forms', 'StatuteLegislations'
+    'News', 'LegalNews', 'CompanyAndFinancial', 'SecondaryMaterials', 'Cases', 'CodeRegulations', 'Directories', 'Dockets', 'Forms', 'StatuteLegislations'
 ]
 
 Select = Literal[
-    'Jurisdiction', 'Location', 'ContentType', 'Byline', 'WordLength', 'WebNewsUrl', 'Geography', 'NegativeNews',
-    'Language', 'Industry', 'People', 'Subject', 'Section', 'Company', 'PublicationType', 'Publisher', 'Document',
-    'GroupDuplicates', 'SimilarDocuments', 'InternationalLocation', 'LEI', 'CompanyName', 'LNGI', 'SearchWithinResults',
-    'Exclusions', 'ResultId', 'SearchType', 'Source', 'Topic', 'PracticeArea', 'Date', 'Keyword', 'PostFilters',
-    'AppliedPostFilter', 'Title', 'DocumentContent', 'Overview', 'Extracts', 'IsCitationMatch', 'SourcePath'
+    'Jurisdiction',
+    'Location',
+    'ContentType',
+    'Byline',
+    'WordLength',
+    'WebNewsUrl',
+    'Geography',
+    'NegativeNews',
+    'Language',
+    'Industry',
+    'People',
+    'Subject',
+    'Section',
+    'Company',
+    'PublicationType',
+    'Publisher',
+    'Document',
+    'GroupDuplicates',
+    'SimilarDocuments',
+    'InternationalLocation',
+    'LEI',
+    'CompanyName',
+    'LNGI',
+    'SearchWithinResults',
+    'Exclusions',
+    'ResultId',
+    'SearchType',
+    'Source',
+    'Topic',
+    'PracticeArea',
+    'Date',
+    'Keyword',
+    'PostFilters',
+    'AppliedPostFilter',
+    'Title',
+    'DocumentContent',
+    'Overview',
+    'Extracts',
+    'IsCitationMatch',
+    'SourcePath',
 ]
-Expand = Literal[
-    'Document', 'SimilarDocuments', 'Source', 'PostFilters', 'AppliedPostFilter'
-]
+Expand = Literal['Document', 'SimilarDocuments', 'Source', 'PostFilters', 'AppliedPostFilter']
 
 DEFAULT_SELECT: list[Select] = [
-    'Jurisdiction', 'Location', 'ContentType', 'Byline', 'WordLength', 'WebNewsUrl', 'Geography', 'NegativeNews',
-    'Language', 'Industry', 'People', 'Subject', 'Section', 'Company', 'PublicationType', 'Publisher', 'Document',
-    'GroupDuplicates', 'InternationalLocation', 'LEI', 'CompanyName', 'LNGI', 'Exclusions', 'ResultId', 'SearchType',
-    'Source', 'Topic', 'PracticeArea', 'Date', 'Keyword', 'AppliedPostFilter', 'Title', 'DocumentContent', 'Overview',
-    'Extracts', 'IsCitationMatch', 'SourcePath'
+    'Jurisdiction',
+    'Location',
+    'ContentType',
+    'Byline',
+    'WordLength',
+    'WebNewsUrl',
+    'Geography',
+    'NegativeNews',
+    'Language',
+    'Industry',
+    'People',
+    'Subject',
+    'Section',
+    'Company',
+    'PublicationType',
+    'Publisher',
+    'Document',
+    'GroupDuplicates',
+    'InternationalLocation',
+    'LEI',
+    'CompanyName',
+    'LNGI',
+    'Exclusions',
+    'ResultId',
+    'SearchType',
+    'Source',
+    'Topic',
+    'PracticeArea',
+    'Date',
+    'Keyword',
+    'AppliedPostFilter',
+    'Title',
+    'DocumentContent',
+    'Overview',
+    'Extracts',
+    'IsCitationMatch',
+    'SourcePath',
 ]
 SLEEP_TIMES = [
     # 5,  # 5s
@@ -52,7 +116,6 @@ SLEEP_TIMES = [
 
 
 class DelayedKeyboardInterrupt:
-
     def __init__(self) -> None:
         self.signal_received: tuple[int, FrameType | None] | None = None
         self.old_handler: Callable[[int, FrameType | None], Any | int | signal.Handlers | None] | int | None = None
@@ -97,14 +160,16 @@ class LexisNexis:
     ```
     """
 
-    def __init__(self,
-                 client_id: str,
-                 client_secret: str,
-                 progress_file: str | None = None,
-                 output_file: str | None = None,
-                 timeout: float = 30.,
-                 logger_: logging.Logger | None = None,
-                 max_retries: int = 20):
+    def __init__(
+        self,
+        client_id: str,
+        client_secret: str,
+        progress_file: str | None = None,
+        output_file: str | None = None,
+        timeout: float = 30.0,
+        logger_: logging.Logger | None = None,
+        max_retries: int = 20,
+    ):
         self.max_retries = max_retries
         self.timeout = timeout
 
@@ -183,8 +248,7 @@ class LexisNexis:
             self._progress_fp.close()
 
     def _commit(self, link: str | None) -> None:
-        self.logger.debug(f'Received a commit prompt, attempting to save the '
-                          f'buffer ({len(self._buffer):,} lines) and record progress.')
+        self.logger.debug(f'Received a commit prompt, attempting to save the buffer ({len(self._buffer):,} lines) and record progress.')
         with DelayedKeyboardInterrupt():
             if self._progress is not None and self._progress_fp is not None:
                 self._progress.link = link
@@ -202,12 +266,10 @@ class LexisNexis:
         self.logger.debug('Getting bearer token')
         response = httpx.post(
             'https://auth-api.lexisnexis.com/oauth/v2/token',
-            data={
-                'grant_type': 'client_credentials',
-                'scope': 'http://oauth.lexisnexis.com/all'
-            },
+            data={'grant_type': 'client_credentials', 'scope': 'http://oauth.lexisnexis.com/all'},
             timeout=self.timeout,
-            headers={'Authorization': f'Basic {auth_string}'}).json()
+            headers={'Authorization': f'Basic {auth_string}'},
+        ).json()
         auth_token: str = response['access_token']
         self.logger.debug(f'AuthToken: {auth_token}')
         return auth_token
@@ -249,23 +311,22 @@ class LexisNexis:
                 raise e
         raise RuntimeError('Reached max_retries but did not finish current request!')
 
-    def get_count(self, search: str,
-                  content_type: ContentType = 'News') -> int | None:
-        link = (f'https://services-api.lexisnexis.com/v1/{content_type}'
-                f'?$search={parse.quote_plus(search)}'
-                f'&$top=5')
+    def get_count(self, search: str, content_type: ContentType = 'News') -> int | None:
+        link = f'https://services-api.lexisnexis.com/v1/{content_type}?$search={parse.quote_plus(search)}&$top=5'
         response = self._request(link, test_count=True)
         return response.get('@odata.count')
 
-    def get_results(self,
-                    search: str,
-                    max_batches: int | None = None,
-                    batch_size: int = 50,
-                    content_type: ContentType = 'News',
-                    select: list[Select] | None = None,
-                    expand: list[Expand] | None = None,
-                    filters: str | None = None,
-                    link: str | None = None) -> Generator[dict[str, Any], None, None]:
+    def get_results(
+        self,
+        search: str,
+        max_batches: int | None = None,
+        batch_size: int = 50,
+        content_type: ContentType = 'News',
+        select: list[Select] | None = None,
+        expand: list[Expand] | None = None,
+        filters: str | None = None,
+        link: str | None = None,
+    ) -> Generator[dict[str, Any], None, None]:
         if link is None:
             if batch_size > 50:
                 raise ValueError('Max batch size is 50')
@@ -274,12 +335,14 @@ class LexisNexis:
             if expand is None:
                 expand = ['Document', 'Source']
 
-            link = (f'https://services-api.lexisnexis.com/v1/{content_type}'
-                    f'?$search={parse.quote_plus(search)}'
-                    f'&$top={batch_size}'
-                    f'&$expand={",".join(expand)}'
-                    f'&$select={",".join(select)}'
-                    f'&$orderby=Date asc')
+            link = (
+                f'https://services-api.lexisnexis.com/v1/{content_type}'
+                f'?$search={parse.quote_plus(search)}'
+                f'&$top={batch_size}'
+                f'&$expand={",".join(expand)}'
+                f'&$select={",".join(select)}'
+                f'&$orderby=Date asc'
+            )
             if filters:
                 link += f'&$filter={filters}'
 
@@ -305,23 +368,20 @@ class LexisNexis:
                 break
         self._commit(None)
 
-    def get_articles(self,
-                     search: str,
-                     max_batches: int | None = None,
-                     batch_size: int = 50,
-                     content_type: ContentType = 'News',
-                     select: list[Select] | None = None,
-                     expand: list[Expand] | None = None,
-                     filters: str | None = None,
-                     link: str | None = None) -> Generator[NewsSearchResult, None, None]:
-        for item in self.get_results(search=search,
-                                     max_batches=max_batches,
-                                     batch_size=batch_size,
-                                     content_type=content_type,
-                                     select=select,
-                                     expand=expand,
-                                     filters=filters,
-                                     link=link):
+    def get_articles(
+        self,
+        search: str,
+        max_batches: int | None = None,
+        batch_size: int = 50,
+        content_type: ContentType = 'News',
+        select: list[Select] | None = None,
+        expand: list[Expand] | None = None,
+        filters: str | None = None,
+        link: str | None = None,
+    ) -> Generator[NewsSearchResult, None, None]:
+        for item in self.get_results(
+            search=search, max_batches=max_batches, batch_size=batch_size, content_type=content_type, select=select, expand=expand, filters=filters, link=link
+        ):
             try:
                 yield NewsSearchResult.model_validate(item)
             except Exception as e:

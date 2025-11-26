@@ -23,9 +23,7 @@ async def read_all_imports_for_project(session: DBSession, project_id: uuid.UUID
 
 @ensure_session_async
 async def read_item_count_for_import(session: DBSession, import_id: uuid.UUID | str) -> int:
-    stmt = select(func.count()) \
-        .select_from(m2m_import_item_table) \
-        .where(m2m_import_item_table.c.import_id == import_id)
+    stmt = select(func.count()).select_from(m2m_import_item_table).where(m2m_import_item_table.c.import_id == import_id)
     result: int | None = (await session.execute(stmt)).scalar()
     if result is None:
         raise NoResultFound('Something went majorly wrong...')
@@ -33,8 +31,7 @@ async def read_item_count_for_import(session: DBSession, import_id: uuid.UUID | 
 
 
 @ensure_session_async
-async def read_import(session: DBSession,
-                      import_id: uuid.UUID | str) -> ImportModel | None:
+async def read_import(session: DBSession, import_id: uuid.UUID | str) -> ImportModel | None:
     stmt = select(Import).where(Import.import_id == import_id)
     result = (await session.execute(stmt)).scalars().one_or_none()
     if result is not None:
@@ -44,10 +41,9 @@ async def read_import(session: DBSession,
 
 @ensure_session_async
 async def upsert_import(session: DBSession, import_model: ImportModel) -> str | uuid.UUID | None:
-    key = await upsert_orm(upsert_model=import_model,
-                           Schema=Import,
-                           primary_key=Import.import_id.name,
-                           session=session)  # FIXME: does this need `use_commit=True` ?
+    key = await upsert_orm(
+        upsert_model=import_model, Schema=Import, primary_key=Import.import_id.name, session=session
+    )  # FIXME: does this need `use_commit=True` ?
     return key
 
 
@@ -62,10 +58,15 @@ async def delete_import(session: DBSession, import_id: uuid.UUID | str) -> None:
     await session.execute(stmt)
 
     # Delete related tasks
-    pipeline_task_ids = (await session.execute(
-        select(ImportRevision.pipeline_task_id)
-        .where(ImportRevision.import_id == import_id,
-               ImportRevision.pipeline_task_id.is_not(None)))).scalars().all()
+    pipeline_task_ids = (
+        (
+            await session.execute(
+                select(ImportRevision.pipeline_task_id).where(ImportRevision.import_id == import_id, ImportRevision.pipeline_task_id.is_not(None))
+            )
+        )
+        .scalars()
+        .all()
+    )
     await session.execute(delete(Task).where(Task.task_id.in_(pipeline_task_ids)))
 
     # TODO rm -r .tasks/user_data/{imp.config.sources}
@@ -75,26 +76,26 @@ async def delete_import(session: DBSession, import_id: uuid.UUID | str) -> None:
     await session.execute(delete(ImportRevision).where(ImportRevision.import_id == import_id))
 
     # Delete import
-    await session.execute(delete(Import)
-                          .where(Import.import_id == import_id))
+    await session.execute(delete(Import).where(Import.import_id == import_id))
 
     # Delete items that no longer belong to any imports (this will cascade to delete their
     # assignments and annotations, so be careful!
-    await session.execute(delete(Item)
-                          .where(~Item.imports.any()))
+    await session.execute(delete(Item).where(~Item.imports.any()))
 
     # Send changes to database
     await session.flush_or_commit()
 
 
 @ensure_session_async
-async def get_or_create_import(session: DBSession,
-                               project_id: str,
-                               import_name: str | None = None,
-                               import_id: str | uuid.UUID | None = None,
-                               user_id: str | uuid.UUID | None = None,
-                               description: str | None = None,
-                               i_type: str = 'script') -> Import:
+async def get_or_create_import(
+    session: DBSession,
+    project_id: str,
+    import_name: str | None = None,
+    import_id: str | uuid.UUID | None = None,
+    user_id: str | uuid.UUID | None = None,
+    description: str | None = None,
+    i_type: str = 'script',
+) -> Import:
     if import_name is not None:
         if description is None or user_id is None:
             raise AttributeError('You need to provide a meaningful description and a user id!')
@@ -109,7 +110,7 @@ async def get_or_create_import(session: DBSession,
             name=import_name,
             description=description,
             type=i_type,
-            time_created=datetime.datetime.now()
+            time_created=datetime.datetime.now(),
         )
         session.add(import_orm)
         await session.flush_or_commit()
@@ -121,12 +122,10 @@ async def get_or_create_import(session: DBSession,
         if import_orm is None:
             raise KeyError('No import found for the given ID!')
         if str(import_orm.project_id) != str(project_id):
-            raise AssertionError(f'The project ID does not match with the `Import` you provided: '
-                                 f'"{import_orm.project_id}" vs "{project_id}"')
+            raise AssertionError(f'The project ID does not match with the `Import` you provided: "{import_orm.project_id}" vs "{project_id}"')
         return import_orm
 
-    raise AttributeError('Seems like neither provided information for creating '
-                         'a new import nor the ID to an existing import!')
+    raise AttributeError('Seems like neither provided information for creating a new import nor the ID to an existing import!')
 
 
 async def set_session_mutex(session: AsyncSession, project_id: str | uuid.UUID, lock: bool) -> None:

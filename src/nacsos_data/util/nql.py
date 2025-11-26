@@ -18,7 +18,7 @@ from nacsos_data.db.schemas import (
     LexisNexisItemSource,
     GenericItem,
     Project,
-    AnyItemSchema
+    AnyItemSchema,
 )
 from nacsos_data.models.items import AcademicItemModel, LexisNexisItemModel, GenericItemModel, FullLexisNexisItemModel, AnyItemModel
 from nacsos_data.models.nql import (
@@ -39,7 +39,7 @@ from nacsos_data.models.nql import (
     MetaFilterBool,
     MetaFilterInt,
     MetaFilterStr,
-    AbstractFilter
+    AbstractFilter,
 )
 from nacsos_data.db.crud.items.lexis_nexis import lexis_orm_to_model
 
@@ -48,9 +48,7 @@ class InvalidNQLError(Exception):
     pass
 
 
-def _field_cmp(cmp: ComparatorExt,
-               value: int | float | bool | str,
-               field: InstrumentedAttribute | Function) -> ColumnExpressionArgument:  # type: ignore[type-arg]
+def _field_cmp(cmp: ComparatorExt, value: int | float | bool | str, field: InstrumentedAttribute | Function) -> ColumnExpressionArgument:  # type: ignore[type-arg]
     if cmp == '>':
         return and_(field > value, field.isnot(None))
     if cmp == '>=':
@@ -71,9 +69,7 @@ def _field_cmp(cmp: ComparatorExt,
     raise InvalidNQLError(f'Unexpected comparator "{cmp}".')
 
 
-def _field_cmp_lst(cmp: SetComparator,
-                   values: list[int],
-                   field: MappedColumn) -> ColumnExpressionArgument:  # type: ignore[type-arg]
+def _field_cmp_lst(cmp: SetComparator, values: list[int], field: MappedColumn) -> ColumnExpressionArgument:  # type: ignore[type-arg]
     if cmp == '==':
         return and_(field == values, field.isnot(None))
     if cmp == '@>':
@@ -86,44 +82,40 @@ def _field_cmp_lst(cmp: SetComparator,
     raise InvalidNQLError(f'Unexpected comparator "{cmp}".')
 
 
-def get_select_base(
-        project_type: ItemType | str = ItemType.academic
-) -> tuple[Type[AnyItemSchema], Type[AnyItemModel], Select]:  # type: ignore[type-arg]
+def get_select_base(project_type: ItemType | str = ItemType.academic) -> tuple[Type[AnyItemSchema], Type[AnyItemModel], Select]:  # type: ignore[type-arg]
     if project_type == ItemType.academic:
         return (  # type: ignore[return-value]
             AcademicItem,
             AcademicItemModel,
-            select(AcademicItem).distinct(AcademicItem.item_id)
+            select(AcademicItem).distinct(AcademicItem.item_id),
         )
     if project_type == ItemType.lexis:
         return (  # type: ignore[return-value]
             LexisNexisItem,
             LexisNexisItemModel,
-            select(LexisNexisItem,
-                   func.array_agg(
-                       func.row_to_json(
-                           LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
-                       )
-                   ).label('sources_grp'))
+            select(
+                LexisNexisItem,
+                func.array_agg(
+                    func.row_to_json(
+                        LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
+                    )
+                ).label('sources_grp'),
+            )
             .join(LexisNexisItemSource, LexisNexisItemSource.item_id == LexisNexisItem.item_id)
-            .group_by(LexisNexisItem.item_id, Item.item_id)
+            .group_by(LexisNexisItem.item_id, Item.item_id),
         )
     if project_type == ItemType.generic:
         return (  # type: ignore[return-value]
             GenericItem,
             GenericItemModel,
-            select(GenericItem)
-            .distinct(GenericItem.item_id)
+            select(GenericItem).distinct(GenericItem.item_id),
         )
 
     raise NotImplementedError(f"Can't use NQL for {project_type} yet.")
 
 
 class NQLQuery:
-    def __init__(self,
-                 project_id: str,
-                 query: NQLFilter | None = None,
-                 project_type: ItemType | str = ItemType.academic):
+    def __init__(self, project_id: str, query: NQLFilter | None = None, project_type: ItemType | str = ItemType.academic):
         self.project_id = project_id
         self.project_type = project_type
 
@@ -141,8 +133,9 @@ class NQLQuery:
         return str(self.query)
 
     @classmethod
-    async def get_query(cls, session: DBSession | AsyncSession, project_id: str, project_type: ItemType | None = None,
-                        query: NQLFilter | None = None) -> 'NQLQuery':
+    async def get_query(
+        cls, session: DBSession | AsyncSession, project_id: str, project_type: ItemType | None = None, query: NQLFilter | None = None
+    ) -> 'NQLQuery':
         if project_type is None:
             project_type = await session.scalar(select(Project.type).where(Project.project_id == project_id))
 
@@ -155,7 +148,7 @@ class NQLQuery:
     def stmt(self) -> Select:  # type: ignore[type-arg]
         return self._stmt
 
-    def _get_column(self, field: Field) -> InstrumentedAttribute | Function:  # type: ignore[type-arg]
+    def _get_column(self, field: Field) -> InstrumentedAttribute | Function:  # type: ignore[type-arg]  # noqa: C901
         if self.project_type == ItemType.academic:
             # TODO: include AcademicItemVariant
             if field == 'title':
@@ -197,7 +190,7 @@ class NQLQuery:
 
         raise InvalidNQLError(f'Field "{field}" in {self.project_type} is not valid.')
 
-    def _assemble_filters(self, subquery: NQLFilter) -> ColumnExpressionArgument:  # type: ignore[type-arg]
+    def _assemble_filters(self, subquery: NQLFilter) -> ColumnExpressionArgument:  # type: ignore[type-arg]  # noqa: C901
         if isinstance(subquery, SubQuery):
             if subquery.and_ is not None:
                 return and_(*(self._assemble_filters(child) for child in subquery.and_))
@@ -250,42 +243,38 @@ class NQLQuery:
             if subquery.mode == 2:
                 if subquery.scopes is None:
                     raise InvalidNQLError('No scopes defined!')
-                self._stmt = self.stmt.join(AssignmentAlias, and_(AssignmentAlias.item_id == self.Schema.item_id,
-                                                                  AssignmentAlias.assignment_scope_id.in_(
-                                                                      subquery.scopes)))
+                self._stmt = self.stmt.join(
+                    AssignmentAlias, and_(AssignmentAlias.item_id == self.Schema.item_id, AssignmentAlias.assignment_scope_id.in_(subquery.scopes))
+                )
                 return AssignmentAlias.item_id != None  # noqa: E711
             if subquery.mode == 3:
                 if subquery.scopes is None:
                     raise InvalidNQLError('No scopes defined!')
                 raise NotImplementedError('"IS ASSIGNED BUT NOT IN" filter not implemented yet')
             if subquery.mode == 4:
-                self._stmt = self.stmt.join(AssignmentAlias, AssignmentAlias.item_id == self.Schema.item_id,
-                                            isouter=True)
+                self._stmt = self.stmt.join(AssignmentAlias, AssignmentAlias.item_id == self.Schema.item_id, isouter=True)
                 return AssignmentAlias.item_id == None  # noqa: E711
             if subquery.mode == 5:
                 if subquery.scopes is None:
                     raise InvalidNQLError('No scopes defined!')
-                self._stmt = self.stmt.join(AssignmentAlias, and_(AssignmentAlias.item_id == self.Schema.item_id,
-                                                                  AssignmentAlias.assignment_scope_id.in_(
-                                                                      subquery.scopes)),
-                                            isouter=True)
+                self._stmt = self.stmt.join(
+                    AssignmentAlias,
+                    and_(AssignmentAlias.item_id == self.Schema.item_id, AssignmentAlias.assignment_scope_id.in_(subquery.scopes)),
+                    isouter=True,
+                )
                 return AssignmentAlias.item_id == None  # noqa: E711
             if subquery.mode == 6:
                 if subquery.scheme is None:
                     raise InvalidNQLError('No scheme defined!')
-                self._stmt = (
-                    self.stmt
-                    .join(AssignmentAlias, and_(AssignmentAlias.item_id == self.Schema.item_id,
-                                                AssignmentAlias.annotation_scheme_id == subquery.scheme))
+                self._stmt = self.stmt.join(
+                    AssignmentAlias, and_(AssignmentAlias.item_id == self.Schema.item_id, AssignmentAlias.annotation_scheme_id == subquery.scheme)
                 )
                 return AssignmentAlias.item_id != None  # noqa: E711
             if subquery.mode == 7:
                 if subquery.scheme is None:
                     raise InvalidNQLError('No scheme defined!')
-                self._stmt = (
-                    self.stmt
-                    .join(AssignmentAlias, and_(AssignmentAlias.item_id == self.Schema.item_id,
-                                                AssignmentAlias.annotation_scheme_id != subquery.scheme))
+                self._stmt = self.stmt.join(
+                    AssignmentAlias, and_(AssignmentAlias.item_id == self.Schema.item_id, AssignmentAlias.annotation_scheme_id != subquery.scheme)
                 )
                 return AssignmentAlias.item_id != None  # noqa: E711
             raise InvalidNQLError(f'Invalid mode in {subquery}')
@@ -294,31 +283,19 @@ class NQLQuery:
             AssignmentAlias = aliased(Assignment)
             AnnotationAlias = aliased(Annotation)
             if subquery.scheme is not None:
-                self._stmt = (
-                    self.stmt
-                    .join(AssignmentAlias,
-                          and_(AssignmentAlias.item_id == self.Schema.item_id,
-                               AssignmentAlias.annotation_scheme_id == subquery.scheme),
-                          isouter=not subquery.incl)
-                    .join(AnnotationAlias,
-                          AssignmentAlias.assignment_id == AnnotationAlias.assignment_id,
-                          isouter=not subquery.incl)
-                )
+                self._stmt = self.stmt.join(
+                    AssignmentAlias,
+                    and_(AssignmentAlias.item_id == self.Schema.item_id, AssignmentAlias.annotation_scheme_id == subquery.scheme),
+                    isouter=not subquery.incl,
+                ).join(AnnotationAlias, AssignmentAlias.assignment_id == AnnotationAlias.assignment_id, isouter=not subquery.incl)
             elif subquery.scopes is not None:
-                self._stmt = (
-                    self.stmt
-                    .join(AssignmentAlias,
-                          and_(AssignmentAlias.item_id == self.Schema.item_id,
-                               AssignmentAlias.assignment_scope_id.in_(subquery.scopes)),
-                          isouter=not subquery.incl)
-                    .join(AnnotationAlias,
-                          AssignmentAlias.assignment_id == AnnotationAlias.assignment_id,
-                          isouter=not subquery.incl)
-                )
+                self._stmt = self.stmt.join(
+                    AssignmentAlias,
+                    and_(AssignmentAlias.item_id == self.Schema.item_id, AssignmentAlias.assignment_scope_id.in_(subquery.scopes)),
+                    isouter=not subquery.incl,
+                ).join(AnnotationAlias, AssignmentAlias.assignment_id == AnnotationAlias.assignment_id, isouter=not subquery.incl)
             else:
-                self._stmt = self.stmt.join(AnnotationAlias,
-                                            AnnotationAlias.item_id == self.Schema.item_id,
-                                            isouter=not subquery.incl)
+                self._stmt = self.stmt.join(AnnotationAlias, AnnotationAlias.item_id == self.Schema.item_id, isouter=not subquery.incl)
             if subquery.incl:
                 return AnnotationAlias.item_id != None  # noqa: E711
             return AnnotationAlias.item_id == None  # noqa: E711
@@ -345,8 +322,7 @@ class NQLQuery:
 
         raise InvalidNQLError(f'Not sure what to do with this: {subquery}!')
 
-    def _label_filter(self, subquery: LabelFilterMulti | LabelFilterBool | LabelFilterInt) \
-            -> ColumnExpressionArgument:  # type: ignore[type-arg]
+    def _label_filter(self, subquery: LabelFilterMulti | LabelFilterBool | LabelFilterInt) -> ColumnExpressionArgument:  # type: ignore[type-arg]  # noqa: C901
         Annotation_: Type[Annotation | BotAnnotation] = Annotation if subquery.type == 'user' else BotAnnotation
 
         def _value_where(Alias):  # type: ignore[no-untyped-def]
@@ -365,27 +341,23 @@ class NQLQuery:
             raise ValueError('Unexpected annotation label value filter clause.')
 
         def _inner_where(Schema) -> Sequence[ColumnExpressionArgument]:  # type: ignore[type-arg,no-untyped-def]
-            inner_wheres = (Schema.key == subquery.key,
-                            _value_where(Schema))  # type: ignore[no-untyped-call]
+            inner_wheres = (Schema.key == subquery.key, _value_where(Schema))  # type: ignore[no-untyped-call]
             if subquery.repeats is not None:
                 Schema.repeats.in_(subquery.repeats)
 
             if subquery.type == 'resolved':
                 BAMAlias = aliased(BotAnnotationMetaData)
-                self._stmt = self.stmt.join(BAMAlias,
-                                            BAMAlias.bot_annotation_metadata_id == Schema.bot_annotation_metadata_id)
+                self._stmt = self.stmt.join(BAMAlias, BAMAlias.bot_annotation_metadata_id == Schema.bot_annotation_metadata_id)
                 if subquery.scopes is not None:
                     inner_wheres += (
                         and_(  # type: ignore[assignment]
-                            Schema.bot_annotation_metadata_id.in_(subquery.scopes),
-                            BAMAlias.kind == 'RESOLVE'
+                            Schema.bot_annotation_metadata_id.in_(subquery.scopes), BAMAlias.kind == 'RESOLVE'
                         ),
                     )
                 elif subquery.scheme is not None:
                     inner_wheres += (
                         and_(  # type: ignore[assignment]
-                            BAMAlias.annotation_scheme_id == subquery.scheme,
-                            BAMAlias.kind == 'RESOLVE'
+                            BAMAlias.annotation_scheme_id == subquery.scheme, BAMAlias.kind == 'RESOLVE'
                         ),
                     )
                 else:
@@ -394,20 +366,17 @@ class NQLQuery:
                     )
             elif subquery.type == 'bot':
                 BAMAlias = aliased(BotAnnotationMetaData)
-                self._stmt = self.stmt.join(BAMAlias,
-                                            BAMAlias.bot_annotation_metadata_id == Schema.bot_annotation_metadata_id)
+                self._stmt = self.stmt.join(BAMAlias, BAMAlias.bot_annotation_metadata_id == Schema.bot_annotation_metadata_id)
                 if subquery.scopes is not None:
                     inner_wheres += (
                         and_(  # type: ignore[assignment]
-                            Schema.bot_annotation_metadata_id.in_(subquery.scopes),
-                            BAMAlias.kind != 'RESOLVE'
+                            Schema.bot_annotation_metadata_id.in_(subquery.scopes), BAMAlias.kind != 'RESOLVE'
                         ),
                     )
                 if subquery.scheme is not None:
                     inner_wheres += (
                         and_(  # type: ignore[assignment]
-                            BAMAlias.annotation_scheme_id == subquery.scheme,
-                            BAMAlias.kind != 'RESOLVE'
+                            BAMAlias.annotation_scheme_id == subquery.scheme, BAMAlias.kind != 'RESOLVE'
                         ),
                     )
                 else:
@@ -436,20 +405,17 @@ class NQLQuery:
 
             if subquery.users.mode == 'ANY':
                 AnnotationAlias = aliased(Annotation_)
-                self._stmt = self._stmt.join(
-                    AnnotationAlias,
-                    self.Schema.item_id == AnnotationAlias.item_id
+                self._stmt = self._stmt.join(AnnotationAlias, self.Schema.item_id == AnnotationAlias.item_id)
+                return and_(
+                    AnnotationAlias.user_id.in_(subquery.users.user_ids),  # type: ignore[union-attr]
+                    and_(*_inner_where(AnnotationAlias)),
                 )
-                return and_(AnnotationAlias.user_id.in_(subquery.users.user_ids),  # type: ignore[union-attr]
-                            and_(*_inner_where(AnnotationAlias)))
 
             elif subquery.users.mode == 'ALL':
                 wheres = []
                 for user in subquery.users.user_ids:
                     AnnotationAlias = aliased(Annotation_)
-                    self._stmt = self._stmt.join(
-                        AnnotationAlias,
-                        self.Schema.item_id == AnnotationAlias.item_id)
+                    self._stmt = self._stmt.join(AnnotationAlias, self.Schema.item_id == AnnotationAlias.item_id)
                     _wheres = _inner_where(AnnotationAlias)
                     _wheres += (AnnotationAlias.user_id == user,)  # type: ignore[operator, union-attr]
                     wheres.append(and_(*_wheres))
@@ -459,9 +425,7 @@ class NQLQuery:
 
         else:
             AnnotationAlias = aliased(Annotation_)
-            self._stmt = self._stmt.join(AnnotationAlias,
-                                         self.Schema.item_id == AnnotationAlias.item_id,
-                                         isouter=True)
+            self._stmt = self._stmt.join(AnnotationAlias, self.Schema.item_id == AnnotationAlias.item_id, isouter=True)
             return and_(*_inner_where(AnnotationAlias))
 
     def count(self, session: Session) -> int:
@@ -469,9 +433,7 @@ class NQLQuery:
         cnt_stmt = func.count(stmt.c.item_id)
         return session.execute(cnt_stmt).scalar()  # type: ignore[return-value]
 
-    def _transform_results(self,
-                           rslt: Sequence[RowMapping]
-                           ) -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
+    def _transform_results(self, rslt: Sequence[RowMapping]) -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
         if self.project_type == ItemType.lexis:
             return lexis_orm_to_model(rslt)
         elif self.project_type == ItemType.academic:
@@ -481,8 +443,9 @@ class NQLQuery:
         else:
             raise NotImplementedError(f'Unexpected project type: {self.project_type}')
 
-    def results(self, session: Session, limit: int | None = 20, offset: int | None = None) \
-            -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
+    def results(
+        self, session: Session, limit: int | None = 20, offset: int | None = None
+    ) -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
         """
         Query the database for results (mappings) either from an existing `session`.
         :param session:
@@ -500,10 +463,9 @@ class NQLQuery:
         rslt = session.execute(stmt).mappings().all()
         return self._transform_results(rslt)
 
-    async def results_async(self,
-                            session: AsyncSession | DBSession,
-                            limit: int | None = 20,
-                            offset: int | None = None) -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
+    async def results_async(
+        self, session: AsyncSession | DBSession, limit: int | None = 20, offset: int | None = None
+    ) -> list[FullLexisNexisItemModel] | list[AcademicItemModel] | list[GenericItemModel]:
         stmt = self.stmt
         if limit is not None:
             stmt = stmt.limit(limit)
@@ -515,14 +477,12 @@ class NQLQuery:
         return self._transform_results(rslt)
 
 
-def query_to_sql(query: NQLFilter, project_id: str,
-                 project_type: ItemType | str = ItemType.academic) -> Select:  # type: ignore[type-arg]
+def query_to_sql(query: NQLFilter, project_id: str, project_type: ItemType | str = ItemType.academic) -> Select:  # type: ignore[type-arg]
     query_object = NQLQuery(query=query, project_id=project_id, project_type=project_type)
     return query_object.stmt
 
 
-def nql_to_sql(query: NQLFilter, project_id: str,
-               project_type: ItemType | str = ItemType.academic) -> Select:  # type: ignore[type-arg]
+def nql_to_sql(query: NQLFilter, project_id: str, project_type: ItemType | str = ItemType.academic) -> Select:  # type: ignore[type-arg]
     return query_to_sql(query=query, project_id=project_id, project_type=project_type)
 
 

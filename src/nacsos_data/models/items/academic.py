@@ -39,6 +39,7 @@ class AcademicItemModel(ItemModel):
     """
     Corresponds to db.schema.items.academic.AcademicItem
     """
+
     item_id: str | UUID | None = None
     doi: str | None = None
     type: ItemType = ItemType.academic

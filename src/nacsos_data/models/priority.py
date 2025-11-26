@@ -56,10 +56,7 @@ class RegressionModel(_TfIdf):
     conf: Literal['REG'] = 'REG'
 
 
-PriorityModelConfig = Annotated[SciBERTModel
-                                | ClimateBERTModel
-                                | RegressionModel
-                                | SVMModel, Field(discriminator='conf')]
+PriorityModelConfig = Annotated[SciBERTModel | ClimateBERTModel | RegressionModel | SVMModel, Field(discriminator='conf')]
 
 
 class _PriorityModel(BaseModel):

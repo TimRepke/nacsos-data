@@ -33,53 +33,49 @@ class LabelOptions(BaseModel):
     strings: bool | None = None
 
 
-def _bool_label_columns(key: str, repeat: int | None, cte: sa.CTE) \
-        -> list[sa.Label]:  # type: ignore[type-arg]
+def _bool_label_columns(key: str, repeat: int | None, cte: sa.CTE) -> list[sa.Label]:  # type: ignore[type-arg]
     conditions = [cte.c.key == key]
     label = lambda x: f'{key}|{x}'  # noqa: E731
     if repeat is not None:
         conditions.append(cte.c.repeat == repeat)
         label = lambda x: f'{key}({repeat})|{x}'  # noqa: E731
     return [
-        sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0,
-                 sa.func.max(sa.case((sa.and_(cte.c.value_bool == vb, *conditions), 1), else_=0))))
-        .label(label(vs))  # type: ignore[no-untyped-call]
+        sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0, sa.func.max(sa.case((sa.and_(cte.c.value_bool == vb, *conditions), 1), else_=0)))).label(
+            label(vs)
+        )  # type: ignore[no-untyped-call]
         for vs, vb in [('0', False), ('1', True)]
     ]
 
 
-def _single_label_columns(key: str, repeat: int | None, values: list[int], cte: sa.CTE) \
-        -> list[sa.Label]:  # type: ignore[type-arg]
+def _single_label_columns(key: str, repeat: int | None, values: list[int], cte: sa.CTE) -> list[sa.Label]:  # type: ignore[type-arg]
     conditions = [cte.c.key == key]
     label = lambda x: f'{key}|{x}'  # noqa: E731
     if repeat is not None:
         conditions.append(cte.c.repeat == repeat)
         label = lambda x: f'{key}({repeat})|{x}'  # noqa: E731
     return [
-        sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0,
-                 sa.func.max(sa.case((sa.and_(cte.c.value_int == v, *conditions), 1), else_=0))))
-        .label(label(v))  # type: ignore[no-untyped-call]
+        sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0, sa.func.max(sa.case((sa.and_(cte.c.value_int == v, *conditions), 1), else_=0)))).label(
+            label(v)
+        )  # type: ignore[no-untyped-call]
         for v in values
     ]
 
 
-def _multi_label_columns(key: str, repeat: int | None, values: list[int], cte: sa.CTE) \
-        -> list[sa.Label]:  # type: ignore[type-arg]
+def _multi_label_columns(key: str, repeat: int | None, values: list[int], cte: sa.CTE) -> list[sa.Label]:  # type: ignore[type-arg]
     conditions = [cte.c.key == key]
     label = lambda x: f'{key}|{x}'  # noqa: E731
     if repeat is not None:
         conditions.append(cte.c.repeat == repeat)
         label = lambda x: f'{key}({repeat})|{x}'  # noqa: E731
     return [
-        sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0,
-                 sa.func.max(sa.case((sa.and_(sa.any_(cte.c.multi_int) == v, *conditions), 1), else_=0))))
-        .label(label(v))  # type: ignore[no-untyped-call]
+        sa.case(
+            (sa.func.count().filter(sa.and_(*conditions)) > 0, sa.func.max(sa.case((sa.and_(sa.any_(cte.c.multi_int) == v, *conditions), 1), else_=0)))
+        ).label(label(v))  # type: ignore[no-untyped-call]
         for v in values
     ]
 
 
-def _str_label_columns(key: str, repeat: int | None, cte: sa.CTE) \
-        -> list[sa.Label]:  # type: ignore[type-arg]
+def _str_label_columns(key: str, repeat: int | None, cte: sa.CTE) -> list[sa.Label]:  # type: ignore[type-arg]
     if repeat is None:
         condition = cte.c.key == key
         label = key
@@ -90,9 +86,7 @@ def _str_label_columns(key: str, repeat: int | None, cte: sa.CTE) \
     return [sa.func.aggregate_strings(cte.c.value_str, ' || ').filter(condition).label(label)]
 
 
-def _get_label_selects(labels: dict[str, LabelOptions],
-                       repeats: list[int] | None,
-                       cte: sa.CTE) -> list[sa.Label]:  # type: ignore[type-arg]
+def _get_label_selects(labels: dict[str, LabelOptions], repeats: list[int] | None, cte: sa.CTE) -> list[sa.Label]:  # type: ignore[type-arg]
     # FIXME: we are ignoring `repeat` for child labels for now, hence, exports might be inconsistent for ranked labels
     selects = []
     for label in labels.values():
@@ -112,22 +106,20 @@ def _get_label_selects(labels: dict[str, LabelOptions],
     return selects
 
 
-def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
-                     assignment_scope_ids: list[str] | list[uuid.UUID] | None,
-                     user_ids: list[str] | list[uuid.UUID] | None,
-                     labels: dict[str, LabelOptions] | None,
-                     ignore_repeat: bool) -> sa.CTE:
-    def _label_filter(Schema: Type[Annotation] | Type[BotAnnotation],
-                      label: LabelOptions) -> sa.ColumnElement[bool] | None:
+def _labels_subquery(  # noqa: C901
+    bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
+    assignment_scope_ids: list[str] | list[uuid.UUID] | None,
+    user_ids: list[str] | list[uuid.UUID] | None,
+    labels: dict[str, LabelOptions] | None,
+    ignore_repeat: bool,
+) -> sa.CTE:
+    def _label_filter(Schema: Type[Annotation] | Type[BotAnnotation], label: LabelOptions) -> sa.ColumnElement[bool] | None:
         if label.options_int:
-            return sa.and_(Schema.key == label.key,
-                           Schema.value_int.in_(label.options_int))
+            return sa.and_(Schema.key == label.key, Schema.value_int.in_(label.options_int))
         if label.options_bool:
-            return sa.and_(Schema.key == label.key,
-                           Schema.value_bool.in_(label.options_bool))
+            return sa.and_(Schema.key == label.key, Schema.value_bool.in_(label.options_bool))
         if label.options_multi:
-            return sa.and_(Schema.key == label.key,
-                           Schema.multi_int.overlap(label.options_multi))
+            return sa.and_(Schema.key == label.key, Schema.multi_int.overlap(label.options_multi))
         if label.strings:
             return Schema.key == label.key
 
@@ -145,16 +137,18 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
                 where.append(sa.or_(*ors))  # type: ignore[arg-type]
 
         sub_queries.append(
-            sa.select(Assignment.item_id,
-                      Assignment.user_id,
-                      Annotation.annotation_id.label('label_id'),
-                      Annotation.parent,
-                      Annotation.key,
-                      Annotation.repeat if not ignore_repeat else sa.literal(1, type_=sa.Integer).label('repeat'),
-                      Annotation.value_int,
-                      Annotation.value_bool,
-                      Annotation.value_str,
-                      Annotation.multi_int)
+            sa.select(
+                Assignment.item_id,
+                Assignment.user_id,
+                Annotation.annotation_id.label('label_id'),
+                Annotation.parent,
+                Annotation.key,
+                Annotation.repeat if not ignore_repeat else sa.literal(1, type_=sa.Integer).label('repeat'),
+                Annotation.value_int,
+                Annotation.value_bool,
+                Annotation.value_str,
+                Annotation.multi_int,
+            )
             .join(Annotation, Annotation.assignment_id == Assignment.assignment_id, isouter=True)
             .where(*where)
         )
@@ -168,17 +162,18 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
                 where.append(sa.or_(*ors))  # type: ignore[arg-type]
 
         sub_queries.append(
-            sa.select(BotAnnotation.item_id,
-                      sa.literal(None, type_=psa.UUID).label('user_id'),
-                      BotAnnotation.bot_annotation_id.label('label_id'),
-                      BotAnnotation.parent,
-                      BotAnnotation.key,
-                      BotAnnotation.repeat if not ignore_repeat else sa.literal(1, type_=sa.Integer).label('repeat'),
-                      BotAnnotation.value_int,
-                      BotAnnotation.value_bool,
-                      BotAnnotation.value_str,
-                      BotAnnotation.multi_int)
-            .where(*where)
+            sa.select(
+                BotAnnotation.item_id,
+                sa.literal(None, type_=psa.UUID).label('user_id'),
+                BotAnnotation.bot_annotation_id.label('label_id'),
+                BotAnnotation.parent,
+                BotAnnotation.key,
+                BotAnnotation.repeat if not ignore_repeat else sa.literal(1, type_=sa.Integer).label('repeat'),
+                BotAnnotation.value_int,
+                BotAnnotation.value_bool,
+                BotAnnotation.value_str,
+                BotAnnotation.multi_int,
+            ).where(*where)
         )
 
     if len(sub_queries) > 1:
@@ -192,58 +187,69 @@ def _labels_subquery(bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | 
 async def get_project_bot_scopes(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[dict[str, str]]:
     session: AsyncSession
     async with db_engine.session() as session:
-        stmt = sa.select(BotAnnotationMetaData.bot_annotation_metadata_id.cast(type_=sa.String).label('id'),
-                         BotAnnotationMetaData.name) \
-            .where(BotAnnotationMetaData.project_id == project_id) \
+        stmt = (
+            sa.select(BotAnnotationMetaData.bot_annotation_metadata_id.cast(type_=sa.String).label('id'), BotAnnotationMetaData.name)
+            .where(BotAnnotationMetaData.project_id == project_id)
             .order_by(BotAnnotationMetaData.time_created)
+        )
         return [dict(r) for r in (await session.execute(stmt)).mappings().all()]
 
 
 async def get_project_scopes(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[dict[str, str]]:
     session: AsyncSession
     async with db_engine.session() as session:
-        stmt = sa.select(AssignmentScope.assignment_scope_id.cast(type_=sa.String).label('id'),
-                         AssignmentScope.name,
-                         AnnotationScheme.annotation_scheme_id.cast(type_=sa.String).label('scheme_id'),
-                         AnnotationScheme.name.label('scheme_name')) \
-            .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id) \
-            .where(AnnotationScheme.project_id == project_id) \
+        stmt = (
+            sa.select(
+                AssignmentScope.assignment_scope_id.cast(type_=sa.String).label('id'),
+                AssignmentScope.name,
+                AnnotationScheme.annotation_scheme_id.cast(type_=sa.String).label('scheme_id'),
+                AnnotationScheme.name.label('scheme_name'),
+            )
+            .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id)
+            .where(AnnotationScheme.project_id == project_id)
             .order_by(AssignmentScope.time_created)
+        )
         return [dict(r) for r in (await session.execute(stmt)).mappings().all()]
 
 
 async def get_project_users(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[dict[str, str]]:
     session: AsyncSession
     async with db_engine.session() as session:
-        stmt = sa.select(User.user_id.cast(type_=sa.String).label('id'),
-                         User.username.label('name')) \
-            .join(ProjectPermissions, ProjectPermissions.user_id == User.user_id) \
-            .where(ProjectPermissions.project_id == project_id) \
+        stmt = (
+            sa.select(User.user_id.cast(type_=sa.String).label('id'), User.username.label('name'))
+            .join(ProjectPermissions, ProjectPermissions.user_id == User.user_id)
+            .where(ProjectPermissions.project_id == project_id)
             .order_by(User.username)
+        )
         return [dict(r) for r in (await session.execute(stmt)).mappings().all()]
 
 
 async def get_labels(stmt_labels: sa.CTE, db_engine: DatabaseEngineAsync) -> dict[str, LabelOptions]:
     stmt_labels_ = sa.union(
-        sa.select(stmt_labels.c.key, stmt_labels.c.value_int, stmt_labels.c.value_bool, stmt_labels.c.value_str,
-                  sa.func.unnest(stmt_labels.c.multi_int).label('multis')),
-        sa.select(stmt_labels.c.key, stmt_labels.c.value_int, stmt_labels.c.value_bool, stmt_labels.c.value_str,
-                  sa.literal(None, type_=sa.Integer).label('multis')),
+        sa.select(
+            stmt_labels.c.key,
+            stmt_labels.c.value_int,
+            stmt_labels.c.value_bool,
+            stmt_labels.c.value_str,
+            sa.func.unnest(stmt_labels.c.multi_int).label('multis'),
+        ),
+        sa.select(
+            stmt_labels.c.key, stmt_labels.c.value_int, stmt_labels.c.value_bool, stmt_labels.c.value_str, sa.literal(None, type_=sa.Integer).label('multis')
+        ),
     ).subquery()
 
-    stmt_options = sa.select(
-        stmt_labels_.c.key,
-        sa.func.array_agg(sa.distinct(stmt_labels_.c.value_int))
-        .filter(stmt_labels_.c.value_int.isnot(None)).label('options_int'),
-        sa.func.array_agg(sa.distinct(stmt_labels_.c.value_bool))
-        .filter(stmt_labels_.c.value_bool.isnot(None)).label('options_bool'),
-        sa.func.array_agg(sa.distinct(stmt_labels_.c.multis))
-        .filter(stmt_labels_.c.multis.isnot(None)).label('options_multi'),
-        (sa.func.count().filter(stmt_labels_.c.value_str.isnot(None)) > 0).label('strings')
-    ) \
-        .where(stmt_labels_.c.key.isnot(None)) \
-        .group_by(stmt_labels_.c.key) \
+    stmt_options = (
+        sa.select(
+            stmt_labels_.c.key,
+            sa.func.array_agg(sa.distinct(stmt_labels_.c.value_int)).filter(stmt_labels_.c.value_int.isnot(None)).label('options_int'),
+            sa.func.array_agg(sa.distinct(stmt_labels_.c.value_bool)).filter(stmt_labels_.c.value_bool.isnot(None)).label('options_bool'),
+            sa.func.array_agg(sa.distinct(stmt_labels_.c.multis)).filter(stmt_labels_.c.multis.isnot(None)).label('options_multi'),
+            (sa.func.count().filter(stmt_labels_.c.value_str.isnot(None)) > 0).label('strings'),
+        )
+        .where(stmt_labels_.c.key.isnot(None))
+        .group_by(stmt_labels_.c.key)
         .order_by(stmt_labels_.c.key)
+    )
 
     session: AsyncSession
     async with db_engine.session() as session:
@@ -262,67 +268,65 @@ async def get_project_labels(project_id: str | uuid.UUID, db_engine: DatabaseEng
     assignment_scope_ids = [r['id'] for r in scopes]
     user_ids = [r['id'] for r in users]
 
-    stmt_labels = _labels_subquery(bot_annotation_metadata_ids=bot_annotation_metadata_ids,
-                                   assignment_scope_ids=assignment_scope_ids,
-                                   user_ids=user_ids,
-                                   labels=None,
-                                   ignore_repeat=True)
+    stmt_labels = _labels_subquery(
+        bot_annotation_metadata_ids=bot_annotation_metadata_ids, assignment_scope_ids=assignment_scope_ids, user_ids=user_ids, labels=None, ignore_repeat=True
+    )
 
     return await get_labels(stmt_labels=stmt_labels, db_engine=db_engine)
 
 
-F2CRetType = (tuple[Type[AcademicItem]
-                    | Type[TwitterItem]
-                    | Type[LexisNexisItem], list[Type[sa.Column]]]  # type: ignore[type-arg]
-              | tuple[None, None])
+F2CRetType = (
+    tuple[Type[AcademicItem] | Type[TwitterItem] | Type[LexisNexisItem], list[Type[sa.Column]]]  # type: ignore[type-arg]
+    | tuple[None, None]
+)
 
 
 @ensure_session_async
-async def prepare_export_table(session: DBSession | AsyncSession,
-                               nql_filter: NQLFilter | None,
-                               bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
-                               assignment_scope_ids: list[str] | list[uuid.UUID] | None,
-                               user_ids: list[str] | list[uuid.UUID] | None,
-                               project_id: str | uuid.UUID,
-                               labels: list[LabelOptions],
-                               ignore_hierarchy: bool,
-                               ignore_repeat: bool) -> list[dict[str, bool | int | str | None]]:
+async def prepare_export_table(
+    session: DBSession | AsyncSession,
+    nql_filter: NQLFilter | None,
+    bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
+    assignment_scope_ids: list[str] | list[uuid.UUID] | None,
+    user_ids: list[str] | list[uuid.UUID] | None,
+    project_id: str | uuid.UUID,
+    labels: list[LabelOptions],
+    ignore_hierarchy: bool,
+    ignore_repeat: bool,
+) -> list[dict[str, bool | int | str | None]]:
     project_type = await session.scalar(sa.select(Project.type).where(Project.project_id == project_id))
 
     if project_type is None:
         raise NotFoundError(f'No project with id={project_id}!')
 
-    nql_query = NQLQuery(query=nql_filter,
-                         project_id=str(project_id),
-                         project_type=project_type)
+    nql_query = NQLQuery(query=nql_filter, project_id=str(project_id), project_type=project_type)
 
     labels_map = {lab.key: lab for lab in labels}
-    stmt_labels_base = _labels_subquery(bot_annotation_metadata_ids=bot_annotation_metadata_ids,
-                                        assignment_scope_ids=assignment_scope_ids,
-                                        user_ids=user_ids,
-                                        labels=labels_map,
-                                        ignore_repeat=ignore_repeat)
+    stmt_labels_base = _labels_subquery(
+        bot_annotation_metadata_ids=bot_annotation_metadata_ids,
+        assignment_scope_ids=assignment_scope_ids,
+        user_ids=user_ids,
+        labels=labels_map,
+        ignore_repeat=ignore_repeat,
+    )
 
     if ignore_hierarchy:
         # Prepare the CASE expressions to spread label values across binary fields
-        label_selects = _get_label_selects(labels=labels_map,
-                                           repeats=None if ignore_repeat else list(range(12)),
-                                           cte=stmt_labels_base)
+        label_selects = _get_label_selects(labels=labels_map, repeats=None if ignore_repeat else list(range(12)), cte=stmt_labels_base)
 
         # Finally construct the main query
         stmt_labels = (
-            sa.select(stmt_labels_base.c.item_id,
-                      stmt_labels_base.c.user_id,
-                      *label_selects)
+            sa.select(stmt_labels_base.c.item_id, stmt_labels_base.c.user_id, *label_selects)
             .group_by(stmt_labels_base.c.item_id, stmt_labels_base.c.user_id)
             .subquery('labels')
         )
         stmt_items = nql_query.stmt.subquery('items')
 
         stmt = (
-            sa.select(stmt_items.columns,  # type: ignore[call-overload]
-                      stmt_labels.columns,
-                      sa.func.coalesce(User.username, 'RESOLVED').label('username'))
+            sa.select(
+                stmt_items.columns,  # type: ignore[call-overload]
+                stmt_labels.columns,
+                sa.func.coalesce(User.username, 'RESOLVED').label('username'),
+            )
             .select_from(stmt_items)
             .join(stmt_labels, stmt_labels.c.item_id == stmt_items.c.item_id, isouter=True)
             .join(User, User.user_id == stmt_labels.c.user_id, isouter=True)
@@ -338,9 +342,9 @@ async def prepare_export_table(session: DBSession | AsyncSession,
 
 def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]) -> Generator[tuple[str, bool | str], None, None]:
     if val['bool'] is not None:
-        yield f'{key}:{int(val['bool'])}', True  # type: ignore[arg-type]
+        yield f'{key}:{int(val["bool"])}', True  # type: ignore[arg-type]
     elif val['int'] is not None:
-        yield f'{key}:{val['int']}', True
+        yield f'{key}:{val["int"]}', True
     elif val['multi'] is not None:
         for vi in val['multi']:  # type: ignore[union-attr]
             yield f'{key}:{vi}', True
@@ -351,18 +355,22 @@ def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]) -> G
 
 
 @ensure_session_async
-async def wide_export_table(session: DBSession | AsyncSession,
-                            nql_filter: NQLFilter | None,
-                            scope_ids: list[str] | list[uuid.UUID],
-                            project_id: str | uuid.UUID,
-                            limit: int | None = None,
-                            prefix: dict[str, str] | None = None,
-                            include_meta: bool = False) -> tuple[list[str], list[str], 'pd.DataFrame']:
+async def wide_export_table(
+    session: DBSession | AsyncSession,
+    nql_filter: NQLFilter | None,
+    scope_ids: list[str] | list[uuid.UUID],
+    project_id: str | uuid.UUID,
+    limit: int | None = None,
+    prefix: dict[str, str] | None = None,
+    include_meta: bool = False,
+) -> tuple[list[str], list[str], 'pd.DataFrame']:
     import pandas as pd
+
     if prefix is None:
         prefix = {}
 
-    stmt_labels = sa.text('''
+    stmt_labels = (
+        sa.text("""
                           WITH
                               scopes as (
                                   SELECT scope_id::uuid,
@@ -411,60 +419,67 @@ async def wide_export_table(session: DBSession | AsyncSession,
                                  coalesce(labels.item_id, ulabels.item_id)         as item_id
                           FROM labels
                                FULL OUTER JOIN ulabels ON labels.item_id = ulabels.item_id
-                          ''').columns(
-        sa.column('scope_order', sa.Integer),
-        sa.column('item_order', sa.Integer),
-        sa.column('item_id', psa.UUID),
-        sa.column('labels_resolved', psa.JSONB),
-        sa.column('labels_unresolved', psa.JSONB),
-    ).alias('annotations')
+                          """)
+        .columns(
+            sa.column('scope_order', sa.Integer),
+            sa.column('item_order', sa.Integer),
+            sa.column('item_id', psa.UUID),
+            sa.column('labels_resolved', psa.JSONB),
+            sa.column('labels_unresolved', psa.JSONB),
+        )
+        .alias('annotations')
+    )
 
     nql = await NQLQuery.get_query(session=session, query=nql_filter, project_id=str(project_id))
 
     # stmt_items = nql.stmt
     # rslt = (await session.execute(stmt_items, {'scopes': scope_ids})).mappings().all()
     stmt_items = nql.stmt.subquery()
-    stmt = (sa.select(stmt_items, stmt_labels)
-            .join(stmt_labels, stmt_labels.c.item_id == stmt_items.c.item_id, isouter=True)
-            .order_by(stmt_labels.c.scope_order, stmt_labels.c.item_order))
+    stmt = (
+        sa.select(stmt_items, stmt_labels)
+        .join(stmt_labels, stmt_labels.c.item_id == stmt_items.c.item_id, isouter=True)
+        .order_by(stmt_labels.c.scope_order, stmt_labels.c.item_order)
+    )
     if limit:
         stmt = stmt.limit(limit)
 
     rslt = (await session.execute(stmt, {'scopes': scope_ids})).mappings().all()
     logger.debug(f'Result lines (limit: {limit}) from DB: {len(rslt):,}')
 
-    df = pd.DataFrame([{
-        'scope_order': r.get('scope_order'),
-        'item_order': r.get('item_order'),
-        'item_id': str(r['item_id']),
-        'title': r.get('title'),
-        'text': r.get('text'),
-        'authors': r.get('authors'),
-        'teaser': r.get('teaser'),
-        'wos_id': r.get('wos_id'),
-        'openalex_id': r.get('openalex_id'),
-        'scopus_id': r.get('scopus_id'),
-        'source': r.get('source'),
-        'publication_date': r.get('publication_date'),
-        'doi': r.get('doi'),
-        'py': r.get('publication_year'),
-        **{
-            f'res|{prefix.get(k, '')}{key}': val
-            for resolution in get_attr(r, 'labels_resolved', [])  # type: ignore[union-attr]
-            for k, v in resolution.items()
-            for key, val in _generate_keys(k, v)
-        },
-        **{
-            f'{usr}|{prefix.get(k, '')}{key}': val
-            for usr, annotation in get_attr(r, 'labels_unresolved', {}).items()  # type: ignore[union-attr]
-            for k, v in annotation.items()
-            for key, val in _generate_keys(k, v)
-        },
-    }
-        for r in rslt
-    ])
-    base_cols = ['scope_order', 'item_order', 'item_id', 'wos_id', 'openalex_id', 'doi',
-                 'title', 'text', 'teaser', 'authors', 'source', 'py']
+    df = pd.DataFrame(
+        [
+            {
+                'scope_order': r.get('scope_order'),
+                'item_order': r.get('item_order'),
+                'item_id': str(r['item_id']),
+                'title': r.get('title'),
+                'text': r.get('text'),
+                'authors': r.get('authors'),
+                'teaser': r.get('teaser'),
+                'wos_id': r.get('wos_id'),
+                'openalex_id': r.get('openalex_id'),
+                'scopus_id': r.get('scopus_id'),
+                'source': r.get('source'),
+                'publication_date': r.get('publication_date'),
+                'doi': r.get('doi'),
+                'py': r.get('publication_year'),
+                **{
+                    f'res|{prefix.get(k, "")}{key}': val
+                    for resolution in get_attr(r, 'labels_resolved', [])  # type: ignore[union-attr]
+                    for k, v in resolution.items()
+                    for key, val in _generate_keys(k, v)
+                },
+                **{
+                    f'{usr}|{prefix.get(k, "")}{key}': val
+                    for usr, annotation in get_attr(r, 'labels_unresolved', {}).items()  # type: ignore[union-attr]
+                    for k, v in annotation.items()
+                    for key, val in _generate_keys(k, v)
+                },
+            }
+            for r in rslt
+        ]
+    )
+    base_cols = ['scope_order', 'item_order', 'item_id', 'wos_id', 'openalex_id', 'doi', 'title', 'text', 'teaser', 'authors', 'source', 'py']
     if include_meta:
         base_cols += ['meta']
     else:

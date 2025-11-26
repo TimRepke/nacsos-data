@@ -22,26 +22,44 @@ from .items.lexis_nexis import LexisNexisItem, LexisNexisItemSource
 AnyItemType = GenericItem | TwitterItem | AcademicItem | LexisNexisItem
 AnyItemSchema = TypeVar('AnyItemSchema', GenericItem, TwitterItem, AcademicItem, LexisNexisItem)
 
-__all__ = ['Base',
-           'User', 'AuthToken',
-           # Schemas for annotations
-           'Annotation', 'AnnotationScheme', 'Assignment', 'AssignmentScope',
-           # Schemas for "automated" annotations
-           'BotAnnotationMetaData', 'BotAnnotation',
-           # Schemas for items (i.e. documents) and util types
-           'Item', 'GenericItem', 'TwitterItem',
-           'AcademicItem', 'AcademicItemVariant',
-           'LexisNexisItem', 'LexisNexisItemSource',
-           'ItemType', 'ItemTypeLiteral', 'AnyItemSchema', 'AnyItemType',
-           # Schemas for organising data
-           'Import', 'm2m_import_item_table',
-           # Schemas for project management
-           'Project', 'ProjectPermissions', 'User',
-           # Schemas for pipelines
-           'Task',
-           # Schemas for text highlighting
-           'Highlighter',
-           # Schemas for annotation statistics
-           'AnnotationTracker', 'AnnotationQuality',
-           # Priority screening
-           'Priority']
+__all__ = [
+    'Base',
+    'User',
+    'AuthToken',
+    # Schemas for annotations
+    'Annotation',
+    'AnnotationScheme',
+    'Assignment',
+    'AssignmentScope',
+    # Schemas for "automated" annotations
+    'BotAnnotationMetaData',
+    'BotAnnotation',
+    # Schemas for items (i.e. documents) and util types
+    'Item',
+    'GenericItem',
+    'TwitterItem',
+    'AcademicItem',
+    'AcademicItemVariant',
+    'LexisNexisItem',
+    'LexisNexisItemSource',
+    'ItemType',
+    'ItemTypeLiteral',
+    'AnyItemSchema',
+    'AnyItemType',
+    # Schemas for organising data
+    'Import',
+    'm2m_import_item_table',
+    # Schemas for project management
+    'Project',
+    'ProjectPermissions',
+    'User',
+    # Schemas for pipelines
+    'Task',
+    # Schemas for text highlighting
+    'Highlighter',
+    # Schemas for annotation statistics
+    'AnnotationTracker',
+    'AnnotationQuality',
+    # Priority screening
+    'Priority',
+]

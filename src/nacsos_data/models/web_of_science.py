@@ -183,8 +183,7 @@ class PreferredName(BaseModel):
 
 
 NameRole = Literal[
-    'author', 'publisher', 'editor', 'researcher_id', 'inventor',
-    'assignee', 'book_editor', 'book_corp', 'anon', 'corp', 'foreign', 'book', 'subject'
+    'author', 'publisher', 'editor', 'researcher_id', 'inventor', 'assignee', 'book_editor', 'book_corp', 'anon', 'corp', 'foreign', 'book', 'subject'
 ]
 
 
@@ -253,8 +252,7 @@ class EWUIDT(BaseModel):
 
 
 TitleType = Literal[
-    'source', 'source_abbrev', 'abbrev_11', 'abbrev_29', 'abbrev_iso',
-    'item', 'book_series', 'series', 'foreign', 'book_seriessub', 'book', 'book_subtitle'
+    'source', 'source_abbrev', 'abbrev_11', 'abbrev_29', 'abbrev_iso', 'item', 'book_series', 'series', 'foreign', 'book_seriessub', 'book', 'book_subtitle'
 ]
 
 
@@ -379,9 +377,7 @@ class GrantDataItem(BaseModel):
     totalAwardAmount: str | None = None
     coPrincipalInvestigators: str | None = None
     currency: str | None = None
-    grantType: str | None = Field(
-        None
-    )
+    grantType: str | None = Field(None)
     startDate: StartDate | None = None
     grantSummary: GrantSummary | None = None
 
@@ -457,7 +453,11 @@ class Language(BaseModel):
 
 class Languages(BaseModel):
     count: int | None = None
-    language: Annotated[list[Language] | None, BeforeValidator(ensure_list), BeforeValidator(fix_lang),] = None
+    language: Annotated[
+        list[Language] | None,
+        BeforeValidator(ensure_list),
+        BeforeValidator(fix_lang),
+    ] = None
 
 
 class Keywords(BaseModel):
@@ -513,9 +513,7 @@ class FuncClass(Enum):
 
 
 class FunctionTcItem(BaseModel):
-    local_count: int | None = Field(
-        None, description='The number of citations in this context'
-    )
+    local_count: int | None = Field(None, description='The number of citations in this context')
     func_class: FuncClass | None = Field(
         None,
         description='* background - previously published research that orients the current study within a scholarly area.\n* basis - references that report the data sets, methods, concepts and ideas that the author is using for her work directly or on which the author bases her work\n* discuss - references mentioned because the current study is going into a more detailed discussion.\n* support - references which the current study reports to have similar results to. This may also refer to similarities in methodology or in some cases replication of results.\n* differ - references which the current study reports to have differing results to. This may also refer to differences in methodology or differences in sample sizes, affecting results.\n',
@@ -523,12 +521,8 @@ class FunctionTcItem(BaseModel):
 
 
 class TcListCc(BaseModel):
-    dedup_total_count: int | None = Field(
-        None, description='Overall number of citing items with citation context'
-    )
-    function_tc: list[FunctionTcItem] | None = Field(
-        None, description='Breakdown of how this article has been mentioned'
-    )
+    dedup_total_count: int | None = Field(None, description='Overall number of citing items with citation context')
+    function_tc: list[FunctionTcItem] | None = Field(None, description='Breakdown of how this article has been mentioned')
 
 
 class SubjectItem1(BaseModel):

@@ -86,9 +86,7 @@ class AuthenticationCache:
         self._token_cache = {}
         self._token_lookup = {}
         async with self.db_engine.engine.connect() as conn:
-            rslt = await conn.execute(select(AuthToken)
-                                      .where(or_(AuthToken.valid_till > datetime.datetime.now(),
-                                                 AuthToken.valid_till.is_(None))))
+            rslt = await conn.execute(select(AuthToken).where(or_(AuthToken.valid_till > datetime.datetime.now(), AuthToken.valid_till.is_(None))))
             for row in rslt.mappings().all():
                 token = AuthTokenModel.model_validate(row)
                 self._token_cache[str(token.token_id)] = token
@@ -97,10 +95,9 @@ class AuthenticationCache:
         logger.debug(f'Known token_ids: {self._token_cache.keys()}')
         logger.debug(f'Known token usernames: {self._token_lookup.keys()}')
 
-    async def get_user(self, username: str | None = None,
-                       user_id: str | uuid.UUID | None = None,
-                       user: UserModel | None = None,
-                       retry: bool = False) -> UserModel:
+    async def get_user(
+        self, username: str | None = None, user_id: str | uuid.UUID | None = None, user: UserModel | None = None, retry: bool = False
+    ) -> UserModel:
         if user is not None:
             return user
         try:
@@ -120,12 +117,14 @@ class AuthenticationCache:
 
         raise RuntimeError('Need to specify either username or user_id or user!')
 
-    async def get_project_permission(self,
-                                     project_id: str | uuid.UUID,
-                                     username: str | None = None,
-                                     user_id: str | uuid.UUID | None = None,
-                                     user: UserModel | None = None,
-                                     retry: bool = False) -> ProjectPermissionsModel | None:
+    async def get_project_permission(
+        self,
+        project_id: str | uuid.UUID,
+        username: str | None = None,
+        user_id: str | uuid.UUID | None = None,
+        user: UserModel | None = None,
+        retry: bool = False,
+    ) -> ProjectPermissionsModel | None:
         user = await self.get_user(username=username, user_id=user_id, user=user)
         permission = self._permission_cache.get(str(project_id).lower().strip(), {}).get(str(user.user_id).lower().strip())
 
@@ -136,12 +135,14 @@ class AuthenticationCache:
 
         return permission
 
-    async def get_auth_token(self,
-                             token_id: str | uuid.UUID | None = None,
-                             username: str | None = None,
-                             user_id: str | uuid.UUID | None = None,
-                             user: UserModel | None = None,
-                             retry: bool = False) -> AuthTokenModel | None:
+    async def get_auth_token(
+        self,
+        token_id: str | uuid.UUID | None = None,
+        username: str | None = None,
+        user_id: str | uuid.UUID | None = None,
+        user: UserModel | None = None,
+        retry: bool = False,
+    ) -> AuthTokenModel | None:
         if token_id is not None:
             tok = self._token_cache.get(str(token_id).lower().strip())
             if tok:
@@ -162,10 +163,7 @@ class AuthenticationCache:
 
 
 class Authentication:
-    def __init__(self,
-                 engine: DatabaseEngineAsync,
-                 token_lifetime_minutes: int = 5,
-                 default_user: str | None = None):
+    def __init__(self, engine: DatabaseEngineAsync, token_lifetime_minutes: int = 5, default_user: str | None = None):
         """
 
         :param engine:
@@ -185,17 +183,10 @@ class Authentication:
     def __await__(self) -> Generator[Any, Any, Any]:
         return self.init().__await__()
 
-    async def check_username_password(self,
-                                      plain_password: str,
-                                      username: str | None = None,
-                                      user_id: str | uuid.UUID | None = None) -> UserModel:
+    async def check_username_password(self, plain_password: str, username: str | None = None, user_id: str | uuid.UUID | None = None) -> UserModel:
         user = await self.cache.get_user(username=username, user_id=user_id)
         async with self.db_engine.engine.connect() as conn:
-            passwd = (
-                await conn.execute(
-                    select(User.password).where(or_(User.username == username,
-                                                    User.user_id == user_id)))
-            ).mappings().one_or_none()
+            passwd = (await conn.execute(select(User.password).where(or_(User.username == username, User.user_id == user_id)))).mappings().one_or_none()
 
         if not verify_password(plain_password=plain_password, hashed_password=passwd['password']):  # type: ignore[index]
             raise InvalidCredentialsError('username/user_id or password wrong!')
@@ -204,15 +195,13 @@ class Authentication:
 
     async def fetch_token_by_user(self, username: str, only_active: bool = True) -> AuthTokenModel:
         token = await self.cache.get_auth_token(username=username)
-        if token is not None and (
-                not only_active or (only_active and (token.valid_till is None or token.valid_till > datetime.datetime.now()))):
+        if token is not None and (not only_active or (only_active and (token.valid_till is None or token.valid_till > datetime.datetime.now()))):
             return token
         raise InvalidCredentialsError(f'No valid auth token found for user "{username}"')
 
     async def fetch_token_by_id(self, token_id: str | uuid.UUID, only_active: bool = True) -> AuthTokenModel:
         token = await self.cache.get_auth_token(token_id=token_id)
-        if token is not None and (
-                not only_active or (only_active and (token.valid_till is None or token.valid_till > datetime.datetime.now()))):
+        if token is not None and (not only_active or (only_active and (token.valid_till is None or token.valid_till > datetime.datetime.now()))):
             return token
         raise InvalidCredentialsError('No valid auth token found for this ID')
 
@@ -228,9 +217,7 @@ class Authentication:
             await conn.commit()
         await self.cache.reload_tokens()
 
-    async def clear_token_by_id(self,
-                                token_id: str | uuid.UUID,
-                                verify_username: str | None = None) -> None:
+    async def clear_token_by_id(self, token_id: str | uuid.UUID, verify_username: str | None = None) -> None:
         async with self.db_engine.engine.connect() as conn:  # type: AsyncConnection
             stmt = delete(AuthToken).where(AuthToken.token_id == token_id)
             if verify_username:
@@ -239,11 +226,13 @@ class Authentication:
             await conn.commit()
         await self.cache.reload_tokens()
 
-    async def refresh_or_create_token(self,
-                                      username: str | None = None,
-                                      token_id: str | uuid.UUID | None = None,
-                                      token_lifetime_minutes: int | None = None,
-                                      verify_username: str | None = None) -> AuthTokenModel:
+    async def refresh_or_create_token(
+        self,
+        username: str | None = None,
+        token_id: str | uuid.UUID | None = None,
+        token_lifetime_minutes: int | None = None,
+        verify_username: str | None = None,
+    ) -> AuthTokenModel:
         if token_lifetime_minutes is None:
             token_lifetime_minutes = self.token_lifetime_minutes
 
@@ -295,11 +284,9 @@ class Authentication:
         logger.debug(f'Current user: {user.username} ({user.user_id})')
         return user
 
-    async def get_project_permissions(self,
-                                      project_id: str | uuid.UUID,
-                                      username: str | None = None,
-                                      user_id: str | None = None,
-                                      user: UserModel | None = None) -> ProjectPermissionsModel:
+    async def get_project_permissions(
+        self, project_id: str | uuid.UUID, username: str | None = None, user_id: str | None = None, user: UserModel | None = None
+    ) -> ProjectPermissionsModel:
         if username is not None or user_id is not None:
             user = await self.cache.get_user(username=username, user_id=user_id)
 
@@ -321,13 +308,15 @@ class Authentication:
 
         return permissions
 
-    async def check_permissions(self,
-                                project_id: str | uuid.UUID,
-                                user_id: str | uuid.UUID | None = None,
-                                username: str | None = None,
-                                user: UserModel | None = None,
-                                required_permissions: list[ProjectPermission] | ProjectPermission | None = None,
-                                fulfill_all: bool = True) -> UserPermissions:
+    async def check_permissions(
+        self,
+        project_id: str | uuid.UUID,
+        user_id: str | uuid.UUID | None = None,
+        username: str | None = None,
+        user: UserModel | None = None,
+        required_permissions: list[ProjectPermission] | ProjectPermission | None = None,
+        fulfill_all: bool = True,
+    ) -> UserPermissions:
         if user_id is None and username is None and user is None:
             raise AssertionError('Need one of `user_id`, `username` or `user`!')
 
@@ -351,15 +340,11 @@ class Authentication:
         for permission in required_permissions:
             p_permission = getattr(permissions, permission, False)
             if fulfill_all and not p_permission:
-                raise InsufficientPermissionError(f'User does not have permission "{permission}" '
-                                                  f'for project "{project_id}".')
+                raise InsufficientPermissionError(f'User does not have permission "{permission}" for project "{project_id}".')
             any_permission_fulfilled = any_permission_fulfilled or p_permission
 
         if not any_permission_fulfilled and not fulfill_all:
-            raise InsufficientPermissionError(
-                f'User does not have any of the required permissions ({required_permissions}) '
-                f'for project "{project_id}".'
-            )
+            raise InsufficientPermissionError(f'User does not have any of the required permissions ({required_permissions}) for project "{project_id}".')
         return user_permissions
 
 

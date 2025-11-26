@@ -15,7 +15,7 @@ from nacsos_data.db.schemas import (
     AnyItemType,
     AnyItemSchema,
     LexisNexisItem,
-    LexisNexisItemSource
+    LexisNexisItemSource,
 )
 from nacsos_data.models.items import (
     GenericItemModel,
@@ -25,7 +25,7 @@ from nacsos_data.models.items import (
     AnyItemModel,
     LexisNexisItemModel,
     LexisNexisItemSourceModel,
-    FullLexisNexisItemModel
+    FullLexisNexisItemModel,
 )
 
 logger = logging.getLogger('nacsos-data.crud.items')
@@ -34,34 +34,34 @@ logger = logging.getLogger('nacsos-data.crud.items')
 async def read_item_count_for_project(project_id: str | UUID, engine: DatabaseEngineAsync) -> int:
     session: AsyncSession
     async with engine.session() as session:
-        result: int = (await session.execute(  # type: ignore[assignment] # FIXME: mypy
-            select(func.count(Item.item_id)).where(Item.project_id == project_id)
-        )).scalar()
+        result: int = (
+            await session.execute(  # type: ignore[assignment] # FIXME: mypy
+                select(func.count(Item.item_id)).where(Item.project_id == project_id)
+            )
+        ).scalar()
         return result
 
 
-async def read_all_for_project(project_id: str | UUID, Schema: Type[AnyItemSchema], Model: Type[AnyItemModelType],
-                               engine: DatabaseEngineAsync) -> list[AnyItemModelType]:
+async def read_all_for_project(
+    project_id: str | UUID, Schema: Type[AnyItemSchema], Model: Type[AnyItemModelType], engine: DatabaseEngineAsync
+) -> list[AnyItemModelType]:
     async with engine.session() as session:
         # FIXME We should probably set a LIMIT by default
-        stmt = (select(Schema)
-                .where(Schema.project_id == project_id))
+        stmt = select(Schema).where(Schema.project_id == project_id)
         result = (await session.execute(stmt)).scalars().all()
         return [Model.model_validate(res.__dict__) for res in result]
 
 
-async def read_paged_for_project(project_id: str | UUID, Schema: Type[AnyItemSchema], Model: Type[AnyItemModelType],
-                                 page: int, page_size: int, engine: DatabaseEngineAsync) -> list[AnyItemModelType]:
+async def read_paged_for_project(
+    project_id: str | UUID, Schema: Type[AnyItemSchema], Model: Type[AnyItemModelType], page: int, page_size: int, engine: DatabaseEngineAsync
+) -> list[AnyItemModelType]:
     # page: count starts at 1
     session: AsyncSession
     async with engine.session() as session:
         offset = (page - 1) * page_size
         if offset < 0:
             offset = 0
-        stmt = (select(Schema)
-                .where(Schema.project_id == project_id)
-                .offset(offset)
-                .limit(page_size))
+        stmt = select(Schema).where(Schema.project_id == project_id).offset(offset).limit(page_size)
         result = (await session.execute(stmt)).scalars().all()
 
         ret = []
@@ -75,8 +75,7 @@ async def read_paged_for_project(project_id: str | UUID, Schema: Type[AnyItemSch
         return ret
 
 
-def _get_schema_model_for_type(item_type: ItemType | ItemTypeLiteral) \
-        -> tuple[Type[AnyItemType], Type[AnyItemModel]]:
+def _get_schema_model_for_type(item_type: ItemType | ItemTypeLiteral) -> tuple[Type[AnyItemType], Type[AnyItemModel]]:
     if item_type == 'generic' or item_type == ItemType.generic:
         return GenericItem, GenericItemModel
     if item_type == 'twitter' or item_type == ItemType.twitter:
@@ -89,17 +88,18 @@ def _get_schema_model_for_type(item_type: ItemType | ItemTypeLiteral) \
     raise ValueError(f'Not implemented for {item_type}')
 
 
-async def read_any_item_by_item_id(item_id: str | UUID, item_type: ItemType | ItemTypeLiteral,
-                                   engine: DatabaseEngineAsync) -> AnyItemModel | None:
+async def read_any_item_by_item_id(item_id: str | UUID, item_type: ItemType | ItemTypeLiteral, engine: DatabaseEngineAsync) -> AnyItemModel | None:
     if item_type == ItemType.lexis or item_type == 'lexis':
         async with engine.session() as session:
             lexis_stmt = (
-                select(LexisNexisItem,
-                       func.array_agg(
-                           func.row_to_json(
-                               LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
-                           )
-                       ).label('sources'))
+                select(
+                    LexisNexisItem,
+                    func.array_agg(
+                        func.row_to_json(
+                            LexisNexisItemSource.__table__.table_valued()  # type: ignore[attr-defined]
+                        )
+                    ).label('sources'),
+                )
                 .join(LexisNexisItemSource, LexisNexisItemSource.item_id == LexisNexisItem.item_id)
                 .where(LexisNexisItem.item_id == item_id)
                 .group_by(LexisNexisItem.item_id, Item.item_id)
@@ -120,5 +120,4 @@ async def read_any_item_by_item_id(item_id: str | UUID, item_type: ItemType | It
     return None
 
 
-__all__ = ['read_all_for_project', 'read_paged_for_project',
-           'read_item_count_for_project', 'read_any_item_by_item_id']
+__all__ = ['read_all_for_project', 'read_paged_for_project', 'read_item_count_for_project', 'read_any_item_by_item_id']

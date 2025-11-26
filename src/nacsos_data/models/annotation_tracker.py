@@ -20,6 +20,7 @@ class AnnotationTrackerModel(DehydratedAnnotationTracker):
 
     You may have more than one tracker per project, for example for keeping track of different progresses.
     """
+
     # The project this tracker is attached to
     project_id: uuid.UUID | str
     # String describing which (combination of) labels reflect inclusion criteria

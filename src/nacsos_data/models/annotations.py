@@ -35,6 +35,7 @@ class Label(BaseModel):
 
     Mainly used during resolving annotations.
     """
+
     key: str
     repeat: int
     value: int | None = None  # value if this is a parent
@@ -150,6 +151,7 @@ class AnnotationSchemeModelFlat(AnnotationSchemeInfo):
     """
     Same as AnnotationSchemeModel but with flattened structure.
     """
+
     labels: list[FlattenedAnnotationSchemeLabel]
 
 
@@ -190,9 +192,7 @@ class AssignmentConfigLegacy(BaseModel):
     legacy: dict[str, Any]
 
 
-AssignmentConfig = Annotated[AssignmentConfigRandom
-                             | AssignmentConfigPriority
-                             | AssignmentConfigLegacy, Field(discriminator='config_type')]
+AssignmentConfig = Annotated[AssignmentConfigRandom | AssignmentConfigPriority | AssignmentConfigLegacy, Field(discriminator='config_type')]
 
 
 class AssignmentScopeModel(BaseModel):
@@ -205,6 +205,7 @@ class AssignmentScopeModel(BaseModel):
     Logically, this should be viewed as a hierarchical organisation
     AnnotationScheme -> [AssignmentScope] -> Assignment -> Annotation
     """
+
     # Unique identifier for this scope
     assignment_scope_id: str | UUID | None = None
     # The AnnotationScheme defining the annotation scheme to be used for this scope
@@ -245,6 +246,7 @@ class AssignmentModel(BaseModel):
       * Creating assignments one at a time based on a set of rules (e.g. for double-coding, defined order, bias, ...)
       * Creating assignments in small batches or one-by-one in prioritised annotation settings
     """
+
     # Unique identifier for this assignment
     assignment_id: str | UUID | None = None
     # The AssignmentScope this Assignment should logically be grouped into.
@@ -295,6 +297,7 @@ class AnnotationModel(AnnotationValue):
     The interface/backend code should be used to make sure, to either not allow partial fulfillment of an
     AnnotationScheme or not display an Assignment as complete.
     """
+
     # Unique identifier for this Annotation
     annotation_id: str | UUID | None = None
 

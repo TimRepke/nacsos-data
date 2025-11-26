@@ -4,19 +4,8 @@ from typing import Any
 from sqlalchemy import text
 
 from nacsos_data.db.engine import ensure_session_async, DBSession
-from nacsos_data.models.annotations import (
-    AnnotationSchemeModel,
-    AnnotationSchemeLabel,
-    Label,
-    ItemAnnotation
-)
-from nacsos_data.models.bot_annotations import (
-    ResolutionSnapshotEntry,
-    ResolutionMatrix,
-    SnapshotEntry,
-    OrderingEntry,
-    BotItemAnnotation
-)
+from nacsos_data.models.annotations import AnnotationSchemeModel, AnnotationSchemeLabel, Label, ItemAnnotation
+from nacsos_data.models.bot_annotations import ResolutionSnapshotEntry, ResolutionMatrix, SnapshotEntry, OrderingEntry, BotItemAnnotation
 
 
 def unravel_annotation_scheme_keys(scheme: AnnotationSchemeModel) -> list[str]:
@@ -27,10 +16,7 @@ def unravel_annotation_scheme_keys(scheme: AnnotationSchemeModel) -> list[str]:
         if label.choices is None:
             return accu
 
-        return [recurse_label(child, accu)
-                for choice in label.choices
-                if choice is not None and choice.children is not None
-                for child in choice.children]
+        return [recurse_label(child, accu) for choice in label.choices if choice is not None and choice.children is not None for child in choice.children]
 
     keys = [recurse_label(label, []) for label in scheme.labels]
     return [k for kk in keys for k in kk]
@@ -46,7 +32,7 @@ async def get_ordering(session: DBSession, assignment_scope_id: str | uuid.UUID)
     :param assignment_scope_id: assignment_scope_id
     :return:
     """
-    stmt = text('''
+    stmt = text("""
         SELECT row_number() over () as identifier, *
         FROM (SELECT ass.item_id::text,
                      MIN(ass."order") as first_occurrence,
@@ -63,43 +49,46 @@ async def get_ordering(session: DBSession, assignment_scope_id: str | uuid.UUID)
               WHERE ass.assignment_scope_id = :scope_id
               GROUP BY ass.item_id
               ORDER BY first_occurrence) as sub;
-    ''')
+    """)
     res = (await session.execute(stmt, {'scope_id': assignment_scope_id})).mappings().all()
 
     return [OrderingEntry(**r) for r in res]
 
 
 def dehydrate_user_annotations(matrix: ResolutionMatrix) -> list[SnapshotEntry]:
-    return [SnapshotEntry(order_key=row_key,
-                          path_key=col_key,
-                          user_id=str(user_id),
-                          item_id=str(anno.annotation.item_id),
-                          anno_id=str(anno.annotation.annotation_id),
-                          value_str=anno.annotation.value_str,
-                          value_bool=anno.annotation.value_bool,
-                          value_int=anno.annotation.value_int,
-                          value_float=anno.annotation.value_float,
-                          multi_int=anno.annotation.multi_int)
-            for row_key, row in matrix.items()
-            for col_key, cell in row.items()
-            for user_id, annos in cell.labels.items()
-            for anno in annos
-            if anno.annotation]
+    return [
+        SnapshotEntry(
+            order_key=row_key,
+            path_key=col_key,
+            user_id=str(user_id),
+            item_id=str(anno.annotation.item_id),
+            anno_id=str(anno.annotation.annotation_id),
+            value_str=anno.annotation.value_str,
+            value_bool=anno.annotation.value_bool,
+            value_int=anno.annotation.value_int,
+            value_float=anno.annotation.value_float,
+            multi_int=anno.annotation.multi_int,
+        )
+        for row_key, row in matrix.items()
+        for col_key, cell in row.items()
+        for user_id, annos in cell.labels.items()
+        for anno in annos
+        if anno.annotation
+    ]
 
 
 def dehydrate_resolutions(matrix: ResolutionMatrix) -> list[ResolutionSnapshotEntry]:
-    return [ResolutionSnapshotEntry(order_key=row_key,
-                                    path_key=col_key,
-                                    ba_id=str(cell.resolution.bot_annotation_id))
-            for row_key, row in matrix.items()
-            for col_key, cell in row.items()]
+    return [
+        ResolutionSnapshotEntry(order_key=row_key, path_key=col_key, ba_id=str(cell.resolution.bot_annotation_id))
+        for row_key, row in matrix.items()
+        for col_key, cell in row.items()
+    ]
 
 
 @ensure_session_async
-async def read_item_annotations(session: DBSession,
-                                assignment_scope_id: str | uuid.UUID,
-                                ignore_hierarchy: bool = False,
-                                ignore_repeat: bool = False) -> list[ItemAnnotation]:
+async def read_item_annotations(
+    session: DBSession, assignment_scope_id: str | uuid.UUID, ignore_hierarchy: bool = False, ignore_repeat: bool = False
+) -> list[ItemAnnotation]:
     """
     asd
     :param session: Connection to the database
@@ -114,15 +103,15 @@ async def read_item_annotations(session: DBSession,
     if ignore_repeat:  # if repeat is ignored, always forcing it to 1
         repeat = '1'
     if ignore_hierarchy:
-        stmt = text(f'''
+        stmt = text(f"""
             SELECT array_to_json(ARRAY[(a.key, {repeat})::annotation_label]) as label,
                    a.*
             FROM annotation AS a
                      JOIN assignment ass ON a.assignment_id = ass.assignment_id
             WHERE ass.assignment_scope_id = :scope_id;
-        ''')
+        """)
     else:
-        stmt = text(f'''
+        stmt = text(f"""
             WITH RECURSIVE ctename AS (
                   SELECT a.annotation_id, a.time_created, a.time_updated, a.assignment_id, a.user_id, a.item_id,
                          a.annotation_scheme_id, a.key, a.repeat,  a.value_bool, a.value_int,a.value_float,
@@ -143,7 +132,7 @@ async def read_item_annotations(session: DBSession,
             SELECT array_to_json(path) as label, ctename.*
             FROM ctename
             WHERE recurse_join is NULL;
-        ''')
+        """)
 
     res = (await session.execute(stmt, {'scope_id': assignment_scope_id})).mappings().all()
     ret = []
@@ -154,9 +143,8 @@ async def read_item_annotations(session: DBSession,
 
 
 @ensure_session_async
-async def read_bot_annotations(session: DBSession,
-                               bot_annotation_metadata_id: str) -> list[BotItemAnnotation]:
-    stmt = text('''
+async def read_bot_annotations(session: DBSession, bot_annotation_metadata_id: str) -> list[BotItemAnnotation]:
+    stmt = text("""
         WITH RECURSIVE ctename AS (
               SELECT a.bot_annotation_id, a.bot_annotation_metadata_id,
                      a.time_created, a.time_updated, a.item_id,
@@ -180,11 +168,9 @@ async def read_bot_annotations(session: DBSession,
         FROM ctename
         WHERE recurse_join is NULL
         ORDER BY ctename.order;
-    ''')
+    """)
 
-    res = (await session.execute(stmt, {
-        'bot_annotation_metadata_id': bot_annotation_metadata_id
-    })).mappings().all()
+    res = (await session.execute(stmt, {'bot_annotation_metadata_id': bot_annotation_metadata_id})).mappings().all()
     ret = []
     for r in res:
         path = [Label.model_validate(label) for label in r['label']]

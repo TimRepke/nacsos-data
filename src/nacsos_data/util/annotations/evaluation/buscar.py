@@ -11,7 +11,7 @@ ArrayOrList = Array | list[int]
 ArrayOrListList = Array | list[list[int]]
 
 
-def calculate_h0(labels_: ArrayOrList, n_docs: int, recall_target: float = .95, bias: float = 1.) -> float | None:
+def calculate_h0(labels_: ArrayOrList, n_docs: int, recall_target: float = 0.95, bias: float = 1.0) -> float | None:
     """
     Calculates a p-score for our null hypothesis h0, that we have missed our recall target `recall_target`.
 
@@ -30,8 +30,7 @@ def calculate_h0(labels_: ArrayOrList, n_docs: int, recall_target: float = .95, 
              We can reject the null hypothesis (and stop screening) if p is below 1 - our confidence level.
 
     """
-    labels: npt.NDArray[np.int_] = (labels_ if type(labels_) is np.ndarray
-                                    else np.array(labels_, dtype=np.int_))
+    labels: npt.NDArray[np.int_] = labels_ if type(labels_) is np.ndarray else np.array(labels_, dtype=np.int_)
 
     # Number of relevant documents we have seen
     r_seen = labels.sum()
@@ -44,10 +43,11 @@ def calculate_h0(labels_: ArrayOrList, n_docs: int, recall_target: float = .95, 
     # in each of our urns for the urn to be in keeping with our null hypothesis
     # that we have missed our target
     k_hat = np.floor(
-        r_seen / recall_target + 1 -  # Divide num of relevant documents by our recall target and add 1  # noqa
-        (
-                r_seen -  # from this we subtract the total relevant documents seen  # noqa
-                urns.cumsum()  # before each urn
+        r_seen / recall_target
+        + 1  # Divide num of relevant documents by our recall target and add 1  # noqa
+        - (
+            r_seen  # from this we subtract the total relevant documents seen  # noqa
+            - urns.cumsum()  # before each urn
         )
     )
 
@@ -58,7 +58,7 @@ def calculate_h0(labels_: ArrayOrList, n_docs: int, recall_target: float = .95, 
             urns.cumsum(),  # the number of relevant documents in the sample
             n_docs - (urns.shape[0] - urn_sizes),  # In a population made up out of the urn and all remaining docs
             k_hat,  # Where K_hat docs in the population are actually relevant
-            urn_sizes  # After observing this many documents
+            urn_sizes,  # After observing this many documents
         )
     else:
         p = nchypergeom_wallenius.cdf(
@@ -66,7 +66,7 @@ def calculate_h0(labels_: ArrayOrList, n_docs: int, recall_target: float = .95, 
             n_docs - (urns.shape[0] - urn_sizes),  # In a population made up out of the urn and all remaining docs
             k_hat,  # Where K_hat docs in the population are actually relevant
             urn_sizes,  # After observing this many documents
-            bias  # Where we are bias times more likely to pick a random relevant document
+            bias,  # Where we are bias times more likely to pick a random relevant document
         )
 
     # We computed this for all, so only return the smallest
@@ -77,11 +77,9 @@ def calculate_h0(labels_: ArrayOrList, n_docs: int, recall_target: float = .95, 
     return p_min
 
 
-def calculate_h0s(labels_: ArrayOrList,
-                  n_docs: int,
-                  recall_target: float = .95,
-                  bias: float = 1.,
-                  batch_size: int = 100) -> Iterator[tuple[int, float | None]]:
+def calculate_h0s(
+    labels_: ArrayOrList, n_docs: int, recall_target: float = 0.95, bias: float = 1.0, batch_size: int = 100
+) -> Iterator[tuple[int, float | None]]:
     """
     Calculates the p-score for H0 after each set of `batch_size` labels.
 
@@ -92,8 +90,7 @@ def calculate_h0s(labels_: ArrayOrList,
     :param batch_size: H0 will be calculated after each batch
     :return:
     """
-    labels: Array = (labels_ if type(labels_) is np.ndarray
-                     else np.array(labels_, dtype=np.int_))
+    labels: Array = labels_ if type(labels_) is np.ndarray else np.array(labels_, dtype=np.int_)
     n_seen = labels.shape[0]
     for n_seen_batch in range(batch_size, n_seen, batch_size):
         batch_labels = labels[:n_seen_batch]
@@ -108,10 +105,7 @@ def calculate_h0s(labels_: ArrayOrList,
         yield n_seen, p_h0
 
 
-def calculate_h0s_for_batches(labels: list[list[int]],
-                              n_docs: int,
-                              recall_target: float = .95,
-                              bias: float = 1.) -> Iterator[tuple[int, float | None]]:
+def calculate_h0s_for_batches(labels: list[list[int]], n_docs: int, recall_target: float = 0.95, bias: float = 1.0) -> Iterator[tuple[int, float | None]]:
     """
     Calculates the p-score for H0 after each batch of labels.
     Similar to `calculate_h0s`, but we assume that batches are determined beforehand
@@ -134,10 +128,9 @@ def calculate_h0s_for_batches(labels: list[list[int]],
         yield pos, p_h0
 
 
-def calculate_stopping_metric_for_batches(labels: list[list[int]],
-                                          n_docs: int,
-                                          recall_target: float = .95,
-                                          bias: float = 1.) -> tuple[H0Series, list[float | None]]:
+def calculate_stopping_metric_for_batches(
+    labels: list[list[int]], n_docs: int, recall_target: float = 0.95, bias: float = 1.0
+) -> tuple[H0Series, list[float | None]]:
     """
     Calculates the p-score for H0 after each batch of labels  and recall after each label.
 
@@ -147,19 +140,14 @@ def calculate_stopping_metric_for_batches(labels: list[list[int]],
     :param bias:
     :return:
     """
-    p_h0s: H0Series = list(calculate_h0s_for_batches(labels=labels,
-                                                     recall_target=recall_target,
-                                                     bias=bias,
-                                                     n_docs=n_docs))
+    p_h0s: H0Series = list(calculate_h0s_for_batches(labels=labels, recall_target=recall_target, bias=bias, n_docs=n_docs))
 
     return p_h0s, compute_recall(labels[-1])
 
 
-def calculate_stopping_metric(labels_: ArrayOrList,
-                              n_docs: int,
-                              recall_target: float = .95,
-                              bias: float = 1.,
-                              batch_size: int = 100) -> tuple[H0Series, list[float | None]]:
+def calculate_stopping_metric(
+    labels_: ArrayOrList, n_docs: int, recall_target: float = 0.95, bias: float = 1.0, batch_size: int = 100
+) -> tuple[H0Series, list[float | None]]:
     """
     Calculates the p-score for H0 after each set of `batch_size` labels and recall after each label.
 
@@ -170,11 +158,9 @@ def calculate_stopping_metric(labels_: ArrayOrList,
     :param batch_size: H0 will be calculated after each batch
     :return:
     """
-    labels: Array = (labels_ if type(labels_) is np.ndarray
-                     else np.array(labels_, dtype=np.int_))
+    labels: Array = labels_ if type(labels_) is np.ndarray else np.array(labels_, dtype=np.int_)
 
-    p_h0s: H0Series = list(calculate_h0s(labels_=labels, batch_size=batch_size, bias=bias,
-                                         n_docs=n_docs, recall_target=recall_target))
+    p_h0s: H0Series = list(calculate_h0s(labels_=labels, batch_size=batch_size, bias=bias, n_docs=n_docs, recall_target=recall_target))
 
     return p_h0s, compute_recall(labels)
 
@@ -185,8 +171,7 @@ def compute_recall(labels_: ArrayOrList) -> list[float | None]:
     :param labels_:
     :return:
     """
-    labels: Array = (labels_ if type(labels_) is np.ndarray
-                     else np.array(labels_, dtype=np.int_))
+    labels: Array = labels_ if type(labels_) is np.ndarray else np.array(labels_, dtype=np.int_)
     n_seen_relevant = labels.sum()
     recall: npt.NDArray[np.float64] = labels.cumsum() / n_seen_relevant
     recall_lst: list[float] = recall.tolist()
@@ -194,10 +179,10 @@ def compute_recall(labels_: ArrayOrList) -> list[float | None]:
 
 
 def recall_frontier(
-        labels_: ArrayOrList,
-        n_docs: int,
-        bias: float = 1.0,
-        max_iter: int = 150,
+    labels_: ArrayOrList,
+    n_docs: int,
+    bias: float = 1.0,
+    max_iter: int = 150,
 ) -> tuple[list[float], list[float]]:
     """
     Calculates a p-score for our null hypothesis h0, that we have missed our recall target `recall_target`, across a range of recall_targets.
@@ -236,12 +221,7 @@ def recall_frontier(
 
 
 def retrospective_h0(
-        labels_: ArrayOrList,
-        n_docs: int,
-        recall_target: float = 0.95,
-        bias: float = 1.,
-        batch_size: int = 1000,
-        confidence_level: float = 0.95
+    labels_: ArrayOrList, n_docs: int, recall_target: float = 0.95, bias: float = 1.0, batch_size: int = 1000, confidence_level: float = 0.95
 ) -> tuple[list[int], list[float]]:
     """
     Calculates a p-score for our null hypothesis h0, that we have missed our recall target `recall_target`, every `batch_size` documents
@@ -265,13 +245,12 @@ def retrospective_h0(
     :return: A dictionary containing a list of batch sizes: `batch_sizes`.
         alongside a list of p-scores: `p`.
     """
-    labels: npt.NDArray[np.int_] = (labels_ if type(labels_) is np.ndarray
-                                    else np.array(labels_, dtype=np.int8))
+    labels: npt.NDArray[np.int_] = labels_ if type(labels_) is np.ndarray else np.array(labels_, dtype=np.int8)
 
-    n_seen_batch: list[int] =[]
+    n_seen_batch: list[int] = []
     batch_ps: list[float] = []
 
-    for n_seen in list(range(0, labels.shape[0], batch_size))[1:] +[ labels.shape[0]]:
+    for n_seen in list(range(0, labels.shape[0], batch_size))[1:] + [labels.shape[0]]:
         batch_labels = labels[:n_seen]
         p = calculate_h0(batch_labels, n_docs=n_docs, recall_target=recall_target, bias=bias)
         if p is not None:

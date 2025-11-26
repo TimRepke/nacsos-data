@@ -4,13 +4,7 @@ from datetime import datetime
 from uuid import UUID
 from enum import Enum
 from pydantic import BaseModel, ConfigDict
-from .annotations import (
-    AssignmentStatus,
-    AnnotationSchemeInfo,
-    FlatLabel,
-    Label,
-    AnnotationValue,
-    ItemAnnotation)
+from .annotations import AssignmentStatus, AnnotationSchemeInfo, FlatLabel, Label, AnnotationValue, ItemAnnotation
 from .users import UserModel
 
 

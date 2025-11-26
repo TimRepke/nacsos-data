@@ -1,17 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import \
-    Integer, \
-    String, \
-    Boolean, \
-    Float, \
-    DateTime, \
-    Enum as SAEnum, \
-    Identity, \
-    ForeignKey, \
-    UniqueConstraint, \
-    CheckConstraint
+from sqlalchemy import Integer, String, Boolean, Float, DateTime, Enum as SAEnum, Identity, ForeignKey, UniqueConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID, ARRAY
 
 from sqlalchemy.sql import func
@@ -40,16 +30,14 @@ class AnnotationScheme(Base):
     The actual annotation scheme is defined as a list of labels (see schemas.annotations.AnnotationSchemeLabel).
     The other fields pose as meta-data.
     """
+
     __tablename__ = 'annotation_scheme'
 
     # Unique identifier for this scheme.
-    annotation_scheme_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                         nullable=False, unique=True, index=True)
+    annotation_scheme_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # Reference to the project this AnnotationScheme belongs to.
-    project_id = mapped_column(UUID(as_uuid=True),
-                               ForeignKey(Project.project_id, ondelete='CASCADE'),
-                               nullable=False)
+    project_id = mapped_column(UUID(as_uuid=True), ForeignKey(Project.project_id, ondelete='CASCADE'), nullable=False)
 
     # A short descriptive title / name for this AnnotationScheme.
     # This may be displayed to the annotators.
@@ -76,8 +64,7 @@ class AnnotationScheme(Base):
     assignment_scopes: Relationship['AssignmentScope'] = relationship('AssignmentScope', cascade='all, delete')
 
     # reference to the associated bot annotations
-    bot_annotation_scopes: Relationship['BotAnnotationMetaData'] = relationship('BotAnnotationMetaData',
-                                                                                cascade='all, delete')
+    bot_annotation_scopes: Relationship['BotAnnotationMetaData'] = relationship('BotAnnotationMetaData', cascade='all, delete')
 
 
 class AssignmentScope(Base):
@@ -90,16 +77,14 @@ class AssignmentScope(Base):
     Logically, this should be viewed as a hierarchical organisation
     AnnotationScheme -> [AssignmentScope] -> Assignment -> Annotation
     """
+
     __tablename__ = 'assignment_scope'
 
     # Unique identifier for this scope
-    assignment_scope_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                        nullable=False, unique=True, index=True)
+    assignment_scope_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # The AnnotationScheme defining the annotation scheme to be used for this scope
-    annotation_scheme_id = mapped_column(UUID(as_uuid=True),
-                                         ForeignKey(AnnotationScheme.annotation_scheme_id, ondelete='CASCADE'),
-                                         nullable=False, index=True)
+    annotation_scheme_id = mapped_column(UUID(as_uuid=True), ForeignKey(AnnotationScheme.annotation_scheme_id, ondelete='CASCADE'), nullable=False, index=True)
 
     # Date and time when this assignment scope was created
     time_created = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -136,29 +121,21 @@ class Assignment(Base):
       * Creating assignments one at a time based on a set of rules (e.g. for double-coding, defined order, bias, ...)
       * Creating assignments in small batches or one-by-one in prioritised annotation settings
     """
+
     __tablename__ = 'assignment'
 
     # Unique identifier for this assignment
-    assignment_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                  nullable=False, unique=True, index=True)
+    assignment_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
     # The AssignmentScope this Assignment should logically be grouped into.
-    assignment_scope_id = mapped_column(UUID(as_uuid=True),
-                                        ForeignKey(AssignmentScope.assignment_scope_id, ondelete='CASCADE'),
-                                        nullable=False, index=True)
+    assignment_scope_id = mapped_column(UUID(as_uuid=True), ForeignKey(AssignmentScope.assignment_scope_id, ondelete='CASCADE'), nullable=False, index=True)
     # The User the AnnotationScheme/Item combination is assigned to
-    user_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(User.user_id),
-                            nullable=False, index=True)
+    user_id = mapped_column(UUID(as_uuid=True), ForeignKey(User.user_id), nullable=False, index=True)
 
     # The Item this assigment refers to.
-    item_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(Item.item_id, ondelete='CASCADE'),
-                            nullable=False, index=True)
+    item_id = mapped_column(UUID(as_uuid=True), ForeignKey(Item.item_id, ondelete='CASCADE'), nullable=False, index=True)
 
     # The AnnotationScheme defining the annotation scheme to be used for this assignment
-    annotation_scheme_id = mapped_column(UUID(as_uuid=True),
-                                         ForeignKey(AnnotationScheme.annotation_scheme_id),
-                                         nullable=False, index=True)
+    annotation_scheme_id = mapped_column(UUID(as_uuid=True), ForeignKey(AnnotationScheme.annotation_scheme_id), nullable=False, index=True)
 
     # The status of this assignment (to be updated with each annotation related to this assignment)
     status = mapped_column(SAEnum(AssignmentStatus), nullable=False, server_default='OPEN')
@@ -178,16 +155,14 @@ class Snippet(Base):
     It refers to a snippet of text with a specific offset in the text string if an item.
     It also contains a copy of that excerpt.
     """
+
     __tablename__ = 'snippet'
 
     # Unique identifier for this text snippet
-    snippet_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                               nullable=False, unique=True, index=True)
+    snippet_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # The Item this assigment refers to (redundant to implicit information from Assignment)
-    item_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(Item.item_id, ondelete='CASCADE'),
-                            nullable=False, index=True)
+    item_id = mapped_column(UUID(as_uuid=True), ForeignKey(Item.item_id, ondelete='CASCADE'), nullable=False, index=True)
 
     # The following fields should be set with the string offset within the respective Item.text
     offset_start = mapped_column(Integer, nullable=False)
@@ -214,46 +189,35 @@ class Annotation(Base):
     The interface/backend code should be used to make sure, to either not allow partial fulfillment of an
     AnnotationScheme or not display an Assignment as complete.
     """
+
     __tablename__ = 'annotation'
     __table_args__ = (
         UniqueConstraint('assignment_id', 'key', 'parent', 'repeat'),
-        CheckConstraint('num_nonnulls(value_bool, value_int, value_float, value_str, multi_int) = 1',
-                        name='annotation_has_value'),
+        CheckConstraint('num_nonnulls(value_bool, value_int, value_float, value_str, multi_int) = 1', name='annotation_has_value'),
     )
 
     # Unique identifier for this Annotation
-    annotation_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                  nullable=False, unique=True, index=True)
+    annotation_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # Date and time when this annotation was created (or last changed)
     time_created = mapped_column(DateTime(timezone=True), server_default=func.now())
     time_updated = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     # The Assignment this Annotation is responding to.
-    assignment_id = mapped_column(UUID(as_uuid=True),
-                                  ForeignKey(Assignment.assignment_id, ondelete='CASCADE'),
-                                  nullable=False, index=True)
+    assignment_id = mapped_column(UUID(as_uuid=True), ForeignKey(Assignment.assignment_id, ondelete='CASCADE'), nullable=False, index=True)
 
     # The User the AnnotationScheme/Item combination is assigned to (redundant to implicit information from Assignment)
-    user_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(User.user_id, ondelete='CASCADE'),
-                            nullable=False, index=True)
+    user_id = mapped_column(UUID(as_uuid=True), ForeignKey(User.user_id, ondelete='CASCADE'), nullable=False, index=True)
 
     # The Item this annotation refers to (redundant to implicit information from Assignment)
-    item_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(Item.item_id, ondelete='CASCADE'),
-                            nullable=False, index=True)
+    item_id = mapped_column(UUID(as_uuid=True), ForeignKey(Item.item_id, ondelete='CASCADE'), nullable=False, index=True)
 
     # When this annotation refers to an in-text excerpt, this refers to the respective snippet
-    snippet_id = mapped_column(UUID(as_uuid=True),
-                               ForeignKey(Snippet.snippet_id),
-                               nullable=True, index=True)
+    snippet_id = mapped_column(UUID(as_uuid=True), ForeignKey(Snippet.snippet_id), nullable=True, index=True)
 
     # The AnnotationScheme defining the annotation scheme to be used for this assignment
     # (redundant to implicit information from Assignment)
-    annotation_scheme_id = mapped_column(UUID(as_uuid=True),
-                                         ForeignKey(AnnotationScheme.annotation_scheme_id, ondelete='CASCADE'),
-                                         nullable=False, index=True)
+    annotation_scheme_id = mapped_column(UUID(as_uuid=True), ForeignKey(AnnotationScheme.annotation_scheme_id, ondelete='CASCADE'), nullable=False, index=True)
 
     # Defines which AnnotationSchemeLabel.key this Annotation refers to.
     # Note, that there is no correctness constraint, the frontend should make sure to send correct data!!
@@ -265,9 +229,7 @@ class Annotation(Base):
     repeat = mapped_column(Integer, nullable=False, default=1)
 
     # Reference to the parent labels' annotation.
-    parent = mapped_column(UUID(as_uuid=True),
-                           ForeignKey('annotation.annotation_id', ondelete='CASCADE'),
-                           nullable=True, index=True)
+    parent = mapped_column(UUID(as_uuid=True), ForeignKey('annotation.annotation_id', ondelete='CASCADE'), nullable=True, index=True)
 
     # Depending on the AnnotationSchemeLabel.kind, one of the following fields should be filled.
     # For single and mixed, the AnnotationSchemeLabelChoice.value should be filled in value_int.

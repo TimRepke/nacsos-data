@@ -33,13 +33,15 @@ def response_logger(logger: logging.Logger) -> Callable[[Response], dict[str, An
 
 
 class RequestClient(Client):
-    def __init__(self,  # type: ignore[no-untyped-def]
-                 *,
-                 max_req_per_sec: int = 5,
-                 max_retries: int = 5,
-                 backoff_rate: float = 120.,
-                 retry_on_status: list[int] | None = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,  # type: ignore[no-untyped-def]
+        *,
+        max_req_per_sec: int = 5,
+        max_retries: int = 5,
+        backoff_rate: float = 120.0,
+        retry_on_status: list[int] | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
 
         self.max_req_per_sec = max_req_per_sec
@@ -60,22 +62,22 @@ class RequestClient(Client):
         self.callbacks[status] = func
 
     @override
-    def request(
-            self,
-            method: str,
-            url: URL | str,
-            *,
-            content: RequestContent | None = None,
-            data: RequestData | None = None,
-            files: RequestFiles | None = None,
-            json: Any | None = None,
-            params: QueryParamTypes | None = None,
-            headers: HeaderTypes | None = None,
-            cookies: CookieTypes | None = None,
-            auth: AuthTypes | UseClientDefault | None = None,
-            follow_redirects: bool | UseClientDefault | None = True,
-            timeout: TimeoutTypes | UseClientDefault = 120,
-            extensions: RequestExtensions | None = None,
+    def request(  # noqa: C901
+        self,
+        method: str,
+        url: URL | str,
+        *,
+        content: RequestContent | None = None,
+        data: RequestData | None = None,
+        files: RequestFiles | None = None,
+        json: Any | None = None,
+        params: QueryParamTypes | None = None,
+        headers: HeaderTypes | None = None,
+        cookies: CookieTypes | None = None,
+        auth: AuthTypes | UseClientDefault | None = None,
+        follow_redirects: bool | UseClientDefault | None = True,
+        timeout: TimeoutTypes | UseClientDefault = 120,
+        extensions: RequestExtensions | None = None,
     ) -> Response:
         for retry in range(self.max_retries):
             # Check if we need to wait before the next request so we are staying below the rate limit
@@ -160,13 +162,15 @@ class RequestClient(Client):
 class AbstractAPI(ABC):
     logger: logging.Logger
 
-    def __init__(self,
-                 api_key: str | None = None,
-                 proxy: str | None = None,
-                 max_req_per_sec: int = 5,
-                 max_retries: int = 5,
-                 backoff_rate: float = 5.,
-                 logger: logging.Logger | None = None):
+    def __init__(
+        self,
+        api_key: str | None = None,
+        proxy: str | None = None,
+        max_req_per_sec: int = 5,
+        max_retries: int = 5,
+        backoff_rate: float = 5.0,
+        logger: logging.Logger | None = None,
+    ):
         self.api_key = api_key
         self.proxy = proxy
         self.max_req_per_sec = max_req_per_sec
@@ -180,9 +184,9 @@ class AbstractAPI(ABC):
 
     @abstractmethod
     def fetch_raw(
-            self,
-            query: str,
-            params: dict[str, Any] | None = None,
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         raise NotImplementedError
 
@@ -192,10 +196,10 @@ class AbstractAPI(ABC):
         raise NotImplementedError
 
     def fetch_translated(
-            self,
-            query: str,
-            project_id: str | uuid.UUID | None = None,
-            params: dict[str, Any] | None = None,
+        self,
+        query: str,
+        project_id: str | uuid.UUID | None = None,
+        params: dict[str, Any] | None = None,
     ) -> Generator[AcademicItemModel, None, None]:
         for record in self.fetch_raw(query, params=params):
             yield self.translate_record(record, project_id)
@@ -204,14 +208,13 @@ class AbstractAPI(ABC):
         collect_raw_jsonl(target=target, items=self.fetch_raw(query, params=params))
 
     def download_translated(
-            self,
-            query: str,
-            target: Path,
-            project_id: str | uuid.UUID | None = None,
-            params: dict[str, Any] | None = None,
+        self,
+        query: str,
+        target: Path,
+        project_id: str | uuid.UUID | None = None,
+        params: dict[str, Any] | None = None,
     ) -> None:
-        collect_jsonl(target=target,
-                      items=self.fetch_translated(query=query, project_id=project_id, params=params))
+        collect_jsonl(target=target, items=self.fetch_translated(query=query, project_id=project_id, params=params))
 
     @classmethod
     def read_translated(cls, source: Path, project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
@@ -227,10 +230,12 @@ class AbstractAPI(ABC):
                 f_out.write(item.model_dump_json(exclude_defaults=True) + '\n')
 
     @classmethod
-    def test_app(cls,  # type: ignore[no-untyped-def]
-                 static_files: list[str],
-                 proxy: str | None = None,
-                 logger: logging.Logger | None = None):
+    def test_app(
+        cls,  # type: ignore[no-untyped-def]
+        static_files: list[str],
+        proxy: str | None = None,
+        logger: logging.Logger | None = None,
+    ):
         import typer
 
         logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s (%(process)d): %(message)s', level='DEBUG')
@@ -239,13 +244,12 @@ class AbstractAPI(ABC):
 
         @app.command()
         def download(
-                api_key: Annotated[str, typer.Option(help='Valid API key')],
-                target: Annotated[Path, typer.Option(help='File to write results to')],
-                query_file: Annotated[Path | None, typer.Option(help='File containing search query')] = None,
-                query: Annotated[str | None, typer.Option(help='Search query')] = None,
-                alt_proxy: Annotated[str | None, typer.Option('--proxy', help='Proxy to use, e.g. "socks5://127.0.0.1:1080"')] = None,
+            api_key: Annotated[str, typer.Option(help='Valid API key')],
+            target: Annotated[Path, typer.Option(help='File to write results to')],
+            query_file: Annotated[Path | None, typer.Option(help='File containing search query')] = None,
+            query: Annotated[str | None, typer.Option(help='Search query')] = None,
+            alt_proxy: Annotated[str | None, typer.Option('--proxy', help='Proxy to use, e.g. "socks5://127.0.0.1:1080"')] = None,
         ) -> None:
-
             if query_file:
                 with open(query_file, 'r') as qf:
                     query_str = qf.read()
@@ -259,8 +263,8 @@ class AbstractAPI(ABC):
 
         @app.command()
         def convert(
-                source: Annotated[Path, typer.Option(help='File to read results from')],
-                target: Annotated[Path, typer.Option(help='File to write results to')],
+            source: Annotated[Path, typer.Option(help='File to read results from')],
+            target: Annotated[Path, typer.Option(help='File to write results to')],
         ) -> None:
             cls.convert_file(source=source, target=target)
 

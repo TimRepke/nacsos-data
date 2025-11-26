@@ -13,8 +13,7 @@ T = TypeVar('T')
 D = TypeVar('D')
 
 
-async def batched_async(lst: AsyncIterator[T] | AsyncGenerator[T, None], batch_size: int) \
-        -> AsyncGenerator[list[T], None]:
+async def batched_async(lst: AsyncIterator[T] | AsyncGenerator[T, None], batch_size: int) -> AsyncGenerator[list[T], None]:
     batch = []
     async for li in lst:
         batch.append(li)
@@ -114,9 +113,11 @@ def ensure_values(o: Any, *attrs: str | tuple[str, Any]) -> tuple[Any, ...]:
 
 def ensure_logger_async(fallback_logger: logging.Logger):  # type: ignore[no-untyped-def]
     def decorator(func):  # type: ignore[no-untyped-def]
-        async def wrapper(*args,  # type: ignore[no-untyped-def]
-                          log: logging.Logger | None = None,
-                          **kwargs):
+        async def wrapper(
+            *args,  # type: ignore[no-untyped-def]
+            log: logging.Logger | None = None,
+            **kwargs,
+        ):
             if log is None:
                 log = fallback_logger
             return await func(*args, log=log, **kwargs)
@@ -128,9 +129,11 @@ def ensure_logger_async(fallback_logger: logging.Logger):  # type: ignore[no-unt
 
 def ensure_logger(fallback_logger: logging.Logger):  # type: ignore[no-untyped-def]
     def decorator(func):  # type: ignore[no-untyped-def]
-        def wrapper(*args,  # type: ignore[no-untyped-def]
-                    log: logging.Logger | None = None,
-                    **kwargs):
+        def wrapper(
+            *args,  # type: ignore[no-untyped-def]
+            log: logging.Logger | None = None,
+            **kwargs,
+        ):
             if log is None:
                 log = fallback_logger
             return func(*args, log=log, **kwargs)

@@ -11,8 +11,7 @@ from .wosfile.record import records_from
 REGEX_C1 = re.compile(r'\[([^\]]+)\] (.*), (.*).')
 
 
-def read_wos_file(filepath: str,
-                  project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
+def read_wos_file(filepath: str, project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:  # noqa: C901
     for record in records_from([filepath]):
         item = AcademicItemModel(item_id=uuid.uuid4(), project_id=project_id)
 
@@ -41,12 +40,9 @@ def read_wos_file(filepath: str,
 
         # There are several fields that could qualify as the "source".
         # Check them all and pick the first one that is valid (non-empty)
-        source_candidates = [sc for sc in [record.get('JI'),
-                                           record.get('SE'),
-                                           record.get('SO'),
-                                           record.get('CT'),
-                                           record.get('J9')]
-                             if sc is not None and len(sc) > 0]
+        source_candidates = [
+            sc for sc in [record.get('JI'), record.get('SE'), record.get('SO'), record.get('CT'), record.get('J9')] if sc is not None and len(sc) > 0
+        ]
         if len(source_candidates) > 0:
             item.source = source_candidates[0]  # type: ignore[assignment]
 
@@ -54,10 +50,7 @@ def read_wos_file(filepath: str,
         if len(keywords) > 0:
             item.keywords = keywords
 
-        authors = {
-            author: AcademicAuthorModel(name=author)
-            for author in record.get('AF', [])
-        }
+        authors = {author: AcademicAuthorModel(name=author) for author in record.get('AF', [])}
         for orcid_entry in record.get('OI', []):
             try:
                 name, orcid = orcid_entry.split('/')
@@ -74,16 +67,11 @@ def read_wos_file(filepath: str,
                         author = authors[name]
                         if author.affiliations is None:
                             author.affiliations = []
-                        author.affiliations.append(AffiliationModel(
-                            name=institute,
-                            country=country
-                        ))
+                        author.affiliations.append(AffiliationModel(name=institute, country=country))
             except (ValueError, AttributeError):
                 pass
         item.authors = list(authors.values())
 
-        item.meta = {
-            'wos': dict(record)
-        }
+        item.meta = {'wos': dict(record)}
 
         yield item

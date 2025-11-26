@@ -23,17 +23,15 @@ class Item(Base):
     For querying and polymorphic querying, see the SQLAlchemy guide:
     https://docs.sqlalchemy.org/en/20/orm/queryguide/inheritance.html#loading-joined-inheritance
     """
+
     __tablename__ = 'item'
 
     # Unique identifier for this Item.
-    item_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                            nullable=False, unique=True, index=True)
+    item_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # reference to the project this item belongs to
     # see https://apsis.mcc-berlin.net/nacsos-docs/dev/schema/20_data/
-    project_id = mapped_column(UUID(as_uuid=True),
-                               ForeignKey(Project.project_id, ondelete='cascade'),
-                               nullable=False, index=True, primary_key=False)
+    project_id = mapped_column(UUID(as_uuid=True), ForeignKey(Project.project_id, ondelete='cascade'), nullable=False, index=True, primary_key=False)
 
     # The text for this item
     text = mapped_column(String, nullable=True)

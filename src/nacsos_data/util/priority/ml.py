@@ -11,43 +11,35 @@ logger = logging.getLogger('nacsos_data.util.priority.labels')
 
 def compute_metrics(p: tuple[np.ndarray, np.ndarray]) -> dict[str, np.ndarray]:
     import evaluate
+
     logits, labels = p
     predictions = np.argmax(logits, axis=-1)
     return {
-        'recall': evaluate.load('recall').compute(predictions=predictions,
-                                                  references=labels,
-                                                  zero_division=0,
-                                                  average='weighted')['recall'],
-        'precision': evaluate.load('precision').compute(predictions=predictions,
-                                                        references=labels,
-                                                        zero_division=0,
-                                                        average='weighted')['precision'],
-        'f1': evaluate.load('f1').compute(predictions=predictions,
-                                          references=labels,
-                                          labels=np.arange(len(labels)),
-                                          average='weighted')['f1'],
-        'accuracy': evaluate.load('accuracy').compute(predictions=predictions,
-                                                      references=labels,
-                                                      normalize=False)['accuracy']
+        'recall': evaluate.load('recall').compute(predictions=predictions, references=labels, zero_division=0, average='weighted')['recall'],
+        'precision': evaluate.load('precision').compute(predictions=predictions, references=labels, zero_division=0, average='weighted')['precision'],
+        'f1': evaluate.load('f1').compute(predictions=predictions, references=labels, labels=np.arange(len(labels)), average='weighted')['f1'],
+        'accuracy': evaluate.load('accuracy').compute(predictions=predictions, references=labels, normalize=False)['accuracy'],
     }
 
 
-def training(df: 'pd.DataFrame',  # type: ignore[no-untyped-def]
-             text: str = 'text',
-             source: str = 'incl',
-             target: str = 'pred|incl',
-             model_name: str = 'climatebert/distilroberta-base-climate-f',
-             max_len: int = 512,
-             train_split: float = 0.9,
-             n_epochs: int = 3,
-             batch_size_predict: int = 50,
-             batch_size_train: int = 16,
-             batch_size_eval: int = 50,
-             warmup_steps: int = 400,
-             weight_decay: float = 0.01,
-             logging_steps: int = 10,
-             eval_strategy='steps',
-             eval_steps: int = 50) -> 'pd.DataFrame':
+def training(
+    df: 'pd.DataFrame',  # type: ignore[no-untyped-def]
+    text: str = 'text',
+    source: str = 'incl',
+    target: str = 'pred|incl',
+    model_name: str = 'climatebert/distilroberta-base-climate-f',
+    max_len: int = 512,
+    train_split: float = 0.9,
+    n_epochs: int = 3,
+    batch_size_predict: int = 50,
+    batch_size_train: int = 16,
+    batch_size_eval: int = 50,
+    warmup_steps: int = 400,
+    weight_decay: float = 0.01,
+    logging_steps: int = 10,
+    eval_strategy='steps',
+    eval_steps: int = 50,
+) -> 'pd.DataFrame':
     import torch
     from tqdm import tqdm
     from datasets import Dataset
@@ -68,18 +60,15 @@ def training(df: 'pd.DataFrame',  # type: ignore[no-untyped-def]
 
     logger.info(f'From {df.shape[0]:,} rows, using {dfi.shape[0]:,} labels of [{labels}]')
     logger.info(f'Training data has {df_train.shape[0]:,} entries / {df_test.shape[0]:,} for testing')
-    logger.info(f'Training labels: {df_train['label'].value_counts()} / '
-                f'Testing labels: {df_test['label'].value_counts()}')
+    logger.info(f'Training labels: {df_train["label"].value_counts()} / Testing labels: {df_test["label"].value_counts()}')
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, max_length=max_len, model_max_length=max_len)  # type: ignore[no-untyped-call]
 
     train_dataset = Dataset.from_pandas(df_train)
-    train_dataset = train_dataset.map(lambda rows: tokenizer(rows[text], padding='max_length', truncation=True),
-                                      batched=True)
+    train_dataset = train_dataset.map(lambda rows: tokenizer(rows[text], padding='max_length', truncation=True), batched=True)
 
     eval_dataset = Dataset.from_pandas(df_test)
-    eval_dataset = eval_dataset.map(lambda rows: tokenizer(rows[text], padding='max_length', truncation=True),
-                                    batched=True)
+    eval_dataset = eval_dataset.map(lambda rows: tokenizer(rows[text], padding='max_length', truncation=True), batched=True)
 
     logger.info('Loading model...')
     model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=len(labels))
@@ -121,8 +110,7 @@ def training(df: 'pd.DataFrame',  # type: ignore[no-untyped-def]
             ds.set_format('torch')
 
             for batch in tqdm(ds.iter(batch_size=batch_size_predict)):
-                pred = model(input_ids=batch['input_ids'].to(device),
-                             attention_mask=batch['attention_mask'].to(device))
+                pred = model(input_ids=batch['input_ids'].to(device), attention_mask=batch['attention_mask'].to(device))
                 predictions.append(torch.softmax(pred.logits, dim=1).cpu())
 
         logger.info('Writing predictions to dataframe...')
@@ -138,32 +126,23 @@ def training(df: 'pd.DataFrame',  # type: ignore[no-untyped-def]
     return df
 
 
-def report(df: 'pd.DataFrame',
-           source: str = 'incl',
-           target: str = 'pred|incl') -> tuple['pd.DataFrame', 'pd.DataFrame']:
+def report(df: 'pd.DataFrame', source: str = 'incl', target: str = 'pred|incl') -> tuple['pd.DataFrame', 'pd.DataFrame']:
     from sklearn.metrics import classification_report
     import pandas as pd
 
     logger.info('Computing classification report on test data...')
     y_true = df[df[f'{target}-test'] == 1][source].to_numpy().astype(int)
     y_pred = df[df[f'{target}-test'] == 1][[f'{target}:0', f'{target}:1']].to_numpy()
-    test_eval = pd.DataFrame(classification_report(y_true, y_pred.argmax(axis=1),
-                                                   output_dict=True, zero_division=True,
-                                                   target_names=['Exclude', 'Include']))
+    test_eval = pd.DataFrame(classification_report(y_true, y_pred.argmax(axis=1), output_dict=True, zero_division=True, target_names=['Exclude', 'Include']))
 
     logger.info('Computing classification report on training data...')
     y_true = df[df[f'{target}-train'] == 1][source].to_numpy().astype(int)
     y_pred = df[df[f'{target}-train'] == 1][[f'{target}:0', f'{target}:1']].to_numpy()
-    self_eval = pd.DataFrame(classification_report(y_true, y_pred.argmax(axis=1),
-                                                   output_dict=True, zero_division=True,
-                                                   target_names=['Exclude', 'Include']))
+    self_eval = pd.DataFrame(classification_report(y_true, y_pred.argmax(axis=1), output_dict=True, zero_division=True, target_names=['Exclude', 'Include']))
     return test_eval, self_eval
 
 
-def workload_estimation(df: 'pd.DataFrame',
-                        source: str = 'incl',
-                        target: str = 'pred|incl',
-                        recall_targets: list[float] | None = None) -> str:
+def workload_estimation(df: 'pd.DataFrame', source: str = 'incl', target: str = 'pred|incl', recall_targets: list[float] | None = None) -> str:
     from sklearn.metrics import precision_recall_curve
 
     y_true = df[df[f'{target}-test'] == 1][source].to_numpy().astype(int)
@@ -172,7 +151,7 @@ def workload_estimation(df: 'pd.DataFrame',
     precision, recall, thresholds = precision_recall_curve(y_true, y_pred)
 
     ret = ''
-    for TARGET_RECALL in (recall_targets or [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.98]):
+    for TARGET_RECALL in recall_targets or [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.98]:
         ret += '=================================\n'
         ret += f'Stats for target recall of {TARGET_RECALL}\n'
         ret += '=================================\n'

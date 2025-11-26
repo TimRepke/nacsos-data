@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from nacsos_data.db.engine import ensure_session_async, DBSession
 
-GRAMMAR = '''
+GRAMMAR = """
 ?clause: expr
        | clause _and clause             -> and
        | clause _or  clause             -> or
@@ -47,7 +47,7 @@ _or: "OR"i | "|"
 %import common.WS
 
 %ignore WS
-'''
+"""
 
 
 class TypeTransformer(Transformer):  # type: ignore[type-arg]
@@ -97,7 +97,7 @@ class SortedAnnotation(BaseModel):
 async def get_annotations(session: DBSession, source_ids: list[str] | None = None) -> list[SortedAnnotation]:
     if source_ids is None:
         return []
-    stmt = text('''
+    stmt = text("""
                 WITH
                     sources as (
                         SELECT row_number() over () source_order, source_id
@@ -158,7 +158,7 @@ async def get_annotations(session: DBSession, source_ids: list[str] | None = Non
                 FROM labels
                 GROUP BY source_order, source_id, source_type, item_id, user_id
                 ORDER BY source_order, item_order;
-                ''')
+                """)
     rslt = await session.execute(stmt, {'source_ids': source_ids})
     return [SortedAnnotation.model_validate(r) for r in rslt.mappings().all()]
 
@@ -178,10 +178,12 @@ Plucker = Callable[[A, str, str], int | bool | None]
 
 
 def pluck_value_flat(annotation: ItemAnnotationValues, key: str, user: str, field: str) -> int | bool | None:
-    if (key in annotation
-            and user in getattr(annotation[key], field)
-            and getattr(annotation[key], field)[user] is not None
-            and len(getattr(annotation[key], field)[user]) > 0):
+    if (
+        key in annotation
+        and user in getattr(annotation[key], field)
+        and getattr(annotation[key], field)[user] is not None
+        and len(getattr(annotation[key], field)[user]) > 0
+    ):
         return getattr(annotation[key], field)[user][0]  # type: ignore[no-any-return]
     return None
 
@@ -217,17 +219,17 @@ def cmp(op: str, v1: int | bool | None, v2: int | bool | None) -> bool:
     raise ValueError(f'Unexpected comparator "{op}".')
 
 
-def test_entry(subtree: Tree | Token,  # type: ignore[type-arg]
-               annotation: A,
-               plucker: Plucker[A],
-               majority: bool = True) -> bool:
+def test_entry(
+    subtree: Tree | Token,  # type: ignore[type-arg]
+    annotation: A,
+    plucker: Plucker[A],
+    majority: bool = True,
+) -> bool:
     if isinstance(subtree, Tree):
         if subtree.data == 'and':
-            return (test_entry(subtree.children[0], annotation, plucker, majority)
-                    and test_entry(subtree.children[1], annotation, plucker, majority))
+            return test_entry(subtree.children[0], annotation, plucker, majority) and test_entry(subtree.children[1], annotation, plucker, majority)
         if subtree.data == 'or':
-            return (test_entry(subtree.children[0], annotation, plucker, majority)
-                    or test_entry(subtree.children[1], annotation, plucker, majority))
+            return test_entry(subtree.children[0], annotation, plucker, majority) or test_entry(subtree.children[1], annotation, plucker, majority)
         if subtree.data == 'not':
             return not test_entry(subtree.children[0], annotation, plucker, majority)
 
@@ -235,26 +237,28 @@ def test_entry(subtree: Tree | Token,  # type: ignore[type-arg]
             key = str(subtree.children[0])
             value = plucker(annotation, key, 'value_int')
             if majority:
-                return cmp(subtree.children[1],  # type: ignore[arg-type]
-                           value,
-                           subtree.children[2].value)  # type: ignore[union-attr]
+                return cmp(
+                    subtree.children[1],  # type: ignore[arg-type]
+                    value,
+                    subtree.children[2].value,
+                )  # type: ignore[union-attr]
 
         if subtree.data == 'bool_clause':
             key = str(subtree.children[0])
             value = plucker(annotation, key, 'value_bool')
             if majority:
-                return cmp(subtree.children[1],  # type: ignore[arg-type]
-                           value,
-                           subtree.children[2].value)  # type: ignore[union-attr]
+                return cmp(
+                    subtree.children[1],  # type: ignore[arg-type]
+                    value,
+                    subtree.children[2].value,
+                )  # type: ignore[union-attr]
 
         # if subtree.data == 'float_clause': TODO
         # if subtree.data == 'multi_clause': TODO
     raise SyntaxError('Invalid inclusion query.')
 
 
-def annotations_to_sequence(inclusion_rule: str,
-                            annotations: list[SortedAnnotation],
-                            majority: bool = True) -> list[int]:
+def annotations_to_sequence(inclusion_rule: str, annotations: list[SortedAnnotation], majority: bool = True) -> list[int]:
     """
     Transform labels to sequence when using the annotation-matrix-style format
     (e.g. via `get_annotations_by_user` `get_annotations`)
@@ -267,8 +271,4 @@ def annotations_to_sequence(inclusion_rule: str,
         raise NotImplementedError('any matching not implemented, yet')
 
     rule_tree = parse_rule(inclusion_rule)
-    return [int(test_entry(rule_tree,
-                           annotation=anno.labels,
-                           plucker=pluck_value_nest,
-                           majority=majority))
-            for anno in annotations]
+    return [int(test_entry(rule_tree, annotation=anno.labels, plucker=pluck_value_nest, majority=majority)) for anno in annotations]

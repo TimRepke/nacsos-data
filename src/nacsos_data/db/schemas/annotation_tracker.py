@@ -16,15 +16,13 @@ class AnnotationTracker(Base):
 
     You may have more than one tracker per project, for example for keeping track of different progresses.
     """
+
     __tablename__ = 'annotation_tracker'
 
     # Unique identifier for this tracker.
-    annotation_tracking_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                           nullable=False, unique=True, index=True)
+    annotation_tracking_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
     # The project this tracker is attached to
-    project_id = mapped_column(UUID(as_uuid=True),
-                               ForeignKey(Project.project_id, ondelete='CASCADE'),
-                               nullable=False, index=True, primary_key=False)
+    project_id = mapped_column(UUID(as_uuid=True), ForeignKey(Project.project_id, ondelete='CASCADE'), nullable=False, index=True, primary_key=False)
     # Descriptive name for this tracker
     name = mapped_column(String, nullable=False, unique=False, index=False)
     # String describing which (combination of) labels reflect inclusion criteria

@@ -26,7 +26,7 @@ Database = Literal['WOS', 'BCI', 'BIOABS', 'BIOSIS', 'CCC', 'DIIDW', 'DRCI', 'ME
 # FS - Custom Field Selection - must be combined with query parameter viewField. It is automatically selected if viewField is used.
 ViewOption = Literal['FR', 'SR', 'FS']
 
-T = TypeVar("T")
+T = TypeVar('T')
 
 
 def dump_wos_record(record: WosRecord) -> dict[str, Any]:
@@ -43,15 +43,17 @@ def get_title(wr: WosRecord) -> str | None:
 
 
 def get_abstract(wr: WosRecord) -> str | None:
-    if (wr.static_data.fullrecord_metadata is None
-            or wr.static_data.fullrecord_metadata.abstracts is None
-            or wr.static_data.fullrecord_metadata.abstracts.abstract is None):
+    if (
+        wr.static_data.fullrecord_metadata is None
+        or wr.static_data.fullrecord_metadata.abstracts is None
+        or wr.static_data.fullrecord_metadata.abstracts.abstract is None
+    ):
         return None
     abstracts = get_value(lambda: wr.static_data.fullrecord_metadata.abstracts.abstract)  # type: ignore[union-attr]
     if abstracts is None:
         return None
     for abstract in abstracts:
-        abstract_ = get_value(lambda: abstract.abstract_text.p)  # noqa: B023  # type: ignore[union-attr]
+        abstract_ = get_value(lambda: abstract.abstract_text.p)  # type: ignore[union-attr]  # noqa: B023
         if abstract_ is None:
             return None
         for abstract__ in abstract_:
@@ -61,9 +63,11 @@ def get_abstract(wr: WosRecord) -> str | None:
 
 
 def get_doi(wr: WosRecord) -> str | None:
-    if (wr.dynamic_data.cluster_related is None
-            or wr.dynamic_data.cluster_related.identifiers is None
-            or wr.dynamic_data.cluster_related.identifiers.IdentifierItem is None):
+    if (
+        wr.dynamic_data.cluster_related is None
+        or wr.dynamic_data.cluster_related.identifiers is None
+        or wr.dynamic_data.cluster_related.identifiers.IdentifierItem is None
+    ):
         return None
     identifiers = get_value(lambda: wr.dynamic_data.cluster_related.identifiers.IdentifierItem)  # type: ignore[union-attr]
     if identifiers is None:
@@ -75,9 +79,7 @@ def get_doi(wr: WosRecord) -> str | None:
 
 
 def get_source(wr: WosRecord) -> str | None:
-    if (wr.static_data.summary is None
-            or wr.static_data.summary.titles is None
-            or wr.static_data.summary.titles.title is None):
+    if wr.static_data.summary is None or wr.static_data.summary.titles is None or wr.static_data.summary.titles.title is None:
         return None
     for title in wr.static_data.summary.titles.title:
         if title.type == 'source':
@@ -86,14 +88,14 @@ def get_source(wr: WosRecord) -> str | None:
 
 
 def get_keywords(wr: WosRecord) -> list[str] | None:
-    if (wr.static_data.fullrecord_metadata is None
-            or wr.static_data.fullrecord_metadata.keywords is None
-            or wr.static_data.fullrecord_metadata.keywords.keyword is None):
+    if (
+        wr.static_data.fullrecord_metadata is None
+        or wr.static_data.fullrecord_metadata.keywords is None
+        or wr.static_data.fullrecord_metadata.keywords.keyword is None
+    ):
         return None
 
-    if (wr.static_data.item is None
-            or wr.static_data.item.keywords_plus is None
-            or wr.static_data.item.keywords_plus.keyword is None):
+    if wr.static_data.item is None or wr.static_data.item.keywords_plus is None or wr.static_data.item.keywords_plus.keyword is None:
         return None
     kw1 = get_value(lambda: wr.static_data.fullrecord_metadata.keywords.keyword)  # type: ignore[union-attr]
     kw2 = get_value(lambda: wr.static_data.item.keywords_plus.keyword)  # type: ignore[union-attr]
@@ -117,44 +119,44 @@ def translate_authors(record: WosRecord) -> list[AcademicAuthorModel] | None:
 
 
 class WoSAPI(AbstractAPI):
-    def __init__(self,
-                 api_key: str,
-                 # Number of records to return, must be 0-100.
-                 page_size: int = 5,
-                 # Database to search. WOK represents all databases.
-                 # Available values : WOS, BCI, BIOABS, BIOSIS, CABI, CCC, CSCD, DCI, DIIDW, FSTA, GRANTS, INSPEC, MEDLINE, PPRN, PQDT, SCIELO, WOK, ZOOREC
-                 database: str = 'WOK',
-                 proxy: str | None = None,
-                 max_req_per_sec: int = 5,
-                 max_retries: int = 5,
-                 backoff_rate: float = 5.,
-                 logger: logging.Logger | None = None):
-        super().__init__(api_key=api_key, proxy=proxy, max_retries=max_retries,
-                         max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
+    def __init__(
+        self,
+        api_key: str,
+        # Number of records to return, must be 0-100.
+        page_size: int = 5,
+        # Database to search. WOK represents all databases.
+        # Available values : WOS, BCI, BIOABS, BIOSIS, CABI, CCC, CSCD, DCI, DIIDW, FSTA, GRANTS, INSPEC, MEDLINE, PPRN, PQDT, SCIELO, WOK, ZOOREC
+        database: str = 'WOK',
+        proxy: str | None = None,
+        max_req_per_sec: int = 5,
+        max_retries: int = 5,
+        backoff_rate: float = 5.0,
+        logger: logging.Logger | None = None,
+    ):
+        super().__init__(api_key=api_key, proxy=proxy, max_retries=max_retries, max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
         self.database = database
         self.page_size = page_size
 
     def fetch_raw(self, query: str, params: dict[str, Any] | None = None) -> Generator[dict[str, Any], None, None]:
         """
-           Web of Science ExpandedAPI wrapper for downloading all records for a given query.
+        Web of Science ExpandedAPI wrapper for downloading all records for a given query.
 
-           Documentation:
-           https://developer.clarivate.com/apis/wos
-           https://api.clarivate.com/swagger-ui/?apikey=none&url=https%3A%2F%2Fdeveloper.clarivate.com%2Fapis%2Fwos%2Fswagger
+        Documentation:
+        https://developer.clarivate.com/apis/wos
+        https://api.clarivate.com/swagger-ui/?apikey=none&url=https%3A%2F%2Fdeveloper.clarivate.com%2Fapis%2Fwos%2Fswagger
 
-           Search syntax
-           https://webofscience.help.clarivate.com/en-us/Content/advanced-search.html
-           https://webofscience.help.clarivate.com/en-us/Content/wos-core-collection/woscc-search-field-tags.htm
+        Search syntax
+        https://webofscience.help.clarivate.com/en-us/Content/advanced-search.html
+        https://webofscience.help.clarivate.com/en-us/Content/wos-core-collection/woscc-search-field-tags.htm
 
-           :return:
-           """
+        :return:
+        """
         if self.api_key is None:
             raise AssertionError('Missing API key!')
 
-        with RequestClient(backoff_rate=self.backoff_rate,
-                           max_req_per_sec=self.max_req_per_sec,
-                           max_retries=self.max_retries,
-                           proxy=self.proxy) as request_client:
+        with RequestClient(
+            backoff_rate=self.backoff_rate, max_req_per_sec=self.max_req_per_sec, max_retries=self.max_retries, proxy=self.proxy
+        ) as request_client:
             page = request_client.get(
                 'https://api.clarivate.com/api/wos',
                 params={
@@ -203,9 +205,11 @@ class WoSAPI(AbstractAPI):
                     yield from records
 
                     n_records += len(records)
-                    self.logger.info(f'Found {n_records:,}/{records_found:,} records in {records_searched:,} records '
-                                     f'after processing page {n_pages} for query {query_id} '
-                                     f'(remaining this year = {remaining_year} | remaining / second = {remaining_sec})')
+                    self.logger.info(
+                        f'Found {n_records:,}/{records_found:,} records in {records_searched:,} records '
+                        f'after processing page {n_pages} for query {query_id} '
+                        f'(remaining this year = {remaining_year} | remaining / second = {remaining_sec})'
+                    )
 
                     if n_records >= records_found:
                         self.logger.info('Reached num_results')
@@ -219,7 +223,7 @@ class WoSAPI(AbstractAPI):
                             'optionView': 'FR',
                             'firstRecord': n_records + 1,
                         },
-                        headers={'X-ApiKey': self.api_key}
+                        headers={'X-ApiKey': self.api_key},
                     )
 
                 except Exception as e:
@@ -243,20 +247,19 @@ class WoSAPI(AbstractAPI):
             source=get_source(wos_record),
             keywords=get_keywords(wos_record),
             authors=translate_authors(wos_record),
-            meta={'wos-api': dump_wos_record(wos_record)}
+            meta={'wos-api': dump_wos_record(wos_record)},
         )
 
 
 if __name__ == '__main__':
-
     import json
 
     app = WoSAPI.test_app(
         static_files=[
             # 'scratch/academic_apis/response_scopus1.json',
             # 'scratch/academic_apis/response_scopus2.jsonl',
-        ])
-
+        ]
+    )
 
     @app.command()  # type: ignore[misc]
     def offline() -> None:
@@ -270,6 +273,5 @@ if __name__ == '__main__':
                 for record in records:
                     item = WoSAPI.translate_record(record)
                     print(item)
-
 
     app()

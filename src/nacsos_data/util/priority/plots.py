@@ -7,8 +7,7 @@ if TYPE_CHECKING:
     from matplotlib import pyplot as plt
 
 
-def inclusion_curve(df: 'pd.DataFrame', key: str = 'incl',
-                    fig_params: dict[str, Any] | None = None) -> 'plt.Figure':
+def inclusion_curve(df: 'pd.DataFrame', key: str = 'incl', fig_params: dict[str, Any] | None = None) -> 'plt.Figure':
     from matplotlib import pyplot as plt
 
     seen = ~df[key].isna()
@@ -17,32 +16,31 @@ def inclusion_curve(df: 'pd.DataFrame', key: str = 'incl',
     fig, ax = plt.subplots(figsize=(15, 5), **(fig_params or {}))
 
     ax.set_title('Actual annotations we did')
-    ax.plot(df[seen]
-            .sort_values(['scope_order', 'item_order'], ascending=True)[key]
-            .cumsum(skipna=True)
-            .reset_index(drop=True))
+    ax.plot(df[seen].sort_values(['scope_order', 'item_order'], ascending=True)[key].cumsum(skipna=True).reset_index(drop=True))
     ax.set_xlabel('Number of documents seen')
     ax.set_ylabel('Number of included documents')
     fig.tight_layout()
     return fig
 
 
-def scope_inclusions(df: 'pd.DataFrame', key: str = 'incl',
-                     fig_params: dict[str, Any] | None = None) -> tuple['plt.Figure', 'pd.DataFrame']:
+def scope_inclusions(df: 'pd.DataFrame', key: str = 'incl', fig_params: dict[str, Any] | None = None) -> tuple['plt.Figure', 'pd.DataFrame']:
     from matplotlib import pyplot as plt
     import pandas as pd
+
     seen = ~df[key].isna()
 
     n_items = df[seen].groupby('scope_order')['item_id'].count()
     n_incl = df[seen].groupby('scope_order')[key].sum()
 
-    df = pd.DataFrame({
-        'n_items': n_items,
-        'n_incl': n_incl,
-        'n_excl': n_items - n_incl,
-        'p_incl': (n_incl / n_items) * 100,
-        'p_excl': ((n_items - n_incl) / n_items) * 100,
-    })
+    df = pd.DataFrame(
+        {
+            'n_items': n_items,
+            'n_incl': n_incl,
+            'n_excl': n_items - n_incl,
+            'p_incl': (n_incl / n_items) * 100,
+            'p_excl': ((n_items - n_incl) / n_items) * 100,
+        }
+    )
 
     axes: tuple[plt.Axes, plt.Axes]
     fig, axes = plt.subplots(1, 2, figsize=(15, 5), **(fig_params or {}))
@@ -69,13 +67,15 @@ def scope_inclusions(df: 'pd.DataFrame', key: str = 'incl',
     return fig, df
 
 
-def buscar_frontiers(df: 'pd.DataFrame',
-                     key: str = 'incl',
-                     batch_size: int = 100,
-                     recall_target: float = 0.95,
-                     bias: float = 1.,
-                     confidence_level: float = 0.95,
-                     fig_params: dict[str, Any] | None = None) -> tuple['plt.Figure', 'pd.DataFrame', 'pd.DataFrame']:
+def buscar_frontiers(
+    df: 'pd.DataFrame',
+    key: str = 'incl',
+    batch_size: int = 100,
+    recall_target: float = 0.95,
+    bias: float = 1.0,
+    confidence_level: float = 0.95,
+    fig_params: dict[str, Any] | None = None,
+) -> tuple['plt.Figure', 'pd.DataFrame', 'pd.DataFrame']:
     from matplotlib import pyplot as plt
     import pandas as pd
 
@@ -92,11 +92,9 @@ def buscar_frontiers(df: 'pd.DataFrame',
     n_total = df.shape[0]
 
     # Compute H0
-    buscar_seen, buscar_ps = retrospective_h0(df[seen][key], n_total,
-                                              batch_size=batch_size,
-                                              recall_target=recall_target,
-                                              bias=bias,
-                                              confidence_level=confidence_level)
+    buscar_seen, buscar_ps = retrospective_h0(
+        df[seen][key], n_total, batch_size=batch_size, recall_target=recall_target, bias=bias, confidence_level=confidence_level
+    )
     # Compute frontier
     recall_targets, recall_ps = recall_frontier(df[key].dropna(), df.shape[0], bias=bias)
 
@@ -120,19 +118,19 @@ def buscar_frontiers(df: 'pd.DataFrame',
     ax2.grid()
 
     fig.tight_layout()
-    return (fig,
-            pd.DataFrame({'batch_size': buscar_seen, 'p': buscar_ps}),
-            pd.DataFrame({'recall': recall_targets, 'p': recall_ps}))
+    return (fig, pd.DataFrame({'batch_size': buscar_seen, 'p': buscar_ps}), pd.DataFrame({'recall': recall_targets, 'p': recall_ps}))
 
 
-def buscar_workload(df: 'pd.DataFrame',  # Assuming df is ordered by (scope_order, item_order)!
-                    source: str = 'incl',
-                    target: str = 'pred|incl',
-                    batch_size: int = 100,
-                    recall_target: float = 0.95,
-                    bias: float = 1.,
-                    confidence_level: float = 0.95,
-                    fig_params: dict[str, Any] | None = None) -> tuple['plt.Figure', 'pd.DataFrame']:
+def buscar_workload(
+    df: 'pd.DataFrame',  # Assuming df is ordered by (scope_order, item_order)!
+    source: str = 'incl',
+    target: str = 'pred|incl',
+    batch_size: int = 100,
+    recall_target: float = 0.95,
+    bias: float = 1.0,
+    confidence_level: float = 0.95,
+    fig_params: dict[str, Any] | None = None,
+) -> tuple['plt.Figure', 'pd.DataFrame']:
     from matplotlib import pyplot as plt
     import pandas as pd
     import numpy as np
@@ -163,19 +161,14 @@ def buscar_workload(df: 'pd.DataFrame',  # Assuming df is ordered by (scope_orde
     data['seen'] = data['incl'].notna().astype(int)
 
     # Order dataframe by human labels first and unseen items sorted by classification score, highest first
-    data = (pd
-            .concat([data[mask_seen],
-                     data.loc[data[mask_unseen].sort_values('prediction', ascending=False).index]])
-            .reset_index()
-            .rename(columns={'index': 'orig_order'}))
+    data = (
+        pd.concat([data[mask_seen], data.loc[data[mask_unseen].sort_values('prediction', ascending=False).index]])
+        .reset_index()
+        .rename(columns={'index': 'orig_order'})
+    )
 
     # Compute H0
-    buscar = retrospective_h0(data['label'],
-                              num_total,
-                              batch_size=batch_size,
-                              recall_target=recall_target,
-                              bias=bias,
-                              confidence_level=confidence_level)
+    buscar = retrospective_h0(data['label'], num_total, batch_size=batch_size, recall_target=recall_target, bias=bias, confidence_level=confidence_level)
     # Add buscar score to table
     data.loc[buscar[0][:-1], 'buscar'] = buscar[1][:-1]
 
@@ -200,10 +193,9 @@ def buscar_workload(df: 'pd.DataFrame',  # Assuming df is ordered by (scope_orde
     return fig, data
 
 
-def roc_auc(df: 'pd.DataFrame',
-            source: str = 'incl',
-            target: str = 'pred|incl',
-            fig_params: dict[str, Any] | None = None) -> tuple['plt.Figure', 'pd.DataFrame']:
+def roc_auc(
+    df: 'pd.DataFrame', source: str = 'incl', target: str = 'pred|incl', fig_params: dict[str, Any] | None = None
+) -> tuple['plt.Figure', 'pd.DataFrame']:
     import numpy as np
     import pandas as pd
     from matplotlib import pyplot as plt
@@ -233,10 +225,7 @@ def roc_auc(df: 'pd.DataFrame',
     return fig, pd.DataFrame({'precision': precision, 'recall': recall, 'threshold': thresholds.tolist() + [1]})
 
 
-def score_distribution(df: 'pd.DataFrame',
-                       source: str = 'incl',
-                       target: str = 'pred|incl',
-                       fig_params: dict[str, Any] | None = None) -> 'plt.Figure':
+def score_distribution(df: 'pd.DataFrame', source: str = 'incl', target: str = 'pred|incl', fig_params: dict[str, Any] | None = None) -> 'plt.Figure':
     import numpy as np
     from matplotlib import pyplot as plt
 

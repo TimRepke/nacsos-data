@@ -24,12 +24,11 @@ APIMap: dict[APIEnum, Type[AbstractAPI]] = {
     APIEnum.WOS: WoSAPI,
     APIEnum.DIMENSIONS: DimensionsAPI,
     APIEnum.PUBMED: PubmedAPI,
-    APIEnum.SCOPUS: ScopusAPI
+    APIEnum.SCOPUS: ScopusAPI,
 }
 
 __all__ = [
-    'DimensionsAPI'
-    'ScopusAPI',
+    'DimensionsAPIScopusAPI',
     'PubmedAPI',
     'OpenAlexAPI',
     'OpenAlexSolrAPI',

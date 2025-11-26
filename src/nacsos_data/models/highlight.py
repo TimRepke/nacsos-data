@@ -13,6 +13,7 @@ class HighlighterModel(BaseModel):
 
     Each matching group will be wrapped in a highlight span in the frontend.
     """
+
     # Unique identifier for this Highlighter
     highlighter_id: str | UUID
     # Reference to a project

@@ -12,9 +12,7 @@ from nacsos_data.util.errors import MissingIdError
 
 
 @ensure_session_async
-async def query_tasks(session: DBSession,
-                      order_by_fields: list[tuple[str, bool]] | None = None,
-                      **kwargs: Any) -> list[TaskModel] | None:
+async def query_tasks(session: DBSession, order_by_fields: list[tuple[str, bool]] | None = None, **kwargs: Any) -> list[TaskModel] | None:
     """
     Get tasks, all of them or filtered by custom criteria specified as keyword arguments.
 
@@ -64,15 +62,13 @@ async def read_task_by_id(session: DBSession, task_id: str | uuid.UUID) -> TaskM
 @ensure_session_async
 async def read_tasks_by_ids(session: DBSession, task_ids: list[str] | list[uuid.UUID]) -> list[TaskModel]:
     stmt = select(Task).where(Task.task_id.in_(task_ids))
-    return [TaskModel.model_validate(r.__dict__)
-            for r in (await session.execute(stmt)).scalars().all()]
+    return [TaskModel.model_validate(r.__dict__) for r in (await session.execute(stmt)).scalars().all()]
 
 
 @ensure_session_async
 async def read_tasks_by_fingerprint(session: DBSession, fingerprint: str) -> list[TaskModel]:
     stmt = select(Task).where(Task.fingerprint == fingerprint)
-    return [TaskModel.model_validate(r.__dict__)
-            for r in (await session.execute(stmt)).scalars().all()]
+    return [TaskModel.model_validate(r.__dict__) for r in (await session.execute(stmt)).scalars().all()]
 
 
 @ensure_session_async
@@ -102,8 +98,7 @@ class StatusForTask(BaseModel):
 @ensure_session_async
 async def read_task_statuses(session: DBSession, task_ids: list[str] | list[uuid.UUID]) -> list[StatusForTask]:
     stmt = select(Task.task_id, Task.status).where(Task.task_id.in_(task_ids))
-    return [StatusForTask.model_validate(r.__dict__)
-            for r in (await session.execute(stmt)).scalars().all()]
+    return [StatusForTask.model_validate(r.__dict__) for r in (await session.execute(stmt)).scalars().all()]
 
 
 @ensure_session_async
@@ -137,12 +132,13 @@ async def reset_failed(session: DBSession) -> None:
 @ensure_session_async
 async def upsert_task(session: DBSession, task: TaskModel) -> TaskModel:
     from sqlalchemy.dialects.postgresql import insert as pg_insert
-    result = (await session.scalars(pg_insert(Task)
-                                    .values(**task.model_dump())
-                                    .on_conflict_do_update(index_elements=[Task.task_id],
-                                                           set_=task.model_dump())
-                                    .returning(Task),
-                                    execution_options={"populate_existing": True})).one_or_none()
+
+    result = (
+        await session.scalars(
+            pg_insert(Task).values(**task.model_dump()).on_conflict_do_update(index_elements=[Task.task_id], set_=task.model_dump()).returning(Task),
+            execution_options={'populate_existing': True},
+        )
+    ).one_or_none()
     await session.flush_or_commit()
     return TaskModel.model_validate(result.__dict__)
 

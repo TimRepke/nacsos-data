@@ -3,26 +3,13 @@ import codecs
 import logging
 import pathlib
 from csv import DictReader
-from typing import (
-    AnyStr,
-    BinaryIO,
-    Dict,
-    IO,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    TextIO,
-    Type,
-    Union,
-    Any
-)
+from typing import AnyStr, BinaryIO, Dict, IO, Iterable, Iterator, List, Optional, TextIO, Type, Union, Any
 
 from .tags import has_item_per_line
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["get_reader", "read", "PlainTextReader", "ReadError", "TabDelimitedReader"]
+__all__ = ['get_reader', 'read', 'PlainTextReader', 'ReadError', 'TabDelimitedReader']
 
 FileName = Union[str, pathlib.Path]
 
@@ -63,32 +50,29 @@ def sniff_encoding(fh: BinaryIO) -> str:
     # respectively. When dealing with files with BOM, avoid the encodings
     # 'utf-8' (which is fine for non-BOM UTF-8), 'utf-16-le', and 'utf-16-be'.
     # See e.g. http://stackoverflow.com/a/8827604
-    encodings = {codecs.BOM_UTF16: "utf-16", codecs.BOM_UTF8: "utf-8-sig"}
+    encodings = {codecs.BOM_UTF16: 'utf-16', codecs.BOM_UTF8: 'utf-8-sig'}
     for bom, encoding in encodings.items():
         if sniff.startswith(bom):
             return encoding
     # WoS export files are either UTF-8 or UTF-16
-    return "utf-8"
+    return 'utf-8'
 
 
 def get_reader(fh: TextIO) -> Type[Reader]:
     """Get appropriate reader for the file type of `fh`"""
     sniff = sniff_file(fh)
 
-    if sniff.startswith("FN "):
+    if sniff.startswith('FN '):
         return PlainTextReader
-    elif "\t" in sniff:
+    elif '\t' in sniff:
         return TabDelimitedReader
     else:
         # XXX TODO Raised for empty file -- not very elegant
-        raise ReadError("Could not determine appropriate reader for file {}".format(fh))
+        raise ReadError('Could not determine appropriate reader for file {}'.format(fh))
 
 
 def read(
-        fname: Union[FileName, Iterable[FileName]],
-        using: Optional[Type[Reader]] = None,
-        encoding: str | None = None,
-        **kwargs: Any
+    fname: Union[FileName, Iterable[FileName]], using: Optional[Type[Reader]] = None, encoding: str | None = None, **kwargs: Any
 ) -> Iterator[Dict[str, str]]:
     """Read WoS export file ('tab-delimited' or 'plain text')
 
@@ -112,7 +96,7 @@ def read(
 
     else:
         if encoding is None:
-            with open(fname, "rb") as fh_sniff:
+            with open(fname, 'rb') as fh_sniff:
                 encoding = sniff_encoding(fh_sniff)
 
         if using is None:
@@ -137,7 +121,7 @@ class TabDelimitedReader(Reader):
 
         """
         super().__init__(fh, **kwargs)
-        self.reader = DictReader(self.fh, delimiter="\t", **kwargs)
+        self.reader = DictReader(self.fh, delimiter='\t', **kwargs)
 
     def __next__(self) -> Dict[str, str]:
         record = next(self.reader)
@@ -162,29 +146,26 @@ class PlainTextReader(Reader):
 
         """
         super().__init__(fh, **kwargs)
-        self.version = "1.0"  # Expected version of WoS plain text format
+        self.version = '1.0'  # Expected version of WoS plain text format
         self.current_line = 0
 
         line = self._next_nonempty_line()
-        if not line.startswith("FN"):
-            raise ReadError("Unknown file format")
+        if not line.startswith('FN'):
+            raise ReadError('Unknown file format')
 
         line = self._next_nonempty_line()
         label, version = line.split()
-        if label != "VR" or version != self.version:
-            raise ReadError(
-                "Unknown version: expected {} "
-                "but got {}".format(self.version, version)
-            )
+        if label != 'VR' or version != self.version:
+            raise ReadError('Unknown version: expected {} but got {}'.format(self.version, version))
 
     def _next_line(self) -> str:
         """Get next line as string"""
         self.current_line += 1
-        return next(self.fh).rstrip("\n")
+        return next(self.fh).rstrip('\n')
 
     def _next_nonempty_line(self) -> str:
         """Get next line that is not empty"""
-        line = ""
+        line = ''
         while not line:
             line = self._next_line()
         return line
@@ -197,16 +178,12 @@ class PlainTextReader(Reader):
                 line = self._next_nonempty_line()
             except StopIteration as err:
                 raise ReadError("Encountered EOF before 'EF' marker") from err
-            if line.startswith("EF"):
+            if line.startswith('EF'):
                 if lines:  # We're in the middle of a record!
-                    raise ReadError(
-                        "Encountered unexpected end of file marker EF on line {}".format(
-                            self.current_line
-                        )
-                    )
+                    raise ReadError('Encountered unexpected end of file marker EF on line {}'.format(self.current_line))
                 else:  # End of file
                     raise StopIteration
-            if line.startswith("ER"):  # end of record
+            if line.startswith('ER'):  # end of record
                 return lines
             else:
                 lines.append(line)
@@ -214,30 +191,30 @@ class PlainTextReader(Reader):
     def _format_values(self, heading: str, values: List[str]) -> str:
         try:
             if has_item_per_line[heading]:  # Iterable field with one item per line
-                return "; ".join(values)
+                return '; '.join(values)
             else:
-                return " ".join(values)
+                return ' '.join(values)
         except KeyError:
             msg = (
-                "\n------------ ERROR ------------\n"
+                '\n------------ ERROR ------------\n'
                 f'Seems that the tag "{heading}" is new and not yet handled by the wosfile library.\n'
-                "Please report this error:\n"
-                "  https://github.com/rafguns/wosfile/issues\n"
-                "We are sorry for the inconvenience.\n"
+                'Please report this error:\n'
+                '  https://github.com/rafguns/wosfile/issues\n'
+                'We are sorry for the inconvenience.\n'
             )
             # raise NotImplementedError(msg)
             logger.warning(msg)
-            return " ".join(values)
+            return ' '.join(values)
 
     def __next__(self) -> Dict[str, str]:
         record = {}
         values: List[str] = []
-        heading = ""
+        heading = ''
         lines = self._next_record_lines()
         try:
             # Parse record, this is mostly handling multi-line fields
             for line in lines:
-                if not line.startswith("  "):  # new field
+                if not line.startswith('  '):  # new field
                     # Add previous field, if available, to record
                     if heading:
                         record[heading] = self._format_values(heading, values)

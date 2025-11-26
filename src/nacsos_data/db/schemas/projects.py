@@ -26,11 +26,11 @@ class Project(Base):
     they way they are augmented by annotations and analysis outcomes is always constrained to the scope
     of a Project.
     """
+
     __tablename__ = 'project'
 
     # Unique identifier for this project
-    project_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                               nullable=False, unique=True, index=True)
+    project_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # Unique descriptive name/title for the project
     name = mapped_column(String, unique=True, nullable=False)
@@ -53,25 +53,18 @@ class Project(Base):
     # ORM reference to all items in the project
     # Note, that they will not be loaded into memory automatically!
     # https://docs.sqlalchemy.org/en/20/orm/large_collections.html
-    items: WriteOnlyMapped[list['Item']] = relationship(cascade="all, delete-orphan",
-                                                        passive_deletes=True)
+    items: WriteOnlyMapped[list['Item']] = relationship(cascade='all, delete-orphan', passive_deletes=True)
     # === Project settings ===
     # True = motivational quotes are shown to the user
     setting_motivational_quotes = mapped_column(Boolean, nullable=False, server_default=text('true'), default=True)
 
     # === Project relationships (quick way to access project-related data)
-    permissions: Relationship['ProjectPermissions'] = relationship('ProjectPermissions',
-                                                                   cascade='all, delete')
-    highlighters: Relationship['Highlighter'] = relationship('Highlighter',
-                                                             cascade='all, delete')
-    bot_annotation_metadata_entries: Relationship['BotAnnotationMetaData'] = relationship('BotAnnotationMetaData',
-                                                                                          cascade='all, delete')
-    annotation_schemes: Relationship['AnnotationScheme'] = relationship('AnnotationScheme',
-                                                                        cascade='all, delete')
-    annotation_trackers: Relationship['AnnotationTracker'] = relationship('AnnotationTracker',
-                                                                          cascade='all, delete')
-    imports: Relationship['Import'] = relationship('Import',
-                                                   cascade='all, delete')
+    permissions: Relationship['ProjectPermissions'] = relationship('ProjectPermissions', cascade='all, delete')
+    highlighters: Relationship['Highlighter'] = relationship('Highlighter', cascade='all, delete')
+    bot_annotation_metadata_entries: Relationship['BotAnnotationMetaData'] = relationship('BotAnnotationMetaData', cascade='all, delete')
+    annotation_schemes: Relationship['AnnotationScheme'] = relationship('AnnotationScheme', cascade='all, delete')
+    annotation_trackers: Relationship['AnnotationTracker'] = relationship('AnnotationTracker', cascade='all, delete')
+    imports: Relationship['Import'] = relationship('Import', cascade='all, delete')
 
 
 class ProjectPermissions(Base):
@@ -84,24 +77,18 @@ class ProjectPermissions(Base):
     It is assumed, that a user can always see and edit their own contributions (e.g. annotations) but
     by giving them permission to view annotations, they can also see other users' annotations.
     """
+
     __tablename__ = 'project_permissions'
-    __table_args__ = (
-        UniqueConstraint('project_id', 'user_id'),
-    )
+    __table_args__ = (UniqueConstraint('project_id', 'user_id'),)
 
     # Unique identifier for this set of permissions
-    project_permission_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                          nullable=False, unique=True, index=True)
+    project_permission_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # Refers to the project this permission relates to
-    project_id = mapped_column(UUID(as_uuid=True),
-                               ForeignKey(Project.project_id),
-                               nullable=False, index=True, unique=False)
+    project_id = mapped_column(UUID(as_uuid=True), ForeignKey(Project.project_id), nullable=False, index=True, unique=False)
 
     # Refers to the User this set of permissions for this project refers to
-    user_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(User.user_id),
-                            nullable=False, index=True, unique=False)
+    user_id = mapped_column(UUID(as_uuid=True), ForeignKey(User.user_id), nullable=False, index=True, unique=False)
 
     # If true, the user has all permissions for this project
     # Note: All other permission settings below will be ignored if set to "true"

@@ -16,13 +16,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from ..conf import load_settings
 from ...db import DatabaseEngineAsync, get_engine_async
 from ...db.crud.imports import get_or_create_import, set_session_mutex
-from ...db.crud.items.academic import (
-    AcademicItemGenerator,
-    read_item_entries_from_db,
-    gen_academic_entries,
-    read_known_ids_map,
-    IdField
-)
+from ...db.crud.items.academic import AcademicItemGenerator, read_item_entries_from_db, gen_academic_entries, read_known_ids_map, IdField
 from ...db.schemas import AcademicItem, m2m_import_item_table
 from ...db.schemas.imports import ImportRevision
 from ...models.items import AcademicItemModel, ItemEntry
@@ -43,9 +37,7 @@ def _read_buffered_items(fp: IO[str]) -> Generator[AcademicItemModel, None, None
         yield AcademicItemModel.model_validate_json(line)
 
 
-def _check_known_identifiers(item: AcademicItemModel,
-                             known_ids: dict[str, dict[str, str]],
-                             logger: logging.Logger) -> str | bool:
+def _check_known_identifiers(item: AcademicItemModel, known_ids: dict[str, dict[str, str]], logger: logging.Logger) -> str | bool:
     for id_field in ID_FIELDS:  # check each item
         identifier = getattr(item, id_field)
         item_id = known_ids[id_field].get(identifier, None)
@@ -58,12 +50,8 @@ def _check_known_identifiers(item: AcademicItemModel,
 
 
 async def _find_id_duplicates(
-        session: AsyncSession,
-        new_items: AcademicItemGenerator,
-        fp: IO[str],
-        project_id: str,
-        logger: logging.Logger,
-        allow_empty_text: bool = False) -> tuple[int, int, dict[str, int], set[str]]:
+    session: AsyncSession, new_items: AcademicItemGenerator, fp: IO[str], project_id: str, logger: logging.Logger, allow_empty_text: bool = False
+) -> tuple[int, int, dict[str, int], set[str]]:
     with elapsed_timer(logger, 'Fetching all known IDs from current project'):
         known_ids: dict[str, dict[str, str]]
         known_ids = {
@@ -100,29 +88,33 @@ async def _find_id_duplicates(
     return n_unknown_items, n_new_items, token_counts, m2m_buffer
 
 
-async def _upsert_m2m(session: AsyncSession, item_id: str, import_id: str, latest_revision: int,
-                      dry_run: bool, logger: logging.Logger) -> None:
+async def _upsert_m2m(session: AsyncSession, item_id: str, import_id: str, latest_revision: int, dry_run: bool, logger: logging.Logger) -> None:
     if dry_run:
         logger.debug(' [DRY-RUN] -> Upserted many-to-many relationship for import/item')
     else:
-        stmt_m2m = (insert_pg(m2m_import_item_table)
-                    .values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit,
-                            first_revision=latest_revision, latest_revision=latest_revision)
-                    .on_conflict_do_update(constraint='m2m_import_item_pkey',
-                                           set_={
-                                               'latest_revision': latest_revision,
-                                           }))
+        stmt_m2m = (
+            insert_pg(m2m_import_item_table)
+            .values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit, first_revision=latest_revision, latest_revision=latest_revision)
+            .on_conflict_do_update(
+                constraint='m2m_import_item_pkey',
+                set_={
+                    'latest_revision': latest_revision,
+                },
+            )
+        )
         await session.execute(stmt_m2m)
         await session.flush()
         logger.debug(' -> Upserted many-to-many relationship for import/item')
 
 
-async def _find_duplicate(session: AsyncSession,
-                          item: AcademicItemModel,
-                          project_id: str,
-                          min_text_len: int,
-                          index: PynndescentDuplicateIndex | MilvusDuplicateIndex,
-                          logger: logging.Logger) -> str | None:
+async def _find_duplicate(
+    session: AsyncSession,
+    item: AcademicItemModel,
+    project_id: str,
+    min_text_len: int,
+    index: PynndescentDuplicateIndex | MilvusDuplicateIndex,
+    logger: logging.Logger,
+) -> str | None:
     txt = itm2txt(item)
     if len(txt) > min_text_len:
         existing_id = index.test(ItemEntry(item_id=str(item.item_id), text=txt))
@@ -130,18 +122,20 @@ async def _find_duplicate(session: AsyncSession,
             logger.debug(f'  -> Text lookup found duplicate: {existing_id}')
             return existing_id
 
-    duplicates = await find_duplicates(item=item,
-                                       project_id=str(project_id),
-                                       check_tslug=True,
-                                       check_tslug_advanced=True,
-                                       check_doi=True,
-                                       check_wos_id=True,
-                                       check_scopus_id=True,
-                                       check_oa_id=True,
-                                       check_pubmed_id=True,
-                                       check_dimensions_id=True,
-                                       check_s2_id=True,
-                                       session=session)
+    duplicates = await find_duplicates(
+        item=item,
+        project_id=str(project_id),
+        check_tslug=True,
+        check_tslug_advanced=True,
+        check_doi=True,
+        check_wos_id=True,
+        check_scopus_id=True,
+        check_oa_id=True,
+        check_pubmed_id=True,
+        check_dimensions_id=True,
+        check_s2_id=True,
+        session=session,
+    )
     if duplicates is not None and len(duplicates):
         existing_id = str(duplicates[0].item_id)
         logger.debug(f'  -> There are at least {len(duplicates)}; I will probably use {existing_id}')
@@ -166,13 +160,13 @@ def _ensure_clean_item(item: AcademicItemModel, project_id: str) -> AcademicItem
 
 
 async def _insert_item(
-        session: AsyncSession,
-        item: AcademicItemModel,
-        import_id: str,
-        import_revision: int,
-        dry_run: bool,
-        logger: logging.Logger,
-        existing_id: str | None = None,
+    session: AsyncSession,
+    item: AcademicItemModel,
+    import_id: str,
+    import_revision: int,
+    dry_run: bool,
+    logger: logging.Logger,
+    existing_id: str | None = None,
 ) -> tuple[str, bool]:
     """
     Returns the item_id of the item that was inserted. This might be the existing ID or a new one.
@@ -209,66 +203,75 @@ async def _insert_item(
         return existing_id, True
 
     logger.debug(f'  -> Creating variant for item_id {existing_id} with variant_id {item.item_id}!')
-    has_changes = await duplicate_insertion(orig_item_id=existing_id,
-                                            import_id=import_id,
-                                            import_revision=import_revision,
-                                            new_item=item,
-                                            session=session)
+    has_changes = await duplicate_insertion(orig_item_id=existing_id, import_id=import_id, import_revision=import_revision, new_item=item, session=session)
     return existing_id, has_changes
 
 
 async def _get_latest_revision_counter(session: AsyncSession, import_id: str | uuid.UUID) -> int:
-    latest_revision: int = (await session.execute(  # type: ignore[assignment]
-        text('SELECT COALESCE(MAX("import_revision_counter"), 0) as latest_revision '
-             'FROM import_revision '
-             'WHERE import_id=:import_id;'),
-        {'import_id': import_id}
-    )).scalar()
+    latest_revision: int = (
+        await session.execute(  # type: ignore[assignment]
+            text('SELECT COALESCE(MAX("import_revision_counter"), 0) as latest_revision FROM import_revision WHERE import_id=:import_id;'),
+            {'import_id': import_id},
+        )
+    ).scalar()
     return latest_revision
 
 
 async def _get_latest_revision(session: AsyncSession, import_id: str | uuid.UUID) -> ImportRevisionModel | None:
-    rslt = (await session.execute(
-        text('SELECT * FROM import_revision WHERE import_id=:import_id ORDER BY import_revision_counter DESC LIMIT 1;'),
-        {'import_id': import_id}
-    )).mappings().one_or_none()
+    rslt = (
+        (
+            await session.execute(
+                text('SELECT * FROM import_revision WHERE import_id=:import_id ORDER BY import_revision_counter DESC LIMIT 1;'), {'import_id': import_id}
+            )
+        )
+        .mappings()
+        .one_or_none()
+    )
     if rslt:
         return ImportRevisionModel(**rslt)
     return None
 
 
-def _revision_required(num_new_items: int | None, last_revision: ImportRevisionModel | None,
-                       min_update_size: int | None, logger: logging.Logger) -> bool:
-    if (min_update_size is not None
-            and num_new_items is not None
-            and last_revision is not None
-            and last_revision.num_items_retrieved is not None
-            and abs(last_revision.num_items_retrieved - num_new_items) < min_update_size):
-        logger.warning(f'Expected a difference of {min_update_size} between {num_new_items:,} new items in query and '
-                       f'{last_revision.num_items_retrieved:,} items in latest revision. Ending here!')
+def _revision_required(num_new_items: int | None, last_revision: ImportRevisionModel | None, min_update_size: int | None, logger: logging.Logger) -> bool:
+    if (
+        min_update_size is not None
+        and num_new_items is not None
+        and last_revision is not None
+        and last_revision.num_items_retrieved is not None
+        and abs(last_revision.num_items_retrieved - num_new_items) < min_update_size
+    ):
+        logger.warning(
+            f'Expected a difference of {min_update_size} between {num_new_items:,} new items in query and '
+            f'{last_revision.num_items_retrieved:,} items in latest revision. Ending here!'
+        )
         return False
     return True
 
 
-async def _update_statistics(session: AsyncSession,
-                             project_id: str | uuid.UUID,
-                             import_id: str | uuid.UUID,
-                             revision_id: str | uuid.UUID,
-                             latest_revision: int,
-                             num_new_items: int,
-                             num_updated: int,
-                             logger: logging.Logger) -> None:
+async def _update_statistics(
+    session: AsyncSession,
+    project_id: str | uuid.UUID,
+    import_id: str | uuid.UUID,
+    revision_id: str | uuid.UUID,
+    latest_revision: int,
+    num_new_items: int,
+    num_updated: int,
+    logger: logging.Logger,
+) -> None:
     with elapsed_timer(logger, 'Updating revision stats...'):
-        num_items = (await session.execute(text('SELECT count(1) FROM m2m_import_item WHERE import_id = :import_id'),
-                                           {'import_id': import_id})).scalar()
-        num_items_new = (await session.execute(text('SELECT count(1) '
-                                                    'FROM m2m_import_item '
-                                                    'WHERE first_revision = :rev AND import_id=:import_id'),
-                                               {'rev': latest_revision, 'import_id': import_id})).scalar()
-        num_items_removed = (await session.execute(text('SELECT count(1) '
-                                                        'FROM m2m_import_item '
-                                                        'WHERE latest_revision = :rev AND import_id=:import_id'),
-                                                   {'rev': latest_revision - 1, 'import_id': import_id})).scalar()
+        num_items = (await session.execute(text('SELECT count(1) FROM m2m_import_item WHERE import_id = :import_id'), {'import_id': import_id})).scalar()
+        num_items_new = (
+            await session.execute(
+                text('SELECT count(1) FROM m2m_import_item WHERE first_revision = :rev AND import_id=:import_id'),
+                {'rev': latest_revision, 'import_id': import_id},
+            )
+        ).scalar()
+        num_items_removed = (
+            await session.execute(
+                text('SELECT count(1) FROM m2m_import_item WHERE latest_revision = :rev AND import_id=:import_id'),
+                {'rev': latest_revision - 1, 'import_id': import_id},
+            )
+        ).scalar()
         revision_stats = {
             'num_items': num_items,
             'num_items_retrieved': num_new_items,
@@ -277,22 +280,20 @@ async def _update_statistics(session: AsyncSession,
             'num_items_removed': num_items_removed,
         }
         logger.info(f'Setting new revision stats: {revision_stats}')
-        await session.execute(update(ImportRevision)
-                              .where(ImportRevision.import_revision_id == revision_id)
-                              .values(**revision_stats))
+        await session.execute(update(ImportRevision).where(ImportRevision.import_revision_id == revision_id).values(**revision_stats))
         await session.commit()
 
     return None
 
 
 async def import_academic_items_nodedup_forced(
-        db_engine: DatabaseEngineAsync,
-        project_id: str | uuid.UUID,
-        new_items: AcademicItemGenerator,
-        user_id: str | uuid.UUID,
-        name: str | uuid.UUID,
-        description: str,
-        logger: logging.Logger | None = None,
+    db_engine: DatabaseEngineAsync,
+    project_id: str | uuid.UUID,
+    new_items: AcademicItemGenerator,
+    user_id: str | uuid.UUID,
+    name: str | uuid.UUID,
+    description: str,
+    logger: logging.Logger | None = None,
 ) -> tuple[str, int | None]:
     if logger is None:
         logger = logging.getLogger('nacsos_data.util.academic.import')
@@ -303,22 +304,21 @@ async def import_academic_items_nodedup_forced(
         await set_session_mutex(session, project_id=project_id, lock=True)
 
         # Get the import and figure out what ids to deduplicate on, based on import type
-        import_orm = await get_or_create_import(session=session,
-                                                project_id=project_id,
-                                                user_id=user_id,
-                                                import_name=name,
-                                                description=description,
-                                                i_type='script')
+        import_orm = await get_or_create_import(
+            session=session, project_id=project_id, user_id=user_id, import_name=name, description=description, i_type='script'
+        )
         import_id = str(import_orm.import_id)
 
         revision_id = str(uuid.uuid4())
 
         # Create a new revision
-        session.add(ImportRevision(
-            import_revision_id=revision_id,
-            import_id=import_id,
-            import_revision_counter=1,
-        ))
+        session.add(
+            ImportRevision(
+                import_revision_id=revision_id,
+                import_id=import_id,
+                import_revision_counter=1,
+            )
+        )
         n_items = 0
         for item in new_items():
             try:
@@ -328,20 +328,28 @@ async def import_academic_items_nodedup_forced(
                         item = _ensure_clean_item(item, project_id=str(project_id))
 
                         # Insert a new item or an item variant
-                        item_id, has_changes = await _insert_item(session=session, item=item, import_id=import_id, existing_id=None,
-                                                                  import_revision=1, dry_run=False, logger=logger)
+                        item_id, has_changes = await _insert_item(
+                            session=session, item=item, import_id=import_id, existing_id=None, import_revision=1, dry_run=False, logger=logger
+                        )
 
                         # UPSERT m2m
-                        await _upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=1,
-                                          logger=logger, dry_run=False)
+                        await _upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=1, logger=logger, dry_run=False)
                         n_items += 1
 
             except (UniqueViolation, IntegrityError, OperationalError) as e:
                 logger.exception(e)
 
         logger.info('Writing statistics!')
-        await _update_statistics(session=session, project_id=project_id, import_id=import_id, revision_id=revision_id,
-                                 latest_revision=1, num_new_items=n_items, num_updated=0, logger=logger)
+        await _update_statistics(
+            session=session,
+            project_id=project_id,
+            import_id=import_id,
+            revision_id=revision_id,
+            latest_revision=1,
+            num_new_items=n_items,
+            num_updated=0,
+            logger=logger,
+        )
 
         logger.info('Free our import mutex!')
         await set_session_mutex(session, project_id=project_id, lock=False)
@@ -355,24 +363,24 @@ async def import_academic_items_nodedup_forced(
 
 
 async def import_academic_items(
-        db_engine: DatabaseEngineAsync,
-        project_id: str | uuid.UUID,
-        new_items: AcademicItemGenerator,
-        import_name: str | None = None,
-        import_id: str | uuid.UUID | None = None,
-        pipeline_task_id: str | None = None,
-        user_id: str | uuid.UUID | None = None,
-        description: str | None = None,
-        vectoriser: CountVectorizer | None = None,
-        min_update_size: int | None = None,
-        num_new_items: int | None = None,
-        max_slop: float = 0.05,
-        min_text_len: int = 300,
-        batch_size: int = 2000,
-        max_features: int = 5000,
-        dry_run: bool = True,
-        logger: logging.Logger | None = None,
-        allow_empty_text: bool = False,
+    db_engine: DatabaseEngineAsync,
+    project_id: str | uuid.UUID,
+    new_items: AcademicItemGenerator,
+    import_name: str | None = None,
+    import_id: str | uuid.UUID | None = None,
+    pipeline_task_id: str | None = None,
+    user_id: str | uuid.UUID | None = None,
+    description: str | None = None,
+    vectoriser: CountVectorizer | None = None,
+    min_update_size: int | None = None,
+    num_new_items: int | None = None,
+    max_slop: float = 0.05,
+    min_text_len: int = 300,
+    batch_size: int = 2000,
+    max_features: int = 5000,
+    dry_run: bool = True,
+    logger: logging.Logger | None = None,
+    allow_empty_text: bool = False,
 ) -> tuple[str, int | None]:
     """
     Helper function for programmatically importing `AcademicItem`s into the platform.
@@ -449,13 +457,9 @@ async def import_academic_items(
             await set_session_mutex(session, project_id=project_id, lock=True)
 
             # Get the import and figure out what ids to deduplicate on, based on import type
-            import_orm = await get_or_create_import(session=session,
-                                                    project_id=project_id,
-                                                    import_id=import_id,
-                                                    user_id=user_id,
-                                                    import_name=import_name,
-                                                    description=description,
-                                                    i_type='script')
+            import_orm = await get_or_create_import(
+                session=session, project_id=project_id, import_id=import_id, user_id=user_id, import_name=import_name, description=description, i_type='script'
+            )
             import_id = str(import_orm.import_id)
 
             revision_id = str(uuid.uuid4())
@@ -465,20 +469,21 @@ async def import_academic_items(
                 latest_revision = last_revision.import_revision_counter + 1
 
                 # Check if we should even create a new revision based on the difference in the number of query results
-                if not _revision_required(num_new_items=num_new_items, last_revision=last_revision,
-                                          min_update_size=min_update_size, logger=logger):
+                if not _revision_required(num_new_items=num_new_items, last_revision=last_revision, min_update_size=min_update_size, logger=logger):
                     # Free our import mutex
                     await set_session_mutex(session, project_id=project_id, lock=False)
                     # Return without committing anything (note, that freeing mutex will roll back session!
                     return import_id, None
 
             # Create a new revision
-            session.add(ImportRevision(
-                import_revision_id=revision_id,
-                import_id=import_id,
-                import_revision_counter=latest_revision,
-                pipeline_task_id=pipeline_task_id,
-            ))
+            session.add(
+                ImportRevision(
+                    import_revision_id=revision_id,
+                    import_id=import_id,
+                    import_revision_counter=latest_revision,
+                    pipeline_task_id=pipeline_task_id,
+                )
+            )
             await session.commit()  # Note, committing instead of flushing here, so this is persisted for reference even on error
 
             with elapsed_timer(logger, 'Checking new items for obvious ID-based duplicates'):
@@ -495,8 +500,7 @@ async def import_academic_items(
 
             # Check if we should even create a new revision based on the difference in the number of query results.
             # This is repeating the previous check in case the `num_new_items` parameter was left empty before.
-            if not _revision_required(num_new_items=num_new_items, last_revision=last_revision,
-                                      min_update_size=min_update_size, logger=logger):
+            if not _revision_required(num_new_items=num_new_items, last_revision=last_revision, min_update_size=min_update_size, logger=logger):
                 # Free our import mutex (note, that freeing mutex will roll back session!)
                 await set_session_mutex(session, project_id=project_id, lock=False)
                 # Return without committing anything
@@ -516,17 +520,14 @@ async def import_academic_items(
             async with db_engine.session() as session:  # type: AsyncSession
                 index = MilvusDuplicateIndex(
                     existing_items=read_item_entries_from_db(
-                        session=session,
-                        batch_size=batch_size,
-                        project_id=project_id,
-                        min_text_len=min_text_len,
-                        log=logger
+                        session=session, batch_size=batch_size, project_id=project_id, min_text_len=min_text_len, log=logger
                     ),
                     new_items=gen_academic_entries(_read_buffered_items(duplicate_buffer)),
                     project_id=project_id,
                     vectoriser=vectoriser,
                     max_slop=max_slop,
-                    batch_size=batch_size)
+                    batch_size=batch_size,
+                )
 
                 with elapsed_timer(logger, '  -> initialising duplicate detection index...'):
                     await index.init()
@@ -537,8 +538,7 @@ async def import_academic_items(
         async with db_engine.session() as session:  # type: AsyncSession
             with elapsed_timer(logger, f'Inserting {len(m2m_buffer):,} buffered m2m relations'):
                 for item_id in m2m_buffer:
-                    await _upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=latest_revision,
-                                      logger=logger, dry_run=dry_run)
+                    await _upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=latest_revision, logger=logger, dry_run=dry_run)
 
             if n_unknown_items == 0 or index is None:
                 logger.info('No unknown items found, ending here!')
@@ -546,9 +546,16 @@ async def import_academic_items(
                 await session.commit()
 
                 # Updating revision stats
-                await _update_statistics(session=session, project_id=project_id, import_id=import_id, revision_id=revision_id,
-                                         latest_revision=latest_revision, num_new_items=num_new_items, num_updated=num_updated,
-                                         logger=logger)
+                await _update_statistics(
+                    session=session,
+                    project_id=project_id,
+                    import_id=import_id,
+                    revision_id=revision_id,
+                    latest_revision=latest_revision,
+                    num_new_items=num_new_items,
+                    num_updated=num_updated,
+                    logger=logger,
+                )
 
                 # Free our import mutex
                 await set_session_mutex(session, project_id=project_id, lock=False)
@@ -568,18 +575,26 @@ async def import_academic_items(
                             item = _ensure_clean_item(item, project_id=str(project_id))
 
                             # Search for duplicates in the index and the database
-                            existing_id = await _find_duplicate(session=session, item=item, project_id=str(project_id),
-                                                                min_text_len=min_text_len, index=index, logger=logger)
+                            existing_id = await _find_duplicate(
+                                session=session, item=item, project_id=str(project_id), min_text_len=min_text_len, index=index, logger=logger
+                            )
 
                             # Insert a new item or an item variant
-                            item_id, has_changes = await _insert_item(session=session, item=item, existing_id=existing_id,
-                                                                      import_id=import_id, import_revision=latest_revision, dry_run=dry_run,
-                                                                      logger=logger)
+                            item_id, has_changes = await _insert_item(
+                                session=session,
+                                item=item,
+                                existing_id=existing_id,
+                                import_id=import_id,
+                                import_revision=latest_revision,
+                                dry_run=dry_run,
+                                logger=logger,
+                            )
                             num_updated += has_changes
 
                             # UPSERT m2m
-                            await _upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=latest_revision,
-                                              logger=logger, dry_run=dry_run)
+                            await _upsert_m2m(
+                                session=session, item_id=item_id, import_id=import_id, latest_revision=latest_revision, logger=logger, dry_run=dry_run
+                            )
 
                 except (UniqueViolation, IntegrityError, OperationalError) as e:
                     logger.exception(e)
@@ -592,8 +607,16 @@ async def import_academic_items(
         index.client.drop_collection(index.collection_name)
 
     async with db_engine.session() as session:  # type: AsyncSession
-        await _update_statistics(session=session, project_id=project_id, import_id=import_id, revision_id=revision_id,
-                                 latest_revision=latest_revision, num_new_items=num_new_items, num_updated=num_updated, logger=logger)
+        await _update_statistics(
+            session=session,
+            project_id=project_id,
+            import_id=import_id,
+            revision_id=revision_id,
+            latest_revision=latest_revision,
+            num_new_items=num_new_items,
+            num_updated=num_updated,
+            logger=logger,
+        )
         # Free our import mutex
         await set_session_mutex(session, project_id=project_id, lock=False)
 
@@ -601,14 +624,16 @@ async def import_academic_items(
     return import_id, latest_revision
 
 
-async def import_wos_files(sources: list[Path],
-                           db_config: Path,
-                           project_id: str | None = None,
-                           import_id: str | None = None,
-                           pipeline_task_id: str | None = None,
-                           min_update_size: int | None = None,
-                           num_new_items: int | None = None,
-                           logger: logging.Logger | None = None) -> tuple[str, int | None]:
+async def import_wos_files(
+    sources: list[Path],
+    db_config: Path,
+    project_id: str | None = None,
+    import_id: str | None = None,
+    pipeline_task_id: str | None = None,
+    min_update_size: int | None = None,
+    num_new_items: int | None = None,
+    logger: logging.Logger | None = None,
+) -> tuple[str, int | None]:
     """
     Import Web of Science files in ISI format.
     Each record will be checked for duplicates within the project.
@@ -625,6 +650,7 @@ async def import_wos_files(sources: list[Path],
     """
 
     from nacsos_data.util.academic.readers.wos import read_wos_file
+
     if len(sources) == 0:
         raise ValueError('Missing source files!')
 
@@ -658,18 +684,20 @@ async def import_wos_files(sources: list[Path],
         max_slop=0.05,
         batch_size=5000,
         dry_run=False,
-        logger=logger
+        logger=logger,
     )
 
 
-async def import_scopus_csv_file(sources: list[Path],
-                                 db_config: Path,
-                                 project_id: str | None = None,
-                                 import_id: str | None = None,
-                                 pipeline_task_id: str | None = None,
-                                 min_update_size: int | None = None,
-                                 num_new_items: int | None = None,
-                                 logger: logging.Logger | None = None) -> tuple[str, int | None]:
+async def import_scopus_csv_file(
+    sources: list[Path],
+    db_config: Path,
+    project_id: str | None = None,
+    import_id: str | None = None,
+    pipeline_task_id: str | None = None,
+    min_update_size: int | None = None,
+    num_new_items: int | None = None,
+    logger: logging.Logger | None = None,
+) -> tuple[str, int | None]:
     """
     Import Scopus files in CSV format.
     Consult the [documentation](https://apsis.mcc-berlin.net/nacsos-docs/user/import/) before continuing!
@@ -687,6 +715,7 @@ async def import_scopus_csv_file(sources: list[Path],
     """
 
     from nacsos_data.util.academic.readers.scopus import read_scopus_csv_file
+
     if len(sources) == 0:
         raise ValueError('Missing source files!')
 
@@ -720,18 +749,20 @@ async def import_scopus_csv_file(sources: list[Path],
         max_slop=0.05,
         batch_size=5000,
         dry_run=False,
-        logger=logger
+        logger=logger,
     )
 
 
-async def import_academic_db(sources: list[Path],
-                             db_config: Path,
-                             project_id: str | None = None,
-                             import_id: str | None = None,
-                             pipeline_task_id: str | None = None,
-                             min_update_size: int | None = None,
-                             num_new_items: int | None = None,
-                             logger: logging.Logger | None = None) -> tuple[str, int | None]:
+async def import_academic_db(
+    sources: list[Path],
+    db_config: Path,
+    project_id: str | None = None,
+    import_id: str | None = None,
+    pipeline_task_id: str | None = None,
+    min_update_size: int | None = None,
+    num_new_items: int | None = None,
+    logger: logging.Logger | None = None,
+) -> tuple[str, int | None]:
     """
     Import articles that are in the exact format of how AcademicItems are stored in the database.
     We assume one JSON-encoded AcademicItemModel per line.
@@ -782,21 +813,23 @@ async def import_academic_db(sources: list[Path],
         max_slop=0.05,
         batch_size=5000,
         dry_run=False,
-        logger=logger
+        logger=logger,
     )
 
 
-async def import_openalex(query: str,
-                          openalex_url: str,
-                          nacsos_config: Path,
-                          def_type: DefType = 'lucene',
-                          field: SearchField = 'title_abstract',
-                          op: OpType = 'AND',
-                          project_id: str | None = None,
-                          import_id: str | None = None,
-                          pipeline_task_id: str | None = None,
-                          min_update_size: int | None = None,
-                          logger: logging.Logger | None = None) -> tuple[str, int | None]:
+async def import_openalex(
+    query: str,
+    openalex_url: str,
+    nacsos_config: Path,
+    def_type: DefType = 'lucene',
+    field: SearchField = 'title_abstract',
+    op: OpType = 'AND',
+    project_id: str | None = None,
+    import_id: str | None = None,
+    pipeline_task_id: str | None = None,
+    min_update_size: int | None = None,
+    logger: logging.Logger | None = None,
+) -> tuple[str, int | None]:
     """
     Import items from our self-hosted Solr database.
     Each record will be checked for duplicates within the project.
@@ -818,6 +851,7 @@ async def import_openalex(query: str,
         The import_id to connect these items to (required)
     """
     from nacsos_data.util.academic.apis import OpenAlexSolrAPI
+
     logger = logging.getLogger('import_openalex') if logger is None else logger
 
     settings = load_settings(nacsos_config)
@@ -832,8 +866,7 @@ async def import_openalex(query: str,
 
     def from_source() -> Generator[AcademicItemModel, None, None]:
         yield from (
-            solr_client
-            .fetch_translated(
+            solr_client.fetch_translated(
                 query=query,
                 project_id=project_id,
             )
@@ -867,18 +900,20 @@ async def import_openalex(query: str,
         max_slop=0.05,
         batch_size=5000,
         dry_run=False,
-        logger=logger
+        logger=logger,
     )
 
 
-async def import_openalex_files(sources: list[Path],
-                                db_config: Path,
-                                project_id: str | None = None,
-                                import_id: str | None = None,
-                                pipeline_task_id: str | None = None,
-                                min_update_size: int | None = None,
-                                num_new_items: int | None = None,
-                                logger: logging.Logger | None = None) -> tuple[str, int | None]:
+async def import_openalex_files(
+    sources: list[Path],
+    db_config: Path,
+    project_id: str | None = None,
+    import_id: str | None = None,
+    pipeline_task_id: str | None = None,
+    min_update_size: int | None = None,
+    num_new_items: int | None = None,
+    logger: logging.Logger | None = None,
+) -> tuple[str, int | None]:
     """
     Import articles that are in the OpenAlex format used in our solr database.
     We assume one JSON-encoded WorkSolr object per line.
@@ -923,5 +958,5 @@ async def import_openalex_files(sources: list[Path],
         max_slop=0.05,
         batch_size=5000,
         dry_run=False,
-        logger=logger
+        logger=logger,
     )

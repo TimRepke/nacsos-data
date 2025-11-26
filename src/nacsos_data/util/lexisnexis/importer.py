@@ -4,6 +4,7 @@ from typing import Generator, AsyncGenerator, TYPE_CHECKING
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+
 # from sqlalchemy.exc import IntegrityError
 import sqlalchemy.sql.functions as F
 
@@ -37,16 +38,14 @@ def has_text(s: str | None) -> bool:
     return s is not None and len(s) > MIN_TEXT_LEN
 
 
-async def load_vectors_from_database(session: AsyncSession,
-                                     project_id: str,
-                                     vectoriser: CountVectorizer,
-                                     batch_size: int = 500) \
-        -> AsyncGenerator[tuple[list[str], csr_matrix], None]:
-    stmt = (select(func.substr(Item.text, 0, CHAR_LIMIT), Item.item_id)
-            .where(Item.project_id == project_id,
-                   Item.text.isnot(None),
-                   F.char_length(Item.text) > MIN_TEXT_LEN)
-            .execution_options(yield_per=batch_size))
+async def load_vectors_from_database(
+    session: AsyncSession, project_id: str, vectoriser: CountVectorizer, batch_size: int = 500
+) -> AsyncGenerator[tuple[list[str], csr_matrix], None]:
+    stmt = (
+        select(func.substr(Item.text, 0, CHAR_LIMIT), Item.item_id)
+        .where(Item.project_id == project_id, Item.text.isnot(None), F.char_length(Item.text) > MIN_TEXT_LEN)
+        .execution_options(yield_per=batch_size)
+    )
     rslt = (await session.stream(stmt)).mappings().partitions()
 
     async for batch in rslt:
@@ -63,12 +62,10 @@ async def load_vectors_from_database(session: AsyncSession,
         yield item_ids, vectors
 
 
-def load_vectors_from_file(filename: str,
-                           vectoriser: CountVectorizer,
-                           fail_on_error: bool = True,
-                           batch_size: int = 10000) -> Generator[tuple[list[str], list[str], csr_matrix], None, None]:
-    for batch in batched(parse_lexis_nexis_file(filename=filename, fail_on_error=fail_on_error),
-                         batch_size=batch_size):
+def load_vectors_from_file(
+    filename: str, vectoriser: CountVectorizer, fail_on_error: bool = True, batch_size: int = 10000
+) -> Generator[tuple[list[str], list[str], csr_matrix], None, None]:
+    for batch in batched(parse_lexis_nexis_file(filename=filename, fail_on_error=fail_on_error), batch_size=batch_size):
         batch_filtered = [(r, s) for _, r, s in batch if r.text is not None and len(r.text) > MIN_TEXT_LEN]
 
         # Nothing to see here, please carry on
@@ -88,20 +85,22 @@ def load_vectors_from_file(filename: str,
 
 
 @ensure_session_async
-async def import_lexis_nexis(session: DBSession,
-                             project_id: str,
-                             filename: str,
-                             import_name: str | None = None,
-                             import_id: str | uuid.UUID | None = None,
-                             user_id: str | uuid.UUID | None = None,
-                             description: str | None = None,
-                             vectoriser: CountVectorizer | None = None,
-                             batch_size_db: int = 500,
-                             batch_size_file: int = 10000,
-                             max_slop: float = 0.02,
-                             dedup_source: bool = True,
-                             fail_on_parse_error: bool = True,
-                             log: logging.Logger | None = None) -> None:
+async def import_lexis_nexis(
+    session: DBSession,
+    project_id: str,
+    filename: str,
+    import_name: str | None = None,
+    import_id: str | uuid.UUID | None = None,
+    user_id: str | uuid.UUID | None = None,
+    description: str | None = None,
+    vectoriser: CountVectorizer | None = None,
+    batch_size_db: int = 500,
+    batch_size_file: int = 10000,
+    max_slop: float = 0.02,
+    dedup_source: bool = True,
+    fail_on_parse_error: bool = True,
+    log: logging.Logger | None = None,
+) -> None:
     """
     Imports and deduplicates lexisnexis items.
 

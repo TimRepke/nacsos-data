@@ -24,11 +24,7 @@ def _get_vector_rep(x: csr_matrix, i: int) -> dict[str, int | np.ndarray]:
             'magnitude': np.sqrt(x.dot(x.T).data[0]),
         }
     else:
-        return {
-            'id': i,
-            'sparse_vector': x,
-            'magnitude': 0
-        }
+        return {'id': i, 'sparse_vector': x, 'magnitude': 0}
 
 
 class MilvusDuplicateIndex:
@@ -45,29 +41,26 @@ class MilvusDuplicateIndex:
     # Number of candidates to look at during query time
     N_CANDIDATES = 5
 
-    def __init__(self,
-                 existing_items: AsyncGenerator[list[ItemEntry], None],
-                 new_items: Generator[ItemEntry, None, None],
-                 project_id: str | uuid.UUID,
-                 vectoriser: CountVectorizer | None = None,
-                 max_slop: float = 0.02,
-                 batch_size: int = 10000,
-                 ):
+    def __init__(
+        self,
+        existing_items: AsyncGenerator[list[ItemEntry], None],
+        new_items: Generator[ItemEntry, None, None],
+        project_id: str | uuid.UUID,
+        vectoriser: CountVectorizer | None = None,
+        max_slop: float = 0.02,
+        batch_size: int = 10000,
+    ):
         from pymilvus import MilvusClient
 
         self.existing_items = existing_items
         self.new_items = new_items
         self.max_slop = max_slop
         self.batch_size = batch_size
-        self.client = MilvusClient(uri="http://localhost:19530")
+        self.client = MilvusClient(uri='http://localhost:19530')
         self.project_id = project_id
         if vectoriser is None:
             self.vectoriser = CountVectorizer(
-                min_df=self.MIN_DF,
-                max_df=self.MAX_DF,
-                max_features=self.MAX_FEATURES,
-                preprocessor=preprocess_text,
-                tokenizer=tokenise_text
+                min_df=self.MIN_DF, max_df=self.MAX_DF, max_features=self.MAX_FEATURES, preprocessor=preprocess_text, tokenizer=tokenise_text
             )
         else:
             self.vectoriser = vectoriser
@@ -79,8 +72,7 @@ class MilvusDuplicateIndex:
 
         self.saved: dict[str, str] = {}
 
-    async def _load_vectors_batched_async(self, generator: AsyncGenerator[list[ItemEntry], None]) \
-            -> AsyncGenerator[tuple[list[str], csr_matrix], None]:
+    async def _load_vectors_batched_async(self, generator: AsyncGenerator[list[ItemEntry], None]) -> AsyncGenerator[tuple[list[str], csr_matrix], None]:
         async for batch in generator:
             logger.debug(f'Received batch with {len(batch)} entries.')
             item_ids = [str(r.item_id) for r in batch]
@@ -94,8 +86,7 @@ class MilvusDuplicateIndex:
 
             yield item_ids, vectors
 
-    def _load_vectors_sync(self, generator: Generator[ItemEntry, None, None]) \
-            -> Generator[tuple[list[str], csr_matrix], None, None]:
+    def _load_vectors_sync(self, generator: Generator[ItemEntry, None, None]) -> Generator[tuple[list[str], csr_matrix], None, None]:
         for bi, batch in enumerate(batched(generator, batch_size=self.batch_size)):
             logger.debug(f'Received batch with {len(batch)} entries.')
             item_ids = [str(r.item_id) for r in batch]
@@ -129,14 +120,12 @@ class MilvusDuplicateIndex:
         logger.info('Loading items from new source...')
         nw_data = list(self._load_vectors_sync(self.new_items))
 
-        self.item_ids_nw = {r: i + offset for i, r in
-                            enumerate(bid for batch_ids, _ in nw_data for bid in batch_ids)}
+        self.item_ids_nw = {r: i + offset for i, r in enumerate(bid for batch_ids, _ in nw_data for bid in batch_ids)}
         self.item_ids_nw_inv = {v: k for k, v in self.item_ids_nw.items()}
         logger.info(f'Found {len(self.item_ids_nw):,} ({len(nw_data):,}) documents in the file.')
 
         logger.info('Constructing nearest neighbour lookup...')
-        vectors = vstack([batch_vectors for _, batch_vectors in db_data]
-                         + [batch_vectors for _, batch_vectors in nw_data])
+        vectors = vstack([batch_vectors for _, batch_vectors in db_data] + [batch_vectors for _, batch_vectors in nw_data])
         # Using Jaccard dissimilarity, defined as: 1 - (token set intersection divided by token set union)
         logger.info(f'document-word matrix has shape: {vectors.shape}')
 
@@ -150,9 +139,9 @@ class MilvusDuplicateIndex:
         )
 
         # schema.add_field(field_name="pk", datatype=DataType.VARCHAR, is_primary=True, max_length=100)
-        schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True)
-        schema.add_field(field_name="magnitude", datatype=DataType.FLOAT)
-        schema.add_field(field_name="sparse_vector", datatype=DataType.SPARSE_FLOAT_VECTOR)
+        schema.add_field(field_name='id', datatype=DataType.INT64, is_primary=True)
+        schema.add_field(field_name='magnitude', datatype=DataType.FLOAT)
+        schema.add_field(field_name='sparse_vector', datatype=DataType.SPARSE_FLOAT_VECTOR)
 
         self.client.create_collection(collection_name=self.collection_name, schema=schema)
 
@@ -165,19 +154,20 @@ class MilvusDuplicateIndex:
         chunks = np.arange(vectors.shape[0], step=chunk)  # type: ignore[call-overload]
         for i in chunks:
             self.client.insert(
-                collection_name=self.collection_name, data=[
+                collection_name=self.collection_name,
+                data=[
                     _get_vector_rep(vectors.getrow(j + i), non_empty[j + i])  # type: ignore[arg-type]
-                    for j in range(vectors[i:i + chunk].shape[0])
-                ]
+                    for j in range(vectors[i : i + chunk].shape[0])
+                ],
             )
         index_params = self.client.prepare_index_params()
 
         index_params.add_index(
-            field_name="sparse_vector",
-            index_name="sparse_inverted_index",
-            index_type="SPARSE_INVERTED_INDEX",  # the type of index to be created. set to `SPARSE_INVERTED_INDEX` or `SPARSE_WAND`.
-            metric_type="IP",  # the metric type to be used for the index. Currently, only `IP` (Inner Product) is supported.
-            params={"drop_ratio_build": 0.2},  # the ratio of small vector values to be dropped during indexing.
+            field_name='sparse_vector',
+            index_name='sparse_inverted_index',
+            index_type='SPARSE_INVERTED_INDEX',  # the type of index to be created. set to `SPARSE_INVERTED_INDEX` or `SPARSE_WAND`.
+            metric_type='IP',  # the metric type to be used for the index. Currently, only `IP` (Inner Product) is supported.
+            params={'drop_ratio_build': 0.2},  # the ratio of small vector values to be dropped during indexing.
         )
 
         # Create index

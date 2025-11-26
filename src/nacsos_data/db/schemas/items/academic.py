@@ -24,15 +24,15 @@ class AcademicItem(Item):
         # UniqueConstraint('title_slug', 'project_id'),
     )
 
-    item_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(Item.item_id, ondelete='CASCADE'),
-                            default=uuid.uuid4, nullable=False, index=True, primary_key=True, unique=True)
+    item_id = mapped_column(
+        UUID(as_uuid=True), ForeignKey(Item.item_id, ondelete='CASCADE'), default=uuid.uuid4, nullable=False, index=True, primary_key=True, unique=True
+    )
 
     # mirror of `Item.project_id` so we can introduce the UniqueConstraint
     # https://docs.sqlalchemy.org/en/20/faq/ormconfiguration.html#i-m-getting-a-warning-or-error-about-implicitly-combining-column-x-under-attribute-y
-    project_id: Mapped[uuid.UUID] = column_property(Column(UUID(as_uuid=True),
-                                                           ForeignKey(Project.project_id, ondelete='cascade'),
-                                                           index=True, nullable=False), Item.project_id)
+    project_id: Mapped[uuid.UUID] = column_property(
+        Column(UUID(as_uuid=True), ForeignKey(Project.project_id, ondelete='cascade'), index=True, nullable=False), Item.project_id
+    )
 
     # Article DOI (normalised format, e.g. '00.000/0000.0000-00' rather than 'https://dx.doi.org/00.000/0000.0000-00')
     doi = mapped_column(String, nullable=True, unique=False, index=True)
@@ -69,8 +69,7 @@ class AcademicItem(Item):
     #   Keys with prefix `_` will not be rendered by the frontend though.
     meta = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True))
 
-    variants: Relationship['AcademicItemVariant'] = relationship('AcademicItemVariant',
-                                                                 cascade='all, delete')
+    variants: Relationship['AcademicItemVariant'] = relationship('AcademicItemVariant', cascade='all, delete')
 
     __mapper_args__ = {
         'polymorphic_identity': ItemType.academic,
@@ -90,6 +89,7 @@ class AcademicItemVariant(Base):
 
     Note, that we only keep unique values here.
     """
+
     __tablename__ = 'academic_item_variant'
 
     __table_args__ = (
@@ -103,7 +103,6 @@ class AcademicItemVariant(Base):
         UniqueConstraint('item_id', 'title'),
         UniqueConstraint('item_id', 'publication_year'),
         UniqueConstraint('item_id', 'source'),
-
         # No constraint, too complicated:
         # UniqueConstraint('item_id', 'meta')
         # UniqueConstraint('item_id', 'authors')
@@ -111,19 +110,13 @@ class AcademicItemVariant(Base):
         # UniqueConstraint('item_id', 'abstract')
     )
 
-    item_variant_id = mapped_column(UUID(as_uuid=True),
-                                    primary_key=True, default=uuid.uuid4,
-                                    nullable=False, unique=True, index=True)
+    item_variant_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # Reference to the `AcademicItem` this is a duplicate of
-    item_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(AcademicItem.item_id, ondelete='CASCADE'),
-                            nullable=False, index=True, unique=False)
+    item_id = mapped_column(UUID(as_uuid=True), ForeignKey(AcademicItem.item_id, ondelete='CASCADE'), nullable=False, index=True, unique=False)
 
     # (Optional) reference to the import/import_revision where this variant came from
-    import_id = mapped_column(UUID(as_uuid=True),
-                              ForeignKey(Import.import_id, ondelete='CASCADE'),
-                              nullable=True, index=False, unique=False)
+    import_id = mapped_column(UUID(as_uuid=True), ForeignKey(Import.import_id, ondelete='CASCADE'), nullable=True, index=False, unique=False)
     import_revision = mapped_column(Integer, nullable=True, index=True, unique=False)
 
     doi = mapped_column(String, nullable=True, unique=False, index=False)
@@ -136,8 +129,7 @@ class AcademicItemVariant(Base):
     title = mapped_column(String, nullable=True, unique=False, index=False)
     publication_year = mapped_column(Integer, nullable=True, unique=False, index=False)
     source = mapped_column(String, nullable=True, unique=False, index=False)
-    keywords = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True,
-                             index=False)
+    keywords = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=False)
     authors = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=False)
     text = mapped_column(String, nullable=True, unique=False, index=False)
     meta = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=False)

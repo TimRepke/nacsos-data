@@ -17,40 +17,32 @@ class AnnotationQuality(Base):
     Computing annotator agreements is a little too expensive to do on the fly. Hence, we capture different
     quality metrix in this table; one row per assignment scope and label.
     """
+
     __tablename__ = 'annotation_quality'
-    __table_args__ = (
-        UniqueConstraint('assignment_scope_id', 'bot_annotation_metadata_id',
-                         'label_key', 'label_value', 'user_base', 'user_target'),
-    )
+    __table_args__ = (UniqueConstraint('assignment_scope_id', 'bot_annotation_metadata_id', 'label_key', 'label_value', 'user_base', 'user_target'),)
 
     # Unique identifier for this quality tracker.
-    annotation_quality_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                          nullable=False, unique=True, index=True)
+    annotation_quality_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # The project this quality tracker is attached to
-    project_id = mapped_column(UUID(as_uuid=True),
-                               ForeignKey(Project.project_id, ondelete='CASCADE'),
-                               nullable=False, index=True, primary_key=False)
+    project_id = mapped_column(UUID(as_uuid=True), ForeignKey(Project.project_id, ondelete='CASCADE'), nullable=False, index=True, primary_key=False)
 
     # The assignment scope this quality tracker is referring to
-    assignment_scope_id = mapped_column(UUID(as_uuid=True),
-                                        ForeignKey(AssignmentScope.assignment_scope_id, ondelete='CASCADE'),
-                                        nullable=False, index=True, primary_key=False)
+    assignment_scope_id = mapped_column(
+        UUID(as_uuid=True), ForeignKey(AssignmentScope.assignment_scope_id, ondelete='CASCADE'), nullable=False, index=True, primary_key=False
+    )
 
     # The resolution this quality tracker is referring to
-    bot_annotation_metadata_id = mapped_column(UUID(as_uuid=True),
-                                               ForeignKey(BotAnnotationMetaData.bot_annotation_metadata_id,
-                                                          ondelete='CASCADE'),
-                                               nullable=True, index=True, primary_key=False)
+    bot_annotation_metadata_id = mapped_column(
+        UUID(as_uuid=True), ForeignKey(BotAnnotationMetaData.bot_annotation_metadata_id, ondelete='CASCADE'), nullable=True, index=True, primary_key=False
+    )
 
     # Some metrics are computed for pairs of users,
     # in this case both foreign keys should be set, otherwise both shall be NULL
     user_base = mapped_column(String, nullable=True, index=False, primary_key=False)
-    annotations_base = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True),
-                                     nullable=True, index=False)
+    annotations_base = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=False)
     user_target = mapped_column(String, nullable=True, index=False, primary_key=False)
-    annotations_target = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True),
-                                       nullable=True, index=False)
+    annotations_target = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True), nullable=True, index=False)
 
     # The label this quality tracker is referring to
     label_key = mapped_column(String, nullable=True, unique=False, index=False)

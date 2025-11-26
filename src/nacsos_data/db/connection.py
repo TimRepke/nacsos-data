@@ -2,9 +2,7 @@ from .engine import DatabaseEngine, DatabaseEngineAsync
 from ..util.conf import DatabaseConfig, load_settings
 
 
-def get_engine(conf_file: str | None = None,
-               settings: DatabaseConfig | None = None,
-               debug: bool = False) -> DatabaseEngine:
+def get_engine(conf_file: str | None = None, settings: DatabaseConfig | None = None, debug: bool = False) -> DatabaseEngine:
     """
     Returns a database connection (aka DatabaseEngine).
 
@@ -41,13 +39,10 @@ def get_engine(conf_file: str | None = None,
             raise AssertionError('Neither `settings` not `conf_file` specified.')
         settings = load_settings(conf_file).DB
 
-    return DatabaseEngine(host=settings.HOST, port=settings.PORT, user=settings.USER, password=settings.PASSWORD,
-                          database=settings.DATABASE, debug=debug)
+    return DatabaseEngine(host=settings.HOST, port=settings.PORT, user=settings.USER, password=settings.PASSWORD, database=settings.DATABASE, debug=debug)
 
 
-def get_engine_async(conf_file: str | None = None,
-                     settings: DatabaseConfig | None = None,
-                     debug: bool = False) -> DatabaseEngineAsync:
+def get_engine_async(conf_file: str | None = None, settings: DatabaseConfig | None = None, debug: bool = False) -> DatabaseEngineAsync:
     """
     Same as `get_engine()`, but returns async db engine.
 
@@ -64,5 +59,4 @@ def get_engine_async(conf_file: str | None = None,
             raise AssertionError('Neither `settings` not `conf_file` specified.')
         settings = load_settings(conf_file).DB
 
-    return DatabaseEngineAsync(host=settings.HOST, port=settings.PORT, user=settings.USER, password=settings.PASSWORD,
-                               database=settings.DATABASE, debug=debug)
+    return DatabaseEngineAsync(host=settings.HOST, port=settings.PORT, user=settings.USER, password=settings.PASSWORD, database=settings.DATABASE, debug=debug)

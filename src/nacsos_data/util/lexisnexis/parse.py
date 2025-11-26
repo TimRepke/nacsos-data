@@ -9,12 +9,7 @@ from lxml import etree
 from markdownify import markdownify as md
 
 from nacsos_data.db.schemas import ItemType
-from nacsos_data.models.items.lexis_nexis import (
-    NewsSearchResult,
-    LexisNexisItemSourceModel,
-    LexisNexisItemModel,
-    LexisNexisDocument
-)
+from nacsos_data.models.items.lexis_nexis import NewsSearchResult, LexisNexisItemSourceModel, LexisNexisItemModel, LexisNexisDocument
 from nacsos_data.util import clear_empty
 
 logger = logging.getLogger('nacsos_data.util.LexisNexis.parse')
@@ -27,7 +22,7 @@ def parse_document(document: str) -> LexisNexisDocument:
         'nitf': 'http://iptc.org/std/NITF/2006-10-18/',
         'dc': 'http://purl.org/dc/elements/1.1/',
         'xsi': 'http://www.w3.org/2001/XMLSchema-instance',
-        'noNamespaceSchemaLocation': 'http://www.lexisnexis.com/xmlschemas/content/public/articledoc/1/'
+        'noNamespaceSchemaLocation': 'http://www.lexisnexis.com/xmlschemas/content/public/articledoc/1/',
     }
 
     parser = etree.XMLParser(remove_blank_text=True, strip_cdata=False)
@@ -69,11 +64,10 @@ def parse_document(document: str) -> LexisNexisDocument:
         teaser=get_md('./atom:content/articleDoc/nitf:body/nitf:body.head'),
         # Actual content
         text=get_md('./atom:content/articleDoc/nitf:body/nitf:body.content'),
-        authors=fuse_lsts(get_texts('./atom:content/articleDoc/articleDocHead//author'),
-                          get_texts('./atom:content//nitf:byline')),
+        authors=fuse_lsts(get_texts('./atom:content/articleDoc/articleDocHead//author'), get_texts('./atom:content//nitf:byline')),
         authors_sec=get_texts('./atom:author/atom:name'),
         section=get_text('./atom:content/articleDoc/articleDocHead/itemInfo/sourceSectionInfo/positionSection'),
-        subsection=get_text('./atom:content/articleDoc/articleDocHead/itemInfo/sourceSectionInfo/positionSubsection')
+        subsection=get_text('./atom:content/articleDoc/articleDocHead/itemInfo/sourceSectionInfo/positionSubsection'),
     )
 
 
@@ -97,8 +91,7 @@ def s2dt_b(s: str | datetime | None) -> datetime | None:
     return None
 
 
-def translate_search_result(result: NewsSearchResult, project_id: str | None = None) \
-        -> tuple[LexisNexisItemModel, LexisNexisItemSourceModel]:
+def translate_search_result(result: NewsSearchResult, project_id: str | None = None) -> tuple[LexisNexisItemModel, LexisNexisItemSourceModel]:
     if result.Document is None or result.Document.Content is None:
         raise ValueError('Missing document content')
 
@@ -133,47 +126,50 @@ def translate_search_result(result: NewsSearchResult, project_id: str | None = N
         content_type=result.ContentType,
         published_at=s2dt_a(doc.published) or s2dt_b(result.Date),
         updated_at=s2dt_a(doc.updated),
-        meta=clear_empty({
-            'Date': result.Date,
-            'published': doc.published,
-            'updated': doc.updated,
-            'authors_1': doc.authors,
-            'authors_2': doc.authors_sec,
-            'section': doc.section,
-            'subsection': doc.subsection,
-            'Jurisdiction': result.Jurisdiction,
-            'Location': result.Location,
-            'ContentType': result.ContentType,
-            'Byline': result.Byline,
-            'WordLength': result.WordLength,
-            'WebNewsUrl': result.WebNewsUrl,
-            'Geography': result.Geography,
-            'Language': result.Language,
-            'Industry': result.Industry,
-            'People': result.People,
-            'Subject': result.Subject,
-            'SectionRes': result.Section,
-            'Company': result.Company,
-            'PublicationType': result.PublicationType,
-            'Publisher': result.Publisher,
-            'LEI': result.LEI,
-            'CompanyName': result.CompanyName,
-            'LNGI': result.LNGI,
-            'MediaLink': result.DocumentContent_odata_mediaReadLink,
-            'MediaType': result.DocumentContent_odata_mediaContentType,
-            'Overview': result.Overview,
-            'TitleRes': result.Title,
-            'TitleDoc': doc.title,
-            'Topic': result.Topic,
-            'PracticeArea': result.PracticeArea
-        })
+        meta=clear_empty(
+            {
+                'Date': result.Date,
+                'published': doc.published,
+                'updated': doc.updated,
+                'authors_1': doc.authors,
+                'authors_2': doc.authors_sec,
+                'section': doc.section,
+                'subsection': doc.subsection,
+                'Jurisdiction': result.Jurisdiction,
+                'Location': result.Location,
+                'ContentType': result.ContentType,
+                'Byline': result.Byline,
+                'WordLength': result.WordLength,
+                'WebNewsUrl': result.WebNewsUrl,
+                'Geography': result.Geography,
+                'Language': result.Language,
+                'Industry': result.Industry,
+                'People': result.People,
+                'Subject': result.Subject,
+                'SectionRes': result.Section,
+                'Company': result.Company,
+                'PublicationType': result.PublicationType,
+                'Publisher': result.Publisher,
+                'LEI': result.LEI,
+                'CompanyName': result.CompanyName,
+                'LNGI': result.LNGI,
+                'MediaLink': result.DocumentContent_odata_mediaReadLink,
+                'MediaType': result.DocumentContent_odata_mediaContentType,
+                'Overview': result.Overview,
+                'TitleRes': result.Title,
+                'TitleDoc': doc.title,
+                'Topic': result.Topic,
+                'PracticeArea': result.PracticeArea,
+            }
+        ),
     )
 
     return item, src
 
 
-def parse_lexis_nexis_file(filename: Path | str, project_id: str | None = None, fail_on_error: bool = True) \
-        -> Generator[tuple[NewsSearchResult, LexisNexisItemModel, LexisNexisItemSourceModel], None, None]:
+def parse_lexis_nexis_file(
+    filename: Path | str, project_id: str | None = None, fail_on_error: bool = True
+) -> Generator[tuple[NewsSearchResult, LexisNexisItemModel, LexisNexisItemSourceModel], None, None]:
     file_path = Path(filename)
     if file_path.exists():
         with open(file_path, 'r') as f_src:

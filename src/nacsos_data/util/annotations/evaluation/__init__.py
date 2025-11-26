@@ -16,7 +16,7 @@ def get_new_label_batches(old_seq: list[list[int]], new_seq: list[list[int]]) ->
         raise ValueError('The old sequence should never be longer than the new sequence of labels!')
 
     if len(old_seq) < len(new_seq):  # We have more batches than before
-        for old_batch, new_batch in zip(old_seq[:-1], new_seq[:len(old_seq) - 1], strict=False):
+        for old_batch, new_batch in zip(old_seq[:-1], new_seq[: len(old_seq) - 1], strict=False):
             if old_batch != new_batch:
                 raise ValueError('Labels in the beginning of the sequence changed, please recompute fully.')
     # We have the same number of batches than before (or more)
@@ -33,13 +33,13 @@ def get_new_label_batches(old_seq: list[list[int]], new_seq: list[list[int]]) ->
     new_data: list[list[int]] = []
     # The last batch from the old data got longer, so add the rest of that to our diff set
     if len(last_old_seq) < len(last_new_seq):
-        new_data.append(last_new_seq[len(last_old_seq):])
+        new_data.append(last_new_seq[len(last_old_seq) :])
 
     # We have the same number of batches in both sets, so nothing else to do
     # if len(old_seq) == len(new_seq):
 
     # Add additional batches from the new sequence to the diff
     if len(old_seq) < len(new_seq):
-        new_data += new_seq[len(old_seq):]
+        new_data += new_seq[len(old_seq) :]
 
     return new_data

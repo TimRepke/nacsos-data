@@ -17,21 +17,17 @@ class Task(Base):
     Most entries in the database will be (indirectly) linked to user accounts, so this is
     at the core of access management and ownership.
     """
+
     __tablename__ = 'tasks'
 
     # Unique identifier for this task.
-    task_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                            nullable=False, unique=True, index=True)
+    task_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
 
     # User who created this task (may be NULL if done via a script)
-    user_id = mapped_column(UUID(as_uuid=True),
-                            ForeignKey(User.user_id),
-                            nullable=True, index=True, primary_key=False)
+    user_id = mapped_column(UUID(as_uuid=True), ForeignKey(User.user_id), nullable=True, index=True, primary_key=False)
 
     # Project this task is attached to
-    project_id = mapped_column(UUID(as_uuid=True),
-                               ForeignKey(Project.project_id, ondelete='CASCADE'),
-                               nullable=False, index=True, primary_key=False)
+    project_id = mapped_column(UUID(as_uuid=True), ForeignKey(Project.project_id, ondelete='CASCADE'), nullable=False, index=True, primary_key=False)
 
     # dramatiq task ID
     message_id = mapped_column(String, nullable=True, unique=False, index=False)
@@ -43,8 +39,7 @@ class Task(Base):
     function_name = mapped_column(String, nullable=False, unique=False, index=True)
 
     # current status of the task
-    status = mapped_column(Enum(TaskStatus), nullable=False,
-                           server_default=TaskStatus.PENDING)
+    status = mapped_column(Enum(TaskStatus), nullable=False, server_default=TaskStatus.PENDING)
 
     # json-encoded dict of the call parameters (or the dict unpacked)
     params = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True))

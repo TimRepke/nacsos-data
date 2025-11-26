@@ -28,14 +28,14 @@ class EnsureUniqKeyMiddleware(BlockMiddleware):  # type: ignore[misc]
     # docstr-coverage: inherited
     def transform_entry(self, entry: Entry, library: Library) -> Block:
         entry.parser_metadata[self.metadata_key()] = True
-        entry.key = f"{entry.key} | {self.cnt}"
+        entry.key = f'{entry.key} | {self.cnt}'
         self.cnt += 1
         return entry
 
     # docstr-coverage: inherited
     @classmethod
     def metadata_key(cls) -> str:
-        return "force_unique_key"
+        return 'force_unique_key'
 
 
 def _ensure_http_doi(doi: str | None) -> str | None:
@@ -53,9 +53,13 @@ def _translate_authors(authors: list[NameParts] | None) -> list[AcademicAuthorMo
     def merge(p: list[str]) -> str:
         return ' '.join(p)
 
-    return [AcademicAuthorModel(name=f'{merge(author.first)}{merge(author.von)} {merge(author.last)}',
-                                surname_initials=f'{merge(author.last)}{", " + author.first[0][0] if len(author.first) > 0 else ""}')
-            for author in authors]
+    return [
+        AcademicAuthorModel(
+            name=f'{merge(author.first)}{merge(author.von)} {merge(author.last)}',
+            surname_initials=f'{merge(author.last)}{", " + author.first[0][0] if len(author.first) > 0 else ""}',
+        )
+        for author in authors
+    ]
 
 
 def _tanslate_yr(yr: str | None) -> int | None:
@@ -70,24 +74,19 @@ def _translate_kw(kws: str | None) -> list[str] | None:
     return [kw.strip() for kw in kws.split(',')]
 
 
-def generate_entries_from_bibtex(file: Path,
-                                 log: logging.Logger | None = None) -> Generator[Entry, None, None]:
+def generate_entries_from_bibtex(file: Path, log: logging.Logger | None = None) -> Generator[Entry, None, None]:
     if log is None:
         log = logger
 
     log.info(f'Parsing BibTeX file: {file}')
-    library = bibtexparser.parse_file(str(file), append_middleware=[
-        EnsureUniqKeyMiddleware(),
-        middlewares.SeparateCoAuthors(),
-        middlewares.SplitNameParts()
-    ])
+    library = bibtexparser.parse_file(str(file), append_middleware=[EnsureUniqKeyMiddleware(), middlewares.SeparateCoAuthors(), middlewares.SplitNameParts()])
 
     yield from library.entries
 
 
-def generate_items_from_bibtex(file: Path,
-                               project_id: str | uuid.UUID | None = None,
-                               log: logging.Logger | None = None) -> Generator[AcademicItemModel, None, None]:
+def generate_items_from_bibtex(
+    file: Path, project_id: str | uuid.UUID | None = None, log: logging.Logger | None = None
+) -> Generator[AcademicItemModel, None, None]:
     """
     Example script on how to use this for importing data to the platform
 
@@ -158,11 +157,7 @@ def generate_items_from_bibtex(file: Path,
             source=d.get('journal', d.get('booktitle')),
             keywords=_translate_kw(d.get('keywords')),
             authors=_translate_authors(d.get('author')),
-            meta=clear_empty({
-                **d,
-                'author': [a.__dict__ for a in d.get('author', [])],
-                'editor': [e.__dict__ for e in d.get('editor', [])]
-            })
+            meta=clear_empty({**d, 'author': [a.__dict__ for a in d.get('author', [])], 'editor': [e.__dict__ for e in d.get('editor', [])]}),
         )
 
 
@@ -179,10 +174,10 @@ def ensure_non_duplicate_keys(infile: Path, outfile: Path) -> None:
     """
     from tqdm import tqdm
     import re
+
     p = re.compile(r'(@\w+){([^,]*),')
     cnt = 0
-    with (open(infile, 'r') as fin,
-          open(outfile, 'w') as fout):
+    with open(infile, 'r') as fin, open(outfile, 'w') as fout:
         for line in tqdm(fin):
             line = p.sub(f'\\1{{\\2-{cnt},', line)
             cnt += 1

@@ -17,14 +17,13 @@ class Highlighter(Base):
 
     Each matching group will be wrapped in a highlight span in the frontend.
     """
+
     __tablename__ = 'highlighters'
 
     # Unique identifier for this Highlighter
-    highlighter_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-                                   nullable=False, unique=True, index=True)
+    highlighter_id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, unique=True, index=True)
     # Reference to a project
-    project_id = mapped_column(UUID(as_uuid=True), ForeignKey(Project.project_id, ondelete='CASCADE'),
-                               nullable=False, index=True)
+    project_id = mapped_column(UUID(as_uuid=True), ForeignKey(Project.project_id, ondelete='CASCADE'), nullable=False, index=True)
 
     # Useful and recognisable name
     name = mapped_column(String, nullable=False, index=False)

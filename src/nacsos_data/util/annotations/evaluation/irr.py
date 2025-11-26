@@ -41,8 +41,7 @@ def get_value_raw(annotation: SortedAnnotationLabel | None, label: FlatLabel) ->
         return None
 
 
-def get_overlap(annotations_base: AnnotationsRaw, annotations_target: AnnotationsRaw) \
-        -> tuple[Annotations, Annotations]:
+def get_overlap(annotations_base: AnnotationsRaw, annotations_target: AnnotationsRaw) -> tuple[Annotations, Annotations]:
     base: Annotations = []
     target: Annotations = []
     for annotation_base, annotation_target in zip(annotations_base, annotations_target, strict=False):
@@ -52,8 +51,7 @@ def get_overlap(annotations_base: AnnotationsRaw, annotations_target: Annotation
     return base, target
 
 
-def get_partial_overlap(annotations: dict[str, AnnotationsRaw], users: list[str] | None = None) \
-        -> dict[str, list[AnnotationsRaw]]:
+def get_partial_overlap(annotations: dict[str, AnnotationsRaw], users: list[str] | None = None) -> dict[str, list[AnnotationsRaw]]:
     if users is None:
         users = list(annotations.keys())
 
@@ -92,8 +90,7 @@ def compress_annotations(base: list[int], target: list[int]) -> tuple[list[int],
     return base, target
 
 
-def compute_correlation(base: list[int], target: list[int],
-                        measure: Literal['pearson', 'kendall', 'spearman']) -> tuple[float, float] | tuple[None, None]:
+def compute_correlation(base: list[int], target: list[int], measure: Literal['pearson', 'kendall', 'spearman']) -> tuple[float, float] | tuple[None, None]:
     with warnings.catch_warnings():
         warnings.simplefilter('error')
         try:
@@ -116,20 +113,16 @@ def compute_correlation(base: list[int], target: list[int],
 T = TypeVar('T')
 
 
-def get_values(annotations: dict[str, list[T | None]],
-               users: list[str] | None = None,
-               include_none: bool = False) -> dict[T | None, int] | dict[T, int]:
+def get_values(annotations: dict[str, list[T | None]], users: list[str] | None = None, include_none: bool = False) -> dict[T | None, int] | dict[T, int]:
     if users is None:
         users = list(annotations.keys())
 
-    return {v: i for i, v in enumerate({annotation
-                                            for user in users
-                                            for annotation in annotations[user]
-                                            if include_none or annotation is not None})}
+    return {v: i for i, v in enumerate({annotation for user in users for annotation in annotations[user] if include_none or annotation is not None})}
 
 
-def get_coincidence_matrix(annotations: dict[str, list[int | None]], users: list[str] | None = None) \
-        -> tuple[dict[int, int], np.ndarray[Any, np.dtype[np.float64]]]:
+def get_coincidence_matrix(
+    annotations: dict[str, list[int | None]], users: list[str] | None = None
+) -> tuple[dict[int, int], np.ndarray[Any, np.dtype[np.float64]]]:
     if users is None:
         users = list(annotations.keys())
 
@@ -146,9 +139,7 @@ def get_coincidence_matrix(annotations: dict[str, list[int | None]], users: list
     return values, coincidence_matrix
 
 
-def compute_fleiss(annotations: dict[str, list[int | None]],
-                   method: Literal['fleiss', 'randolph'],
-                   users: list[str] | None = None) -> float | None:
+def compute_fleiss(annotations: dict[str, list[int | None]], method: Literal['fleiss', 'randolph'], users: list[str] | None = None) -> float | None:
     """
     Fleiss’ and Randolph’s kappa multi-rater agreement measure
 
@@ -198,7 +189,7 @@ def compute_fleiss(annotations: dict[str, list[int | None]],
     p_cat = table.sum(0) / n_total
 
     table2 = table * table
-    p_rat = (table2.sum(1) - n_rat) / (n_rat * (n_rat - 1.))
+    p_rat = (table2.sum(1) - n_rat) / (n_rat * (n_rat - 1.0))
     p_mean = p_rat.mean()
 
     if method == 'fleiss':
@@ -209,15 +200,15 @@ def compute_fleiss(annotations: dict[str, list[int | None]],
         p_mean_exp = 0  # type: ignore[unreachable]
 
     if p_mean_exp == 1:
-        return 1.
+        return 1.0
 
     kappa: float = (p_mean - p_mean_exp) / (1 - p_mean_exp)
     return fix(kappa)
 
 
-def compute_krippendorff(annotations: dict[str, list[int | None]],
-                         data_type: Literal['nominal', 'ordinal', 'interval', 'ratio'],
-                         users: list[str] | None = None) -> float | None:
+def compute_krippendorff(  # noqa: C901
+    annotations: dict[str, list[int | None]], data_type: Literal['nominal', 'ordinal', 'interval', 'ratio'], users: list[str] | None = None
+) -> float | None:
     """
     Compute Krippendorff's alpha statistic between annotations agreements
 
@@ -248,10 +239,10 @@ def compute_krippendorff(annotations: dict[str, list[int | None]],
             element1 = coincidence_matrix_sum[g]
             val += element1
 
-        element2 = (coincidence_matrix_sum[v1] + coincidence_matrix_sum[v2]) / 2.
+        element2 = (coincidence_matrix_sum[v1] + coincidence_matrix_sum[v2]) / 2.0
         val = val - element2
 
-        return val ** 2
+        return val**2
 
     def delta_interval(v1: float | int, v2: float | int) -> float:
         return (v1 - v2) ** 2
@@ -260,7 +251,7 @@ def compute_krippendorff(annotations: dict[str, list[int | None]],
         return ((v1 - v2) / (v1 + v2)) ** 2
 
     def disagreement(obs_or_exp: Literal['observed', 'expected']) -> float:
-        result = 0.
+        result = 0.0
         for vi_1 in range(1, len(values)):
             for vi_2 in range(vi_1):
                 v1 = values_inv[vi_1]
@@ -277,20 +268,20 @@ def compute_krippendorff(annotations: dict[str, list[int | None]],
                     raise AssertionError(f'Unknown data_type={data_type}')
 
                 if obs_or_exp == 'observed':
-                    result += (coincidence_matrix[vi_1][vi_2] * delta)
+                    result += coincidence_matrix[vi_1][vi_2] * delta
                 else:
-                    result += (coincidence_matrix_sum[vi_1] * coincidence_matrix_sum[vi_2] * delta)
+                    result += coincidence_matrix_sum[vi_1] * coincidence_matrix_sum[vi_2] * delta
         return result
 
     observed_disagreement = disagreement(obs_or_exp='observed')
     expected_disagreement = disagreement(obs_or_exp='expected')
 
     if expected_disagreement == 0:
-        return 1.
+        return 1.0
 
     n_total = sum(coincidence_matrix_sum)
 
-    result: float = 1. - (n_total - 1.) * (observed_disagreement / expected_disagreement)
+    result: float = 1.0 - (n_total - 1.0) * (observed_disagreement / expected_disagreement)
     return fix(result)
 
 
@@ -320,14 +311,16 @@ def compute_mean(metric: str, label_qualities: list[AnnotationQualityModel]) -> 
     return None
 
 
-def aggregate_qualities(qualities: list[AnnotationQualityModel],
-                        label_kind: AnnotationSchemeLabelTypes,
-                        label_key: str,
-                        label_value: int | None,
-                        assignment_scope_id: str | uuid.UUID,
-                        resolution_id: str | uuid.UUID | None,
-                        project_id: str | uuid.UUID | None,
-                        user_annotations_raw: dict[str, list[int | None]] | None = None) -> AnnotationQualityModel:
+def aggregate_qualities(
+    qualities: list[AnnotationQualityModel],
+    label_kind: AnnotationSchemeLabelTypes,
+    label_key: str,
+    label_value: int | None,
+    assignment_scope_id: str | uuid.UUID,
+    resolution_id: str | uuid.UUID | None,
+    project_id: str | uuid.UUID | None,
+    user_annotations_raw: dict[str, list[int | None]] | None = None,
+) -> AnnotationQualityModel:
     fleiss = None
     randolph = None
     krippendorff = None
@@ -362,12 +355,11 @@ def aggregate_qualities(qualities: list[AnnotationQualityModel],
         perc_agree=compute_mean('perc_agree', qualities),
         multi_overlap_mean=compute_mean('multi_overlap_mean', qualities),
         multi_overlap_median=compute_mean('multi_overlap_median', qualities),
-        multi_overlap_std=compute_mean('multi_overlap_std', qualities)
+        multi_overlap_std=compute_mean('multi_overlap_std', qualities),
     )
 
 
-def precision_recall_f1(base: list[int], target: list[int], average: str) \
-        -> tuple[float | None, float | None, float | None]:
+def precision_recall_f1(base: list[int], target: list[int], average: str) -> tuple[float | None, float | None, float | None]:
     with warnings.catch_warnings():
         warnings.simplefilter('error')
         try:
@@ -382,14 +374,14 @@ def fix(val: float | None) -> float | None:
 
 
 @ensure_session_async
-async def compute_irr_scores(session: DBSession,
-                             assignment_scope_id: str | uuid.UUID,
-                             resolution_id: str | uuid.UUID | None = None,
-                             project_id: str | uuid.UUID | None = None,
-                             include_key: str = '-[include]-') -> list[AnnotationQualityModel]:
-    scheme: AnnotationSchemeModel | None = await read_annotation_scheme_for_scope(
-        assignment_scope_id=assignment_scope_id,
-        session=session)
+async def compute_irr_scores(  # noqa: C901
+    session: DBSession,
+    assignment_scope_id: str | uuid.UUID,
+    resolution_id: str | uuid.UUID | None = None,
+    project_id: str | uuid.UUID | None = None,
+    include_key: str = '-[include]-',
+) -> list[AnnotationQualityModel]:
+    scheme: AnnotationSchemeModel | None = await read_annotation_scheme_for_scope(assignment_scope_id=assignment_scope_id, session=session)
     if not scheme:
         raise NotFoundError(f'No annotation scheme for scope {assignment_scope_id}')
     labels = labels_from_scheme(scheme, ignore_hierarchy=True, ignore_repeat=True)
@@ -404,8 +396,9 @@ async def compute_irr_scores(session: DBSession,
     inclusions: list[int] | None = None
     if scheme.inclusion_rule:
         inclusions = annotations_to_sequence(inclusion_rule=scheme.inclusion_rule, annotations=annotations)
-        labels.append(FlatLabel(path=[], repeat=1, path_key=f'{include_key}|1', name='Inclusion Rule', key=include_key,
-                                required=True, max_repeat=1, kind='bool'))
+        labels.append(
+            FlatLabel(path=[], repeat=1, path_key=f'{include_key}|1', name='Inclusion Rule', key=include_key, required=True, max_repeat=1, kind='bool')
+        )
     annotation_map: dict[str, dict[str, dict[str, SortedAnnotationLabel]]] = {}
     annotators = []
     item_order = []
@@ -424,8 +417,7 @@ async def compute_irr_scores(session: DBSession,
 
         annotation_map[item_id][user_key] = annotation.labels
         if inclusions:
-            annotation_map[item_id][user_key][include_key] = SortedAnnotationLabel(value_bool=bool(inclusions[ai]),
-                                                                                   values_bool=[bool(inclusions[ai])])
+            annotation_map[item_id][user_key][include_key] = SortedAnnotationLabel(value_bool=bool(inclusions[ai]), values_bool=[bool(inclusions[ai])])
 
     annotators = sorted(set(annotators))
     item_order = list(dict.fromkeys(item_order).keys())
@@ -436,32 +428,24 @@ async def compute_irr_scores(session: DBSession,
     for label in labels:
         logger.debug(f'Computing IRR for label {label.path_key}')
         if label.kind == 'str' or label.kind == 'float':
-            logger.info(f'Skipping label {label.path_key} for scope {assignment_scope_id} '
-                        f'because "{label.kind}" is not supported!')
+            logger.info(f'Skipping label {label.path_key} for scope {assignment_scope_id} because "{label.kind}" is not supported!')
             continue
 
         label_qualities: list[AnnotationQualityModel] = []
         choice_qualities: dict[int, list[AnnotationQualityModel]] = {}
 
         user_annotations_raw = {
-            annotator: [
-                get_value_raw(annotation_map[item_id]
-                              .get(annotator, {})
-                              .get(label.key), label)
-                for item_id in item_order
-            ]
-            for annotator in annotators
+            annotator: [get_value_raw(annotation_map[item_id].get(annotator, {}).get(label.key), label) for item_id in item_order] for annotator in annotators
         }
 
         for ui, user_base in enumerate(annotators):
-            for user_target in annotators[ui + 1:]:
+            for user_target in annotators[ui + 1 :]:
                 annotations_base = user_annotations_raw[user_base]
                 annotations_target = user_annotations_raw[user_target]
                 base, target = get_overlap(annotations_base, annotations_target)  # type: ignore[arg-type] # FIXME
 
                 if len(base) == 0 or len(target) == 0 or len(base) != len(target):
-                    logger.debug(f'There is no annotation overlap between '
-                                 f'{user_base} and {user_target} for label {label.path_key}.')
+                    logger.debug(f'There is no annotation overlap between {user_base} and {user_target} for label {label.path_key}.')
                 else:
                     logger.debug(f'{user_base} -> {user_target}')
                     num_agree, num_disagree, perc_agree = compute_agreement(base, target)
@@ -479,34 +463,34 @@ async def compute_irr_scores(session: DBSession,
                         num_overlap=len(base),
                         num_agree=num_agree,
                         num_disagree=num_disagree,
-                        perc_agree=perc_agree
+                        perc_agree=perc_agree,
                     )
                     if label.kind == 'multi':
-                        quality.multi_overlap_mean, quality.multi_overlap_median, quality.multi_overlap_std = \
-                            compute_multi_overlap(base, target)  # type: ignore[arg-type] # FIXME
+                        quality.multi_overlap_mean, quality.multi_overlap_median, quality.multi_overlap_std = compute_multi_overlap(base, target)  # type: ignore[arg-type] # FIXME
                     else:
-                        quality.precision, quality.recall, quality.f1 = precision_recall_f1(
-                            base, target, average='macro')  # type: ignore[arg-type] # FIXME
-                        quality.pearson, quality.pearson_p = compute_correlation(
-                            base, target, 'pearson')  # type: ignore[arg-type] # FIXME
-                        quality.kendall, quality.kendall_p = compute_correlation(
-                            base, target, 'kendall')  # type: ignore[arg-type] # FIXME
-                        quality.spearman, quality.spearman_p = compute_correlation(
-                            base, target, 'spearman')  # type: ignore[arg-type] # FIXME
+                        quality.precision, quality.recall, quality.f1 = precision_recall_f1(base, target, average='macro')  # type: ignore[arg-type] # FIXME
+                        quality.pearson, quality.pearson_p = compute_correlation(base, target, 'pearson')  # type: ignore[arg-type] # FIXME
+                        quality.kendall, quality.kendall_p = compute_correlation(base, target, 'kendall')  # type: ignore[arg-type] # FIXME
+                        quality.spearman, quality.spearman_p = compute_correlation(base, target, 'spearman')  # type: ignore[arg-type] # FIXME
 
                         quality.cohen = compute_cohen(base, target)  # type: ignore[arg-type] # FIXME
-                        quality.fleiss = compute_fleiss(user_annotations_raw,  # type: ignore[arg-type] # FIXME
-                                                        method='fleiss',
-                                                        users=[user_base, user_target])
-                        quality.randolph = compute_fleiss(user_annotations_raw,  # type: ignore[arg-type] # FIXME
-                                                          method='randolph',
-                                                          users=[user_base, user_target])
-                        quality.krippendorff = compute_krippendorff(user_annotations_raw,  # type: ignore[arg-type]
-                                                                    'nominal',
-                                                                    users=[user_base, user_target])
+                        quality.fleiss = compute_fleiss(
+                            user_annotations_raw,  # type: ignore[arg-type] # FIXME
+                            method='fleiss',
+                            users=[user_base, user_target],
+                        )
+                        quality.randolph = compute_fleiss(
+                            user_annotations_raw,  # type: ignore[arg-type] # FIXME
+                            method='randolph',
+                            users=[user_base, user_target],
+                        )
+                        quality.krippendorff = compute_krippendorff(
+                            user_annotations_raw,  # type: ignore[arg-type]
+                            'nominal',
+                            users=[user_base, user_target],
+                        )
                     if label.kind == 'bool':
-                        quality.precision, quality.recall, quality.f1 = precision_recall_f1(
-                            base, target, average='binary')  # type: ignore[arg-type] # FIXME
+                        quality.precision, quality.recall, quality.f1 = precision_recall_f1(base, target, average='binary')  # type: ignore[arg-type] # FIXME
 
                     qualities.append(quality)
                     label_qualities.append(quality)
@@ -514,15 +498,23 @@ async def compute_irr_scores(session: DBSession,
                     if label.choices:
                         for choice in label.choices:
                             if label.kind == 'multi':
-                                base_ = [int(choice.value in bi)  # type: ignore[operator] # FIXME
-                                         for bi in base]  # FIXME
-                                target_ = [int(choice.value in ti)  # type: ignore[operator] # FIXME
-                                           for ti in target]  # FIXME
+                                base_ = [
+                                    int(choice.value in bi)  # type: ignore[operator] # FIXME
+                                    for bi in base
+                                ]  # FIXME
+                                target_ = [
+                                    int(choice.value in ti)  # type: ignore[operator] # FIXME
+                                    for ti in target
+                                ]  # FIXME
                             else:
-                                base_ = [int(int(bi) == int(choice.value))  # type: ignore[arg-type] # FIXME
-                                         for bi in base]  # FIXME
-                                target_ = [int(int(ti) == int(choice.value))  # type: ignore[arg-type] # FIXME
-                                           for ti in target]  # FIXME
+                                base_ = [
+                                    int(int(bi) == int(choice.value))  # type: ignore[arg-type] # FIXME
+                                    for bi in base
+                                ]  # FIXME
+                                target_ = [
+                                    int(int(ti) == int(choice.value))  # type: ignore[arg-type] # FIXME
+                                    for ti in target
+                                ]  # FIXME
 
                             num_agree, num_disagree, perc_agree = compute_agreement(base_, target_)
                             pearson, pearson_p = compute_correlation(base_, target_, 'pearson')
@@ -554,7 +546,7 @@ async def compute_irr_scores(session: DBSession,
                                 perc_agree=perc_agree,
                                 precision=fix(precision),
                                 recall=fix(recall),
-                                f1=fix(f1)
+                                f1=fix(f1),
                             )
                             qualities.append(choice_quality)
                             if choice.value not in choice_qualities:
@@ -562,22 +554,30 @@ async def compute_irr_scores(session: DBSession,
                             choice_qualities[choice.value].append(choice_quality)
 
         if len(label_qualities) > 0:
-            qualities.append(aggregate_qualities(label_qualities,
-                                                 label_kind=label.kind,
-                                                 label_key=label.key,
-                                                 label_value=None,
-                                                 project_id=project_id,
-                                                 resolution_id=resolution_id,
-                                                 assignment_scope_id=assignment_scope_id,
-                                                 user_annotations_raw=user_annotations_raw))  # type: ignore[arg-type] # FIXME
+            qualities.append(
+                aggregate_qualities(
+                    label_qualities,
+                    label_kind=label.kind,
+                    label_key=label.key,
+                    label_value=None,
+                    project_id=project_id,
+                    resolution_id=resolution_id,
+                    assignment_scope_id=assignment_scope_id,
+                    user_annotations_raw=user_annotations_raw,
+                )
+            )  # type: ignore[arg-type] # FIXME
         for label_value, label_choice_qualities in choice_qualities.items():
-            qualities.append(aggregate_qualities(label_choice_qualities,
-                                                 label_kind=label.kind,
-                                                 label_key=label.key,
-                                                 label_value=label_value,
-                                                 project_id=project_id,
-                                                 resolution_id=resolution_id,
-                                                 assignment_scope_id=assignment_scope_id,
-                                                 user_annotations_raw=user_annotations_raw))  # type: ignore[arg-type] # FIXME
+            qualities.append(
+                aggregate_qualities(
+                    label_choice_qualities,
+                    label_kind=label.kind,
+                    label_key=label.key,
+                    label_value=label_value,
+                    project_id=project_id,
+                    resolution_id=resolution_id,
+                    assignment_scope_id=assignment_scope_id,
+                    user_annotations_raw=user_annotations_raw,
+                )
+            )  # type: ignore[arg-type] # FIXME
 
     return qualities

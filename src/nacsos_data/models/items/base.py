@@ -10,6 +10,7 @@ class ItemModel(BaseModel):
     Corresponds to db.models.items.Item
 
     """
+
     # Unique identifier for this Item.
     item_id: str | UUID | None = None
     # 1:N relationship to project
