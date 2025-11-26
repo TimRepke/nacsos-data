@@ -29,6 +29,7 @@ cache:
         - uv.lock
     paths:
       - $UV_CACHE_DIR
+      - venv
 
 build-job:
   except:
@@ -38,6 +39,9 @@ build-job:
     - se164-docker
   script:
     - python -V
+    - pip install virtualenv
+    - python -m venv venv
+    - source venv/bin/activate
     - pip install uv
     - pwd
     - ls -lisah
@@ -51,6 +55,7 @@ test-ruff:
   tags:
     - se164-docker
   script:
+    - source venv/bin/activate
     - uv run ruff check
     - uv run ruff format --check
     - uv cache prune --ci
@@ -62,6 +67,7 @@ test-mypy:
   tags:
     - se164-docker
   script:
+    - source venv/bin/activate
     - uv run mypy
     - uv cache prune --ci
 
