@@ -29,45 +29,48 @@ cache:
         - uv.lock
     paths:
       - $UV_CACHE_DIR
-      - venv
+
+.uv:
+  script:
+    - pip install uv
+    - python -V
+    - pwd
+    - ls -lisah
 
 build-job:
+  extends:
+    - .uv
   except:
     - schedules
   stage: build
   tags:
     - se164-docker
   script:
-    - python -V
-    - pip install virtualenv
-    - python -m venv venv
-    - source venv/bin/activate
-    - pip install uv
-    - pwd
-    - ls -lisah
     - uv sync --group dev
     - uv cache prune --ci
 
 test-ruff:
+  extends:
+    - .uv
   except:
     - schedules
   stage: test
   tags:
     - se164-docker
   script:
-    - source venv/bin/activate
     - uv run ruff check
     - uv run ruff format --check
     - uv cache prune --ci
 
 test-mypy:
+  extends:
+    - .uv
   except:
     - schedules
   stage: test
   tags:
     - se164-docker
   script:
-    - source venv/bin/activate
     - uv run mypy
     - uv cache prune --ci
 
