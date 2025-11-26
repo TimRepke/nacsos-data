@@ -40,10 +40,9 @@ def _bool_label_columns(key: str, repeat: int | None, cte: sa.CTE) -> list[sa.La
         conditions.append(cte.c.repeat == repeat)
         label = lambda x: f'{key}({repeat})|{x}'  # noqa: E731
     return [
-        sa.case((
-            sa.func.count().filter(sa.and_(*conditions)) > 0,
-            sa.func.max(sa.case((sa.and_(cte.c.value_bool == vb, *conditions), 1), else_=0))
-        )).label(label(vs))  # type: ignore[no-untyped-call]
+        sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0, sa.func.max(sa.case((sa.and_(cte.c.value_bool == vb, *conditions), 1), else_=0)))).label(
+            label(vs)
+        )  # type: ignore[no-untyped-call]
         for vs, vb in [('0', False), ('1', True)]
     ]
 
@@ -55,10 +54,9 @@ def _single_label_columns(key: str, repeat: int | None, values: list[int], cte: 
         conditions.append(cte.c.repeat == repeat)
         label = lambda x: f'{key}({repeat})|{x}'  # noqa: E731
     return [
-        sa.case((
-            sa.func.count().filter(sa.and_(*conditions)) > 0,
-            sa.func.max(sa.case((sa.and_(cte.c.value_int == v, *conditions), 1), else_=0))
-        )).label(label(v))  # type: ignore[no-untyped-call]
+        sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0, sa.func.max(sa.case((sa.and_(cte.c.value_int == v, *conditions), 1), else_=0)))).label(
+            label(v)
+        )  # type: ignore[no-untyped-call]
         for v in values
     ]
 
@@ -70,10 +68,9 @@ def _multi_label_columns(key: str, repeat: int | None, values: list[int], cte: s
         conditions.append(cte.c.repeat == repeat)
         label = lambda x: f'{key}({repeat})|{x}'  # noqa: E731
     return [
-        sa.case((
-            sa.func.count().filter(sa.and_(*conditions)) > 0,
-            sa.func.max(sa.case((sa.and_(sa.any_(cte.c.multi_int) == v, *conditions), 1), else_=0))
-        )).label(label(v))  # type: ignore[no-untyped-call]
+        sa.case(
+            (sa.func.count().filter(sa.and_(*conditions)) > 0, sa.func.max(sa.case((sa.and_(sa.any_(cte.c.multi_int) == v, *conditions), 1), else_=0)))
+        ).label(label(v))  # type: ignore[no-untyped-call]
         for v in values
     ]
 
@@ -110,11 +107,11 @@ def _get_label_selects(labels: dict[str, LabelOptions], repeats: list[int] | Non
 
 
 def _labels_subquery(  # noqa: C901
-        bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
-        assignment_scope_ids: list[str] | list[uuid.UUID] | None,
-        user_ids: list[str] | list[uuid.UUID] | None,
-        labels: dict[str, LabelOptions] | None,
-        ignore_repeat: bool,
+    bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
+    assignment_scope_ids: list[str] | list[uuid.UUID] | None,
+    user_ids: list[str] | list[uuid.UUID] | None,
+    labels: dict[str, LabelOptions] | None,
+    ignore_repeat: bool,
 ) -> sa.CTE:
     def _label_filter(Schema: Type[Annotation] | Type[BotAnnotation], label: LabelOptions) -> sa.ColumnElement[bool] | None:
         if label.options_int:
@@ -237,7 +234,10 @@ async def get_labels(stmt_labels: sa.CTE, db_engine: DatabaseEngineAsync) -> dic
             sa.func.unnest(stmt_labels.c.multi_int).label('multis'),
         ),
         sa.select(
-            stmt_labels.c.key, stmt_labels.c.value_int, stmt_labels.c.value_bool, stmt_labels.c.value_str,
+            stmt_labels.c.key,
+            stmt_labels.c.value_int,
+            stmt_labels.c.value_bool,
+            stmt_labels.c.value_str,
             sa.literal(None, type_=sa.Integer).label('multis'),
         ),
     ).subquery()
@@ -273,7 +273,10 @@ async def get_project_labels(project_id: str | uuid.UUID, db_engine: DatabaseEng
     user_ids = [r['id'] for r in users]
 
     stmt_labels = _labels_subquery(
-        bot_annotation_metadata_ids=bot_annotation_metadata_ids, assignment_scope_ids=assignment_scope_ids, user_ids=user_ids, labels=None,
+        bot_annotation_metadata_ids=bot_annotation_metadata_ids,
+        assignment_scope_ids=assignment_scope_ids,
+        user_ids=user_ids,
+        labels=None,
         ignore_repeat=True,
     )
 
@@ -281,22 +284,22 @@ async def get_project_labels(project_id: str | uuid.UUID, db_engine: DatabaseEng
 
 
 F2CRetType = (
-        tuple[Type[AcademicItem] | Type[TwitterItem] | Type[LexisNexisItem], list[Type[sa.Column]]]  # type: ignore[type-arg]
-        | tuple[None, None]
+    tuple[Type[AcademicItem] | Type[TwitterItem] | Type[LexisNexisItem], list[Type[sa.Column]]]  # type: ignore[type-arg]
+    | tuple[None, None]
 )
 
 
 @ensure_session_async
 async def prepare_export_table(
-        session: DBSession | AsyncSession,
-        nql_filter: NQLFilter | None,
-        bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
-        assignment_scope_ids: list[str] | list[uuid.UUID] | None,
-        user_ids: list[str] | list[uuid.UUID] | None,
-        project_id: str | uuid.UUID,
-        labels: list[LabelOptions],
-        ignore_hierarchy: bool,
-        ignore_repeat: bool,
+    session: DBSession | AsyncSession,
+    nql_filter: NQLFilter | None,
+    bot_annotation_metadata_ids: list[str] | list[uuid.UUID] | None,
+    assignment_scope_ids: list[str] | list[uuid.UUID] | None,
+    user_ids: list[str] | list[uuid.UUID] | None,
+    project_id: str | uuid.UUID,
+    labels: list[LabelOptions],
+    ignore_hierarchy: bool,
+    ignore_repeat: bool,
 ) -> list[dict[str, bool | int | str | None]]:
     project_type = await session.scalar(sa.select(Project.type).where(Project.project_id == project_id))
 
@@ -361,13 +364,13 @@ def _generate_keys(key: str, val: dict[str, None | bool | int | list[int]]) -> G
 
 @ensure_session_async
 async def wide_export_table(
-        session: DBSession | AsyncSession,
-        nql_filter: NQLFilter | None,
-        scope_ids: list[str] | list[uuid.UUID],
-        project_id: str | uuid.UUID,
-        limit: int | None = None,
-        prefix: dict[str, str] | None = None,
-        include_meta: bool = False,
+    session: DBSession | AsyncSession,
+    nql_filter: NQLFilter | None,
+    scope_ids: list[str] | list[uuid.UUID],
+    project_id: str | uuid.UUID,
+    limit: int | None = None,
+    prefix: dict[str, str] | None = None,
+    include_meta: bool = False,
 ) -> tuple[list[str], list[str], 'pd.DataFrame']:
     import pandas as pd
 
@@ -484,8 +487,7 @@ async def wide_export_table(
             for r in rslt
         ],
     )
-    base_cols = ['scope_order', 'item_order', 'item_id', 'wos_id', 'openalex_id', 'doi', 'title', 'text', 'teaser', 'authors', 'source',
-                 'py']
+    base_cols = ['scope_order', 'item_order', 'item_id', 'wos_id', 'openalex_id', 'doi', 'title', 'text', 'teaser', 'authors', 'source', 'py']
     if include_meta:
         base_cols += ['meta']
     else:
