@@ -30,47 +30,46 @@ cache:
     paths:
       - $UV_CACHE_DIR
 
-.uv:
-  script:
-    - pip install uv
-    - python -V
-    - pwd
-    - ls -lisah
-
 build-job:
-  extends:
-    - .uv
   except:
     - schedules
   stage: build
   tags:
     - se164-docker
   script:
+    - pip install uv
+    - python -V
+    - pwd
+    - ls -lisah
     - uv sync --group dev
     - uv cache prune --ci
 
 test-ruff:
-  extends:
-    - .uv
   except:
     - schedules
   stage: test
   tags:
     - se164-docker
   script:
+    - pip install uv
+    - python -V
+    - pwd
+    - ls -lisah
     - uv run ruff check
     - uv run ruff format --check
     - uv cache prune --ci
 
 test-mypy:
-  extends:
-    - .uv
   except:
     - schedules
   stage: test
   tags:
     - se164-docker
   script:
+    - pip install uv
+    - python -V
+    - pwd
+    - ls -lisah
     - uv run mypy
     - uv cache prune --ci
 
