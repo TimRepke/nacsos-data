@@ -46,7 +46,7 @@ FIELDS_API = {
     'has_fulltext',
     # 'fulltext_origin',
     # 'fulltext',
-    # 'cited_by_count',
+    'cited_by_count',
     # 'citation_normalized_percentile',
     # 'cited_by_percentile_year',
     # 'biblio',
@@ -77,7 +77,13 @@ FIELDS_API = {
     'updated_date',
     'created_date',
 }
-FIELDS_SOLR: set[str] = FIELDS_API - {'abstract_inverted_index'} | {
+
+FIELDS_SOLR: set[str] = FIELDS_API - {
+    'abstract_inverted_index',
+    'ids',
+    'display_name',
+    'primary_location',
+} | {
     'abstract',
     'title_abstract',
     'abstract_source',
@@ -96,7 +102,7 @@ FIELDS_META = set(FIELDS_SOLR) - {'abstract', 'abstract_inverted_index'}
 
 NESTED_FIELDS = {field for field, dtype in WorksSchema.model_fields.items() if get_args(dtype.annotation)[0] not in {str, int, float, bool}}
 
-NON_ALPHA = re.compile(r'[^a-zA-Z]')
+NON_ALPHA = re.compile(r'[^a-zA-Z]+')
 
 
 def translate_work_to_solr(work: WorksSchema) -> dict[str, str | bool | int | float]:
@@ -152,7 +158,7 @@ def translate_work_to_item(work: WorksSchema, project_id: str | uuid.UUID | None
         meta=clear_empty(
             {
                 'openalex': work.model_dump(include=FIELDS_META, exclude_none=True, exclude_unset=True),
-            }
+            },
         ),
     )
 
@@ -177,7 +183,10 @@ class OpenAlexAPI(AbstractAPI):
         n_works = 0
         headers = {'api_key': self.api_key} if self.api_key else None
         with RequestClient(
-            backoff_rate=self.backoff_rate, max_req_per_sec=self.max_req_per_sec, max_retries=self.max_retries, proxy=self.proxy
+            backoff_rate=self.backoff_rate,
+            max_req_per_sec=self.max_req_per_sec,
+            max_retries=self.max_retries,
+            proxy=self.proxy,
         ) as request_client:
             while cursor is not None:
                 n_pages += 1
@@ -269,7 +278,11 @@ class OpenAlexSolrAPI(AbstractAPI):
         :return:
         """
         with RequestClient(
-            backoff_rate=self.backoff_rate, max_req_per_sec=self.max_req_per_sec, max_retries=self.max_retries, proxy=self.proxy, auth=self.openalex_conf.auth
+            backoff_rate=self.backoff_rate,
+            max_req_per_sec=self.max_req_per_sec,
+            max_retries=self.max_retries,
+            proxy=self.proxy,
+            auth=self.openalex_conf.auth,
         ) as request_client:
             params_ = {'q': query, 'q.op': self.op, 'sort': 'id desc', 'fl': ','.join(FIELDS_SOLR), 'rows': self.batch_size, 'cursorMark': '*'}
 
@@ -293,7 +306,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                 params_ |= params
 
             t0 = time()
-            self.logger.info(f'Querying endpoint with batch_size={self.batch_size:,}: {self.openalex_conf.SOLR_URL}')
+            self.logger.info(f'Querying endpoint with batch_size={self.batch_size:,}: {self.openalex_conf.solr_url}')
             self.logger.info(f'Request parameters: {params_}')
 
             batch_i = 0
@@ -303,7 +316,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                 batch_i += 1
                 self.logger.info(f'Running query for batch {batch_i} with cursor "{params_["cursorMark"]}"')
                 t2 = time()
-                res = request_client.post(f'{self.openalex_conf.SOLR_URL}/select', data=params_, timeout=60).json()
+                res = request_client.post(f'{self.openalex_conf.solr_url}/select', data=params_, timeout=60).json()
 
                 next_curser = res.get('nextCursorMark')
                 params_['cursorMark'] = next_curser
@@ -362,7 +375,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                     'start': offset,
                     'cursorMark': None,
                 },
-            )
+            ),
         )
 
         return SearchResult(

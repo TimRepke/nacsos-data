@@ -40,9 +40,23 @@ class DatabaseConfig(BaseSettings):
 
 class OpenAlexConfig(BaseSettings):
     API_KEY: str | None = None
-    SOLR_URL: str = 'http://localhost:8983/solr/openalex'
+
+    SOLR_ENDPOINT: str = 'http://localhost:8983'
+    SOLR_COLLECTION: str = 'openalex'
     SOLR_USER: str | None = None
     SOLR_PASSWORD: str | None = None
+
+    # Optional info (mainly for meta-cache)
+    SNAPSHOT_DIR: str | None = None  # Path to S3 snapshot on disk
+    SOLR_BIN: str | None = None  # /path/to/solr/bin directory
+    SOLR_HOME: str | None = None  # /path/to/solr-home directory
+    SOLR_HOST: str | None = None  # probably same as in SOLR_ENDPOINT
+    SOLR_PORT: str | None = None  # probably same as in SOLR_ENDPOINT (probably 8983)
+    SOLR_ZOO_PORT: str | None = None  # zookeper port (probably 9983)
+
+    @property
+    def solr_url(self) -> str:
+        return f'{self.SOLR_ENDPOINT}/solr/{self.SOLR_COLLECTION}'
 
     @property
     def auth(self) -> BasicAuth | None:
@@ -57,7 +71,7 @@ class Settings(BaseSettings):
     DB: DatabaseConfig = DatabaseConfig()
     OPENALEX: OpenAlexConfig = OpenAlexConfig()
 
-    model_config = SettingsConfigDict(case_sensitive=True, env_prefix='NACSOS_', env_nested_delimiter='__')
+    model_config = SettingsConfigDict(case_sensitive=True, env_prefix='NACSOS_', env_nested_delimiter='__', extra='allow')
 
 
 def load_settings(conf_file: Path | str | None = None) -> Settings:
