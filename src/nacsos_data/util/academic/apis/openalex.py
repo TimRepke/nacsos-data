@@ -102,7 +102,7 @@ FIELDS_META = set(FIELDS_SOLR) - {'abstract', 'abstract_inverted_index'}
 
 NESTED_FIELDS = {field for field, dtype in WorksSchema.model_fields.items() if get_args(dtype.annotation)[0] not in {str, int, float, bool}}
 
-NON_ALPHA = re.compile(r'[^a-zA-Z]')
+NON_ALPHA = re.compile(r'[^a-zA-Z]+')
 
 
 def translate_work_to_solr(work: WorksSchema) -> dict[str, str | bool | int | float]:
