@@ -46,7 +46,7 @@ class OpenAlexConfig(BaseSettings):
     SOLR_USER: str | None = None
     SOLR_PASSWORD: str | None = None
 
-    # Optional info (mainly for meta-cache)
+    # Optional info (mainly for meta-cache and local snapshot)
     SNAPSHOT_DIR: str | None = None  # Path to S3 snapshot on disk
     SOLR_BIN: str | None = None  # /path/to/solr/bin directory
     SOLR_HOME: str | None = None  # /path/to/solr-home directory

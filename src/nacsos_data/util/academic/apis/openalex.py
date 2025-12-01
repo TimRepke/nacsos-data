@@ -102,7 +102,7 @@ FIELDS_META = set(FIELDS_SOLR) - {'abstract', 'abstract_inverted_index'}
 
 NESTED_FIELDS = {field for field, dtype in WorksSchema.model_fields.items() if get_args(dtype.annotation)[0] not in {str, int, float, bool}}
 
-NON_ALPHA = re.compile(r'[^a-zA-Z]+')
+NON_ALPHA = re.compile(r'[^a-zA-Z]')
 
 
 def translate_work_to_solr(work: WorksSchema) -> dict[str, str | bool | int | float]:
@@ -110,7 +110,7 @@ def translate_work_to_solr(work: WorksSchema) -> dict[str, str | bool | int | fl
     return (
         doc
         | {
-            'title_abstract': NON_ALPHA.sub(f'{work.title} {work.abstract}', ' '),
+            'title_abstract': NON_ALPHA.sub(' ', f'{work.title} {work.abstract}'),
             'abstract_source': 'OpenAlex' if work.abstract else None,
         }
         | {field: json.dumps(doc[field]) for field in NESTED_FIELDS if field in doc}
