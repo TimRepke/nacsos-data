@@ -53,10 +53,10 @@ dev = [
     "mypy[faster-cache]==1.18.2",
     "types-passlib==1.7.7.20250602",
     "types-requests==2.32.4.20250913",
-    "nacsos-data[utils,scripts]",
+    "nacsos_data[utils,scripts]",
 ]
 mldev = [
-    "nacsos-data[utils,scripts,priority]",
+    "nacsos_data[utils,scripts,priority]",
 ]
 
 
@@ -73,7 +73,7 @@ members = [
 ]
 
 [tool.uv.sources]
-nacsos-data = { workspace = true, editable = true }
+nacsos_data = { workspace = true, editable = true }
 
 [build-system]
 requires = ["uv-build>=0.9.10,<0.10.0"]
