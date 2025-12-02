@@ -471,7 +471,7 @@ class WorksSchema(BaseModel, extra='allow'):
         return data
 
     @property
-    def tiab(self):
+    def tiab(self) -> str:
         return NON_ALPHA.sub(' ', f'{self.title or ""} {self.abstract or ""}')
 
 

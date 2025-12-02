@@ -236,7 +236,7 @@ class OpenAlexAPI(AbstractAPI):
             self.logger.error(e.response.text)
             raise e
 
-        return page.json().get('meta', {}).get('count', None)
+        return page.json().get('meta', {}).get('count', None)  # type: ignore [no-any-return]
 
 
 class SearchResult(BaseModel):
