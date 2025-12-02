@@ -1,8 +1,8 @@
 import re
 from typing import TypeVar, Annotated, Literal, Any
 
-from pydantic import BaseModel, BeforeValidator, WrapValidator, Field, model_validator, AfterValidator
-from pydantic_core.core_schema import ValidatorFunctionWrapHandler, ValidationInfo
+from pydantic import BaseModel, BeforeValidator, model_validator, AfterValidator
+
 
 # based on
 # https://github.com/ourresearch/openalex-elastic-api/blob/master/works/schemas.py
@@ -44,12 +44,7 @@ def strip_urls(urls: list[str] | None) -> list[str] | None:
     return [URLS.sub('', url) for url in urls]
 
 
-def invert_abstract(v: str | None, handler: ValidatorFunctionWrapHandler, info: ValidationInfo) -> str | None:
-    # v := abstract
-    if v is not None:
-        return v
-
-    abstract_inverted_index: dict[str, list[int]] | None = info.data.get('abstract_inverted_index')
+def invert_abstract(abstract_inverted_index: dict[str, list[int]] | None) -> str | None:
     if abstract_inverted_index is None:
         return None
 
@@ -363,6 +358,9 @@ class KeywordsSchema(BaseModel, extra='allow'):
     score: float | None = None
 
 
+NON_ALPHA = re.compile(r'[^a-zA-Z0-9.]+')
+
+
 class WorksSchema(BaseModel, extra='allow'):
     id: Annotated[str | None, AfterValidator(strip_url)] = None
     doi: Annotated[str | None, AfterValidator(strip_url)] = None
@@ -417,15 +415,15 @@ class WorksSchema(BaseModel, extra='allow'):
     referenced_works_count: int | None = None
     referenced_works: Annotated[list[str] | None, BeforeValidator(ensure_clean_list), AfterValidator(strip_urls)] = None
     related_works: Annotated[list[str] | None, BeforeValidator(ensure_clean_list), AfterValidator(strip_urls)] = None
-    abstract_inverted_index: dict[str, list[int]] | None = None
     cited_by_api_url: str | None = None
     counts_by_year: Annotated[list[CountsByYearSchema] | None, BeforeValidator(ensure_clean_list)] = None
     updated_date: str | None = None
     created_date: str | None = None
 
     # Custom attributes
-    abstract: Annotated[str | None, WrapValidator(invert_abstract), Field(validate_default=True)] = None
+    abstract: str | None = None
     title_abstract: str | None = None
+    abstract_inverted_index: dict[str, list[int]] | None = None
     abstract_source: AbstractSource | None = None
 
     is_published: bool | None = None
@@ -465,9 +463,16 @@ class WorksSchema(BaseModel, extra='allow'):
             if data['ids'].get('pmcid'):
                 data['id_pmcid'] = str(data['ids']['pmcid'])
 
+        if not data.get('abstract') and data.get('abstract_inverted_index'):
+            data['abstract'] = invert_abstract(data['abstract_inverted_index'])
+
         data['is_open_access'] = data.get('open_access', {}).get('is_oa', False)
 
         return data
+
+    @property
+    def tiab(self):
+        return NON_ALPHA.sub(' ', f'{self.title or ""} {self.abstract or ""}')
 
 
 if __name__ == '__main__':

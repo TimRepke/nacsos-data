@@ -1,5 +1,4 @@
 import json
-import re
 import uuid
 import logging
 from pathlib import Path
@@ -7,7 +6,8 @@ from time import time
 from datetime import timedelta
 from typing import Any, Generator, Annotated, Literal, get_args
 
-from httpx import Response
+import httpx
+from httpx import Response, HTTPStatusError
 from pydantic import BaseModel
 
 from nacsos_data.models.items import AcademicItemModel
@@ -102,15 +102,13 @@ FIELDS_META = set(FIELDS_SOLR) - {'abstract', 'abstract_inverted_index'}
 
 NESTED_FIELDS = {field for field, dtype in WorksSchema.model_fields.items() if get_args(dtype.annotation)[0] not in {str, int, float, bool}}
 
-NON_ALPHA = re.compile(r'[^a-zA-Z]+')
-
 
 def translate_work_to_solr(work: WorksSchema) -> dict[str, str | bool | int | float]:
     doc = work.model_dump(include=FIELDS_SOLR, exclude_none=True, exclude_unset=True)
     return (
         doc
         | {
-            'title_abstract': NON_ALPHA.sub(' ', f'{work.title} {work.abstract}'),
+            'title_abstract': work.tiab,
             'abstract_source': 'OpenAlex' if work.abstract else None,
         }
         | {field: json.dumps(doc[field]) for field in NESTED_FIELDS if field in doc}
@@ -191,7 +189,7 @@ class OpenAlexAPI(AbstractAPI):
             while cursor is not None:
                 n_pages += 1
 
-                page = request_client.get(
+                req = request_client.get(
                     'https://api.openalex.org/works',
                     params={  # type: ignore[arg-type]
                         'filter': query,
@@ -201,7 +199,13 @@ class OpenAlexAPI(AbstractAPI):
                     }
                     | (params or {}),
                     headers=headers,
-                ).json()
+                )
+                try:
+                    req.raise_for_status()
+                except HTTPStatusError as e:
+                    self.logger.error(e.response.text)
+                    raise e
+                page = req.json()
                 cursor = page['meta']['next_cursor']
                 self.logger.info(f'Retrieved {n_works:,} / {page["meta"]["count"]:,} | currently on page {n_pages:,}')
 
@@ -212,6 +216,27 @@ class OpenAlexAPI(AbstractAPI):
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
         work = WorksSchema.model_validate(record)
         return translate_work_to_item(work=work, project_id=project_id)
+
+    def get_count(self, query: str, params: dict[str, Any] | None = None) -> int | None:
+        headers = {'api_key': self.api_key} if self.api_key else None
+
+        page = httpx.get(
+            'https://api.openalex.org/works',
+            params={  # type: ignore[arg-type]
+                'filter': query,
+                'select': 'id',
+                'per-page': 1,
+            }
+            | (params or {}),
+            headers=headers,
+        )
+        try:
+            page.raise_for_status()
+        except HTTPStatusError as e:
+            self.logger.error(e.response.text)
+            raise e
+
+        return page.json().get('meta', {}).get('count', None)
 
 
 class SearchResult(BaseModel):
@@ -284,7 +309,7 @@ class OpenAlexSolrAPI(AbstractAPI):
             proxy=self.proxy,
             auth=self.openalex_conf.auth,
         ) as request_client:
-            params_ = {'q': query, 'q.op': self.op, 'sort': 'id desc', 'fl': ','.join(FIELDS_SOLR), 'rows': self.batch_size, 'cursorMark': '*'}
+            params_ = {'q': query, 'q.op': self.op, 'sort': 'id desc', 'fl': ','.join(self.export_fields), 'rows': self.batch_size, 'cursorMark': '*'}
 
             if self.def_type == 'lucene':
                 params_ |= {'df': self.field, 'defType': 'lucene'}
@@ -309,17 +334,21 @@ class OpenAlexSolrAPI(AbstractAPI):
             self.logger.info(f'Querying endpoint with batch_size={self.batch_size:,}: {self.openalex_conf.solr_url}')
             self.logger.info(f'Request parameters: {params_}')
 
+            if params_['cursorMark'] is None:
+                del params_['cursorMark']
+
             batch_i = 0
             num_docs_cum = 0
             while True:
                 t1 = time()
                 batch_i += 1
-                self.logger.info(f'Running query for batch {batch_i} with cursor "{params_["cursorMark"]}"')
+                self.logger.info(f'Running query for batch {batch_i} with cursor "{params_.get("cursorMark")}"')
                 t2 = time()
                 res = request_client.post(f'{self.openalex_conf.solr_url}/select', data=params_, timeout=60).json()
 
                 next_curser = res.get('nextCursorMark')
                 params_['cursorMark'] = next_curser
+
                 batch_docs = res['response']['docs']
                 n_docs_batch = len(batch_docs)
                 num_docs_cum += n_docs_batch
@@ -386,13 +415,22 @@ class OpenAlexSolrAPI(AbstractAPI):
         )
 
     def get_count(self, query: str) -> SearchResult:
-        return self.query(query, limit=1)
+        return self.query(query, limit=0)
 
 
 if __name__ == '__main__':
     import typer
 
     logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s (%(process)d): %(message)s', level='DEBUG')
+
+    fin = Path('../../../../../scratch/snippet.jsonl').resolve()
+    print(fin)
+    with open(fin) as f:
+        for li, line in enumerate(f):
+            print(li)
+            work = WorksSchema.model_validate_json(line)
+            # print(work.model_dump(exclude_unset=True, exclude_none=True))
+            print(translate_work_to_solr(work))
 
     app = typer.Typer()
 
