@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from nacsos_data.models.items import AcademicItemModel
 from nacsos_data.models.items.academic import AcademicAuthorModel, AffiliationModel
-from nacsos_data.models.openalex import WorksSchema, AuthorshipsSchema, DefType, SearchField, OpType
+from nacsos_data.models.openalex import WorksSchema, AuthorshipsSchema, DefType, SearchField, OpType, AbstractSource
 from nacsos_data.util import clear_empty, as_uuid, get
 from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
 from nacsos_data.util.conf import OpenAlexConfig, load_settings
@@ -100,16 +100,16 @@ FIELDS_SOLR: set[str] = FIELDS_API - {
 }
 FIELDS_META = set(FIELDS_SOLR) - {'abstract', 'abstract_inverted_index'}
 
-NESTED_FIELDS = {field for field, dtype in WorksSchema.model_fields.items() if get_args(dtype.annotation)[0] not in {str, int, float, bool}}
+NESTED_FIELDS = {field for field, dtype in WorksSchema.model_fields.items() if get_args(dtype.annotation)[0] not in {str, int, float, bool, AbstractSource}}
 
 
-def translate_work_to_solr(work: WorksSchema) -> dict[str, str | bool | int | float]:
+def translate_work_to_solr(work: WorksSchema, source: str = 'OpenAlex') -> dict[str, str | bool | int | float]:
     doc = work.model_dump(include=FIELDS_SOLR, exclude_none=True, exclude_unset=True)
     return (
         doc
         | {
             'title_abstract': work.tiab,
-            'abstract_source': 'OpenAlex' if work.abstract else None,
+            'abstract_source': source if work.abstract else None,
         }
         | {field: json.dumps(doc[field]) for field in NESTED_FIELDS if field in doc}
     )

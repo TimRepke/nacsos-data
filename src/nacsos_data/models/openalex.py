@@ -358,7 +358,7 @@ class KeywordsSchema(BaseModel, extra='allow'):
     score: float | None = None
 
 
-NON_ALPHA = re.compile(r'[^a-zA-Z0-9.]+')
+NON_ALPHA = re.compile(r'[^a-zA-Z0-9]+')
 
 
 class WorksSchema(BaseModel, extra='allow'):
