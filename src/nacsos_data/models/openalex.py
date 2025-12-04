@@ -420,10 +420,11 @@ class WorksSchema(BaseModel, extra='allow'):
     updated_date: str | None = None
     created_date: str | None = None
 
+    abstract_inverted_index: dict[str, list[int]] | None = None
+
     # Custom attributes
     abstract: str | None = None
     title_abstract: str | None = None
-    abstract_inverted_index: dict[str, list[int]] | None = None
     abstract_source: AbstractSource | None = None
 
     is_published: bool | None = None
@@ -438,6 +439,11 @@ class WorksSchema(BaseModel, extra='allow'):
     id_mag: str | None = None
     id_pmid: str | None = None
     id_pmcid: str | None = None
+
+    has_pdf: bool | None = None
+    has_grobid_xml: bool | None = None
+    open_access_status: str | None = None
+    any_repository_has_fulltext: bool | None = None
 
     @model_validator(mode='before')
     @classmethod
@@ -456,12 +462,23 @@ class WorksSchema(BaseModel, extra='allow'):
             data['is_accepted'] = data['primary_location'].get('is_accepted', False)
 
         if data.get('ids'):
-            if data['ids'].get('mag'):
+            if data['ids'].get('mag') and not data.get('id_mag'):
                 data['id_mag'] = str(data['ids']['mag'])
-            if data['ids'].get('pmid'):
+            if data['ids'].get('pmid') and not data.get('id_pmid'):
                 data['id_pmid'] = str(data['ids']['pmid'])
-            if data['ids'].get('pmcid'):
+            if data['ids'].get('pmcid') and not data.get('id_pmcid'):
                 data['id_pmcid'] = str(data['ids']['pmcid'])
+
+        if data.get('has_content'):
+            if not data.get('has_pdf'):
+                data['has_pdf'] = data['has_content'].get('has_pdf', False)
+            if not data.get('has_grobid_xml'):
+                data['has_grobid_xml'] = data['has_content'].get('has_grobid_xml', False)
+        if data.get('open_access'):
+            if not data.get('open_access_status'):
+                data['open_access_status'] = data['open_access'].get('oa_status', False)
+            if not data.get('open_access_status'):
+                data['any_repository_has_fulltext'] = data['open_access'].get('any_repository_has_fulltext', False)
 
         if not data.get('abstract') and data.get('abstract_inverted_index'):
             data['abstract'] = invert_abstract(data['abstract_inverted_index'])

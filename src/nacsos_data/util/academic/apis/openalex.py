@@ -78,12 +78,16 @@ FIELDS_API = {
     'created_date',
 }
 
-FIELDS_SOLR: set[str] = FIELDS_API - {
+FIELDS_REDUNDANT: set[str] = {
     'abstract_inverted_index',
     'ids',
     'display_name',
     'primary_location',
-} | {
+    'open_access',
+    'has_content',
+}
+
+FIELDS_CUSTOM: set[str] = {
     'abstract',
     'title_abstract',
     'abstract_source',
@@ -97,8 +101,14 @@ FIELDS_SOLR: set[str] = FIELDS_API - {
     'id_mag',
     'id_pmid',
     'id_pmcid',
+    'has_pdf',
+    'has_grobid_xml',
+    'open_access_status',
+    'any_repository_has_fulltext',
 }
-FIELDS_META = set(FIELDS_SOLR) - {'abstract', 'abstract_inverted_index'}
+
+FIELDS_SOLR: set[str] = (FIELDS_API - FIELDS_REDUNDANT) | FIELDS_CUSTOM
+FIELDS_META = set(FIELDS_SOLR) - {'abstract', 'title_abstract'}
 
 NESTED_FIELDS = {field for field, dtype in WorksSchema.model_fields.items() if get_args(dtype.annotation)[0] not in {str, int, float, bool, AbstractSource}}
 
