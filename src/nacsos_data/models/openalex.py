@@ -447,7 +447,7 @@ class WorksSchema(BaseModel, extra='allow'):
 
     @model_validator(mode='before')
     @classmethod
-    def _custom(cls, data: dict[str, Any]) -> dict[str, Any]:
+    def _custom(cls, data: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
         if data.get('primary_location') and data.get('locations') and len(data['locations']) > 0:
             data['locations'][0] = data['locations'][0] | data['primary_location'] | {'is_primary': True}
 

@@ -1,16 +1,19 @@
 import datetime
+import logging
 import uuid
 
-from sqlalchemy import select, delete, func
+from sqlalchemy import select, delete, func, text, update
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert as insert_pg
 
 from nacsos_data.db.crud import upsert_orm
 from nacsos_data.db.engine import ensure_session_async, DBSession
 from nacsos_data.db.schemas import Import, m2m_import_item_table, Task, Project
 from nacsos_data.db.schemas.imports import ImportRevision
 from nacsos_data.db.schemas.items.base import Item
-from nacsos_data.models.imports import ImportModel
+from nacsos_data.models.imports import ImportModel, ImportRevisionModel, M2MImportItemType
+from nacsos_data.util import elapsed_timer
 from nacsos_data.util.errors import MissingIdError, ParallelImportError
 
 
@@ -143,3 +146,85 @@ async def set_session_mutex(session: AsyncSession, project_id: str | uuid.UUID, 
     # Set or free our import mutex
     project.import_mutex = True if lock else None
     await session.commit()
+
+
+async def upsert_m2m(session: AsyncSession, item_id: str, import_id: str, latest_revision: int, dry_run: bool, logger: logging.Logger) -> None:
+    if dry_run:
+        logger.debug(' [DRY-RUN] -> Upserted many-to-many relationship for import/item')
+    else:
+        stmt_m2m = (
+            insert_pg(m2m_import_item_table)
+            .values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit, first_revision=latest_revision, latest_revision=latest_revision)
+            .on_conflict_do_update(
+                constraint='m2m_import_item_pkey',
+                set_={
+                    'latest_revision': latest_revision,
+                },
+            )
+        )
+        await session.execute(stmt_m2m)
+        await session.flush()
+        logger.debug(' -> Upserted many-to-many relationship for import/item')
+
+
+async def update_revision_statistics(
+    session: AsyncSession,
+    import_id: str | uuid.UUID,
+    revision_id: str | uuid.UUID,
+    latest_revision: int,
+    num_new_items: int,
+    num_updated: int,
+    logger: logging.Logger,
+) -> None:
+    with elapsed_timer(logger, 'Updating revision stats...'):
+        num_items = ((await session.execute(text('SELECT count(1) FROM m2m_import_item WHERE import_id = :import_id'), {'import_id': import_id})).scalar(),)
+        num_items_new = (
+            await session.execute(
+                text('SELECT count(1) FROM m2m_import_item WHERE first_revision = :rev AND import_id=:import_id'),
+                {'rev': latest_revision, 'import_id': import_id},
+            )
+        ).scalar()
+        num_items_removed = (
+            await session.execute(
+                text('SELECT count(1) FROM m2m_import_item WHERE latest_revision = :rev AND import_id=:import_id'),
+                {'rev': latest_revision - 1, 'import_id': import_id},
+            )
+        ).scalar()
+        revision_stats = {
+            'num_items': num_items,
+            'num_items_retrieved': num_new_items,
+            'num_items_new': num_items_new,
+            'num_items_updated': num_updated,
+            'num_items_removed': num_items_removed,
+        }
+        logger.info(f'Setting new revision stats: {revision_stats}')
+        await session.execute(update(ImportRevision).where(ImportRevision.import_revision_id == revision_id).values(**revision_stats))
+        await session.commit()
+
+    return None
+
+
+async def get_latest_revision_counter(session: AsyncSession, import_id: str | uuid.UUID) -> int:
+    latest_revision: int = (
+        await session.execute(  # type: ignore[assignment]
+            text('SELECT COALESCE(MAX("import_revision_counter"), 0) as latest_revision FROM import_revision WHERE import_id=:import_id;'),
+            {'import_id': import_id},
+        )
+    ).scalar()
+    return latest_revision
+
+
+async def get_latest_revision(session: AsyncSession, import_id: str | uuid.UUID) -> ImportRevisionModel | None:
+    rslt = (
+        (
+            await session.execute(
+                text('SELECT * FROM import_revision WHERE import_id=:import_id ORDER BY import_revision_counter DESC LIMIT 1;'),
+                {'import_id': import_id},
+            )
+        )
+        .mappings()
+        .one_or_none()
+    )
+    if rslt:
+        return ImportRevisionModel(**rslt)
+    return None

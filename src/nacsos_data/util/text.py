@@ -43,10 +43,10 @@ def tokenise_item(item: AnyItemModel, lowercase: bool = True) -> list[str]:
     return tokenise_text(preprocess_text(itm2txt(item)), lowercase=lowercase)
 
 
-def extract_vocabulary(token_counts: dict[str, int], min_count: int = 1, max_features: int = 1000) -> list[str]:
+def extract_vocabulary(token_counts: dict[str, int], min_count: int = 1, skip_top: float = 0.0, max_features: int = 1000) -> list[str]:
     filtered_vocab = [(tok, cnt) for tok, cnt in token_counts.items() if cnt > min_count]
     vocab = [tok for tok, _ in sorted(filtered_vocab, key=lambda x: x[1], reverse=True)]
-    return vocab[:max_features]
+    return vocab[int(len(vocab) * skip_top) : max_features]
 
 
 def clean_text(txt: str | None) -> str | None:

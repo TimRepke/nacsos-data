@@ -6,8 +6,6 @@ from pathlib import Path
 from typing import Generator, IO
 from collections import defaultdict
 
-from sqlalchemy import text, update
-from sqlalchemy.dialects.postgresql import insert as insert_pg
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 from psycopg.errors import UniqueViolation, OperationalError
@@ -15,12 +13,12 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 from ..conf import load_settings
 from ...db import DatabaseEngineAsync, get_engine_async
-from ...db.crud.imports import get_or_create_import, set_session_mutex
+from ...db.crud.imports import get_or_create_import, set_session_mutex, upsert_m2m, update_revision_statistics, get_latest_revision
 from ...db.crud.items.academic import AcademicItemGenerator, read_item_entries_from_db, gen_academic_entries, read_known_ids_map, IdField
-from ...db.schemas import AcademicItem, m2m_import_item_table
+from ...db.schemas import AcademicItem
 from ...db.schemas.imports import ImportRevision
 from ...models.items import AcademicItemModel, ItemEntry
-from ...models.imports import M2MImportItemType, ImportRevisionModel
+from ...models.imports import ImportRevisionModel
 from ...models.openalex import DefType, SearchField, OpType
 from .. import elapsed_timer
 from ..text import tokenise_item, extract_vocabulary, itm2txt
@@ -91,25 +89,6 @@ async def _find_id_duplicates(
 
     # return number of items we need to check for duplicates, vocabulary, updated set of seen item_ids, and the m2m buffer
     return n_unknown_items, n_new_items, token_counts, m2m_buffer
-
-
-async def _upsert_m2m(session: AsyncSession, item_id: str, import_id: str, latest_revision: int, dry_run: bool, logger: logging.Logger) -> None:
-    if dry_run:
-        logger.debug(' [DRY-RUN] -> Upserted many-to-many relationship for import/item')
-    else:
-        stmt_m2m = (
-            insert_pg(m2m_import_item_table)
-            .values(item_id=item_id, import_id=import_id, type=M2MImportItemType.explicit, first_revision=latest_revision, latest_revision=latest_revision)
-            .on_conflict_do_update(
-                constraint='m2m_import_item_pkey',
-                set_={
-                    'latest_revision': latest_revision,
-                },
-            )
-        )
-        await session.execute(stmt_m2m)
-        await session.flush()
-        logger.debug(' -> Upserted many-to-many relationship for import/item')
 
 
 async def _find_duplicate(
@@ -212,32 +191,6 @@ async def _insert_item(
     return existing_id, has_changes
 
 
-async def _get_latest_revision_counter(session: AsyncSession, import_id: str | uuid.UUID) -> int:
-    latest_revision: int = (
-        await session.execute(  # type: ignore[assignment]
-            text('SELECT COALESCE(MAX("import_revision_counter"), 0) as latest_revision FROM import_revision WHERE import_id=:import_id;'),
-            {'import_id': import_id},
-        )
-    ).scalar()
-    return latest_revision
-
-
-async def _get_latest_revision(session: AsyncSession, import_id: str | uuid.UUID) -> ImportRevisionModel | None:
-    rslt = (
-        (
-            await session.execute(
-                text('SELECT * FROM import_revision WHERE import_id=:import_id ORDER BY import_revision_counter DESC LIMIT 1;'),
-                {'import_id': import_id},
-            )
-        )
-        .mappings()
-        .one_or_none()
-    )
-    if rslt:
-        return ImportRevisionModel(**rslt)
-    return None
-
-
 def _revision_required(num_new_items: int | None, last_revision: ImportRevisionModel | None, min_update_size: int | None, logger: logging.Logger) -> bool:
     if (
         min_update_size is not None
@@ -252,44 +205,6 @@ def _revision_required(num_new_items: int | None, last_revision: ImportRevisionM
         )
         return False
     return True
-
-
-async def _update_statistics(
-    session: AsyncSession,
-    project_id: str | uuid.UUID,
-    import_id: str | uuid.UUID,
-    revision_id: str | uuid.UUID,
-    latest_revision: int,
-    num_new_items: int,
-    num_updated: int,
-    logger: logging.Logger,
-) -> None:
-    with elapsed_timer(logger, 'Updating revision stats...'):
-        num_items = (await session.execute(text('SELECT count(1) FROM m2m_import_item WHERE import_id = :import_id'), {'import_id': import_id})).scalar()
-        num_items_new = (
-            await session.execute(
-                text('SELECT count(1) FROM m2m_import_item WHERE first_revision = :rev AND import_id=:import_id'),
-                {'rev': latest_revision, 'import_id': import_id},
-            )
-        ).scalar()
-        num_items_removed = (
-            await session.execute(
-                text('SELECT count(1) FROM m2m_import_item WHERE latest_revision = :rev AND import_id=:import_id'),
-                {'rev': latest_revision - 1, 'import_id': import_id},
-            )
-        ).scalar()
-        revision_stats = {
-            'num_items': num_items,
-            'num_items_retrieved': num_new_items,
-            'num_items_new': num_items_new,
-            'num_items_updated': num_updated,
-            'num_items_removed': num_items_removed,
-        }
-        logger.info(f'Setting new revision stats: {revision_stats}')
-        await session.execute(update(ImportRevision).where(ImportRevision.import_revision_id == revision_id).values(**revision_stats))
-        await session.commit()
-
-    return None
 
 
 async def import_academic_items_nodedup_forced(
@@ -350,16 +265,15 @@ async def import_academic_items_nodedup_forced(
                         )
 
                         # UPSERT m2m
-                        await _upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=1, logger=logger, dry_run=False)
+                        await upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=1, logger=logger, dry_run=False)
                         n_items += 1
 
             except (UniqueViolation, IntegrityError, OperationalError) as e:
                 logger.exception(e)
 
         logger.info('Writing statistics!')
-        await _update_statistics(
+        await update_revision_statistics(
             session=session,
-            project_id=project_id,
             import_id=import_id,
             revision_id=revision_id,
             latest_revision=1,
@@ -486,7 +400,7 @@ async def import_academic_items(
             import_id = str(import_orm.import_id)
 
             revision_id = str(uuid.uuid4())
-            last_revision = await _get_latest_revision(session=session, import_id=import_id)
+            last_revision = await get_latest_revision(session=session, import_id=import_id)
             latest_revision = 1
             if last_revision is not None:
                 latest_revision = last_revision.import_revision_counter + 1
@@ -532,7 +446,7 @@ async def import_academic_items(
         index: MilvusDuplicateIndex | None = None
         if n_unknown_items > 0:
             with elapsed_timer(logger, f'Constructing vocabulary from {len(token_counts):,} `token_counts`'):
-                vocabulary = extract_vocabulary(token_counts, min_count=1, max_features=max_features)
+                vocabulary = extract_vocabulary(token_counts, min_count=1, max_features=max_features, skip_top=0.05)
                 del token_counts  # clean up term counts to save RAM
 
             if vectoriser is None:
@@ -565,7 +479,7 @@ async def import_academic_items(
         async with db_engine.session() as session:  # type: AsyncSession
             with elapsed_timer(logger, f'Inserting {len(m2m_buffer):,} buffered m2m relations'):
                 for item_id in m2m_buffer:
-                    await _upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=latest_revision, logger=logger, dry_run=dry_run)
+                    await upsert_m2m(session=session, item_id=item_id, import_id=import_id, latest_revision=latest_revision, logger=logger, dry_run=dry_run)
 
             if n_unknown_items == 0 or index is None:
                 logger.info('No unknown items found, ending here!')
@@ -573,9 +487,8 @@ async def import_academic_items(
                 await session.commit()
 
                 # Updating revision stats
-                await _update_statistics(
+                await update_revision_statistics(
                     session=session,
-                    project_id=project_id,
                     import_id=import_id,
                     revision_id=revision_id,
                     latest_revision=latest_revision,
@@ -624,7 +537,7 @@ async def import_academic_items(
                             num_updated += has_changes
 
                             # UPSERT m2m
-                            await _upsert_m2m(
+                            await upsert_m2m(
                                 session=session,
                                 item_id=item_id,
                                 import_id=import_id,
@@ -644,9 +557,8 @@ async def import_academic_items(
         index.client.drop_collection(index.collection_name)
 
     async with db_engine.session() as session:  # type: AsyncSession
-        await _update_statistics(
+        await update_revision_statistics(
             session=session,
-            project_id=project_id,
             import_id=import_id,
             revision_id=revision_id,
             latest_revision=latest_revision,
