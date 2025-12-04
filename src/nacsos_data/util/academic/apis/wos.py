@@ -261,7 +261,7 @@ if __name__ == '__main__':
         ]
     )
 
-    @app.command()  # type: ignore[misc]
+    @app.command()  # type: ignore[untyped-decorator]
     def offline() -> None:
         for fp in [
             'scratch/academic_apis/wos_response.json',

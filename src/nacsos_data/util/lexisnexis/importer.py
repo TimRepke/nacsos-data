@@ -87,7 +87,7 @@ def _filtered_entries(
         if item.text is None or len(item.text) < min_text_len:
             continue
 
-        for source in item.sources:
+        for source in item.sources or []:
             if source.lexis_id in known_ids:
                 break
         else:
@@ -118,7 +118,6 @@ async def import_lexis_nexis(  # noqa: C901
     user_id: str | uuid.UUID | None = None,
     description: str | None = None,
     vectoriser: CountVectorizer | None = None,
-    num_new_items: int | None = None,
     max_slop: float = 0.05,
     min_text_len: int = 50,
     max_text_len: int = 800,
@@ -141,7 +140,7 @@ async def import_lexis_nexis(  # noqa: C901
        - else: create new item, lexis_item, and lexis_item_source and m2m
 
 
-    :param max_text_len: Cutting texts longer than that, no need to compare more than that
+    :param max_text_len: For similarity check, cut texts longer than that; no need to compare more than that
     """
 
     if logger is None:
@@ -244,9 +243,9 @@ async def import_lexis_nexis(  # noqa: C901
             num_total += 1
             try:
                 async with session.begin_nested():
-                    with elapsed_timer(logger, f'Importing LexisNexis item with ID {new_item.sources[0].lexis_id} and title "{new_item.sources[0].title}"'):
+                    with elapsed_timer(logger, f'Importing LexisNexis item with ID {new_item.sources[0].lexis_id} and title "{new_item.sources[0].title}"'):  # type: ignore[index]
                         # Check if we've seen this lexis item before based on source ID
-                        for source in new_item.sources:
+                        for source in new_item.sources or []:
                             # Quick check in the lookup index from earlier
                             if source.lexis_id in known_ids:
                                 await upsert_m2m(
@@ -280,7 +279,7 @@ async def import_lexis_nexis(  # noqa: C901
 
                             # When we have enough text, check our similarity index
                             if item.text is not None and len(item.text) > min_text_len:
-                                item_id = index.test(ItemEntry(item_id=str(item.item_id), text=item.text[:max_text_len]))
+                                item_id = index.test(ItemEntry(item_id=str(item.item_id), text=item.text[:max_text_len]))  # type: ignore[assignment]
 
                             # We have not found anything, add new LexisNexisItem!
                             if item_id is None:
@@ -295,14 +294,21 @@ async def import_lexis_nexis(  # noqa: C901
 
                             # Add all the sources (no need to double-check source existence again)
                             # This either adds the source to the exising item we found or the newly created item
-                            for source in item.sources:
+                            for source in item.sources or []:
                                 if source.item_source_id is None:
                                     source.item_source_id = str(uuid.uuid4())
                                 source.item_id = item.item_id
                                 session.add(LexisNexisItemSource(**source.model_dump()))
 
                             # Link item to import revision
-                            await upsert_m2m(session, item_id=item.item_id, logger=logger, import_id=import_id, dry_run=False, latest_revision=revision_counter)
+                            await upsert_m2m(
+                                session,
+                                item_id=str(item.item_id),
+                                logger=logger,
+                                import_id=import_id,
+                                dry_run=False,
+                                latest_revision=revision_counter,
+                            )
 
                         await session.flush()
 
@@ -322,7 +328,7 @@ async def import_lexis_nexis(  # noqa: C901
             import_id=import_id,
             revision_id=revision_id,
             latest_revision=revision_counter,
-            num_new_items=num_new_items,
+            num_new_items=num_new,
             num_updated=num_updated,
             logger=logger,
         )
