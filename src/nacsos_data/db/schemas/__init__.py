@@ -11,6 +11,7 @@ from .highlight import Highlighter
 from .annotation_tracker import AnnotationTracker
 from .annotation_quality import AnnotationQuality
 from .priority import Priority
+from .enhancements import Enhancement
 
 from .items import ItemType, ItemTypeLiteral
 from .items.base import Item
@@ -34,6 +35,7 @@ __all__ = [
     # Schemas for "automated" annotations
     'BotAnnotationMetaData',
     'BotAnnotation',
+    'Enhancement',
     # Schemas for items (i.e. documents) and util types
     'Item',
     'GenericItem',

@@ -12,6 +12,7 @@ from . import ItemType
 
 if TYPE_CHECKING:
     from ..annotations import Annotation, Assignment
+    from ..enhancements import Enhancement
 
 
 class Item(Base):
@@ -51,6 +52,7 @@ class Item(Base):
 
     annotations: Mapped[list['Annotation']] = relationship('Annotation')
     assignments: Mapped[list['Assignment']] = relationship('Assignment')
+    enhancements: Mapped[list['Enhancement']] = relationship('Enhancement')
 
     __mapper_args__ = {
         'polymorphic_identity': 'item',
