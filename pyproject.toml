@@ -17,6 +17,7 @@ dependencies = [
     "setuptools==80.9.0",
     "SQLAlchemy==2.0.44",
     "sqlalchemy-json==0.7.0",
+    "pymilvus==2.6.4",
 ]
 
 [project.optional-dependencies]
