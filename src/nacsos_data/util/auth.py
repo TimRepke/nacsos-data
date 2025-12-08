@@ -148,6 +148,9 @@ class AuthenticationCache:
             if tok:
                 return tok
 
+        if username is None and user_id is None and user is None:
+            raise InvalidCredentialsError('Need to specify either username or user_id or user!')
+
         try:
             user = await self.get_user(username, user_id, user)
             token_id = self._token_lookup[str(user.username).lower().strip()]
@@ -157,8 +160,8 @@ class AuthenticationCache:
                 logger.warning('Did not find requested token, trying to reload!')
                 await self.reload_tokens()
                 return await self.get_auth_token(token_id=token_id, username=username, user_id=user_id, user=user, retry=True)
-
-            logger.error(f'Did not find "{user.username}" in the list of {self._token_lookup}')  # type: ignore[union-attr]
+            username = user.username if user else 'MISSING_USERNAME'
+            logger.error(f'Did not find "{username}" in the list of {self._token_lookup}')  # type: ignore[union-attr]
             raise e
 
 
@@ -280,6 +283,8 @@ class Authentication:
             raise InvalidCredentialsError(f'No token with id={token_id}!')
 
         user = await self.cache.get_user(username=token.username)
+        if user is None:
+            raise InvalidCredentialsError(f'No token with id={token_id}!')
 
         logger.debug(f'Current user: {user.username} ({user.user_id})')
         return user
