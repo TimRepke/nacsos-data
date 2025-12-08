@@ -161,7 +161,7 @@ class AuthenticationCache:
                 await self.reload_tokens()
                 return await self.get_auth_token(token_id=token_id, username=username, user_id=user_id, user=user, retry=True)
             username = user.username if user else 'MISSING_USERNAME'
-            logger.error(f'Did not find "{username}" in the list of {self._token_lookup}')  # type: ignore[union-attr]
+            logger.error(f'Did not find "{username}" in the list of {self._token_lookup}')
             raise e
 
 
