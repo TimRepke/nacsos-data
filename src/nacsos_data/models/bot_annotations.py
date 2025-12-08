@@ -11,8 +11,8 @@ from .users import UserModel
 class ResolutionMethod(str, Enum):
     majority = 'majority'
     first = 'first'
-    last = 'first'
-    trust = 'first'
+    last = 'last'
+    trust = 'trust'
 
 
 class SnapshotEntry(AnnotationValue):

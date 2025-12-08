@@ -113,8 +113,13 @@ FIELDS_META = set(FIELDS_SOLR) - {'abstract', 'title_abstract'}
 NESTED_FIELDS = {field for field, dtype in WorksSchema.model_fields.items() if get_args(dtype.annotation)[0] not in {str, int, float, bool, AbstractSource}}
 
 
-def translate_work_to_solr(work: WorksSchema, source: str = 'OpenAlex') -> dict[str, str | bool | int | float]:
+def translate_work_to_solr(work: WorksSchema, source: str = 'OpenAlex',
+                           authorship_limit: int|None=None) -> dict[str, str | bool | int | float]:
     doc = work.model_dump(include=FIELDS_SOLR, exclude_none=True, exclude_unset=True)
+
+    if doc.get('authorships') and authorship_limit:
+        doc['authorships'] = doc['authorships'][:authorship_limit]
+
     return (
         doc
         | {
