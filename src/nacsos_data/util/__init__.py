@@ -189,9 +189,14 @@ def anding(arr: list[Optional['pd.Series[bool]']]) -> 'bool | pd.Series[bool]':
 
 def get(obj: object, *keys: str, default: Any = None) -> Any:
     for key in keys:
-        if not hasattr(obj, key):
-            return default
-        obj = getattr(obj, key)
+        if type(obj) is dict:
+            if key not in obj:
+                return default
+            obj = obj[key]
+        else:
+            if not hasattr(obj, key):
+                return default
+            obj = getattr(obj, key)
     return obj
 
 

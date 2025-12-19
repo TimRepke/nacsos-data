@@ -28,7 +28,8 @@ APIMap: dict[APIEnum, Type[AbstractAPI]] = {
 }
 
 __all__ = [
-    'DimensionsAPIScopusAPI',
+    'DimensionsAPI',
+    'ScopusAPI',
     'PubmedAPI',
     'OpenAlexAPI',
     'OpenAlexSolrAPI',

@@ -1,7 +1,9 @@
 import uuid
 import logging
+from dataclasses import dataclass
+from pyexpat.errors import codes
 from typing import Any, Generator, Literal, TypeVar
-
+from httpx import codes
 from nacsos_data.models.items import AcademicItemModel
 from nacsos_data.models.items.academic import AcademicAuthorModel
 from nacsos_data.models.web_of_science import WosRecord
@@ -44,9 +46,9 @@ def get_title(wr: WosRecord) -> str | None:
 
 def get_abstract(wr: WosRecord) -> str | None:
     if (
-        wr.static_data.fullrecord_metadata is None
-        or wr.static_data.fullrecord_metadata.abstracts is None
-        or wr.static_data.fullrecord_metadata.abstracts.abstract is None
+            wr.static_data.fullrecord_metadata is None
+            or wr.static_data.fullrecord_metadata.abstracts is None
+            or wr.static_data.fullrecord_metadata.abstracts.abstract is None
     ):
         return None
     abstracts = get_value(lambda: wr.static_data.fullrecord_metadata.abstracts.abstract)  # type: ignore[union-attr]
@@ -64,9 +66,9 @@ def get_abstract(wr: WosRecord) -> str | None:
 
 def get_doi(wr: WosRecord) -> str | None:
     if (
-        wr.dynamic_data.cluster_related is None
-        or wr.dynamic_data.cluster_related.identifiers is None
-        or wr.dynamic_data.cluster_related.identifiers.IdentifierItem is None
+            wr.dynamic_data.cluster_related is None
+            or wr.dynamic_data.cluster_related.identifiers is None
+            or wr.dynamic_data.cluster_related.identifiers.IdentifierItem is None
     ):
         return None
     identifiers = get_value(lambda: wr.dynamic_data.cluster_related.identifiers.IdentifierItem)  # type: ignore[union-attr]
@@ -89,9 +91,9 @@ def get_source(wr: WosRecord) -> str | None:
 
 def get_keywords(wr: WosRecord) -> list[str] | None:
     if (
-        wr.static_data.fullrecord_metadata is None
-        or wr.static_data.fullrecord_metadata.keywords is None
-        or wr.static_data.fullrecord_metadata.keywords.keyword is None
+            wr.static_data.fullrecord_metadata is None
+            or wr.static_data.fullrecord_metadata.keywords is None
+            or wr.static_data.fullrecord_metadata.keywords.keyword is None
     ):
         return None
 
@@ -118,22 +120,33 @@ def translate_authors(record: WosRecord) -> list[AcademicAuthorModel] | None:
     return [AcademicAuthorModel(name=author.full_name) for author in authors if author.full_name is not None]
 
 
+@dataclass
+class State:
+    n_pages: int = 0
+    n_records: int = 0
+
+    query_id: int = 0
+    records_searched: int = 0
+    records_found: int = 0
+
+
 class WoSAPI(AbstractAPI):
     def __init__(
-        self,
-        api_key: str,
-        # Number of records to return, must be 0-100.
-        page_size: int = 5,
-        # Database to search. WOK represents all databases.
-        # Available values : WOS, BCI, BIOABS, BIOSIS, CABI, CCC, CSCD, DCI, DIIDW, FSTA, GRANTS, INSPEC, MEDLINE, PPRN, PQDT, SCIELO, WOK, ZOOREC
-        database: str = 'WOK',
-        proxy: str | None = None,
-        max_req_per_sec: int = 5,
-        max_retries: int = 5,
-        backoff_rate: float = 5.0,
-        logger: logging.Logger | None = None,
+            self,
+            api_key: str,
+            # Number of records to return, must be 0-100.
+            page_size: int = 5,
+            # Database to search. WOK represents all databases.
+            # Available values : WOS, BCI, BIOABS, BIOSIS, CABI, CCC, CSCD, DCI, DIIDW, FSTA, GRANTS, INSPEC, MEDLINE, PPRN, PQDT, SCIELO, WOK, ZOOREC
+            database: str = 'WOK',
+            proxy: str | None = None,
+            max_req_per_sec: int = 5,
+            max_retries: int = 5,
+            backoff_rate: float = 5.0,
+            logger: logging.Logger | None = None,
     ):
-        super().__init__(api_key=api_key, proxy=proxy, max_retries=max_retries, max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
+        super().__init__(api_key=api_key, proxy=proxy, max_retries=max_retries, max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate,
+                         logger=logger)
         self.database = database
         self.page_size = page_size
 
@@ -155,10 +168,10 @@ class WoSAPI(AbstractAPI):
             raise AssertionError('Missing API key!')
 
         with RequestClient(
-            backoff_rate=self.backoff_rate, max_req_per_sec=self.max_req_per_sec, max_retries=self.max_retries, proxy=self.proxy
-        ) as request_client:
-            page = request_client.get(
-                'https://api.clarivate.com/api/wos',
+                backoff_rate=self.backoff_rate,
+                max_req_per_sec=self.max_req_per_sec,
+                max_retries=self.max_retries,
+                proxy=self.proxy,
                 params={
                     'usrQuery': query,
                     'count': self.page_size,
@@ -169,17 +182,21 @@ class WoSAPI(AbstractAPI):
                 headers={
                     'X-ApiKey': self.api_key,
                 },
-            )
+        ) as request_client:
+            state = State()
 
-            n_pages = 0
-            n_records = 0
+            def skip_on_error(response):
+                state.n_records += 2
+                request_client.kwargs['params']['firstRecord'] += 2
+                request_client.time_per_request = 1 / request_client.max_req_per_sec
+                return {}
 
-            query_id = 0
-            records_searched = 0
-            records_found = 0
+            request_client.on(codes.INTERNAL_SERVER_ERROR, skip_on_error)
+            page = request_client.get('https://api.clarivate.com/api/wos')
+
             while True:
-                n_pages += 1
-                self.logger.info(f'Fetching page {n_pages}...')
+                state.n_pages += 1
+                self.logger.info(f'Fetching page {state.n_pages}...')
                 try:
                     data = page.json()
 
@@ -193,10 +210,8 @@ class WoSAPI(AbstractAPI):
                     # next_page = page.headers.get('x-paginate-by-query-id')
                     remaining_year = page.headers.get('x-rec-amtperyear-remaining')
                     remaining_sec = page.headers.get('x-req-reqpersec-remaining')
-
-                    records = get(data, 'Records', 'records', 'REC', default=[])
-                    if len(records) == 0:  # Records are nested in Data on first page
-                        records = get(data, 'Data', 'Records', 'records', 'REC', default=[])
+                    # Records are nested in Data on first page
+                    records = get(data['Data'] if 'Data' in data else data, 'Records', 'records', 'REC', default=[])
 
                     if len(records) == 0:
                         self.logger.info('No more records received.')
@@ -204,31 +219,29 @@ class WoSAPI(AbstractAPI):
 
                     yield from records
 
-                    n_records += len(records)
+                    state.n_records += len(records)
                     self.logger.info(
-                        f'Found {n_records:,}/{records_found:,} records in {records_searched:,} records '
-                        f'after processing page {n_pages} for query {query_id} '
-                        f'(remaining this year = {remaining_year} | remaining / second = {remaining_sec})'
+                        f'Found {state.n_records:,}/{records_found:,} records in {records_searched:,} records '
+                        f'after processing page {state.n_pages} for query {query_id} '
+                        f'(remaining this year = {remaining_year} | remaining / second = {remaining_sec})',
                     )
 
-                    if n_records >= records_found:
+                    if state.n_records >= records_found:
                         self.logger.info('Reached num_results')
                         break
 
-                    page = request_client.get(
-                        f'https://api.clarivate.com/api/wos/query/{query_id}',
-                        params={
-                            'count': self.page_size,
-                            'sortField': 'LD+D',
-                            'optionView': 'FR',
-                            'firstRecord': n_records + 1,
-                        },
-                        headers={'X-ApiKey': self.api_key},
-                    )
+                    request_client.kwargs['params'] = {
+                        'count': self.page_size,
+                        'sortField': 'LD+D',
+                        'optionView': 'FR',
+                        'firstRecord': state.n_records + 1,
+                    }
+                    page = request_client.get(f'https://api.clarivate.com/api/wos/query/{query_id}')
 
                 except Exception as e:
                     logging.warning(f'Failed: {e}')
-                    logging.warning(e.response.text)  # type: ignore[attr-defined]
+                    if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                        logging.warning(e.response.text)  # type: ignore[attr-defined]
                     logging.exception(e)
                     raise e
 
@@ -258,8 +271,9 @@ if __name__ == '__main__':
         static_files=[
             # 'scratch/academic_apis/response_scopus1.json',
             # 'scratch/academic_apis/response_scopus2.jsonl',
-        ]
+        ],
     )
+
 
     @app.command()  # type: ignore[untyped-decorator]
     def offline() -> None:
@@ -273,5 +287,6 @@ if __name__ == '__main__':
                 for record in records:
                     item = WoSAPI.translate_record(record)
                     print(item)
+
 
     app()
