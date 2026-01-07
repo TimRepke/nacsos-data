@@ -183,7 +183,7 @@ class WoSAPI(AbstractAPI):
         ) as request_client:
             state = State()
 
-            def skip_on_error(response):
+            def skip_on_error(_response: Any) -> dict[str, Any]:
                 state.n_records += 2
                 request_client.kwargs['params']['firstRecord'] += 2
                 request_client.time_per_request = 1 / request_client.max_req_per_sec
@@ -239,7 +239,7 @@ class WoSAPI(AbstractAPI):
                 except Exception as e:
                     logging.warning(f'Failed: {e}')
                     if hasattr(e, 'response') and hasattr(e.response, 'text'):
-                        logging.warning(e.response.text)  # type: ignore[attr-defined]
+                        logging.warning(e.response.text)
                     logging.exception(e)
                     raise e
 

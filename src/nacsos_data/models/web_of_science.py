@@ -230,7 +230,7 @@ class AddressConfidence(BaseModel):
 def deconstruct_confidence_address(val: Any) -> str | None:
     if type(val) is str:
         return val
-    if type(val) is dict and val.get('content'):
+    if type(val) is dict and val.get('content') and type(val['content']) is str:
         return val['content']
     return None
 
