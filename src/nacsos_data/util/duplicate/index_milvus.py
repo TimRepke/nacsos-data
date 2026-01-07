@@ -151,7 +151,7 @@ class MilvusDuplicateIndex:
 
         chunk: int = 10000
         i: int
-        chunks = np.arange(vectors.shape[0], step=chunk)  # type: ignore[call-overload]
+        chunks = np.arange(vectors.shape[0], step=chunk)  # type: ignore[call-overload,unused-ignore]
         for i in chunks:
             self.client.insert(
                 collection_name=self.collection_name,
