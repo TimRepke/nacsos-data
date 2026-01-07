@@ -222,10 +222,23 @@ class UrlSpec(BaseModel):
     url: str | None = None
 
 
+class AddressConfidence(BaseModel):
+    wosaffiliationconfidencescore: float | None = None
+    content: str | None = None
+
+
+def deconstruct_confidence_address(val: Any) -> str | None:
+    if type(val) is str:
+        return val
+    if type(val) is dict and val.get('content'):
+        return val['content']
+    return None
+
+
 class AddressSpec(BaseModel):
     city: str | None = None
     addr_no: int | None = None
-    full_address: str | None = None
+    full_address: Annotated[str | None, BeforeValidator(deconstruct_confidence_address)] = None
     url_spec: UrlSpec | None = None
 
 
