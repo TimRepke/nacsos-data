@@ -1,9 +1,8 @@
 import uuid
 import logging
 from dataclasses import dataclass
-from pyexpat.errors import codes
 from typing import Any, Generator, Literal, TypeVar
-from httpx import codes
+from httpx import codes as http_status
 from nacsos_data.models.items import AcademicItemModel
 from nacsos_data.models.items.academic import AcademicAuthorModel
 from nacsos_data.models.web_of_science import WosRecord
@@ -46,9 +45,9 @@ def get_title(wr: WosRecord) -> str | None:
 
 def get_abstract(wr: WosRecord) -> str | None:
     if (
-            wr.static_data.fullrecord_metadata is None
-            or wr.static_data.fullrecord_metadata.abstracts is None
-            or wr.static_data.fullrecord_metadata.abstracts.abstract is None
+        wr.static_data.fullrecord_metadata is None
+        or wr.static_data.fullrecord_metadata.abstracts is None
+        or wr.static_data.fullrecord_metadata.abstracts.abstract is None
     ):
         return None
     abstracts = get_value(lambda: wr.static_data.fullrecord_metadata.abstracts.abstract)  # type: ignore[union-attr]
@@ -66,9 +65,9 @@ def get_abstract(wr: WosRecord) -> str | None:
 
 def get_doi(wr: WosRecord) -> str | None:
     if (
-            wr.dynamic_data.cluster_related is None
-            or wr.dynamic_data.cluster_related.identifiers is None
-            or wr.dynamic_data.cluster_related.identifiers.IdentifierItem is None
+        wr.dynamic_data.cluster_related is None
+        or wr.dynamic_data.cluster_related.identifiers is None
+        or wr.dynamic_data.cluster_related.identifiers.IdentifierItem is None
     ):
         return None
     identifiers = get_value(lambda: wr.dynamic_data.cluster_related.identifiers.IdentifierItem)  # type: ignore[union-attr]
@@ -91,9 +90,9 @@ def get_source(wr: WosRecord) -> str | None:
 
 def get_keywords(wr: WosRecord) -> list[str] | None:
     if (
-            wr.static_data.fullrecord_metadata is None
-            or wr.static_data.fullrecord_metadata.keywords is None
-            or wr.static_data.fullrecord_metadata.keywords.keyword is None
+        wr.static_data.fullrecord_metadata is None
+        or wr.static_data.fullrecord_metadata.keywords is None
+        or wr.static_data.fullrecord_metadata.keywords.keyword is None
     ):
         return None
 
@@ -132,21 +131,20 @@ class State:
 
 class WoSAPI(AbstractAPI):
     def __init__(
-            self,
-            api_key: str,
-            # Number of records to return, must be 0-100.
-            page_size: int = 5,
-            # Database to search. WOK represents all databases.
-            # Available values : WOS, BCI, BIOABS, BIOSIS, CABI, CCC, CSCD, DCI, DIIDW, FSTA, GRANTS, INSPEC, MEDLINE, PPRN, PQDT, SCIELO, WOK, ZOOREC
-            database: str = 'WOK',
-            proxy: str | None = None,
-            max_req_per_sec: int = 5,
-            max_retries: int = 5,
-            backoff_rate: float = 5.0,
-            logger: logging.Logger | None = None,
+        self,
+        api_key: str,
+        # Number of records to return, must be 0-100.
+        page_size: int = 5,
+        # Database to search. WOK represents all databases.
+        # Available values : WOS, BCI, BIOABS, BIOSIS, CABI, CCC, CSCD, DCI, DIIDW, FSTA, GRANTS, INSPEC, MEDLINE, PPRN, PQDT, SCIELO, WOK, ZOOREC
+        database: str = 'WOK',
+        proxy: str | None = None,
+        max_req_per_sec: int = 5,
+        max_retries: int = 5,
+        backoff_rate: float = 5.0,
+        logger: logging.Logger | None = None,
     ):
-        super().__init__(api_key=api_key, proxy=proxy, max_retries=max_retries, max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate,
-                         logger=logger)
+        super().__init__(api_key=api_key, proxy=proxy, max_retries=max_retries, max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
         self.database = database
         self.page_size = page_size
 
@@ -168,20 +166,20 @@ class WoSAPI(AbstractAPI):
             raise AssertionError('Missing API key!')
 
         with RequestClient(
-                backoff_rate=self.backoff_rate,
-                max_req_per_sec=self.max_req_per_sec,
-                max_retries=self.max_retries,
-                proxy=self.proxy,
-                params={
-                    'usrQuery': query,
-                    'count': self.page_size,
-                    'databaseId': self.database,
-                    'optionView': 'FR',
-                    'firstRecord': 1,
-                },
-                headers={
-                    'X-ApiKey': self.api_key,
-                },
+            backoff_rate=self.backoff_rate,
+            max_req_per_sec=self.max_req_per_sec,
+            max_retries=self.max_retries,
+            proxy=self.proxy,
+            params={
+                'usrQuery': query,
+                'count': self.page_size,
+                'databaseId': self.database,
+                'optionView': 'FR',
+                'firstRecord': 1,
+            },
+            headers={
+                'X-ApiKey': self.api_key,
+            },
         ) as request_client:
             state = State()
 
@@ -191,7 +189,7 @@ class WoSAPI(AbstractAPI):
                 request_client.time_per_request = 1 / request_client.max_req_per_sec
                 return {}
 
-            request_client.on(codes.INTERNAL_SERVER_ERROR, skip_on_error)
+            request_client.on(http_status.INTERNAL_SERVER_ERROR, skip_on_error)
             page = request_client.get('https://api.clarivate.com/api/wos')
 
             while True:
@@ -274,7 +272,6 @@ if __name__ == '__main__':
         ],
     )
 
-
     @app.command()  # type: ignore[untyped-decorator]
     def offline() -> None:
         for fp in [
@@ -287,6 +284,5 @@ if __name__ == '__main__':
                 for record in records:
                     item = WoSAPI.translate_record(record)
                     print(item)
-
 
     app()
