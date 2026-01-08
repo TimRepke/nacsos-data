@@ -96,26 +96,29 @@ class AuthenticationCache:
         logger.debug(f'Known token usernames: {self._token_lookup.keys()}')
 
     async def get_user(
-        self, username: str | None = None, user_id: str | uuid.UUID | None = None, user: UserModel | None = None, retry: bool = False
+        self, username: str | None = None, user_id: str | uuid.UUID | None = None, user: UserModel | None = None, is_retry: bool = False
     ) -> UserModel:
+        if username is None and user_id is None and user is None:
+            raise RuntimeError('None of username or user_id or user was provided!')
+
         if user is not None:
             return user
-        try:
-            if user_id is not None:
-                return self._user_cache[str(user_id).lower().strip()]
 
-            if username is not None:
-                return self._user_cache[self._user_lookup[username.lower().strip()]]
-        except KeyError as e:
-            logger.error(f'Did not find "{username}" / "{user_id}" in the list of {self._token_lookup}')
-            if not retry:
-                logger.warning('Did not find requested user, trying to reload!')
-                await self.reload_users()
-                return await self.get_user(username=username, user_id=user_id, user=user, retry=True)
+        user_id = str(user_id).lower().strip() if user_id is not None else None
+        if user_id is not None and user_id in self._user_cache:
+            return self._user_cache[user_id]
 
-            raise e
+        username = username.lower().strip() if username is not None else None
+        if username is not None and username in self._user_lookup and self._user_lookup[username] in self._user_cache:
+            return self._user_cache[self._user_lookup[username]]
 
-        raise RuntimeError('Need to specify either username or user_id or user!')
+        logger.error(f'Did not find "{username}" / "{user_id}" in the list of {self._token_lookup}')
+        if not is_retry:
+            logger.warning('Did not find requested user, trying to reload!')
+            await self.reload_users()
+            return await self.get_user(username=username, user_id=user_id, user=user, is_retry=True)
+
+        raise RuntimeError('User not found!')
 
     async def get_project_permission(
         self,
@@ -123,15 +126,15 @@ class AuthenticationCache:
         username: str | None = None,
         user_id: str | uuid.UUID | None = None,
         user: UserModel | None = None,
-        retry: bool = False,
+        is_retry: bool = False,
     ) -> ProjectPermissionsModel | None:
         user = await self.get_user(username=username, user_id=user_id, user=user)
         permission = self._permission_cache.get(str(project_id).lower().strip(), {}).get(str(user.user_id).lower().strip())
 
-        if permission is None and not retry:
+        if permission is None and not is_retry:
             logger.warning('Did not find requested project-user permission, trying to reload!')
             await self.reload_permissions()
-            return await self.get_project_permission(project_id=project_id, username=username, user_id=user_id, user=user, retry=True)
+            return await self.get_project_permission(project_id=project_id, username=username, user_id=user_id, user=user, is_retry=True)
 
         return permission
 
@@ -141,12 +144,17 @@ class AuthenticationCache:
         username: str | None = None,
         user_id: str | uuid.UUID | None = None,
         user: UserModel | None = None,
-        retry: bool = False,
+        is_retry: bool = False,
     ) -> AuthTokenModel | None:
         if token_id is not None:
             tok = self._token_cache.get(str(token_id).lower().strip())
             if tok:
                 return tok
+
+            if username is None and user_id is None and user is None and not is_retry:
+                logger.warning('Did not find requested token, trying to reload!')
+                await self.reload_tokens()
+                return await self.get_auth_token(token_id=token_id, is_retry=True)
 
         if username is None and user_id is None and user is None:
             raise InvalidCredentialsError('Need to specify either username or user_id or user!')
@@ -156,10 +164,10 @@ class AuthenticationCache:
             token_id = self._token_lookup[str(user.username).lower().strip()]
             return self._token_cache[str(token_id).lower().strip()]
         except Exception as e:
-            if not retry:
+            if not is_retry:
                 logger.warning('Did not find requested token, trying to reload!')
                 await self.reload_tokens()
-                return await self.get_auth_token(token_id=token_id, username=username, user_id=user_id, user=user, retry=True)
+                return await self.get_auth_token(token_id=token_id, username=username, user_id=user_id, user=user, is_retry=True)
             username = user.username if user else 'MISSING_USERNAME'
             logger.error(f'Did not find "{username}" in the list of {self._token_lookup}')
             raise e
@@ -192,7 +200,7 @@ class Authentication:
             passwd = (await conn.execute(select(User.password).where(or_(User.username == username, User.user_id == user_id)))).mappings().one_or_none()
 
         if not verify_password(plain_password=plain_password, hashed_password=passwd['password']):  # type: ignore[index]
-            raise InvalidCredentialsError('username/user_id or password wrong!')
+            raise InvalidCredentialsError('username, user_id, or password wrong!')
 
         return user
 
@@ -236,19 +244,17 @@ class Authentication:
         token_lifetime_minutes: int | None = None,
         verify_username: str | None = None,
     ) -> AuthTokenModel:
+        if token_id is None and username is None:
+            raise AssertionError('Missing username or token_id!')
+
         if token_lifetime_minutes is None:
             token_lifetime_minutes = self.token_lifetime_minutes
 
         session: AsyncSession
         async with self.db_engine.session() as session:
             valid_till = datetime.datetime.now() + datetime.timedelta(minutes=token_lifetime_minutes)
-            if token_id is not None:
-                stmt = select(AuthToken).where(AuthToken.token_id == token_id)
-            elif username is not None:
-                stmt = select(AuthToken).where(AuthToken.username == username)
-            else:
-                raise AssertionError('Missing username or token_id!')
 
+            stmt = select(AuthToken).where(or_(AuthToken.token_id == token_id, AuthToken.username == username))
             token_orm: AuthToken | None = (await session.scalars(stmt)).one_or_none()
 
             # There's an existing token that we just need to update

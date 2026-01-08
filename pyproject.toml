@@ -1,6 +1,6 @@
 [project]
 name = "nacsos_data"
-version = "0.24.4"
+version = "0.24.5"
 description = "Core data models and utilities for the NACSOS platform"
 author = "Tim Repke / ECS@PIK"
 license = { file = "LICENSE" }
