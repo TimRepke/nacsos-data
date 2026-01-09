@@ -442,7 +442,7 @@ class WorksSchema(BaseModel, extra='allow'):
 
     has_pdf: bool | None = None
     has_grobid_xml: bool | None = None
-    open_access_status: str | None = None
+    open_access_status: str | bool | None = None
     any_repository_has_fulltext: bool | None = None
 
     @model_validator(mode='before')
