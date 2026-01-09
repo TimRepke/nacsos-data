@@ -418,7 +418,8 @@ class OpenAlexSolrAPI(AbstractAPI):
                     'rows': limit,
                     'start': offset,
                     'cursorMark': None,
-                } | (params or {}),
+                }
+                | (params or {}),
             ),
         )
 
