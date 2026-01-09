@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Annotated
+from typing import Literal, Annotated, Any
 from uuid import UUID
 from pydantic import BaseModel, Field as PField
 
@@ -34,6 +34,7 @@ class OpenAlexSolrImport(BaseModel):
     def_type: DefType = 'lucene'
     field: SearchField = 'title_abstract'
     op: OpType = 'AND'
+    params: dict[str, Any] | None = None
 
 
 class ScopusAPIImport(BaseModel):

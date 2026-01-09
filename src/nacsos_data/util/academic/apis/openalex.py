@@ -409,6 +409,7 @@ class OpenAlexSolrAPI(AbstractAPI):
         query: str,
         limit: int = 20,
         offset: int = 0,
+        params: dict[str, Any] | None = None,
     ) -> SearchResult:
         docs = list(
             self.fetch_translated(
@@ -417,7 +418,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                     'rows': limit,
                     'start': offset,
                     'cursorMark': None,
-                },
+                } | (params or {}),
             ),
         )
 

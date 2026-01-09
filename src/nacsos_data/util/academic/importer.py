@@ -3,7 +3,7 @@ import logging
 import tempfile
 
 from pathlib import Path
-from typing import Generator, IO
+from typing import Generator, IO, Any
 from collections import defaultdict
 
 from sqlalchemy.exc import IntegrityError
@@ -776,6 +776,7 @@ async def import_openalex(
     import_id: str | None = None,
     pipeline_task_id: str | None = None,
     min_update_size: int | None = None,
+    params: dict[str, Any] | None = None,
     logger: logging.Logger | None = None,
 ) -> tuple[str, int | None]:
     """
@@ -817,6 +818,7 @@ async def import_openalex(
             solr_client.fetch_translated(
                 query=query,
                 project_id=project_id,
+                params=params,
             )
         )
 
