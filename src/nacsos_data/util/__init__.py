@@ -237,21 +237,23 @@ def as_uuid(val: str | uuid.UUID | None = None) -> uuid.UUID | None:
 
 
 class Cached(Generic[RetType]):
-    def __init__(self, func: Callable[..., Awaitable[RetType]], max_size: int = 50, max_age: int | None = None) -> None:
-        self.func = func
+    def __init__(self, func: Callable[Param, Awaitable[RetType]], max_size: int = 50, max_age: int | None = None) -> None:
+        self.func: Callable[Param, Awaitable[RetType]] = func
         self.cache: OrderedDict[int, tuple[float, RetType]] = OrderedDict()  # { args : (timestamp, result)}
-        self.max_size = max_size
-        self.max_age = max_age
+        self.max_size: int = max_size
+        self.max_age: int | None = max_age
 
-    async def __call__(self, *args, **kwargs) -> RetType:
+    # async def __call__(self, *args: Param.args, **kwargs: Param.kwargs) -> RetType:
+    async def __call__(self, *args, **kwargs) -> RetType:  # type: ignore[no-untyped-def]
         arg_hash = hash(args) + hash(kwargs)
         if arg_hash in self.cache:
             self.cache.move_to_end(arg_hash)
             timestamp, result = self.cache[arg_hash]
 
-            if time() - timestamp <= self.max_age:
+            if self.max_age is not None and (time() - timestamp <= self.max_age):
                 return result
-        result = await self.func(*args)
+
+        result = await self.func(*args, **kwargs)
         self.cache[arg_hash] = time(), result
         if len(self.cache) > self.max_size:
             self.cache.popitem(last=False)

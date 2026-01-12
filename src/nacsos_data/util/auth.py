@@ -134,7 +134,7 @@ class Authentication:
             else:
                 raise InvalidCredentialsError(f'No auth token found for {username} / {token_id}!')
 
-    async def get_current_user(self, token_id: str | uuid.UUID) -> UserModel:
+    async def get_user(self, token_id: str | uuid.UUID | None = None, username: str | None = None, user_id: str | uuid.UUID | None = None) -> UserModel:
         async with self.db_engine.engine.connect() as conn:  # type: AsyncConnection
             user_orm = (
                 (
@@ -142,7 +142,8 @@ class Authentication:
                         select(User)
                         .join(AuthToken, AuthToken.username == User.username)
                         .where(
-                            AuthToken.token_id == token_id,
+                            User.is_active == True,
+                            or_(AuthToken.token_id == token_id, User.user_id == user_id, User.username == username),
                             or_(AuthToken.valid_till == None, AuthToken.valid_till > datetime.datetime.now()),  # noqa: E711
                         )
                         .limit(1),
@@ -163,10 +164,10 @@ class Authentication:
         self,
         project_id: str | uuid.UUID,
         username: str | None = None,
-        user_id: str | None = None,
+        user_id: str | uuid.UUID | None = None,
         user: UserModel | None = None,
     ) -> ProjectPermissionsModel:
-        if user and user.is_superuser:
+        if user and user.is_superuser and user.user_id:
             logger.debug('Using super_admin permissions!')
             # admin gets to do anything always, so return with simulated full permissions
             return ProjectPermissionsModel.get_virtual_admin(project_id=project_id, user_id=user.user_id)
@@ -210,6 +211,11 @@ class Authentication:
     ) -> UserPermissions:
         if type(required_permissions) is str:
             required_permissions = [required_permissions]
+
+        if not user:
+            user = await self.get_user(user_id=user_id, username=username)
+        if not user:  # redundant, just to appease mypy
+            raise InsufficientPermissionError('No permission found for this user!')
 
         permissions = await self.get_project_permissions(project_id=project_id, user=user, username=username, user_id=user_id)
         user_permissions = UserPermissions(user=user, permissions=permissions)
