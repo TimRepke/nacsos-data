@@ -2,7 +2,6 @@ import uuid
 import logging
 import datetime
 from typing import TYPE_CHECKING, Generator, Any
-
 from pydantic import BaseModel
 from sqlalchemy import select, delete, or_
 

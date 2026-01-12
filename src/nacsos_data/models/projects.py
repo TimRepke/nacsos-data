@@ -123,6 +123,9 @@ class ProjectPermissionsModel(BaseModel):
     # This should only be editable by superusers!
     import_limit_oa: int = 0
 
+    def __hash__(self) -> int:
+        return hash(f'{self.project_permission_id}{self.user_id}{self.project_id}')
+
     @classmethod
     def get_virtual_admin(cls, project_id: str | uuid.UUID, user_id: str | uuid.UUID) -> 'ProjectPermissionsModel':
         return cls(

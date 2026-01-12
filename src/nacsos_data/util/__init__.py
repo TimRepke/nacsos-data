@@ -3,8 +3,14 @@ import uuid
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from datetime import timedelta
+from time import time
+from functools import wraps
 from timeit import default_timer
-from typing import Sequence, Generator, TypeVar, Any, AsyncIterator, AsyncGenerator, Callable, TYPE_CHECKING, Optional
+from typing import Sequence, Generator, TypeVar, Any, AsyncIterator, AsyncGenerator, Callable, TYPE_CHECKING, Optional, ParamSpec, \
+    Concatenate, Awaitable, Generic, OrderedDict
+
+Param = ParamSpec("Param")
+RetType = TypeVar("RetType")
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -114,9 +120,9 @@ def ensure_values(o: Any, *attrs: str | tuple[str, Any]) -> tuple[Any, ...]:
 def ensure_logger_async(fallback_logger: logging.Logger):  # type: ignore[no-untyped-def]
     def decorator(func):  # type: ignore[no-untyped-def]
         async def wrapper(  # type: ignore[no-untyped-def]
-            *args,
-            log: logging.Logger | None = None,
-            **kwargs,
+                *args,
+                log: logging.Logger | None = None,
+                **kwargs,
         ):
             if log is None:
                 log = fallback_logger
@@ -130,9 +136,9 @@ def ensure_logger_async(fallback_logger: logging.Logger):  # type: ignore[no-unt
 def ensure_logger(fallback_logger: logging.Logger):  # type: ignore[no-untyped-def]
     def decorator(func):  # type: ignore[no-untyped-def]
         def wrapper(  # type: ignore[no-untyped-def]
-            *args,
-            log: logging.Logger | None = None,
-            **kwargs,
+                *args,
+                log: logging.Logger | None = None,
+                **kwargs,
         ):
             if log is None:
                 log = fallback_logger
@@ -216,3 +222,26 @@ def as_uuid(val: str | uuid.UUID | None = None) -> uuid.UUID | None:
     if type(val) is str:
         return uuid.UUID(val)
     return val  # type: ignore[return-value]
+
+
+class Cached(Generic[RetType]):
+    def __init__(self, func: Callable[..., Awaitable[RetType]], max_size: int = 50, max_age: int | None = None) -> None:
+        self.func = func
+        self.cache: OrderedDict[int, tuple[float, RetType]] = OrderedDict()  # { args : (timestamp, result)}
+        self.max_size = max_size
+        self.max_age = max_age
+
+    async def __call__(self, *args, **kwargs) -> RetType:
+        arg_hash = hash(args) + hash(kwargs)
+        if arg_hash in self.cache:
+            self.cache.move_to_end(arg_hash)
+            timestamp, result = self.cache[arg_hash]
+
+            if time() - timestamp <= self.max_age:
+                return result
+        result = await self.func(*args)
+        self.cache[arg_hash] = time(), result
+        if len(self.cache) > self.max_size:
+            self.cache.popitem(last=False)
+
+        return result

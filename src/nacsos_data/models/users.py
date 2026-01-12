@@ -45,6 +45,9 @@ class UserBaseModel(DehydratedUser):
     time_created: datetime.datetime | None = None
     time_updated: datetime.datetime | None = None
 
+    def __hash__(self) -> int:
+        return hash(f'{self.user_id}{self.username}')
+
 
 # Properties to receive via API on creation
 class UserCreateModel(UserBaseModel):
@@ -88,3 +91,6 @@ class AuthTokenModel(BaseModel):
 
     # Timestamp to indicate until when this token is valid; null means valid forever
     valid_till: datetime.datetime | None = None
+
+    def __hash__(self) -> int:
+        return hash(f'{self.token_id}{self.username}')
