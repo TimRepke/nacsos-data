@@ -1,6 +1,6 @@
 [project]
 name = "nacsos_data"
-version = "0.24.7"
+version = "0.24.8"
 description = "Core data models and utilities for the NACSOS platform"
 author = "Tim Repke / ECS@PIK"
 license = { file = "LICENSE" }
@@ -24,7 +24,7 @@ utils = [
     "httpx[http2,socks]==0.28.1",
     "bcrypt==5.0.0",
     "rispy==0.10.0",
-    "scipy==1.16.3",
+    "scipy==1.17.0",
     "scikit-learn==1.8.0",
     "markdownify==1.2.2",
     "lxml==6.0.2",
@@ -40,12 +40,12 @@ priority = [
 ]
 scripts = [
     "typer==0.21.1",
-    "alembic==1.17.2",
+    "alembic==1.18.0",
 ]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.14.10",
+    "ruff>=0.14.11",
 #    "tox==4.32.0",
 #    "pytest==9.0.1",
 #    "pytest-cov==7.0.0",
