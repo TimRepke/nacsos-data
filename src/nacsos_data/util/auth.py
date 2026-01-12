@@ -137,16 +137,20 @@ class Authentication:
     async def get_current_user(self, token_id: str | uuid.UUID) -> UserModel:
         async with self.db_engine.engine.connect() as conn:  # type: AsyncConnection
             user_orm = (
-                await conn.execute(
-                    select(User)
-                    .join(AuthToken, AuthToken.username == User.username)
-                    .where(
-                        AuthToken.token_id == token_id,
-                        or_(AuthToken.valid_till == None, AuthToken.valid_till > datetime.datetime.now()),  # noqa: E711
+                (
+                    await conn.execute(
+                        select(User)
+                        .join(AuthToken, AuthToken.username == User.username)
+                        .where(
+                            AuthToken.token_id == token_id,
+                            or_(AuthToken.valid_till == None, AuthToken.valid_till > datetime.datetime.now()),  # noqa: E711
+                        )
+                        .limit(1),
                     )
-                    .limit(1),
                 )
-            ).mappings().one_or_none()
+                .mappings()
+                .one_or_none()
+            )
 
         if not user_orm:
             raise InvalidCredentialsError(f'No user found for token: {token_id}!')
@@ -171,19 +175,25 @@ class Authentication:
             async with self.db_engine.engine.connect() as conn:  # type: AsyncConnection
                 logger.debug(f'Checking user/project permissions for {username} ({user_id}) -> {project_id}...')
                 permission_orm = (
-                    await conn.execute(
-                        select(ProjectPermissions)
-                        .join(User, ProjectPermissions.user_id == User.user_id)
-                        .where(or_(ProjectPermissions.user_id == user_id, User.username == username), ProjectPermissions.project_id == project_id)
+                    (
+                        await conn.execute(
+                            select(ProjectPermissions)
+                            .join(User, ProjectPermissions.user_id == User.user_id)
+                            .where(or_(ProjectPermissions.user_id == user_id, User.username == username), ProjectPermissions.project_id == project_id)
+                        )
                     )
-                ).mappings().one_or_none()
+                    .mappings()
+                    .one_or_none()
+                )
                 if permission_orm:
                     return ProjectPermissionsModel.model_validate(permission_orm)
 
                 logger.debug('Checking if user is superuser...')
                 user_orm = (
-                    await conn.execute(select(User).where(or_(User.username == username, User.user_id == user_id, User.is_superuser == True)).limit(1))
-                ).mappings().one_or_none()
+                    (await conn.execute(select(User).where(or_(User.username == username, User.user_id == user_id, User.is_superuser == True)).limit(1)))
+                    .mappings()
+                    .one_or_none()
+                )
                 if user_orm:
                     return ProjectPermissionsModel.get_virtual_admin(project_id=project_id, user_id=user_orm['user_id'])
 

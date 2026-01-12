@@ -4,13 +4,25 @@ from collections.abc import MutableMapping
 from contextlib import contextmanager
 from datetime import timedelta
 from time import time
-from functools import wraps
 from timeit import default_timer
-from typing import Sequence, Generator, TypeVar, Any, AsyncIterator, AsyncGenerator, Callable, TYPE_CHECKING, Optional, ParamSpec, \
-    Concatenate, Awaitable, Generic, OrderedDict
+from typing import (
+    Sequence,
+    Generator,
+    TypeVar,
+    Any,
+    AsyncIterator,
+    AsyncGenerator,
+    Callable,
+    TYPE_CHECKING,
+    Optional,
+    ParamSpec,
+    Awaitable,
+    Generic,
+    OrderedDict,
+)
 
-Param = ParamSpec("Param")
-RetType = TypeVar("RetType")
+Param = ParamSpec('Param')
+RetType = TypeVar('RetType')
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -120,9 +132,9 @@ def ensure_values(o: Any, *attrs: str | tuple[str, Any]) -> tuple[Any, ...]:
 def ensure_logger_async(fallback_logger: logging.Logger):  # type: ignore[no-untyped-def]
     def decorator(func):  # type: ignore[no-untyped-def]
         async def wrapper(  # type: ignore[no-untyped-def]
-                *args,
-                log: logging.Logger | None = None,
-                **kwargs,
+            *args,
+            log: logging.Logger | None = None,
+            **kwargs,
         ):
             if log is None:
                 log = fallback_logger
@@ -136,9 +148,9 @@ def ensure_logger_async(fallback_logger: logging.Logger):  # type: ignore[no-unt
 def ensure_logger(fallback_logger: logging.Logger):  # type: ignore[no-untyped-def]
     def decorator(func):  # type: ignore[no-untyped-def]
         def wrapper(  # type: ignore[no-untyped-def]
-                *args,
-                log: logging.Logger | None = None,
-                **kwargs,
+            *args,
+            log: logging.Logger | None = None,
+            **kwargs,
         ):
             if log is None:
                 log = fallback_logger
