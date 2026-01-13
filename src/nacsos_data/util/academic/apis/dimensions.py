@@ -30,7 +30,7 @@ def translate_author(record: dict[str, Any]) -> AcademicAuthorModel | None:
     orcid = record.get('orcid')  #  "orcid": "['s']",
     if orcid is not None:
         try:
-            orcid = json.loads(record.get('orcid'))# type: ignore[arg-type]
+            orcid = json.loads(record.get('orcid'))  # type: ignore[arg-type]
         except Exception:
             pass
         if orcid is not None and len(orcid) > 0:
