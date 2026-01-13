@@ -167,36 +167,46 @@ class Authentication:
         user_id: str | uuid.UUID | None = None,
         user: UserModel | None = None,
     ) -> ProjectPermissionsModel:
+        if user is None and user_id is None and username is None:
+            raise InsufficientPermissionError('Missing user or username or user_id!')
+
         if user and user.is_superuser and user.user_id:
             logger.debug('Using super_admin permissions!')
             # admin gets to do anything always, so return with simulated full permissions
             return ProjectPermissionsModel.get_virtual_admin(project_id=project_id, user_id=user.user_id)
 
-        if user is None and (username is not None or user_id is not None):
-            async with self.db_engine.engine.connect() as conn:  # type: AsyncConnection
-                logger.debug(f'Checking user/project permissions for {username} ({user_id}) -> {project_id}...')
-                permission_orm = (
-                    (
-                        await conn.execute(
-                            select(ProjectPermissions)
-                            .join(User, ProjectPermissions.user_id == User.user_id)
-                            .where(or_(ProjectPermissions.user_id == user_id, User.username == username), ProjectPermissions.project_id == project_id)
-                        )
-                    )
-                    .mappings()
-                    .one_or_none()
-                )
-                if permission_orm:
-                    return ProjectPermissionsModel.model_validate(permission_orm)
+        # if we get a user, override data
+        if user is not None and (username is None and user_id is None):
+            username = user.username if username is None else username
+            user_id = user.user_id if user_id is None else user_id
 
-                logger.debug('Checking if user is superuser...')
-                user_orm = (
-                    (await conn.execute(select(User).where(or_(User.username == username, User.user_id == user_id, User.is_superuser == True)).limit(1)))
-                    .mappings()
-                    .one_or_none()
+        async with self.db_engine.engine.connect() as conn:  # type: AsyncConnection
+            logger.debug(f'Checking user/project permissions for {username} ({user_id}) -> {project_id}...')
+            permission_orm = (
+                (
+                    await conn.execute(
+                        select(ProjectPermissions)
+                        .join(User, ProjectPermissions.user_id == User.user_id)
+                        .where(or_(ProjectPermissions.user_id == user_id, User.username == username), ProjectPermissions.project_id == project_id)
+                    )
                 )
-                if user_orm:
-                    return ProjectPermissionsModel.get_virtual_admin(project_id=project_id, user_id=user_orm['user_id'])
+                .mappings()
+                .one_or_none()
+            )
+            if permission_orm:
+                return ProjectPermissionsModel.model_validate(permission_orm)
+
+            if user:
+                raise InsufficientPermissionError('No permission found for this project and not superuser!')
+
+            logger.debug('Checking if user is superuser...')
+            user_orm = (
+                (await conn.execute(select(User).where(or_(User.username == username, User.user_id == user_id, User.is_superuser == True)).limit(1)))
+                .mappings()
+                .one_or_none()
+            )
+            if user_orm:
+                return ProjectPermissionsModel.get_virtual_admin(project_id=project_id, user_id=user_orm['user_id'])
 
         raise InsufficientPermissionError('No permission found for this project!')
 
