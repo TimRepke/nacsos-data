@@ -1,27 +1,52 @@
 import logging
 import uuid
 from typing import Any, Generator
-
+import orjson as json
 from httpx import codes, HTTPError, Response
-from nacsos_data.models.items import AcademicItemModel
-from nacsos_data.util import get, as_uuid
+from nacsos_data.models.items.academic import AcademicAuthorModel, AcademicItemModel, AffiliationModel
+from nacsos_data.util import get, as_uuid, clear_empty
 from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
 
 
-def get_title(obj: dict[str, Any]) -> str | None:
-    return obj.get('title')
+def get_str(obj: dict[str, Any], k: str) -> str | None:
+    v = obj.get(k)
+    return v if type(v) is str else None
 
 
-def get_abstract(obj: dict[str, Any]) -> str | None:
-    return obj.get('abstract')
+def get_int(obj: dict[str, Any], k: str) -> int | None:
+    v = obj.get(k)
+    return v if type(v) is int else None
 
 
-def get_doi(obj: dict[str, Any]) -> str | None:
-    return obj.get('doi')
+def get_source(obj: dict[str, Any]) -> str | None:
+    v = obj.get('journal', {}).get('title')
+    if v is not None and type(v) is str:
+        return v  # type: ignore[no-any-return]
+    v = obj.get('source_title', {}).get('title')
+    return v if type(v) is str else None
 
 
-def get_id(obj: dict[str, Any]) -> str | None:
-    return obj.get('id')
+def translate_author(record: dict[str, Any]) -> AcademicAuthorModel | None:
+    orcid = record.get('orcid')  #  "orcid": "['s']",
+    if orcid is not None:
+        try:
+            orcid = json.loads(record.get('orcid'))# type: ignore[arg-type]
+        except Exception:
+            pass
+        if orcid is not None and len(orcid) > 0:
+            orcid = orcid[0]
+    return AcademicAuthorModel(
+        name=f'{record.get("first_name")} {record.get("last_name")}',
+        orcid=orcid,
+        dimensions_id=record.get('researcher_id'),
+        affiliations=[
+            AffiliationModel(
+                name=affil.get('name'),
+                country=affil.get('country_code'),
+            )
+            for affil in record.get('affiliations', [])
+        ],
+    )
 
 
 class DimensionsAPI(AbstractAPI):
@@ -57,6 +82,7 @@ class DimensionsAPI(AbstractAPI):
         return publications[basics+categories+extras+book]
 
         :param query:
+        :param params:
         :return:
         """
 
@@ -117,11 +143,14 @@ class DimensionsAPI(AbstractAPI):
         return AcademicItemModel(
             item_id=uuid.uuid4(),
             project_id=as_uuid(project_id),
-            doi=get_doi(record),
-            title=get_title(record),
-            dimensions_id=get_id(record),
-            text=get_abstract(record),
-            # TODO
+            doi=get_str(record, 'doi'),
+            title=get_str(record, 'title'),
+            dimensions_id=get_str(record, 'id'),
+            text=get_str(record, 'abstract'),
+            publication_year=get_int(record, 'year'),
+            source=get_source(record),
+            authors=[auth for auth in [translate_author(author) for author in record.get('authors', [])] if auth is not None],
+            meta={'dimensions': clear_empty(record)},
         )
 
 
