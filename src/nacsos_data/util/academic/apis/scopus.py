@@ -152,6 +152,6 @@ if __name__ == '__main__':
             # 'scratch/academic_apis/response_scopus1.json',
             'scratch/academic_apis/response_scopus2.jsonl',
         ],
-        proxy='socks5://127.0.0.1:1080',
+       # proxy='socks5://127.0.0.1:1080',
     )
     app()

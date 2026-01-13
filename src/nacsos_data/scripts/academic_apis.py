@@ -11,6 +11,7 @@ from nacsos_data.util.academic.apis import (
     APIEnum,
     APIMap,
 )
+from nacsos_data.util.conf import load_settings
 
 
 def run():
@@ -26,7 +27,7 @@ def run():
             kind: APIEnum,
             target: Annotated[Path, typer.Option(help='File to write results to')],
             api_key: Annotated[str | None, typer.Option(help='Valid API key')] = None,
-            openalex_endpoint: Annotated[str | None, typer.Option(help='solr endpoint')] = None,
+            openalex_config: Annotated[Path | None, typer.Option(help='openalex config')] = None,
             batch_size: Annotated[int, typer.Option(help='File to write results to')] = 5,
             page_size: int = 5,
             database: str = 'WOK',
@@ -42,8 +43,9 @@ def run():
         else:
             raise AttributeError('Must provide either `query_file` or `query`')
 
-        if kind == APIEnum.SOLR and openalex_endpoint is not None:
-            api = OpenAlexSolrAPI(api_key='', openalex_endpoint=openalex_endpoint, batch_size=batch_size)
+        if kind == APIEnum.SOLR and openalex_config is not None:
+            conf = load_settings(conf_file=openalex_config)
+            api = OpenAlexSolrAPI(openalex_conf=conf.OPENALEX, batch_size=batch_size)
         elif kind == APIEnum.OA and api_key is not None:
             api = OpenAlexAPI(api_key=api_key)
         elif kind == APIEnum.WOS and api_key is not None:

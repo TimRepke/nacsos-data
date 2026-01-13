@@ -165,6 +165,8 @@ class WoSAPI(AbstractAPI):
         if self.api_key is None:
             raise AssertionError('Missing API key!')
 
+        skip_step = int(self.page_size / self.max_retries) + 2
+
         with RequestClient(
             backoff_rate=self.backoff_rate,
             max_req_per_sec=self.max_req_per_sec,
@@ -184,8 +186,8 @@ class WoSAPI(AbstractAPI):
             state = State()
 
             def skip_on_error(_response: Any) -> dict[str, Any]:
-                state.n_records += 2
-                request_client.kwargs['params']['firstRecord'] += 2
+                state.n_records += skip_step
+                request_client.kwargs['params']['firstRecord'] += skip_step
                 request_client.time_per_request = 1 / request_client.max_req_per_sec
                 return {}
 
