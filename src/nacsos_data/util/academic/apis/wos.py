@@ -195,6 +195,8 @@ class WoSAPI(AbstractAPI):
             request_client.on(http_status.INTERNAL_SERVER_ERROR, skip_on_error)
             page = request_client.get('https://api.clarivate.com/api/wos')
 
+            # FIXME: deal with HTTPStatusError: Client error '429 Too Many Requests' for url
+
             while True:
                 state.n_pages += 1
                 self.logger.info(f'Fetching page {state.n_pages}...')
