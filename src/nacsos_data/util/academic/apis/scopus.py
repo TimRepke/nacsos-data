@@ -72,6 +72,7 @@ class ScopusAPI(AbstractAPI):
         https://dev.elsevier.com/documentation/ScopusSearchAPI.wadl
 
         :param query:
+        :param params:
         :return:
         """
         if self.api_key is None:
@@ -95,7 +96,8 @@ class ScopusAPI(AbstractAPI):
                         'cursor': next_cursor,
                         # https://dev.elsevier.com/sc_search_views.html
                         'view': 'COMPLETE',
-                    },
+                    }
+                    | (params or {}),
                     headers={
                         'Accept': 'application/json',
                         'X-ELS-APIKey': self.api_key,
@@ -152,6 +154,6 @@ if __name__ == '__main__':
             # 'scratch/academic_apis/response_scopus1.json',
             'scratch/academic_apis/response_scopus2.jsonl',
         ],
-       # proxy='socks5://127.0.0.1:1080',
+        # proxy='socks5://127.0.0.1:1080',
     )
     app()

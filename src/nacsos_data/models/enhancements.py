@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import BaseModel
 
 
-class Enhancement(BaseModel):
+class EnhancementModel(BaseModel):
     """Similar to bot_annotation, but without rules"""
 
     # Unique identifier for this BotAnnotation

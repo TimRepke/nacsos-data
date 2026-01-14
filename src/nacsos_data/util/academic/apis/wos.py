@@ -178,7 +178,8 @@ class WoSAPI(AbstractAPI):
                 'databaseId': self.database,
                 'optionView': 'FR',
                 'firstRecord': 1,
-            },
+            }
+            | (params or {}),
             headers={
                 'X-ApiKey': self.api_key,
             },

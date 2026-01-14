@@ -375,6 +375,8 @@ async def import_academic_items(
                     If true, simulate best as possible (note, that duplicates within the `items` are not validated
                                                         and not all constraints can be checked)
     :param logger:
+    :param pipeline_task_id:
+    :param allow_empty_text:
     :return: import_id, latest_revision_num (or None if no action taken)
     """
     if logger is None:

@@ -7,6 +7,83 @@ from nacsos_data.models.items.academic import AcademicAuthorModel, AcademicItemM
 from nacsos_data.util import get, as_uuid, clear_empty
 from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
 
+FIELDS = [
+    'abstract',
+    'acknowledgements',
+    'altmetric',
+    'altmetric_id',
+    'arxiv_id',
+    'authors',
+    'authors_count',
+    'book_doi',
+    'book_series_title',
+    'book_title',
+    # 'category_bra',
+    # 'category_for',
+    # 'category_for_2020',
+    # 'category_hra',
+    # 'category_hrcs_hc',
+    # 'category_hrcs_rac',
+    # 'category_icrp_cso',
+    # 'category_icrp_ct',
+    # 'category_rcdc',
+    # 'category_sdg',
+    # 'category_uoa',
+    # 'clinical_trial_ids',
+    'concepts',
+    'concepts_scores',
+    'date',
+    'date_inserted',
+    'date_online',
+    'date_print',
+    'dimensions_url',
+    'document_type',
+    'doi',
+    'editors',
+    'field_citation_ratio',
+    'funder_countries',
+    'funders',
+    'funding_section',
+    'id',
+    # 'isbn',
+    # 'issn',
+    # 'issue',
+    # 'journal',
+    # 'journal_lists',
+    # 'journal_title_raw',
+    # 'linkout',
+    # 'mesh_terms',
+    # 'open_access',
+    # 'pages',
+    # 'pmcid',
+    # 'pmid',
+    # 'proceedings_title',
+    # 'publisher',
+    # 'recent_citations',
+    # 'reference_ids',
+    # 'referenced_pubs',
+    # 'relative_citation_ratio',
+    # 'research_org_cities',
+    # 'research_org_countries',
+    # 'research_org_country_names',
+    # 'research_org_names',
+    # 'research_org_state_codes',
+    # 'research_org_state_names',
+    # 'research_org_types',
+    # 'research_orgs',
+    # 'researchers',
+    # 'resulting_publication_doi',
+    # 'score',
+    # 'source_title',
+    # 'subtitles',
+    # 'supporting_grant_ids',
+    # 'times_cited',
+    # 'title',
+    # 'type',
+    # 'volume',
+    # 'year',
+]
+
 
 def get_str(obj: dict[str, Any], k: str) -> str | None:
     v = obj.get(k)
@@ -27,7 +104,7 @@ def get_source(obj: dict[str, Any]) -> str | None:
 
 
 def translate_author(record: dict[str, Any]) -> AcademicAuthorModel | None:
-    orcid = record.get('orcid')  #  "orcid": "['s']",
+    orcid = record.get('orcid')  # "orcid": "['s']",
     if orcid is not None:
         try:
             orcid = json.loads(record.get('orcid'))  # type: ignore[arg-type]
@@ -41,32 +118,41 @@ def translate_author(record: dict[str, Any]) -> AcademicAuthorModel | None:
         dimensions_id=record.get('researcher_id'),
         affiliations=[
             AffiliationModel(
-                name=affil.get('name'),
-                country=affil.get('country_code'),
+                name=affiliation.get('name'),
+                country=affiliation.get('country_code'),
             )
-            for affil in record.get('affiliations', [])
+            for affiliation in record.get('affiliations', [])
         ],
     )
 
 
 class DimensionsAPI(AbstractAPI):
     def __init__(
-        self,
-        api_key: str,
-        page_size: int = 5,
-        proxy: str | None = None,
-        max_req_per_sec: int = 5,
-        max_retries: int = 5,
-        backoff_rate: float = 5.0,
-        logger: logging.Logger | None = None,
+            self,
+            api_key: str,
+            page_size: int = 5,
+            proxy: str | None = None,
+            max_req_per_sec: int = 5,
+            max_retries: int = 5,
+            backoff_rate: float = 5.0,
+            fields: list[str] | None = None,
+            logger: logging.Logger | None = None,
     ):
-        super().__init__(api_key=api_key, proxy=proxy, max_retries=max_retries, max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
+        super().__init__(
+            api_key=api_key,
+            proxy=proxy,
+            max_retries=max_retries,
+            max_req_per_sec=max_req_per_sec,
+            backoff_rate=backoff_rate,
+            logger=logger,
+        )
         self.page_size = page_size
+        self.fields = fields if fields is not None and len(fields) > 0 else FIELDS
 
     def fetch_raw(
-        self,
-        query: str,
-        params: dict[str, Any] | None = None,
+            self,
+            query: str,
+            params: dict[str, Any] | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         """
         dimensions.ai API wrapper for downloading all records for a given query.
@@ -90,9 +176,15 @@ class DimensionsAPI(AbstractAPI):
             raise AssertionError('Missing API key!')
 
         with RequestClient(
-            backoff_rate=self.backoff_rate, max_req_per_sec=self.max_req_per_sec, max_retries=self.max_retries, proxy=self.proxy
+                backoff_rate=self.backoff_rate,
+                max_req_per_sec=self.max_req_per_sec,
+                max_retries=self.max_retries,
+                proxy=self.proxy,
         ) as request_client:
-            jwt = 'empty'
+            headers = {
+                'Accept': 'application/json',
+                'Authorization': 'JWT empty',
+            }
             logger = self.logger
             api_key = self.api_key
 
@@ -100,23 +192,32 @@ class DimensionsAPI(AbstractAPI):
                 logger.debug('Fetching JWT token')
                 res = request_client.post('https://app.dimensions.ai/api/auth.json', json={'key': api_key})
                 res.raise_for_status()
-                jwt = res.json()['token']
-                return {'headers': {'Authorization': f'JWT {jwt}'}}
+                headers['Authorization'] = f'JWT {res.json()["token"]}'
+                return {'headers': headers}
 
             request_client.on(codes.UNAUTHORIZED, update_jwt)
+
+            where = ''
+            if params and 'where' in params:
+                where = f' where {params.pop("where")}'
 
             n_pages = 0
             n_records = 0
             while True:
                 logger.info(f'Fetching page {n_pages}...')
                 try:
+                    content = (
+                        f'search publications '
+                               f'in title_abstract_only for "{query.replace('\n',' ').replace('"', '\\"')}" {where} '
+                               f'return publications[{"+".join(self.fields)}] '
+                               f'sort by id '
+                               f'limit {self.page_size} skip {n_pages * self.page_size} '
+                    )
+                    logger.debug(f'Query: {content}')
                     page = request_client.post(
                         url='https://app.dimensions.ai/api/dsl/v2',
-                        content=f'{query} limit {self.page_size} skip {n_pages * self.page_size}',
-                        headers={
-                            'Accept': 'application/json',
-                            'Authorization': f'JWT {jwt}',
-                        },
+                        content=content,
+                        headers=headers,
                     )
 
                     n_pages += 1
@@ -135,6 +236,7 @@ class DimensionsAPI(AbstractAPI):
                 except HTTPError as e:
                     logging.warning(f'Failed: {e}')
                     logging.warning(e.response.text)  # type: ignore[attr-defined]
+                    logging.warning(e.request.content)
                     logging.exception(e)
                     raise e
 
@@ -159,6 +261,6 @@ if __name__ == '__main__':
         static_files=[
             # 'scratch/academic_apis/response_scopus1.json',
             # 'scratch/academic_apis/response_scopus2.jsonl',
-        ]
+        ],
     )
     app()
