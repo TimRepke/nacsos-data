@@ -134,15 +134,15 @@ def translate_author(record: dict[str, Any]) -> AcademicAuthorModel | None:
 
 class DimensionsAPI(AbstractAPI):
     def __init__(
-            self,
-            api_key: str,
-            page_size: int = 5,
-            proxy: str | None = None,
-            max_req_per_sec: int = 5,
-            max_retries: int = 5,
-            backoff_rate: float = 5.0,
-            fields: list[str] | None = None,
-            logger: logging.Logger | None = None,
+        self,
+        api_key: str,
+        page_size: int = 5,
+        proxy: str | None = None,
+        max_req_per_sec: int = 5,
+        max_retries: int = 5,
+        backoff_rate: float = 5.0,
+        fields: list[str] | None = None,
+        logger: logging.Logger | None = None,
     ):
         super().__init__(
             api_key=api_key,
@@ -156,9 +156,9 @@ class DimensionsAPI(AbstractAPI):
         self.fields = fields if fields is not None and len(fields) > 0 else FIELDS
 
     def fetch_raw(
-            self,
-            query: str,
-            params: dict[str, Any] | None = None,
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         """
         dimensions.ai API wrapper for downloading all records for a given query.
@@ -182,10 +182,10 @@ class DimensionsAPI(AbstractAPI):
             raise AssertionError('Missing API key!')
 
         with RequestClient(
-                backoff_rate=self.backoff_rate,
-                max_req_per_sec=self.max_req_per_sec,
-                max_retries=self.max_retries,
-                proxy=self.proxy,
+            backoff_rate=self.backoff_rate,
+            max_req_per_sec=self.max_req_per_sec,
+            max_retries=self.max_retries,
+            proxy=self.proxy,
         ) as request_client:
             headers = {
                 'Accept': 'application/json',
@@ -214,10 +214,10 @@ class DimensionsAPI(AbstractAPI):
                 try:
                     content = (
                         f'search publications '
-                               f'in title_abstract_only for "{query.replace('\n',' ').replace('"', '\\"')}" {where} '
-                               f'return publications[{"+".join(self.fields)}] '
-                               f'sort by id '
-                               f'limit {self.page_size} skip {n_pages * self.page_size} '
+                        f'in title_abstract_only for "{query.replace("\n", " ").replace('"', '\\"')}" {where} '
+                        f'return publications[{"+".join(self.fields)}] '
+                        f'sort by id '
+                        f'limit {self.page_size} skip {n_pages * self.page_size} '
                     )
                     logger.debug(f'Query: {content}')
                     page = request_client.post(

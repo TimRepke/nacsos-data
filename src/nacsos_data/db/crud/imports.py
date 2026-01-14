@@ -177,7 +177,7 @@ async def update_revision_statistics(
     logger: logging.Logger,
 ) -> None:
     with elapsed_timer(logger, 'Updating revision stats...'):
-        num_items = ((await session.execute(text('SELECT count(1) FROM m2m_import_item WHERE import_id = :import_id'), {'import_id': import_id})).scalar(),)
+        num_items = (await session.execute(text('SELECT count(1) FROM m2m_import_item WHERE import_id = :import_id'), {'import_id': import_id})).scalar()
         num_items_new = (
             await session.execute(
                 text('SELECT count(1) FROM m2m_import_item WHERE first_revision = :rev AND import_id=:import_id'),
