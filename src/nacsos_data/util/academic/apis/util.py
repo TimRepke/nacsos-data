@@ -219,9 +219,13 @@ class AbstractAPI(ABC):
     @classmethod
     def read_translated(cls, source: Path, project_id: str | uuid.UUID | None = None) -> Generator[AcademicItemModel, None, None]:
         with open(source, 'r') as f_in:
-            for line in f_in:
-                record = json.loads(line)
-                yield cls.translate_record(record=record, project_id=project_id)
+            for li, line in enumerate(f_in):
+                try:
+                    record = json.loads(line)
+                    yield cls.translate_record(record=record, project_id=project_id)
+                except json.decoder.JSONDecodeError as e:
+                    logging.error(f'Failed to decode record in line {li}')
+                    logging.error(f'Error message: {e}')
 
     @classmethod
     def convert_file(cls, source: Path, target: Path, project_id: str | uuid.UUID | None = None) -> None:

@@ -7,7 +7,7 @@ from nacsos_data.models.items.academic import AcademicAuthorModel, AcademicItemM
 from nacsos_data.util import get, as_uuid, clear_empty
 from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
 
-FIELDS = [
+FIELDS = [  # FIXME: would be nice to activate ALL fields but that leads to a "too many" error (2026-01-14)...
     'abstract',
     'acknowledgements',
     'altmetric',
@@ -18,18 +18,18 @@ FIELDS = [
     'book_doi',
     'book_series_title',
     'book_title',
-    # 'category_bra',
-    # 'category_for',
-    # 'category_for_2020',
-    # 'category_hra',
-    # 'category_hrcs_hc',
-    # 'category_hrcs_rac',
-    # 'category_icrp_cso',
-    # 'category_icrp_ct',
-    # 'category_rcdc',
-    # 'category_sdg',
-    # 'category_uoa',
-    # 'clinical_trial_ids',
+    'category_bra',
+    'category_for',
+    'category_for_2020',
+    'category_hra',
+    'category_hrcs_hc',
+    'category_hrcs_rac',
+    'category_icrp_cso',
+    'category_icrp_ct',
+    'category_rcdc',
+    'category_sdg',
+    'category_uoa',
+    'clinical_trial_ids',
     'concepts',
     'concepts_scores',
     'date',
@@ -45,22 +45,22 @@ FIELDS = [
     'funders',
     'funding_section',
     'id',
-    # 'isbn',
-    # 'issn',
-    # 'issue',
-    # 'journal',
-    # 'journal_lists',
-    # 'journal_title_raw',
+    'isbn',
+    'issn',
+    'issue',
+    'journal',
+    'journal_lists',
+    'journal_title_raw',
     # 'linkout',
     # 'mesh_terms',
     # 'open_access',
     # 'pages',
-    # 'pmcid',
-    # 'pmid',
-    # 'proceedings_title',
-    # 'publisher',
+    'pmcid',
+    'pmid',
+    'proceedings_title',
+    'publisher',
     # 'recent_citations',
-    # 'reference_ids',
+    'reference_ids',
     # 'referenced_pubs',
     # 'relative_citation_ratio',
     # 'research_org_cities',
@@ -71,17 +71,17 @@ FIELDS = [
     # 'research_org_state_names',
     # 'research_org_types',
     # 'research_orgs',
-    # 'researchers',
+    'researchers',
     # 'resulting_publication_doi',
     # 'score',
-    # 'source_title',
-    # 'subtitles',
-    # 'supporting_grant_ids',
+    'source_title',
+    'subtitles',
+    'supporting_grant_ids',
     # 'times_cited',
-    # 'title',
-    # 'type',
-    # 'volume',
-    # 'year',
+    'title',
+    'type',
+    'volume',
+    'year',
 ]
 
 
@@ -105,13 +105,19 @@ def get_source(obj: dict[str, Any]) -> str | None:
 
 def translate_author(record: dict[str, Any]) -> AcademicAuthorModel | None:
     orcid = record.get('orcid')  # "orcid": "['s']",
+
     if orcid is not None:
         try:
-            orcid = json.loads(record.get('orcid'))  # type: ignore[arg-type]
+            if type(orcid) is str:
+                orcid = json.loads(orcid)  # type: ignore[arg-type]
+            if type(orcid) is list and len(orcid) > 0:
+                orcid = orcid[0]
         except Exception:
             pass
-        if orcid is not None and len(orcid) > 0:
-            orcid = orcid[0]
+
+        if type(orcid) is not str:
+            orcid = None
+
     return AcademicAuthorModel(
         name=f'{record.get("first_name")} {record.get("last_name")}',
         orcid=orcid,
