@@ -83,7 +83,7 @@ class ScopusAPI(AbstractAPI):
         ) as request_client:
             request_client.on(status=codes.UNAUTHORIZED, func=response_logger(self.logger))
 
-            next_cursor = '*'
+            next_cursor: str | None = '*'
             n_pages = 0
             n_records = 0
             while True:
@@ -112,10 +112,10 @@ class ScopusAPI(AbstractAPI):
                 data = page.json()
 
                 next_cursor = get(data, 'search-results', 'cursor', '@next', default=None)
-                entries = get(data, 'search-results', 'entry', default=[])
-                n_results = get(data, 'search-results', 'opensearch:totalResults', default=0)
+                entries: list[dict[str, Any]] | None = get(data, 'search-results', 'entry', default=[])
+                n_results: int | None = get(data, 'search-results', 'opensearch:totalResults', default=0)
 
-                if len(entries) == 0 or n_results == 0:
+                if entries is None or len(entries) == 0 or n_results is None or n_results == 0:
                     break
                 if len(entries) == 1 and entries[0].get('error') is not None:
                     break

@@ -214,9 +214,9 @@ class WoSAPI(AbstractAPI):
                     remaining_year = page.headers.get('x-rec-amtperyear-remaining')
                     remaining_sec = page.headers.get('x-req-reqpersec-remaining')
                     # Records are nested in Data on first page
-                    records = get(data['Data'] if 'Data' in data else data, 'Records', 'records', 'REC', default=[])
+                    records: list[dict[str, Any]] | None = get(data['Data'] if 'Data' in data else data, 'Records', 'records', 'REC', default=[])
 
-                    if len(records) == 0:
+                    if records is None or len(records) == 0:
                         self.logger.info('No more records received.')
                         break
 
@@ -285,7 +285,10 @@ if __name__ == '__main__':
         ]:
             with open(fp, 'r') as f:
                 data = json.load(f)
-                records = get(data, 'Data', 'Records', 'records', 'REC', default=[])
+                records: list[dict[str, Any]] | None = get(data, 'Data', 'Records', 'records', 'REC', default=[])
+                if not records:
+                    return
+
                 for record in records:
                     item = WoSAPI.translate_record(record)
                     print(item)

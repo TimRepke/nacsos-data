@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from nacsos_data.db.connection import DatabaseEngineAsync
 from nacsos_data.db.schemas.annotations import Annotation, Assignment, AssignmentScope, AnnotationScheme
 from nacsos_data.db.schemas.bot_annotations import BotAnnotation, BotAnnotationMetaData
-from .. import get_attr, anding
+from .. import get, anding
 
 from ..errors import NotFoundError
 from ..nql import NQLQuery
@@ -473,13 +473,13 @@ async def wide_export_table(
                 'py': r.get('publication_year'),
                 **{
                     f'res|{prefix.get(k, "")}{key}': val
-                    for resolution in get_attr(r, 'labels_resolved', [])  # type: ignore[union-attr]
+                    for resolution in get(r, 'labels_resolved', [])  # type: ignore[arg-type]
                     for k, v in resolution.items()
                     for key, val in _generate_keys(k, v)
                 },
                 **{
                     f'{usr}|{prefix.get(k, "")}{key}': val
-                    for usr, annotation in get_attr(r, 'labels_unresolved', {}).items()  # type: ignore[union-attr]
+                    for usr, annotation in get(r, 'labels_unresolved', {}).items()  # type: ignore[ arg-type]
                     for k, v in annotation.items()
                     for key, val in _generate_keys(k, v)
                 },

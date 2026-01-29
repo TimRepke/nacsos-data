@@ -192,7 +192,8 @@ class NameItem(BaseModel):
     role: NameRole | None = None
     claim_status: bool | None = None
     full_name: Annotated[str | None, BeforeValidator(fix_name)] = None
-    addr_no: Annotated[list[int] | None, BeforeValidator(str_to_int_lst)] | None = None
+    # addr_no: Annotated[list[int] | None, BeforeValidator(str_to_int_lst)] | None = None
+    addr_no: int | None = None
     reprint: str | None = None
     last_name: Annotated[str | None, BeforeValidator(fix_name)] = None
     display_name: Annotated[str | None, BeforeValidator(fix_name)] = None
@@ -237,6 +238,7 @@ def deconstruct_confidence_address(val: Any) -> str | None:
 
 class AddressSpec(BaseModel):
     city: str | None = None
+    country: str | None = None
     addr_no: int | None = None
     full_address: Annotated[str | None, BeforeValidator(deconstruct_confidence_address)] = None
     url_spec: UrlSpec | None = None
@@ -625,20 +627,24 @@ class WosSearchResponse(BaseModel):
 
 if __name__ == '__main__':
     import json
-    from nacsos_data.util import get
-    from nacsos_data.util.academic.apis.wos import dump_wos_record
+    # from nacsos_data.util import get
+    # from nacsos_data.util.academic.apis.wos import dump_wos_record
 
-    for fp in [
-        'scratch/academic_apis/wos_response.json',
-        'scratch/academic_apis/response2.json',
-    ]:
-        with open(fp, 'r') as f:
-            data = json.load(f)
-            # response = CategoryContextResponse.model_validate(data)
-            # print(response)
-            records = get(data, 'Data', 'Records', 'records', 'REC', default=[])
-            for record in records:
-                wr = WosRecord.model_validate(record)
-                wrd = dump_wos_record(wr)
-                print(wr)
-                print(wrd)
+    with open('scratch/academic_apis/wos.json') as f:
+        obj = json.load(f)
+        print(json.dumps(WosRecord.model_validate(obj).model_dump(), indent=2))
+    #
+    # for fp in [
+    #     'scratch/academic_apis/wos_response.json',
+    #     'scratch/academic_apis/response2.json',
+    # ]:
+    #     with open(fp, 'r') as f:
+    #         data = json.load(f)
+    #         # response = CategoryContextResponse.model_validate(data)
+    #         # print(response)
+    #         records = get(data, 'Data', 'Records', 'records', 'REC', default=[])
+    #         for record in records:
+    #             wr = WosRecord.model_validate(record)
+    #             wrd = dump_wos_record(wr)
+    #             print(wr)
+    #             print(wrd)

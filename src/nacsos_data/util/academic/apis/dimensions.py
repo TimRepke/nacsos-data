@@ -229,10 +229,10 @@ class DimensionsAPI(AbstractAPI):
                     n_pages += 1
                     data = page.json()
 
-                    n_results = get(data, '_stats', 'total_count', default=0)
-                    entries = get(data, 'publications', default=[])
+                    n_results: int = get(data, '_stats', 'total_count', default=0)
+                    entries: list[dict[str, Any]] | None = get(data, 'publications', default=[])
 
-                    if len(entries) == 0 or n_results == 0 or n_records >= n_results:
+                    if entries is None or len(entries) == 0 or n_results == 0 or n_records >= n_results:
                         break
 
                     for entry in entries:

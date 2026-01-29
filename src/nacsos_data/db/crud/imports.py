@@ -45,7 +45,10 @@ async def read_import(session: DBSession, import_id: uuid.UUID | str) -> ImportM
 @ensure_session_async
 async def upsert_import(session: DBSession, import_model: ImportModel) -> str | uuid.UUID | None:
     key = await upsert_orm(
-        upsert_model=import_model, Schema=Import, primary_key=Import.import_id.name, session=session
+        upsert_model=import_model,
+        Schema=Import,
+        primary_key=Import.import_id.name,
+        session=session,
     )  # FIXME: does this need `use_commit=True` ?
     return key
 
@@ -64,7 +67,7 @@ async def delete_import(session: DBSession, import_id: uuid.UUID | str) -> None:
     pipeline_task_ids = (
         (
             await session.execute(
-                select(ImportRevision.pipeline_task_id).where(ImportRevision.import_id == import_id, ImportRevision.pipeline_task_id.is_not(None))
+                select(ImportRevision.pipeline_task_id).where(ImportRevision.import_id == import_id, ImportRevision.pipeline_task_id.is_not(None)),
             )
         )
         .scalars()
@@ -177,14 +180,19 @@ async def update_revision_statistics(
     logger: logging.Logger,
 ) -> None:
     with elapsed_timer(logger, 'Updating revision stats...'):
-        num_items = (await session.execute(text('SELECT count(1) FROM m2m_import_item WHERE import_id = :import_id'), {'import_id': import_id})).scalar()
-        num_items_new = (
+        num_items: int = (  # type: ignore[assignment]
+            await session.execute(
+                text('SELECT count(1) FROM m2m_import_item WHERE import_id = :import_id'),
+                {'import_id': import_id},
+            )
+        ).scalar()
+        num_items_new: int = (  # type: ignore[assignment]
             await session.execute(
                 text('SELECT count(1) FROM m2m_import_item WHERE first_revision = :rev AND import_id=:import_id'),
                 {'rev': latest_revision, 'import_id': import_id},
             )
         ).scalar()
-        num_items_removed = (
+        num_items_removed: int = (  # type: ignore[assignment]
             await session.execute(
                 text('SELECT count(1) FROM m2m_import_item WHERE latest_revision = :rev AND import_id=:import_id'),
                 {'rev': latest_revision - 1, 'import_id': import_id},

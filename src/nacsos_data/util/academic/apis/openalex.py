@@ -276,6 +276,7 @@ class OpenAlexSolrAPI(AbstractAPI):
         max_req_per_sec: int = 5,
         max_retries: int = 5,
         backoff_rate: float = 5.0,
+        timeout: int = 60,
         logger: logging.Logger | None = None,
     ):
         super().__init__(api_key='', proxy=proxy, max_retries=max_retries, max_req_per_sec=max_req_per_sec, backoff_rate=backoff_rate, logger=logger)
@@ -293,6 +294,7 @@ class OpenAlexSolrAPI(AbstractAPI):
         self.histogram_to = histogram_to
         self.num_found: int | None = None
         self.query_time: int | None = None
+        self.timeout: int = timeout
 
         if export_fields is not None:
             self.export_fields = export_fields
@@ -358,7 +360,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                 batch_i += 1
                 self.logger.info(f'Running query for batch {batch_i} with cursor "{params_.get("cursorMark")}"')
                 t2 = time()
-                res = request_client.post(f'{self.openalex_conf.solr_url}/select', data=params_, timeout=60).json()
+                res = request_client.post(f'{self.openalex_conf.solr_url}/select', data=params_, timeout=self.timeout).json()
 
                 next_curser = res.get('nextCursorMark')
                 params_['cursorMark'] = next_curser
@@ -393,11 +395,11 @@ class OpenAlexSolrAPI(AbstractAPI):
 
     @classmethod
     def _prepare_histogram(cls, response: Response) -> dict[str, int] | None:
-        hist_facets = get(response, 'facet_counts', 'facet_ranges', 'publication_year', 'counts', default=None)
+        hist_facets: list[int | str] | None = get(response, 'facet_counts', 'facet_ranges', 'publication_year', 'counts', default=None)
         if hist_facets is None:
             return None
 
-        return {hist_facets[i]: hist_facets[i + 1] for i in range(0, len(hist_facets), 2)}
+        return {hist_facets[i]: hist_facets[i + 1] for i in range(0, len(hist_facets), 2)}  # type: ignore[misc]
 
     @classmethod
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:

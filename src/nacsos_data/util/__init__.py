@@ -174,13 +174,19 @@ def elapsed_timer(logger: logging.Logger, tn: str = 'Task') -> Generator[Callabl
     logger.debug(f'{tn} took {timedelta(seconds=end - start)} to execute.')
 
 
-def get_attr(obj: Any, key: str, default: T | None = None) -> T | None:
-    if hasattr(obj, key):
-        val = getattr(obj, key)
-        if val is None:
+def get(obj: Any, *keys: str, default: Any = None) -> Any:
+    for key in keys:
+        if type(obj) is dict:
+            if key not in obj:
+                return default
+            obj = obj[key]
+        else:
+            if not hasattr(obj, key):
+                return default
+            obj = getattr(obj, key)
+        if obj is None:
             return default
-        return val  # type: ignore[no-any-return]
-    return default
+    return obj
 
 
 def oring(arr: list[Optional['pd.Series[bool]']]) -> 'bool | pd.Series[bool]':
@@ -203,19 +209,6 @@ def anding(arr: list[Optional['pd.Series[bool]']]) -> 'bool | pd.Series[bool]':
     for a in fixed_arr[1:]:
         ret &= a
     return ret
-
-
-def get(obj: object, *keys: str, default: Any = None) -> Any:
-    for key in keys:
-        if type(obj) is dict:
-            if key not in obj:
-                return default
-            obj = obj[key]
-        else:
-            if not hasattr(obj, key):
-                return default
-            obj = getattr(obj, key)
-    return obj
 
 
 def get_value(val: Callable[[], T], default: D | None = None) -> T | D | None:
