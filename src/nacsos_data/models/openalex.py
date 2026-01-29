@@ -3,6 +3,7 @@ from typing import TypeVar, Annotated, Literal, Any
 
 from pydantic import BaseModel, BeforeValidator, model_validator, AfterValidator
 
+from nacsos_data.util import get
 
 # based on
 # https://github.com/ourresearch/openalex-elastic-api/blob/master/works/schemas.py
@@ -451,10 +452,10 @@ class WorksSchema(BaseModel, extra='allow'):
         if data.get('primary_location') and data.get('locations') and len(data['locations']) > 0:
             data['locations'][0] = data['locations'][0] | data['primary_location'] | {'is_primary': True}
 
-            if data['primary_location'].get('source', {}).get('display_name'):
+            if get(data,'primary_location', 'source', 'display_name', default=None):
                 data['source'] = data['primary_location']['source']['display_name']
                 data['source_id'] = data['primary_location']['source']['id']
-            if data['primary_location'].get('source', {}).get('host_organization_name'):
+            if get(data,'primary_location', 'source', 'host_organization_name', default=None):
                 data['publisher'] = data['primary_location']['source']['host_organization_name']
                 data['publisher_id'] = data['primary_location']['source']['host_organization']
 
