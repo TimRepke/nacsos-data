@@ -407,7 +407,9 @@ class WorksSchema(BaseModel, extra='allow'):
     locations: Annotated[list[LocationSchema] | None, BeforeValidator(ensure_clean_list)] = None
     best_oa_location: LocationSchema | None = None
     sustainable_development_goals: Annotated[list[SDGSchema] | None, BeforeValidator(ensure_clean_list)] = None
-    grants: Annotated[list[GrantsSchema] | None, BeforeValidator(ensure_clean_list)] = None  # FIXME: DEPRECATED https://docs.openalex.org/api-entities/works/work-object#grants-deprecated
+    grants: Annotated[list[GrantsSchema] | None, BeforeValidator(ensure_clean_list)] = (
+        None  # FIXME: DEPRECATED https://docs.openalex.org/api-entities/works/work-object#grants-deprecated
+    )
     awards: Annotated[list[AwardsSchema] | None, BeforeValidator(ensure_clean_list)] = None
     funders: Annotated[list[FundersSchema] | None, BeforeValidator(ensure_clean_list)] = None
     datasets: Annotated[list[str] | None, BeforeValidator(ensure_clean_list)] = None
@@ -452,10 +454,10 @@ class WorksSchema(BaseModel, extra='allow'):
         if data.get('primary_location') and data.get('locations') and len(data['locations']) > 0:
             data['locations'][0] = data['locations'][0] | data['primary_location'] | {'is_primary': True}
 
-            if get(data,'primary_location', 'source', 'display_name', default=None):
+            if get(data, 'primary_location', 'source', 'display_name', default=None):
                 data['source'] = data['primary_location']['source']['display_name']
                 data['source_id'] = data['primary_location']['source']['id']
-            if get(data,'primary_location', 'source', 'host_organization_name', default=None):
+            if get(data, 'primary_location', 'source', 'host_organization_name', default=None):
                 data['publisher'] = data['primary_location']['source']['host_organization_name']
                 data['publisher_id'] = data['primary_location']['source']['host_organization']
 
