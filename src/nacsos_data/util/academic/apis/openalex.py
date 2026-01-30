@@ -67,7 +67,7 @@ FIELDS_API = {
     # 'datasets',
     # 'versions',
     'has_content',
-    'content_urls',
+    # 'content_urls',
     # 'referenced_works_count',
     'referenced_works',
     # 'related_works',
