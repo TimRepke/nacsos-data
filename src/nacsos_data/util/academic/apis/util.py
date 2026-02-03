@@ -179,6 +179,7 @@ class AbstractAPI(ABC):
         self.backoff_rate = backoff_rate
         self.ignored_exceptions = ignored_exceptions or []
         self.api_feedback = {}
+        self.n_results: int | None = None
 
         if logger is None:
             self.logger = logging.getLogger(type(self).__name__)
@@ -197,6 +198,14 @@ class AbstractAPI(ABC):
     @abstractmethod
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
         raise NotImplementedError
+
+    def fetch_n_results(self,
+        query: str,
+        params: dict[str, Any] | None = None,
+    ) -> int | None:
+        for _record in self.fetch_raw(query=query, params=params):
+            break
+        return self.n_results
 
     def fetch_translated(
         self,

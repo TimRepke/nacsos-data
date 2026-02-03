@@ -118,9 +118,9 @@ class ScopusAPI(AbstractAPI):
 
                 next_cursor = get(data, 'search-results', 'cursor', '@next', default=None)
                 entries: list[dict[str, Any]] | None = get(data, 'search-results', 'entry', default=[])
-                n_results: int | None = get(data, 'search-results', 'opensearch:totalResults', default=0)
+                self.n_results: int | None = get(data, 'search-results', 'opensearch:totalResults', default=0)
 
-                if entries is None or len(entries) == 0 or n_results is None or n_results == 0:
+                if entries is None or len(entries) == 0 or self.n_results is None or self.n_results == 0:
                     break
                 if len(entries) == 1 and entries[0].get('error') is not None:
                     break
@@ -128,7 +128,7 @@ class ScopusAPI(AbstractAPI):
                 yield from entries
 
                 n_records += len(entries)
-                self.logger.debug(f'Found {n_records}/{n_results} records after processing page {n_pages} {self.api_feedback}')
+                self.logger.debug(f'Found {n_records}/{self.n_results} records after processing page {n_pages} {self.api_feedback}')
 
     @classmethod
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:

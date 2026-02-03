@@ -98,7 +98,7 @@ class PubmedAPI(AbstractAPI):
                 for error in errors.iter():
                     self.logger.error(f'Error {error.tag}: {"".join(error.itertext())}')
 
-            n_total = int(tree.find('Count').text)  # type: ignore[union-attr,arg-type]
+            self.n_results = int(tree.find('Count').text)  # type: ignore[union-attr,arg-type]
             page_size = int(tree.find('RetMax').text)  # type: ignore[union-attr,arg-type]
 
             done = False
@@ -134,10 +134,10 @@ class PubmedAPI(AbstractAPI):
                 yield from articles
 
                 self.logger.info(
-                    f'Found {n_records:,}/{n_total:,} records after processing page {n_pages} ({page_size} per page) | {self.api_feedback}',
+                    f'Found {n_records:,}/{self.n_results:,} records after processing page {n_pages} ({page_size} per page) | {self.api_feedback}',
                 )
 
-                if n_records >= n_total or len(articles) == 0:
+                if n_records >= self.n_results or len(articles) == 0:
                     self.logger.info('Seemed to have reached the end (count zero or total reached).')
                     break
 

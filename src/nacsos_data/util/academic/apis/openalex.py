@@ -379,6 +379,7 @@ class OpenAlexSolrAPI(AbstractAPI):
                 n_docs_batch = len(batch_docs)
                 num_docs_cum += n_docs_batch
                 self.num_found = res['response']['numFound']
+                self.n_results = self.num_found  # not pretty, but for compatibility copy this variable
                 self.query_time = res['responseHeader']['QTime']
 
                 self.logger.debug(f'Query took {timedelta(seconds=time() - t2)}h and yielded {n_docs_batch:,} docs')

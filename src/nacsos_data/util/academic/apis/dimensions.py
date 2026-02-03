@@ -189,7 +189,7 @@ class DimensionsAPI(AbstractAPI):
         ) as request_client:
             headers = {
                 'Accept': 'application/json',
-                'Authorization': 'JWT empty',
+                'Authorization': f'JWT {(params or {}).get("jwt", "empty")}',
             }
             logger = self.logger
             api_key = self.api_key
@@ -198,7 +198,9 @@ class DimensionsAPI(AbstractAPI):
                 logger.debug('Fetching JWT token')
                 res = request_client.post('https://app.dimensions.ai/api/auth.json', json={'key': api_key})
                 res.raise_for_status()
-                headers['Authorization'] = f'JWT {res.json()["token"]}'
+                token = res.json()['token']
+                self.api_feedback['jwt'] = token
+                headers['Authorization'] = f'JWT {token}'
                 return {'headers': headers}
 
             request_client.on(codes.UNAUTHORIZED, update_jwt)
@@ -229,16 +231,16 @@ class DimensionsAPI(AbstractAPI):
                     n_pages += 1
                     data = page.json()
 
-                    n_results: int = get(data, '_stats', 'total_count', default=0)
+                    self.n_results = get(data, '_stats', 'total_count', default=0)
                     entries: list[dict[str, Any]] | None = get(data, 'publications', default=[])
 
-                    if entries is None or len(entries) == 0 or n_results == 0 or n_records >= n_results:
+                    if entries is None or len(entries) == 0 or self.n_results == 0 or n_records >= self.n_results:
                         break
 
                     for entry in entries:
                         n_records += 1
                         yield entry
-                    logger.debug(f'Found {n_records:,} records after processing page {n_pages} (total {n_results:,} records)')
+                    logger.debug(f'Found {n_records:,} records after processing page {n_pages} (total {self.n_results:,} records)')
                 except HTTPError as e:
                     logging.warning(f'Failed: {e}')
                     logging.warning(e.response.text)  # type: ignore[attr-defined]

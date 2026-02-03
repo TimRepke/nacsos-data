@@ -208,6 +208,7 @@ class WoSAPI(AbstractAPI):
                         query_id = data['QueryResult']['QueryID']
                         records_searched = data['QueryResult']['RecordsSearched']
                         records_found = data['QueryResult']['RecordsFound']
+                        self.n_results = records_found  # looks odd, but better ensures compatibility
 
                     # Gather info from header
                     # next_page = page.headers.get('x-paginate-by-query-id')
