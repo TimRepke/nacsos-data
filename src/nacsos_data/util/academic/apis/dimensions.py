@@ -133,6 +133,8 @@ def translate_author(record: dict[str, Any]) -> AcademicAuthorModel | None:
 
 
 class DimensionsAPI(AbstractAPI):
+    PAGE_MAX = 20  # FIXME: unclear https://docs.dimensions.ai/dsl/language.html#paginating-results
+
     def __init__(
         self,
         api_key: str,
@@ -141,6 +143,7 @@ class DimensionsAPI(AbstractAPI):
         max_req_per_sec: int = 5,
         max_retries: int = 5,
         backoff_rate: float = 5.0,
+        override_content: bool = False,
         fields: list[str] | None = None,
         logger: logging.Logger | None = None,
     ):
@@ -154,6 +157,7 @@ class DimensionsAPI(AbstractAPI):
         )
         self.page_size = page_size
         self.fields = fields if fields is not None and len(fields) > 0 else FIELDS
+        self.override_content = override_content
 
     def fetch_raw(
         self,
@@ -214,13 +218,16 @@ class DimensionsAPI(AbstractAPI):
             while True:
                 logger.info(f'Fetching page {n_pages}...')
                 try:
-                    content = (
-                        f'search publications '
-                        f'in title_abstract_only for "{query.replace("\n", " ").replace('"', '\\"')}" {where} '
-                        f'return publications[{"+".join(self.fields)}] '
-                        f'sort by id '
-                        f'limit {self.page_size} skip {n_pages * self.page_size} '
-                    )
+                    if self.override_content:
+                        content = f'{query} sort by id limit {self.page_size} skip {n_pages * self.page_size} '
+                    else:
+                        content = (
+                            f'search publications '
+                            f'in title_abstract_only for "{query.replace("\n", " ").replace('"', '\\"')}" {where} '
+                            f'return publications[{"+".join(self.fields)}] '
+                            f'sort by id '
+                            f'limit {self.page_size} skip {n_pages * self.page_size} '
+                        )
                     logger.debug(f'Query: {content}')
                     page = request_client.post(
                         url='https://app.dimensions.ai/api/dsl/v2',

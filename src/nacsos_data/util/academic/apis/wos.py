@@ -130,6 +130,8 @@ class State:
 
 
 class WoSAPI(AbstractAPI):
+    PAGE_MAX = 50
+
     def __init__(
         self,
         api_key: str,

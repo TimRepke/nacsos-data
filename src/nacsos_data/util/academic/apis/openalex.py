@@ -22,13 +22,13 @@ FIELDS_API = {
     'doi',
     'title',
     'display_name',
-    #'relevance_score',
+    # 'relevance_score',
     'publication_year',
     'publication_date',
     'ids',
     'language',
     'primary_location',
-    #'sources',
+    # 'sources',
     'type',
     'type_crossref',
     'indexed_in',
@@ -176,6 +176,8 @@ def translate_work_to_item(work: WorksSchema, project_id: str | uuid.UUID | None
 
 
 class OpenAlexAPI(AbstractAPI):
+    PAGE_MAX = 50
+
     def fetch_raw(
         self,
         query: str,
@@ -271,6 +273,8 @@ class SearchResult(BaseModel):
 
 
 class OpenAlexSolrAPI(AbstractAPI):
+    PAGE_MAX = 100  # effectively unlimited, but 100 is a reasonable default
+
     def __init__(
         self,
         openalex_conf: OpenAlexConfig,

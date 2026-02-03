@@ -186,6 +186,12 @@ class AbstractAPI(ABC):
         else:
             self.logger = logger
 
+    @classmethod
+    @property
+    @abstractmethod
+    def PAGE_MAX(cls):
+        raise NotImplementedError
+
     @abstractmethod
     def fetch_raw(
         self,
@@ -199,7 +205,8 @@ class AbstractAPI(ABC):
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
         raise NotImplementedError
 
-    def fetch_n_results(self,
+    def fetch_n_results(
+        self,
         query: str,
         params: dict[str, Any] | None = None,
     ) -> int | None:

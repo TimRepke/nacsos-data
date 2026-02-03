@@ -43,6 +43,8 @@ def get_authors(citation: dict[str, Any]) -> Generator[AcademicAuthorModel, None
 
 
 class PubmedAPI(AbstractAPI):
+    PAGE_MAX = 50  # FIXME: unclear, not documented
+
     def _fetch_raw(
         self,
         query: str,

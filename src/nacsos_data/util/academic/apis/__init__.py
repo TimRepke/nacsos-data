@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import Enum
 from typing import Type
 
 from .dimensions import DimensionsAPI
@@ -9,7 +9,7 @@ from .wos import WoSAPI
 from .scopus import ScopusAPI
 
 
-class APIEnum(StrEnum):
+class APIEnum(str, Enum):
     SOLR = 'SOLR'
     OA = 'OA'
     WOS = 'WOS'

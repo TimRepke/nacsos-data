@@ -57,6 +57,8 @@ def translate_authors(record: dict[str, Any]) -> list[AcademicAuthorModel] | Non
 
 
 class ScopusAPI(AbstractAPI):
+    PAGE_MAX = 25  # FIXME: unclear, not documented
+
     def fetch_raw(
         self,
         query: str,
