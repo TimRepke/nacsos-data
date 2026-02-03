@@ -211,8 +211,11 @@ class WoSAPI(AbstractAPI):
 
                     # Gather info from header
                     # next_page = page.headers.get('x-paginate-by-query-id')
-                    remaining_year = page.headers.get('x-rec-amtperyear-remaining')
-                    remaining_sec = page.headers.get('x-req-reqpersec-remaining')
+                    self.api_feedback = {
+                        'remaining_year': page.headers.get('x-rec-amtperyear-remaining'),
+                        'remaining_sec': page.headers.get('x-req-reqpersec-remaining'),
+                    }
+
                     # Records are nested in Data on first page
                     records: list[dict[str, Any]] | None = get(data['Data'] if 'Data' in data else data, 'Records', 'records', 'REC', default=[])
 
@@ -226,7 +229,7 @@ class WoSAPI(AbstractAPI):
                     self.logger.info(
                         f'Found {state.n_records:,}/{records_found:,} records in {records_searched:,} records '
                         f'after processing page {state.n_pages} for query {query_id} '
-                        f'(remaining this year = {remaining_year} | remaining / second = {remaining_sec})',
+                        f'{self.api_feedback}',
                     )
 
                     if state.n_records >= records_found:

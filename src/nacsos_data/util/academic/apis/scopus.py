@@ -79,7 +79,10 @@ class ScopusAPI(AbstractAPI):
             raise AssertionError('Missing API key!')
 
         with RequestClient(
-            backoff_rate=self.backoff_rate, max_req_per_sec=self.max_req_per_sec, max_retries=self.max_retries, proxy=self.proxy
+            backoff_rate=self.backoff_rate,
+            max_req_per_sec=self.max_req_per_sec,
+            max_retries=self.max_retries,
+            proxy=self.proxy,
         ) as request_client:
             request_client.on(status=codes.UNAUTHORIZED, func=response_logger(self.logger))
 
@@ -104,9 +107,11 @@ class ScopusAPI(AbstractAPI):
                     },
                 )
 
-                scopus_requests_limit = page.headers.get('x-ratelimit-limit')
-                scopus_requests_remaining = page.headers.get('x-ratelimit-remaining')
-                scopus_requests_reset = page.headers.get('x-ratelimit-reset')
+                self.api_feedback = {
+                    'scopus_requests_limit': page.headers.get('x-ratelimit-limit'),
+                    'scopus_requests_remaining': page.headers.get('x-ratelimit-remaining'),
+                    'scopus_requests_reset': page.headers.get('x-ratelimit-reset'),
+                }
 
                 n_pages += 1
                 data = page.json()
@@ -123,12 +128,7 @@ class ScopusAPI(AbstractAPI):
                 yield from entries
 
                 n_records += len(entries)
-                self.logger.debug(
-                    f'Found {n_records}/{n_results} records after processing page {n_pages} '
-                    f'(rate limit = {scopus_requests_limit} '
-                    f'| remaining = {scopus_requests_remaining} '
-                    f'| reset = {scopus_requests_reset})'
-                )
+                self.logger.debug(f'Found {n_records}/{n_results} records after processing page {n_pages} {self.api_feedback}')
 
     @classmethod
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:

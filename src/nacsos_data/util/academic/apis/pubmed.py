@@ -72,7 +72,10 @@ class PubmedAPI(AbstractAPI):
         n_records = 0
         n_pages = 0
         with RequestClient(
-            backoff_rate=self.backoff_rate, max_req_per_sec=self.max_req_per_sec, max_retries=self.max_retries, proxy=self.proxy
+            backoff_rate=self.backoff_rate,
+            max_req_per_sec=self.max_req_per_sec,
+            max_retries=self.max_retries,
+            proxy=self.proxy,
         ) as request_client:
             search_page = request_client.post(
                 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi',
@@ -109,10 +112,20 @@ class PubmedAPI(AbstractAPI):
             while not done:
                 result_page = request_client.get(
                     'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi',
-                    params={'api_key': self.api_key, 'db': 'pubmed', 'WebEnv': web_env, 'query_key': query_key, 'retmax': page_size, 'retstart': n_records},
+                    params={
+                        'api_key': self.api_key,
+                        'db': 'pubmed',
+                        'WebEnv': web_env,
+                        'query_key': query_key,
+                        'retmax': page_size,
+                        'retstart': n_records,
+                    },
                 )
-                rate_limit = result_page.headers.get('x-ratelimit-limit')
-                rate_left = result_page.headers.get('x-ratelimit-remaining')
+
+                self.api_feedback = {
+                    'rate_limit': result_page.headers.get('x-ratelimit-limit'),
+                    'rate_left': result_page.headers.get('x-ratelimit-remaining'),
+                }
 
                 tree = parse_xml(result_page.text)
                 articles = list(tree.findall('PubmedArticle'))
@@ -121,9 +134,7 @@ class PubmedAPI(AbstractAPI):
                 yield from articles
 
                 self.logger.info(
-                    f'Found {n_records:,}/{n_total:,} records after processing page {n_pages} ({page_size} per page)'
-                    f' | rate-limit: {rate_limit}'
-                    f' | rate-remaining: {rate_left}'
+                    f'Found {n_records:,}/{n_total:,} records after processing page {n_pages} ({page_size} per page) | {self.api_feedback}',
                 )
 
                 if n_records >= n_total or len(articles) == 0:
@@ -163,7 +174,7 @@ class PubmedAPI(AbstractAPI):
                 [
                     kw.get('_text', '').strip()
                     for kw in select(citation, 'KeywordList', default={}).get('Keyword', [])  # type: ignore[union-attr]
-                ]
+                ],
             ),
             meta={'pubmed-api': clear_empty(record)},
         )
@@ -173,6 +184,6 @@ if __name__ == '__main__':
     app = PubmedAPI.test_app(
         static_files=[
             'scratch/academic_apis/response_pubmed.jsonl',
-        ]
+        ],
     )
     app()

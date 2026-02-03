@@ -178,6 +178,7 @@ class AbstractAPI(ABC):
         self.max_retries = max_retries
         self.backoff_rate = backoff_rate
         self.ignored_exceptions = ignored_exceptions or []
+        self.api_feedback = {}
 
         if logger is None:
             self.logger = logging.getLogger(type(self).__name__)
