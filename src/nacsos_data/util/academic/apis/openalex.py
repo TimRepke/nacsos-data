@@ -236,7 +236,6 @@ class OpenAlexAPI(AbstractAPI):
                     else:
                         raise e
 
-
     @classmethod
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:
         work = WorksSchema.model_validate(record)
