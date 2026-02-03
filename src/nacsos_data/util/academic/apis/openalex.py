@@ -216,15 +216,26 @@ class OpenAlexAPI(AbstractAPI):
                 )
                 try:
                     req.raise_for_status()
+
+                    page = req.json()
+                    cursor = page['meta']['next_cursor']
+                    self.logger.info(f'Retrieved {n_works:,} / {page["meta"]["count"]:,} | currently on page {n_pages:,}')
+
+                    yield from page['results']
+                    n_works += len(page['results'])
+
                 except HTTPStatusError as e:
                     self.logger.error(e.response.text)
                     raise e
-                page = req.json()
-                cursor = page['meta']['next_cursor']
-                self.logger.info(f'Retrieved {n_works:,} / {page["meta"]["count"]:,} | currently on page {n_pages:,}')
+                except Exception as e:
+                    for exc_type in self.ignored_exceptions:
+                        if type(e) is exc_type:
+                            self.logger.error(e)
+                            self.logger.warning(f'Ignoring error {e}')
+                            break
+                    else:
+                        raise e
 
-                yield from page['results']
-                n_works += len(page['results'])
 
     @classmethod
     def translate_record(cls, record: dict[str, Any], project_id: str | uuid.UUID | None = None) -> AcademicItemModel:

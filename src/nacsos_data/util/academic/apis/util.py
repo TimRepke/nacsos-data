@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Iterable, Generator, Annotated
+from typing import Any, Callable, Iterable, Generator, Annotated, Type
 from pathlib import Path
 from time import perf_counter, sleep
 from typing_extensions import override
@@ -169,6 +169,7 @@ class AbstractAPI(ABC):
         max_req_per_sec: int = 5,
         max_retries: int = 5,
         backoff_rate: float = 5.0,
+        ignored_exceptions: list[Type[Exception]] | None = None,
         logger: logging.Logger | None = None,
     ):
         self.api_key = api_key
@@ -176,6 +177,7 @@ class AbstractAPI(ABC):
         self.max_req_per_sec = max_req_per_sec
         self.max_retries = max_retries
         self.backoff_rate = backoff_rate
+        self.ignored_exceptions = ignored_exceptions or []
 
         if logger is None:
             self.logger = logging.getLogger(type(self).__name__)
