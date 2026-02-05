@@ -225,7 +225,7 @@ class OpenAlexAPI(AbstractAPI):
                     ('(4/4) oa=true|typ=!art', 'type:article,open_access.is_oa:true'),
                 ]:
                     # get child logger for neat log separation
-                    self.logger = self.logger.getChild(name)
+                    self.logger = logger.getChild(name)
 
                     # run the query with the sub-filter
                     yield from self._fetch_raw(
