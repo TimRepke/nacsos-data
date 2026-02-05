@@ -178,18 +178,15 @@ class AbstractAPI(ABC):
         self.max_retries = max_retries
         self.backoff_rate = backoff_rate
         self.ignored_exceptions = ignored_exceptions or []
-        self.api_feedback = {}
+        self.api_feedback: dict[str, int] = {}
         self.n_results: int | None = None
 
-        if logger is None:
-            self.logger = logging.getLogger(type(self).__name__)
-        else:
-            self.logger = logger
+        self.logger = logger or logging.getLogger(type(self).__name__)
 
-    @classmethod
+    @classmethod  # type: ignore[misc]
     @property
     @abstractmethod
-    def PAGE_MAX(cls):
+    def PAGE_MAX(cls) -> int:
         raise NotImplementedError
 
     @abstractmethod

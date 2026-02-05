@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from time import time
 from datetime import timedelta
-from typing import Any, Generator, Annotated, Literal, get_args
+from typing import Any, Generator, Annotated, Literal, get_args, Type
 
 import httpx
 from httpx import Response, HTTPStatusError
@@ -178,7 +178,69 @@ def translate_work_to_item(work: WorksSchema, project_id: str | uuid.UUID | None
 class OpenAlexAPI(AbstractAPI):
     PAGE_MAX = 50
 
+    def __init__(
+        self,
+        split_larger: int | None = None,
+        api_key: str | None = None,
+        proxy: str | None = None,
+        max_req_per_sec: int = 5,
+        max_retries: int = 5,
+        backoff_rate: float = 5.0,
+        ignored_exceptions: list[Type[Exception]] | None = None,
+        logger: logging.Logger | None = None,
+    ):
+        super().__init__(
+            proxy=proxy,
+            max_retries=max_retries,
+            max_req_per_sec=max_req_per_sec,
+            backoff_rate=backoff_rate,
+            logger=logger,
+            ignored_exceptions=ignored_exceptions,
+            api_key=api_key,
+        )
+        self.split_larger = split_larger
+
     def fetch_raw(
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
+    ) -> Generator[dict[str, Any], None, None]:
+        # If there's no "large result" split threshold, proceed as normal
+        if self.split_larger is None:
+            yield from self._fetch_raw(query, params)
+
+        # We'd like to split response sets that are too large
+        else:
+            # Get the size of the expected result set
+            count = self.get_count(query, params) or 0
+
+            # Seems too big for one chunk, proceed to sub-chunking
+            if count > self.split_larger:
+                # keep track of original logger
+                logger = self.logger
+                for name, subfilter in [
+                    ('(1/4) oa=false|typ=art', 'type:!article,open_access.is_oa:false'),
+                    ('(2/4) oa=true|typ=art', 'type:!article,open_access.is_oa:true'),
+                    ('(3/4) oa=false|typ=!art', 'type:article,open_access.is_oa:false'),
+                    ('(4/4) oa=true|typ=!art', 'type:article,open_access.is_oa:true'),
+                ]:
+                    # get child logger for neat log separation
+                    self.logger = self.logger.getChild(name)
+
+                    # run the query with the sub-filter
+                    yield from self._fetch_raw(
+                        query,
+                        (params or {}) | {'filter': f'{params["filter"]},{subfilter}' if params and params.get('filter') else subfilter},
+                    )
+
+                # reset to original logger
+                self.logger = logger
+
+            # Size is reasonable, do it in one go
+            else:
+                yield from self._fetch_raw(query, params)
+
+    def _fetch_raw(
         self,
         query: str,
         params: dict[str, Any] | None = None,

@@ -59,6 +59,10 @@ class OpenAlexConfig(BaseSettings):
         return f'{self.SOLR_ENDPOINT}/solr/{self.SOLR_COLLECTION}'
 
     @property
+    def solr_collections_url(self) -> str:
+        return f'{self.SOLR_ENDPOINT}/api/collections/{self.SOLR_COLLECTION}'
+
+    @property
     def auth(self) -> BasicAuth | None:
         if self.SOLR_USER is None or self.SOLR_PASSWORD is None:
             return None
