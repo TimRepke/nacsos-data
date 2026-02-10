@@ -3,7 +3,7 @@ from typing import TypeVar, Annotated, Literal, Any
 
 from pydantic import BaseModel, BeforeValidator, model_validator, AfterValidator
 
-from nacsos_data.util import get
+from nacsos_data.util import get, clear_empty
 
 # based on
 # https://github.com/ourresearch/openalex-elastic-api/blob/master/works/schemas.py
@@ -19,9 +19,7 @@ T = TypeVar('T')
 
 
 def ensure_clean_list(v: list[T] | None) -> list[T] | None:
-    if v is None or len(v) == 0 or v[0] is None:
-        return None
-    return v
+    return clear_empty(v)
 
 
 URLS = re.compile(
@@ -36,13 +34,14 @@ URLS = re.compile(
 def strip_url(url: str | None) -> str | None:
     if url is None:
         return None
-    return URLS.sub('', url)
+    url = URLS.sub('', url)
+    return url if len(url) > 0 else None
 
 
 def strip_urls(urls: list[str] | None) -> list[str] | None:
     if urls is None or len(urls) == 0:
         return None
-    return [URLS.sub('', url) for url in urls]
+    return clear_empty([URLS.sub('', url) for url in urls])
 
 
 def invert_abstract(abstract_inverted_index: dict[str, list[int]] | None) -> str | None:
