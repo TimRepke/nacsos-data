@@ -1,5 +1,6 @@
 # NACSOS™ nexus – Data Utils
 [![Volkswagen status](.ci/volkswargen_ci.svg)](https://github.com/auchenberg/volkswagen)
+![pipeline](https://gitlab.pik-potsdam.de/mcc-apsis/nacsos/nacsos-data/badges/main/pipeline.svg)
 
 This repository contains the core data model for the NACSOS platform.
 Furthermore, it provides core utilities to programmatically access the data.
