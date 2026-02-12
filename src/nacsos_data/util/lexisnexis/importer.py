@@ -285,7 +285,7 @@ async def import_lexis_nexis(  # noqa: C901
                                 item_id = uuid.uuid4()
                                 new_item.item_id = item_id
                                 new_item.project_id = project_id
-                                session.add(LexisNexisItem(**item.model_dump(exclude={'source'})))
+                                session.add(LexisNexisItem(**item.model_dump(exclude={'sources'})))
                                 await session.flush()
                                 num_new += 1
                             else:
