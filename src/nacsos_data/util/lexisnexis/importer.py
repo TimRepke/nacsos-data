@@ -1,7 +1,7 @@
 import logging
 import uuid
 from collections import defaultdict
-from typing import Generator, AsyncGenerator, TYPE_CHECKING, TypeAlias, Callable
+from typing import Generator, AsyncGenerator, TypeAlias, Callable
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
@@ -19,8 +19,7 @@ from ...db.schemas.imports import ImportRevision
 from ...models.items import FullLexisNexisItemModel, ItemEntry
 
 
-if TYPE_CHECKING:
-    from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
 
 LexisNexisItemGenerator: TypeAlias = Callable[[], Generator[FullLexisNexisItemModel, None, None]]
 
@@ -41,7 +40,7 @@ async def read_known_ids(
                     SELECT lis.lexis_id, lis.item_id::text
                     FROM lexis_item_source lis
                     JOIN item i ON lis.item_id = i.item_id
-                    WHERE ai.project_id = :project_id {txt_where};
+                    WHERE i.project_id = :project_id {txt_where};
                 """),
                 {'project_id': project_id},
             )

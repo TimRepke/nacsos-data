@@ -163,7 +163,7 @@ class NewsPostFilter(BaseModel):
 
 
 class SummaryDetails(BaseModel):
-    Type: Optional[SummaryType] = None
+    Type: Optional[str] = None  # Optional[SummaryType] = None  # FIXME: hotfix to deal with messy API
     SummaryText: Optional[str] = Field(None, description='The matched relevant extract within the document.')
 
 
@@ -221,7 +221,7 @@ class NewsSearchResult(BaseModel):
         None,
         description="The location of the news article. This property is typically only used for filtering, and won't be populated in the search results.",
     )
-    NegativeNews: Optional[NegativeNewsType] = None
+    NegativeNews: Optional[str] = None  # Optional[NegativeNewsType] = None  # FIXME: hotfix to deal with messy API
     Language: Optional[LanguageEnum] = None
     Industry: Optional[str] = Field(
         None,
@@ -279,7 +279,7 @@ class NewsSearchResult(BaseModel):
         None,
         description='The search result identifier.  This will typically also be the identity of the document associated with this search result.',
     )
-    SearchType: SearchTypeEnum | None = None
+    SearchType: str | None = None  # SearchTypeEnum | None = None # FIXME: quick workaround because lexisnexis is messy
     Source: Optional[SourceObj] = None
     Topic: Optional[TopicObj] = None
     PracticeArea: Optional[PracticeAreaObj] = None
