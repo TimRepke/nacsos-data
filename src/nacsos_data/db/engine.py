@@ -213,7 +213,7 @@ def ensure_connection_async(func: Callable[..., Awaitable[R]]) -> Callable[..., 
         if isinstance(connection, AsyncConnection):
             return await func(*args, db_conn=connection, **kwargs)
 
-        conn: AsyncConnection
+        conn: AsyncConnection | None = None
         if isinstance(connection, DatabaseEngineAsync):
             async with connection.engine.connect() as conn:
                 return await func(*args, db_conn=conn, **kwargs)
@@ -222,12 +222,13 @@ def ensure_connection_async(func: Callable[..., Awaitable[R]]) -> Callable[..., 
             try:
                 conn = await connection.connection()
                 ret = await func(*args, db_conn=conn, **kwargs)
+                return ret
             except Exception as e:
-                await conn.rollback()
+                if conn:
+                    await conn.rollback()
                 raise e
             finally:
                 await conn.close()
-                return ret  # noqa: B012
 
         raise RuntimeError('Unsupported connection type!')
 

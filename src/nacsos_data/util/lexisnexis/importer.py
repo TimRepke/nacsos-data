@@ -296,7 +296,7 @@ async def import_lexis_nexis(  # noqa: C901
                             for source in item.sources or []:
                                 if source.item_source_id is None:
                                     source.item_source_id = str(uuid.uuid4())
-                                source.item_id = item.item_id
+                                source.item_id = item_id
                                 session.add(LexisNexisItemSource(**source.model_dump()))
 
                             # Link item to import revision
