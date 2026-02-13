@@ -25,25 +25,25 @@ ModelType: TypeAlias = (
 FeaturiserType: TypeAlias = TfidfVectorizer | TransformerMixin | Pipeline
 
 Featurisers: dict[str, Callable[[], FeaturiserType]] = {
-    'tfidf(ngrams=(1,1), df=(0.01, 0.95))': lambda: (TfidfVectorizer(ngram_range=(1, 1), min_df=5, max_df=0.95)),
-    'tfidf(ngrams=(1,1), df=(0.01, 0.95)) + pca(50)': lambda: (
-        Pipeline([('tfidf', TfidfVectorizer(ngram_range=(1, 1), min_df=5, max_df=0.95)), ('pca', TruncatedSVD(n_components=50))])
+    'tfidf(ngrams=(1,1), df=(0.01, 0.95))': lambda: TfidfVectorizer(ngram_range=(1, 1), min_df=5, max_df=0.95),
+    'tfidf(ngrams=(1,1), df=(0.01, 0.95)) + pca(50)': lambda: Pipeline(
+        [('tfidf', TfidfVectorizer(ngram_range=(1, 1), min_df=5, max_df=0.95)), ('pca', TruncatedSVD(n_components=50))]
     ),
 }
 
 Models: dict[str, Callable[[], ModelType]] = {
-    'AdaBoost(LogReg(balanced), n_est=100)': lambda: (AdaBoostClassifier(estimator=LogisticRegression(class_weight='balanced'), n_estimators=100)),
-    'DecisionTree(balanced)': lambda: (DecisionTreeClassifier(class_weight='balanced')),
-    'RandomForest(balanced)': lambda: (RandomForestClassifier(class_weight='balanced')),
-    'NaiveBayesMult': lambda: (MultinomialNB()),
-    'NaiveBayesGauss': lambda: (GaussianNB()),
-    'LogReg(balanced)': lambda: (LogisticRegression(class_weight='balanced')),
-    'Ridge(balanced)': lambda: (RidgeClassifier(class_weight='balanced')),
-    'SVM(gamma=2,C=1,balanced)': lambda: (SVC(gamma=2.0, C=1.0, probability=True, class_weight='balanced')),
-    'SVM(gamma=2,balanced)': lambda: (SVC(C=2.0, probability=True, class_weight='balanced')),
-    'SVM(C=1,balanced)': lambda: (SVC(C=1.0, probability=True, class_weight='balanced')),
-    'SVM(gamma=0.25,balanced)': lambda: (SVC(C=0.25, probability=True, class_weight='balanced')),
-    'SVM(C=0.025,balanced)': lambda: (SVC(C=0.025, probability=True, class_weight='balanced')),
+    'AdaBoost(LogReg(balanced), n_est=100)': lambda: AdaBoostClassifier(estimator=LogisticRegression(class_weight='balanced'), n_estimators=100),
+    'DecisionTree(balanced)': lambda: DecisionTreeClassifier(class_weight='balanced'),
+    'RandomForest(balanced)': lambda: RandomForestClassifier(class_weight='balanced'),
+    'NaiveBayesMult': lambda: MultinomialNB(),
+    'NaiveBayesGauss': lambda: GaussianNB(),
+    'LogReg(balanced)': lambda: LogisticRegression(class_weight='balanced'),
+    'Ridge(balanced)': lambda: RidgeClassifier(class_weight='balanced'),
+    'SVM(gamma=2,C=1,balanced)': lambda: SVC(gamma=2.0, C=1.0, probability=True, class_weight='balanced'),
+    'SVM(gamma=2,balanced)': lambda: SVC(C=2.0, probability=True, class_weight='balanced'),
+    'SVM(C=1,balanced)': lambda: SVC(C=1.0, probability=True, class_weight='balanced'),
+    'SVM(gamma=0.25,balanced)': lambda: SVC(C=0.25, probability=True, class_weight='balanced'),
+    'SVM(C=0.025,balanced)': lambda: SVC(C=0.025, probability=True, class_weight='balanced'),
 }
 
 
