@@ -314,7 +314,8 @@ async def import_lexis_nexis(  # noqa: C901
             except (UniqueViolation, IntegrityError, OperationalError) as e:
                 logger.exception(e)
 
-            logger.info(f'Processed {num_total} items, matched {num_matched}, updated {num_updated}, and added {num_new} items.')
+            logger.info(f'Processed {num_total:,} items, matched {num_matched:,}, updated {num_updated:,}, and added {num_new:,} items. '
+                        f'Total expected: {n_unknown_items:,}')
 
         # Commit all changes
         await session.commit()
