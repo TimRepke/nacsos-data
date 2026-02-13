@@ -233,7 +233,7 @@ async def import_lexis_nexis(  # noqa: C901
 
     logger.info('Finished pre-processing and index building.')
     logger.info('Proceeding to insert new items and creating m2m tuples...')
-    num_query = len(index.item_ids_nw)
+    num_query = len(index.item_ids_nw or {})
     num_updated = 0
     num_total = 0
     num_new = 0
@@ -316,8 +316,9 @@ async def import_lexis_nexis(  # noqa: C901
             except (UniqueViolation, IntegrityError, OperationalError) as e:
                 logger.exception(e)
 
-            logger.info(f'Processed {num_total:,} items, matched {num_matched:,}, updated {num_updated:,}, and added {num_new:,} items.'
-                        f'Expecting {num_query:,} items.')
+            logger.info(
+                f'Processed {num_total:,} items, matched {num_matched:,}, updated {num_updated:,}, and added {num_new:,} items.Expecting {num_query:,} items.'
+            )
 
         # Commit all changes
         await session.commit()
