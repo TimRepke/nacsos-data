@@ -302,7 +302,7 @@ async def import_lexis_nexis(  # noqa: C901
                             # Link item to import revision
                             await upsert_m2m(
                                 session,
-                                item_id=str(item.item_id),
+                                item_id=str(item_id),
                                 logger=logger,
                                 import_id=import_id,
                                 dry_run=False,
