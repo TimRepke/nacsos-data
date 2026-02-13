@@ -1,6 +1,6 @@
 [project]
 name = "nacsos_data"
-version = "0.24.21"
+version = "0.24.22"
 description = "Core data models and utilities for the NACSOS platform"
 author = "Tim Repke / ECS@PIK"
 license = { file = "LICENSE" }
@@ -28,28 +28,28 @@ utils = [
     "markdownify==1.2.2",
     "lxml==6.0.2",
     "bibtexparser==1.4.4",
-    "pymilvus==2.6.8",
+    "pymilvus==2.6.9",
     "pandas[excel]==3.0.0",
 ]
 priority = [
     "matplotlib==3.10.8",
-    "transformers[torch]==4.57.3",
-    "datasets==4.4.2",
+    "transformers[torch]==5.1.0",
+    "datasets==4.5.0",
     "evaluate==0.4.6",
 ]
 scripts = [
-    "typer==0.21.1",
-    "alembic==1.18.3",
+    "typer==0.23.1",
+    "alembic==1.18.4",
 ]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.14.14",
+    "ruff>=0.15.1",
 #    "tox==4.32.0",
 #    "pytest==9.0.1",
 #    "pytest-cov==7.0.0",
     "mypy[faster-cache]==1.19.1",
-    "types-passlib==1.7.7.20250602",
+    "types-passlib==1.7.7.20260211",
     "types-requests==2.32.4.20260107",
     "nacsos_data[utils,scripts]",
 ]

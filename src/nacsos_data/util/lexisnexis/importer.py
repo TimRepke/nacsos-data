@@ -184,7 +184,6 @@ async def import_lexis_nexis(  # noqa: C901
     # Accumulator for our vocabulary
     token_counts: defaultdict[str, int] = defaultdict(int)
     n_unknown_items = 0
-
     with elapsed_timer(logger, f'Constructing vocabulary from {len(token_counts):,} `token_counts`'):
         for it, item in enumerate(new_items()):
             # Extend our vocabulary
@@ -197,6 +196,7 @@ async def import_lexis_nexis(  # noqa: C901
 
         vocabulary = extract_vocabulary(token_counts, min_count=1, max_features=max_features, skip_top=0.05)
         del token_counts  # clean up term counts to save RAM
+    logger.info(f'Processed {n_unknown_items:,} items to build vocabulary.')
 
     if vectoriser is None:
         with elapsed_timer(logger, f'Setting up vectorizer with {len(vocabulary):,} tokens in the vocabulary'):
@@ -238,13 +238,13 @@ async def import_lexis_nexis(  # noqa: C901
     num_new = 0
     num_matched = 0
     async with db_engine.session() as session:  # type: AsyncSession
-        for new_item in new_items():
+        for item in new_items():
             num_total += 1
             try:
                 async with session.begin_nested():
-                    with elapsed_timer(logger, f'Importing LexisNexis item with ID {new_item.sources[0].lexis_id} and title "{new_item.sources[0].title}"'):  # type: ignore[index]
+                    with elapsed_timer(logger, f'Importing LexisNexis item with ID {item.sources[0].lexis_id} and title "{item.sources[0].title}"'):  # type: ignore[index]
                         # Check if we've seen this lexis item before based on source ID
-                        for source in new_item.sources or []:
+                        for source in item.sources or []:
                             # Quick check in the lookup index from earlier
                             if source.lexis_id in known_ids:
                                 await upsert_m2m(
@@ -283,8 +283,8 @@ async def import_lexis_nexis(  # noqa: C901
                             # We have not found anything, add new LexisNexisItem!
                             if item_id is None:
                                 item_id = uuid.uuid4()
-                                new_item.item_id = item_id
-                                new_item.project_id = project_id
+                                item.item_id = item_id
+                                item.project_id = project_id
                                 session.add(LexisNexisItem(**item.model_dump(exclude={'sources'})))
                                 await session.flush()
                                 num_new += 1
