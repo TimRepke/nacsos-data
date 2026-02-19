@@ -287,8 +287,8 @@ async def duplicate_insertion(  # noqa: C901
         variant = AcademicItemVariantModel(
             item_variant_id=uuid.uuid4(),
             item_id=orig_item_id,
-            import_id=(orig_import or {})['import_id'],  # type: ignore[index]
-            import_revision=(orig_import or {})['first_revision'],  # type: ignore[index]
+            import_id=(orig_import or {}).get('import_id'),  # type: ignore[index]
+            import_revision=(orig_import or {}).get('first_revision'),  # type: ignore[index]
             doi=orig_item.doi,
             wos_id=orig_item.wos_id,
             scopus_id=orig_item.scopus_id,
@@ -335,7 +335,7 @@ async def duplicate_insertion(  # noqa: C901
                     setattr(orig_item_orm, field, new_value)
                     setattr(orig_item_orm, 'title_slug', str_to_title_slug(new_value))
             elif field == 'text':
-                candidates = sorted([abs for abs in field_values | {new_value} if len(abs) < MAX_ABSTRACT_LENGTH], key=lambda a: len(a))
+                candidates = sorted([abstr for abstr in field_values | {new_value} if len(abstr) < MAX_ABSTRACT_LENGTH], key=lambda a: len(a))
                 new_variant[field] = new_value
                 if len(candidates) > 0 and editable:
                     setattr(orig_item_orm, field, candidates[-1])
