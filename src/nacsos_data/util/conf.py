@@ -54,6 +54,9 @@ class OpenAlexConfig(BaseSettings):
     SOLR_PORT: str | None = None  # probably same as in SOLR_ENDPOINT (probably 8983)
     SOLR_ZOO_PORT: str | None = None  # zookeper port (probably 9983)
 
+    #SSL context with the default CA bundle (True), `False` to disable verification
+    SSL_VERIFY: bool = False
+
     @property
     def solr_url(self) -> str:
         return f'{self.SOLR_ENDPOINT}/solr/{self.SOLR_COLLECTION}'

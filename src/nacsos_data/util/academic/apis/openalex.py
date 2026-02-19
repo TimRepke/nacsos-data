@@ -400,6 +400,7 @@ class OpenAlexSolrAPI(AbstractAPI):
             max_retries=self.max_retries,
             proxy=self.proxy,
             auth=self.openalex_conf.auth,
+            verify=self.openalex_conf.SSL_VERIFY,
         ) as request_client:
             params_ = {'q': query, 'q.op': self.op, 'sort': 'id desc', 'fl': ','.join(self.export_fields), 'rows': self.batch_size, 'cursorMark': '*'}
 
