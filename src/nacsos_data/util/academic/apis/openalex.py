@@ -394,6 +394,9 @@ class OpenAlexSolrAPI(AbstractAPI):
 
         :return:
         """
+        self.logger.info(
+            f'Using proxy: {self.proxy} | auth info is provided: {self.openalex_conf.auth is None} | ssl verification: {self.openalex_conf.SSL_VERIFY}'
+        )
         with RequestClient(
             backoff_rate=self.backoff_rate,
             max_req_per_sec=self.max_req_per_sec,
@@ -524,9 +527,9 @@ if __name__ == '__main__':
     with open(fin) as f:
         for li, line in enumerate(f):
             print(li)
-            work = WorksSchema.model_validate_json(line)
+            work_ = WorksSchema.model_validate_json(line)
             # print(work.model_dump(exclude_unset=True, exclude_none=True))
-            print(translate_work_to_solr(work))
+            print(translate_work_to_solr(work_))
 
     app = typer.Typer()
 

@@ -181,7 +181,7 @@ class AbstractAPI(ABC):
         self.api_feedback: dict[str, int] = {}
         self.n_results: int | None = None
 
-        self.logger = logger or logging.getLogger(type(self).__name__)
+        self.logger = logging.getLogger(type(self).__name__) if logger is None else logger
 
     @classmethod  # type: ignore[misc]
     @property
