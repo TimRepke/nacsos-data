@@ -35,16 +35,15 @@ def _read_buffered_items(fp: IO[str]) -> Generator[AcademicItemModel, None, None
         yield AcademicItemModel.model_validate_json(line)
 
 
-def _check_known_identifiers(item: AcademicItemModel, known_ids: dict[str, dict[str, str]], logger: logging.Logger) -> str | bool:
+def _check_known_identifiers(item: AcademicItemModel, known_ids: dict[str, dict[str, str]]) -> str | None:
     for id_field in ID_FIELDS:  # check each item
         identifier = getattr(item, id_field)
         item_id = known_ids[id_field].get(identifier, None)
 
         if identifier is not None and item_id is not None:
-            logger.debug(' -> Found ID match and adding it to import/item m2m buffer')
             return item_id
 
-    return False
+    return None
 
 
 async def _find_id_duplicates(
@@ -53,6 +52,7 @@ async def _find_id_duplicates(
     fp: IO[str],
     project_id: str,
     logger: logging.Logger,
+    n_vocab_items: int | None = None,
     allow_empty_text: bool = False,
 ) -> tuple[int, int, dict[str, int], set[str]]:
     with elapsed_timer(logger, 'Fetching all known IDs from current project'):
@@ -73,19 +73,23 @@ async def _find_id_duplicates(
         for item in new_items():  # Iterate all new items
             n_new_items += 1
             # Check if we know this new item via some trusted identifier (e.g. openalex_id)
-            known_item_id = _check_known_identifiers(item, known_ids, logger)
+            known_item_id = _check_known_identifiers(item, known_ids)
 
             # We don't know this new item, add it to our buffer file and extend vocabulary
-            if known_item_id is False:
-                for tok in tokenise_item(item, lowercase=True):
-                    token_counts[tok] += 1
+            if known_item_id is None:
+                if (n_vocab_items is None) or (n_unknown_items < n_vocab_items):
+                    for tok in tokenise_item(item, lowercase=True):
+                        token_counts[tok] += 1
                 fp.write(item.model_dump_json() + '\n')
                 n_unknown_items += 1
-            elif known_item_id is True:  # never happens, just to appease mypy
-                pass
+
             # We found a match!
             else:
+                logger.log(level=5, msg=' -> Found ID match and adding it to import/item m2m buffer')  # fine-grained log (DEBUG=10)
                 m2m_buffer.add(known_item_id)
+
+            if (n_new_items % 1000) == 0:
+                logger.debug(f'  -> n_new: {n_new_items:,} | m2m-buffer (known): {len(m2m_buffer):,} | n_unknown: {n_unknown_items:,}')
 
     # return number of items we need to check for duplicates, vocabulary, updated set of seen item_ids, and the m2m buffer
     return n_unknown_items, n_new_items, token_counts, m2m_buffer

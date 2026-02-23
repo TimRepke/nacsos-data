@@ -245,6 +245,7 @@ async def duplicate_insertion(  # noqa: C901
     """
     This method handles insertion of an item for which we found a duplicate in the database with `item_id`
 
+    :param import_revision:
     :param log:
     :param import_id:
     :param session:
@@ -287,8 +288,8 @@ async def duplicate_insertion(  # noqa: C901
         variant = AcademicItemVariantModel(
             item_variant_id=uuid.uuid4(),
             item_id=orig_item_id,
-            import_id=(orig_import or {}).get('import_id'),  # type: ignore[index]
-            import_revision=(orig_import or {}).get('first_revision'),  # type: ignore[index]
+            import_id=(orig_import or {}).get('import_id'),  # type: ignore[call-overload]
+            import_revision=(orig_import or {}).get('first_revision'),  # type: ignore[call-overload]
             doi=orig_item.doi,
             wos_id=orig_item.wos_id,
             scopus_id=orig_item.scopus_id,

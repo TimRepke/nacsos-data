@@ -57,6 +57,7 @@ class MilvusDuplicateIndex:
         self.max_slop = max_slop
         self.batch_size = batch_size
         self.client = MilvusClient(uri='http://localhost:19530')
+        self.collection_name = 'default'  # will be reset in `.init()`
         self.project_id = project_id
         if vectoriser is None:
             self.vectoriser = CountVectorizer(
