@@ -212,7 +212,7 @@ def wildcards(
     query_file: Annotated[Path, typer.Option(help='Path to text file containing the query')],
     target: Annotated[Path, typer.Option(help='Path to target csv file')],
     limit: Annotated[int, typer.Option(help='Number of terms to return per wildcard')] = 100,
-):
+) -> None:
     import re
     import pandas as pd
     from tqdm import tqdm

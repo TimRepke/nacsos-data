@@ -234,7 +234,7 @@ def as_uuid(val: str | uuid.UUID | None = None) -> uuid.UUID | None:
     return val  # type: ignore[return-value]
 
 
-def get_logger(logger_name: str, run_log_init=True, loglevel: str = 'INFO') -> logging.Logger:
+def get_logger(logger_name: str, run_log_init: bool = True, loglevel: str = 'INFO') -> logging.Logger:
     if run_log_init:
         logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s (%(process)d): %(message)s', level=loglevel)
         logging.getLogger('elasticsearch').setLevel(logging.WARNING)
@@ -251,7 +251,7 @@ def get_logger(logger_name: str, run_log_init=True, loglevel: str = 'INFO') -> l
     return logger
 
 
-def _essentials(config: Path, logger_name: str, run_log_init=True, loglevel: str = 'INFO') -> tuple[logging.Logger, Settings]:
+def _essentials(config: Path, logger_name: str, run_log_init: bool = True, loglevel: str = 'INFO') -> tuple[logging.Logger, Settings]:
     from .conf import load_settings
 
     logger = get_logger(logger_name=logger_name, run_log_init=run_log_init, loglevel=loglevel)
@@ -263,7 +263,7 @@ def _essentials(config: Path, logger_name: str, run_log_init=True, loglevel: str
     return logger, settings
 
 
-def essentials(config: Path, logger_name: str, run_log_init=True, loglevel: str = 'INFO') -> tuple[logging.Logger, Settings, DatabaseEngine]:
+def essentials(config: Path, logger_name: str, run_log_init: bool = True, loglevel: str = 'INFO') -> tuple[logging.Logger, Settings, DatabaseEngine]:
     from nacsos_data.db import get_engine
 
     logger, settings = _essentials(config=config, logger_name=logger_name, run_log_init=run_log_init, loglevel=loglevel)
@@ -273,7 +273,7 @@ def essentials(config: Path, logger_name: str, run_log_init=True, loglevel: str 
     return logger, settings, db_engine
 
 
-def async_essentials(config: Path, logger_name: str, run_log_init=True, loglevel: str = 'INFO') -> tuple[logging.Logger, Settings, DatabaseEngineAsync]:
+def async_essentials(config: Path, logger_name: str, run_log_init: bool = True, loglevel: str = 'INFO') -> tuple[logging.Logger, Settings, DatabaseEngineAsync]:
     from nacsos_data.db import get_engine_async
 
     logger, settings = _essentials(config=config, logger_name=logger_name, run_log_init=run_log_init, loglevel=loglevel)

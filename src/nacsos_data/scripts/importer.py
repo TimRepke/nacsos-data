@@ -60,7 +60,7 @@ def _sources(path: Path, extension: str = 'csv') -> list[Path]:
     if path.is_file():
         return [path]
 
-    raise RuntimeError(f'path is neither directory nor file')
+    raise RuntimeError('path is neither directory nor file')
 
 
 async def _ensure_import(
@@ -190,7 +190,7 @@ def importer(
             )
 
         elif kind == ImportTypeEnum.SOLR:
-            logger.info(f'Importing OpenAlex directly from solr')
+            logger.info('Importing OpenAlex directly from solr')
             import_id_ = await _ensure_committed_import()
             await _ensure_project_type(db_engine=db_engine, project_id=project_id, expected_type=ItemType.academic)
             with open(source, 'r') as f:
@@ -249,6 +249,6 @@ def importer(
         else:
             raise AssertionError(f'Unknown kind: {kind}')
 
-        logger.info(f'Done importing!')
+        logger.info('Done importing!')
 
     asyncio.run(_run())

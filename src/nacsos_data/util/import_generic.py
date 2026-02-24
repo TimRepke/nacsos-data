@@ -13,14 +13,14 @@ from tqdm import tqdm
 
 async def import_generic(
     sources: list[Path],  # Path to translated import file
-    import_id: str,  # Project ID
+    db_engine: DatabaseEngineAsync,
+    logger: logging.Logger,
     project_id: str,  # Project ID
     name: str,  # Name of this import
     description: str,  # Description of this import
-    db_engine: DatabaseEngineAsync,
-    logger: logging.Logger,
+    import_id: str | None = None,  # Project ID
     user_id: str = 'fd641232-bada-466e-9a3b-fb12038f5508',  # User ID used for import (default: Tim)
-):
+) -> None:
     num_items = 0
 
     for source in tqdm(sources, total=f'Counting items from {len(sources)} source files'):
@@ -31,7 +31,7 @@ async def import_generic(
     async with db_engine.session() as session:
         if import_id is None:
             logger.info('Creating new import')
-            import_id = uuid.uuid4()
+            import_id = str(uuid.uuid4())
 
             imp = Import(
                 import_id=import_id,
