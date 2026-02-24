@@ -14,8 +14,9 @@ dependencies = [
     "pydantic==2.12.5",
     "pydantic-settings==2.13.1",
     "python-dotenv==1.2.1",
-    "SQLAlchemy==2.0.46",
+    "SQLAlchemy==2.0.47",
     "sqlalchemy-json==0.7.0",
+    "typer==0.24.1",
 ]
 
 [project.optional-dependencies]
@@ -38,7 +39,7 @@ priority = [
     "evaluate==0.4.6",
 ]
 scripts = [
-    "typer==0.24.1",
+    "tqdm==4.67.3",
     "alembic==1.18.4",
 ]
 
@@ -59,6 +60,8 @@ mldev = [
 
 
 [project.scripts]
+nacsos = "nacsos_data.scripts.nacsos:run"
+
 nacsos_migrate = "nacsos_data.scripts.migrations:run"
 academic_api = "nacsos_data.scripts.academic_apis:run"
 
@@ -88,7 +91,7 @@ line-length = 160
 indent-width = 4
 target-version = "py313"
 include = ["pyproject.toml", "src/nacsos_data/**/*.py"]
-exclude = ["src/nacsos_data/scripts/"]
+exclude = ["src/nacsos_data/scripts/migrations/","src/nacsos_data/scripts/dummy_data/"]
 
 [tool.ruff.lint]
 select = ["C", "E", "F", "W", "B", "B9"]

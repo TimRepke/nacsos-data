@@ -4,8 +4,6 @@ import typer
 from enum import Enum
 from pathlib import Path
 
-from alembic.config import Config
-from alembic import command
 
 
 class Command(str, Enum):
@@ -41,6 +39,8 @@ def main(cmd: Command,
     :param autogenerate: used as `--autogenerate` in `alembic revision --autogenerate -m "message"`
     :return:
     """
+    from alembic.config import Config
+    from alembic import command
     if ini_file is None:
         ini_file = root_path / 'alembic.ini'
 

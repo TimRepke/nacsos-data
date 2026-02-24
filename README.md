@@ -9,10 +9,27 @@ The main purpose of this package is to be used in the NACSOS backend/frontend in
 It can also be imported in any other project, where accessing data through the proper API 
 does not provide the required functionality.
 
-## Milvus via docker
+## NACSOS data CLI
+```bash
+# Academic API wrappers (download and translate data)
+uv run nacsos apis --help
+uv run nacsos apis download --help
+uv run nacsos apis convert --help
+
+# Helper for dealing with solr wildcards
+uv run nacsos apis solr-wildcards --help
+
+# Importing data from CLI
+uv run nacsos import --help
 ```
+
+## Milvus via docker
+```bash
 cd /srv/milvus
+# start milvus container
 sudo milvus/scripts/standalone_embed.sh start
+# for self-upgrading milvus container
+sudo milvus/scripts/standalone_embed.sh upgrade
 ```
 
 ## Setup for development

@@ -784,6 +784,7 @@ async def import_openalex(
     def_type: DefType = 'lucene',
     field: SearchField = 'title_abstract',
     op: OpType = 'AND',
+    batch_size: int = 10000,
     project_id: str | None = None,
     import_id: str | None = None,
     pipeline_task_id: str | None = None,
@@ -821,7 +822,7 @@ async def import_openalex(
         def_type=def_type,
         field=field,
         op=op,
-        batch_size=1000,
+        batch_size=batch_size,
         logger=logger,
     )
 

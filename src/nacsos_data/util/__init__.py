@@ -3,6 +3,7 @@ import uuid
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from datetime import timedelta
+from pathlib import Path
 from time import time
 from timeit import default_timer
 from typing import (
@@ -20,6 +21,10 @@ from typing import (
     Generic,
     OrderedDict,
 )
+
+if TYPE_CHECKING:
+    from nacsos_data.util.conf import Settings
+    from nacsos_data.db.engine import DatabaseEngine, DatabaseEngineAsync
 
 Param = ParamSpec('Param')
 RetType = TypeVar('RetType')
@@ -227,6 +232,55 @@ def as_uuid(val: str | uuid.UUID | None = None) -> uuid.UUID | None:
     if type(val) is str:
         return uuid.UUID(val)
     return val  # type: ignore[return-value]
+
+
+def get_logger(logger_name: str, run_log_init=True, loglevel: str = 'INFO') -> logging.Logger:
+    if run_log_init:
+        logging.basicConfig(format='%(asctime)s [%(levelname)s] %(name)s (%(process)d): %(message)s', level=loglevel)
+        logging.getLogger('elasticsearch').setLevel(logging.WARNING)
+        logging.getLogger('matplotlib').setLevel(logging.WARNING)
+        logging.getLogger('httpcore').setLevel(logging.WARNING)
+        logging.getLogger('urllib3').setLevel(logging.WARNING)
+        logging.getLogger('httpx').setLevel(logging.WARNING)
+
+        logging.getLogger('root').setLevel(loglevel)
+
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(loglevel)
+
+    return logger
+
+
+def _essentials(config: Path, logger_name: str, run_log_init=True, loglevel: str = 'INFO') -> tuple[logging.Logger, Settings]:
+    from .conf import load_settings
+
+    logger = get_logger(logger_name=logger_name, run_log_init=run_log_init, loglevel=loglevel)
+
+    logger.info(f'Loading config from {config.resolve()}...')
+    if not config.exists():
+        raise AssertionError(f'Config file does not exist at {config.resolve()}!')
+    settings = load_settings(config)
+    return logger, settings
+
+
+def essentials(config: Path, logger_name: str, run_log_init=True, loglevel: str = 'INFO') -> tuple[logging.Logger, Settings, DatabaseEngine]:
+    from nacsos_data.db import get_engine
+
+    logger, settings = _essentials(config=config, logger_name=logger_name, run_log_init=run_log_init, loglevel=loglevel)
+
+    logger.info('Connecting to database...')
+    db_engine = get_engine(settings=settings.DB)
+    return logger, settings, db_engine
+
+
+def async_essentials(config: Path, logger_name: str, run_log_init=True, loglevel: str = 'INFO') -> tuple[logging.Logger, Settings, DatabaseEngineAsync]:
+    from nacsos_data.db import get_engine_async
+
+    logger, settings = _essentials(config=config, logger_name=logger_name, run_log_init=run_log_init, loglevel=loglevel)
+
+    logger.info('Connecting to database...')
+    db_engine = get_engine_async(settings=settings.DB)
+    return logger, settings, db_engine
 
 
 class Cached(Generic[RetType]):
