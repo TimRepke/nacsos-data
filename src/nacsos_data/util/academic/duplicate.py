@@ -28,7 +28,7 @@ def str_to_title_slug(title: str | None) -> str | None:
     if title is None or len(title.strip()) == 0:
         return None
     # remove all non-alphabetic characters
-    return REGEX_NON_ALPH.sub('', title.lower())
+    return REGEX_NON_ALPH.sub('', title.lower())[:500]
 
 
 def get_title_slug(item: AcademicItemModel) -> str | None:

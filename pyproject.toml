@@ -1,6 +1,6 @@
 [project]
 name = "nacsos_data"
-version = "0.24.27"
+version = "0.24.28"
 description = "Core data models and utilities for the NACSOS platform"
 author = "Tim Repke / ECS@PIK"
 license = { file = "LICENSE" }
@@ -33,7 +33,7 @@ utils = [
 ]
 priority = [
     "matplotlib==3.10.8",
-    "transformers[torch]==5.1.0",
+    "transformers[torch]==5.2.0",
     "datasets==4.5.0",
     "evaluate==0.4.6",
 ]
