@@ -27,6 +27,7 @@ from .clean import get_cleaned_meta_field
 from .duplicate import str_to_title_slug, find_duplicates, duplicate_insertion
 
 ID_FIELDS: list[IdField] = ['openalex_id', 's2_id', 'scopus_id', 'wos_id', 'pubmed_id', 'dimensions_id']
+MIN_TSLUG_LEN = 20
 
 
 def _read_buffered_items(fp: IO[str]) -> Generator[AcademicItemModel, None, None]:
@@ -141,7 +142,7 @@ def _ensure_clean_item(item: AcademicItemModel, project_id: str) -> AcademicItem
     item.project_id = project_id
 
     # ensure we have a title_slug
-    if item.title_slug is None or len(item.title_slug) == 0:
+    if item.title_slug is None or len(item.title_slug) < MIN_TSLUG_LEN:
         item.title_slug = str_to_title_slug(item.title)
 
     return item

@@ -22,13 +22,15 @@ REGEX_NON_ALPHNUM = re.compile(r'[^a-z0-9]')
 LATEST_POSSIBLE_PUB_YEAR = date.today().year + 5
 # determined by case study at https://gitlab.pik-potsdam.de/mcc-apsis/nacsos/case-studies/duplicate-detection/-/blob/main/202407_experiments/avg_abstract_len.sql?ref_type=heads
 MAX_ABSTRACT_LENGTH = 10000
+MIN_TSLUG_LEN = 20
+MAX_TSLUG_LEN = 500
 
 
 def str_to_title_slug(title: str | None) -> str | None:
     if title is None or len(title.strip()) == 0:
         return None
     # remove all non-alphabetic characters
-    return REGEX_NON_ALPH.sub('', title.lower())[:500]
+    return REGEX_NON_ALPH.sub('', title.lower())[:MAX_TSLUG_LEN]
 
 
 def get_title_slug(item: AcademicItemModel) -> str | None:
@@ -55,8 +57,8 @@ def _are_actually_duplicate(item: AcademicItemModel, candidate: Candidate) -> bo
     :return:
     """
 
-    tslug_item = item.title_slug if item.title_slug is not None and len(item.title_slug) > 0 else None
-    tslug_cand = candidate.title_slug if candidate.title_slug is not None and len(candidate.title_slug) > 0 else None
+    tslug_item = item.title_slug if item.title_slug is not None and len(item.title_slug) > MIN_TSLUG_LEN else None
+    tslug_cand = candidate.title_slug if candidate.title_slug is not None and len(candidate.title_slug) > MIN_TSLUG_LEN else None
 
     if tslug_item is not None and tslug_cand is not None:
         # Different non-empty title-slug means we must have matched on something else like an ID
@@ -68,7 +70,7 @@ def _are_actually_duplicate(item: AcademicItemModel, candidate: Candidate) -> bo
             # But we only do this, if we get long titles, otherwise there might be too many false positive non-duplicates.
             # For example, consider "Carbon trading: What does it mean for RE?" vs "Carbon trading".
             if item.doi == candidate.doi:
-                if len(tslug_item) > 20 and len(tslug_cand) > 20:
+                if len(tslug_item) > MIN_TSLUG_LEN and len(tslug_cand) > MIN_TSLUG_LEN:
                     return False
 
             # We trust wos_id and co -> true duplicate
@@ -153,7 +155,7 @@ async def find_duplicates(  # noqa: C901
         stmt = stmt.where(AcademicItem.project_id == project_id)
 
     checks = []
-    if check_tslug and item.title_slug is not None and len(item.title_slug) > 0:
+    if check_tslug and item.title_slug is not None and len(item.title_slug) > MIN_TSLUG_LEN:
         checks.append(AcademicItem.title_slug == item.title_slug)
     if check_doi and item.doi is not None:
         checks.append(AcademicItem.doi == item.doi)
