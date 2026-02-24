@@ -14,7 +14,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from ..conf import load_settings
 from ...db import DatabaseEngineAsync, get_engine_async
 from ...db.crud.imports import get_or_create_import, set_session_mutex, upsert_m2m, update_revision_statistics, get_latest_revision
-from ...db.crud.items.academic import AcademicItemGenerator, read_item_entries_from_db, gen_academic_entries, read_known_ids_map, IdField
+from ...db.crud.items.academic import AcademicItemGenerator, read_item_entries_from_db, gen_academic_entries, read_known_ids_map
 from ...db.schemas import AcademicItem
 from ...db.schemas.imports import ImportRevision
 from ...models.items import AcademicItemModel, ItemEntry
@@ -25,9 +25,7 @@ from ..text import tokenise_item, extract_vocabulary, itm2txt
 from ..duplicate import MilvusDuplicateIndex, PynndescentDuplicateIndex
 from .clean import get_cleaned_meta_field
 from .duplicate import str_to_title_slug, find_duplicates, duplicate_insertion
-
-ID_FIELDS: list[IdField] = ['openalex_id', 's2_id', 'scopus_id', 'wos_id', 'pubmed_id', 'dimensions_id']
-MIN_TSLUG_LEN = 20
+from .util import ID_FIELDS, MIN_TSLUG_LEN, MAX_TITLE_LENGTH, MAX_ABSTRACT_LENGTH
 
 
 def _read_buffered_items(fp: IO[str]) -> Generator[AcademicItemModel, None, None]:
@@ -78,11 +76,18 @@ async def _find_id_duplicates(
 
             # We don't know this new item, add it to our buffer file and extend vocabulary
             if known_item_id is None:
+                n_unknown_items += 1
+
+                # Clip length of title and abstract
+                item.title = item.title[:MAX_TITLE_LENGTH] if item.title is not None else None
+                item.text = item.text[:MAX_ABSTRACT_LENGTH] if item.text is not None else None
+
+                # Construct vocabulary only until certain length
                 if (n_vocab_items is None) or (n_unknown_items < n_vocab_items):
                     for tok in tokenise_item(item, lowercase=True):
                         token_counts[tok] += 1
+
                 fp.write(item.model_dump_json() + '\n')
-                n_unknown_items += 1
 
             # We found a match!
             else:
