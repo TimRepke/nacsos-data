@@ -163,9 +163,9 @@ def importer(
 
     async def _run():
         logger.info(f'Unwrapping sources for: {source}')
-        sources = _sources(source)
 
         if kind == ImportTypeEnum.WOS:
+            sources = _sources(source, extension='txt')
             logger.info(f'Importing WOS from {sources}')
             import_id_ = await _ensure_committed_import()
             await _ensure_project_type(db_engine=db_engine, project_id=project_id, expected_type=ItemType.academic)
@@ -178,6 +178,7 @@ def importer(
             )
 
         elif kind == ImportTypeEnum.SCOPUS:
+            sources = _sources(source, extension='csv')
             logger.info(f'Importing Scopus from {sources}')
             import_id_ = await _ensure_committed_import()
             await _ensure_project_type(db_engine=db_engine, project_id=project_id, expected_type=ItemType.academic)
@@ -201,12 +202,13 @@ def importer(
                 nacsos_config=config_file,
                 params=params_,
                 project_id=project_id,
-                import_id=import_id,
+                import_id=import_id_,
                 logger=logger,
             )
 
         elif kind == ImportTypeEnum.OA:
             logger.info('Proceeding with OpenAlex file import...')
+            sources = _sources(source,extension='jsonl')
             import_id_ = await _ensure_committed_import()
             await _ensure_project_type(db_engine=db_engine, project_id=project_id, expected_type=ItemType.academic)
             await import_openalex_files(
@@ -219,6 +221,7 @@ def importer(
 
         elif kind == ImportTypeEnum.ACADEMIC:
             logger.info('Proceeding with AcademicItem file import...')
+            sources = _sources(source, extension='jsonl')
             import_id_ = await _ensure_committed_import()
             await _ensure_project_type(db_engine=db_engine, project_id=project_id, expected_type=ItemType.academic)
             await import_academic_db(
@@ -230,6 +233,8 @@ def importer(
             )
 
         elif kind == ImportTypeEnum.GENERIC:
+            logger.info('Proceeding for Generic project import...')
+            sources = _sources(source, extension='jsonl')
             await _ensure_project_type(db_engine=db_engine, project_id=project_id, expected_type=ItemType.generic)
             await import_generic(
                 sources=sources,
