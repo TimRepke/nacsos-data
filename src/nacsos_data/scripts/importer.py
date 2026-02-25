@@ -261,7 +261,7 @@ def importer(
 
 
 @app.command('check-format', help='Test if provided file(s) match the assumed format', epilog=ImportTypeEnum.help())
-def test_format(
+def test_format(  # noqa: C901
     kind: ImportTypeEnum,
     source: Annotated[Path, typer.Option(help='Data source (single file, folder with files, or txt file containing solr query)')],
     loglevel: Annotated[str, typer.Option(help='Log level for importing (defaults to INFO)')] = 'INFO',
