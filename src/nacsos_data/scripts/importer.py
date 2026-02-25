@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from nacsos_data.db.engine import ensure_session_async
 from nacsos_data.db.schemas import Import, Project, ItemType
 from nacsos_data.db.schemas.imports import ImportRevision
+from nacsos_data.models.items import AcademicItemModel, GenericItemModel, LexisNexisItemModel
 from nacsos_data.util.academic.importer import (
     import_scopus_csv_file,
     import_openalex,
@@ -208,7 +209,7 @@ def importer(
 
         elif kind == ImportTypeEnum.OA:
             logger.info('Proceeding with OpenAlex file import...')
-            sources = _sources(source,extension='jsonl')
+            sources = _sources(source, extension='jsonl')
             import_id_ = await _ensure_committed_import()
             await _ensure_project_type(db_engine=db_engine, project_id=project_id, expected_type=ItemType.academic)
             await import_openalex_files(
@@ -257,3 +258,82 @@ def importer(
         logger.info('Done importing!')
 
     asyncio.run(_run())
+
+
+@app.command('check-format', help='Test if provided file(s) match the assumed format', epilog=ImportTypeEnum.help())
+def test_format(
+    kind: ImportTypeEnum,
+    source: Annotated[Path, typer.Option(help='Data source (single file, folder with files, or txt file containing solr query)')],
+    loglevel: Annotated[str, typer.Option(help='Log level for importing (defaults to INFO)')] = 'INFO',
+):
+    from nacsos_data.util import get_logger
+
+    logger = get_logger(logger_name='format-test', loglevel=loglevel)
+
+    if kind == ImportTypeEnum.WOS:
+        from nacsos_data.util.academic.apis import WoSAPI
+
+        sources = _sources(source, extension='txt')
+        logger.info(f'Testing Web of Science data from {sources}')
+        for source_ in sources:
+            for item in WoSAPI.read_translated(source=source_):
+                logger.debug(item)
+
+    elif kind == ImportTypeEnum.SCOPUS:
+        from nacsos_data.util.academic.apis import ScopusAPI
+
+        sources = _sources(source, extension='csv')
+        logger.info(f'Testing Scopus data from {sources}')
+        for source_ in sources:
+            for item in ScopusAPI.read_translated(source=source_):
+                logger.debug(item)
+
+    elif kind == ImportTypeEnum.SOLR:
+        from nacsos_data.util.academic.apis import OpenAlexSolrAPI
+
+        sources = _sources(source, extension='jsonl')
+        logger.info(f'Testing OpenAlex-solr data from {sources}')
+        for source_ in sources:
+            for item in OpenAlexSolrAPI.read_translated(source=source_):
+                logger.debug(item)
+
+    elif kind == ImportTypeEnum.OA:
+        from nacsos_data.util.academic.apis import OpenAlexAPI
+
+        sources = _sources(source, extension='jsonl')
+        logger.info(f'Testing OpenAlex-API data from {sources}')
+        for source_ in sources:
+            for item in OpenAlexAPI.read_translated(source=source_):
+                logger.debug(item)
+
+    elif kind == ImportTypeEnum.ACADEMIC:
+        sources = _sources(source, extension='jsonl')
+        logger.info(f'Testing AcademicItem from {sources}')
+        for source_ in sources:
+            with open(source_, 'r') as source_file:
+                for line in source_file:
+                    item = AcademicItemModel.model_validate_json(line)
+                    logger.debug(item)
+
+    elif kind == ImportTypeEnum.GENERIC:
+        sources = _sources(source, extension='jsonl')
+        logger.info(f'Testing GenericItem from {sources}')
+        for source_ in sources:
+            with open(source_, 'r') as source_file:
+                for line in source_file:
+                    item = GenericItemModel.model_validate_json(line)
+                    logger.debug(item)
+
+    elif kind == ImportTypeEnum.LEXIS:
+        sources = _sources(source, extension='jsonl')
+        logger.info(f'Testing LexisNexisItem from {sources}')
+        for source_ in sources:
+            with open(source_, 'r') as source_file:
+                for line in source_file:
+                    item = LexisNexisItemModel.model_validate_json(line)
+                    logger.debug(item)
+
+    else:
+        raise AssertionError(f'Unknown kind: {kind}')
+
+    logger.info('Done importing!')

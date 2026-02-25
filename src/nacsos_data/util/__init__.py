@@ -273,7 +273,9 @@ def essentials(config: Path, logger_name: str, run_log_init: bool = True, loglev
     return logger, settings, db_engine
 
 
-def async_essentials(config: Path, logger_name: str, run_log_init: bool = True, loglevel: str = 'INFO') -> tuple[logging.Logger, 'Settings', 'DatabaseEngineAsync']:
+def async_essentials(
+    config: Path, logger_name: str, run_log_init: bool = True, loglevel: str = 'INFO'
+) -> tuple[logging.Logger, 'Settings', 'DatabaseEngineAsync']:
     from nacsos_data.db import get_engine_async
 
     logger, settings = _essentials(config=config, logger_name=logger_name, run_log_init=run_log_init, loglevel=loglevel)

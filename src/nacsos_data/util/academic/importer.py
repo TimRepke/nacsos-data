@@ -519,10 +519,10 @@ async def import_academic_items(
                 index.client.load_collection(index.collection_name)
 
             logger.info(f'Inserting (maybe) {n_unknown_items:,} buffered duplicate candidates...')
-            for item in _read_buffered_items(duplicate_buffer):
+            for i, item in enumerate(_read_buffered_items(duplicate_buffer)):
                 try:
                     async with session.begin_nested():
-                        with elapsed_timer(logger, f'Importing AcademicItem with doi {item.doi} and title "{item.title}"'):
+                        with elapsed_timer(logger, f'Importing AcademicItem ({i:,}) with doi {item.doi} and title "{item.title}"'):
                             # Make sure the item fields are complete and clean
                             item = _ensure_clean_item(item, project_id=str(project_id))
 
