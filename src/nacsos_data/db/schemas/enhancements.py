@@ -3,7 +3,6 @@ from sqlalchemy import String, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy_json import mutable_json_type
 
 from ...db.base_class import Base
 from .items.base import Item
