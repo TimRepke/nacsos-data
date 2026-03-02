@@ -11,6 +11,40 @@ from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
 from .shared import FIELDS_API, translate_work_to_item
 
 
+# TODO: https://developers.openalex.org/api-reference/errors#retry-logic
+# import time
+# import requests
+#
+# def fetch_with_retry(url, max_retries=5):
+#     for attempt in range(max_retries):
+#         try:
+#             response = requests.get(url, timeout=30)
+#
+#             if response.status_code == 200:
+#                 return response.json()
+#
+#             if response.status_code == 429:
+#                 # Rate limited - wait longer
+#                 wait_time = 2 ** attempt
+#                 time.sleep(wait_time)
+#                 continue
+#
+#             if response.status_code >= 500:
+#                 # Server error - retry
+#                 wait_time = 2 ** attempt
+#                 time.sleep(wait_time)
+#                 continue
+#
+#             # Client error - don't retry
+#             response.raise_for_status()
+#
+#         except requests.exceptions.Timeout:
+#             if attempt < max_retries - 1:
+#                 time.sleep(2 ** attempt)
+#             else:
+#                 raise
+#
+#     raise Exception(f"Failed after {max_retries} retries")
 class OpenAlexAPI(AbstractAPI):
     PAGE_MAX = 50
 

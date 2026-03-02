@@ -25,6 +25,8 @@ from .util import (
 
 logger = logging.getLogger('nacsos_data.util.academic.duplicate')
 
+MAX_NUM_VARIANTS = 100
+
 
 class Candidate(BaseModel):
     item_id: str | uuid.UUID
@@ -256,6 +258,10 @@ async def duplicate_insertion(  # noqa: C901
 
     # Get prior variants of that AcademicItem
     variants = [v.__dict__ for v in (await session.execute(select(AcademicItemVariant).where(AcademicItemVariant.item_id == orig_item_id))).scalars().all()]
+
+    #
+    if len(variants) > MAX_NUM_VARIANTS:
+        return False
 
     # If we have no prior variant, we need to create one
     if len(variants) == 0:

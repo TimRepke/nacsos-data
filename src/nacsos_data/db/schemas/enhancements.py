@@ -25,4 +25,4 @@ class Enhancement(Base):
     # A reference to keep track of what this is (e.g. mordecai)
     key = mapped_column(String, nullable=False, index=True)
 
-    payload = mapped_column(mutable_json_type(dbtype=JSONB(none_as_null=True), nested=True))
+    payload = mapped_column(JSONB(none_as_null=True))
