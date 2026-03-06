@@ -13,7 +13,7 @@ from nacsos_data.util import get, clear_empty
 DefType = Literal['edismax', 'lucene', 'dismax']
 SearchField = Literal['title', 'abstract', 'title_abstract']
 OpType = Literal['OR', 'AND']
-AbstractSource = Literal['OpenAlex', 'OpenAlex_old', 'SCOPUS', 'WOS', 'PUBMED', 'OTHER']
+AbstractSource = Literal['OpenAlex', 'OpenAlex_old', 'SCOPUS', 'WOS', 'PUBMED', 'OTHER', 'DIMENSIONS']
 
 T = TypeVar('T')
 

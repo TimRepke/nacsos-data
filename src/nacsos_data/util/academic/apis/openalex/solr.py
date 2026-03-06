@@ -203,8 +203,8 @@ class OpenAlexSolrAPI(AbstractAPI):
             histogram=self.histogram,
         )
 
-    def get_count(self, query: str) -> SearchResult:
-        return self.query(query, limit=0)
+    def get_count(self, query: str, params: dict[str, Any] | None = None) -> SearchResult:
+        return self.query(query, params=params, limit=0)
 
 
 def wildcards(
