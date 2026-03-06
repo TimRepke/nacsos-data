@@ -1,5 +1,12 @@
 from .shared import (
-    FIELDS_API, FIELDS_META, FIELDS_CUSTOM, FIELDS_SOLR, FIELDS_REDUNDANT, NESTED_FIELDS, translate_work_to_solr, translate_work_to_item,
+    FIELDS_API,
+    FIELDS_META,
+    FIELDS_CUSTOM,
+    FIELDS_SOLR,
+    FIELDS_REDUNDANT,
+    NESTED_FIELDS,
+    translate_work_to_solr,
+    translate_work_to_item,
     translate_authorship,
 )
 from .solr import OpenAlexSolrAPI, wildcards

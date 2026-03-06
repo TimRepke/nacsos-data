@@ -71,7 +71,7 @@ class OpenAlexAPI(AbstractAPI):
         )
         self.page_size = page_size
         self.split_larger = split_larger
-        self.meta: dict[str, int|str] | None = None
+        self.meta: dict[str, int | str] | None = None
 
     def fetch_raw(
         self,
