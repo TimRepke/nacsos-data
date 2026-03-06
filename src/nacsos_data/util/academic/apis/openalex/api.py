@@ -56,6 +56,7 @@ class OpenAlexAPI(AbstractAPI):
         max_req_per_sec: int = 5,
         max_retries: int = 5,
         backoff_rate: float = 5.0,
+        page_size: int = 100,
         ignored_exceptions: list[Type[Exception]] | None = None,
         logger: logging.Logger | None = None,
     ):
@@ -68,7 +69,9 @@ class OpenAlexAPI(AbstractAPI):
             ignored_exceptions=ignored_exceptions,
             api_key=api_key,
         )
+        self.page_size = page_size
         self.split_larger = split_larger
+        self.meta: dict[str, int|str] | None = None
 
     def fetch_raw(
         self,
@@ -120,6 +123,7 @@ class OpenAlexAPI(AbstractAPI):
 
         Documentation:
         https://docs.openalex.org/
+        https://developers.openalex.org/api-reference/works/list-works
 
         https://docs.openalex.org/api-entities/works/filter-works#from_created_date
         --> https://api.openalex.org/works?filter=from_created_date:2023-01-12&api_key=myapikey
@@ -143,7 +147,7 @@ class OpenAlexAPI(AbstractAPI):
                         'filter': query,
                         'select': ','.join(FIELDS_API),
                         'cursor': cursor,
-                        'per-page': 50,
+                        'per-page': self.page_size,
                     }
                     | (params or {}),
                     headers=headers,
@@ -152,6 +156,7 @@ class OpenAlexAPI(AbstractAPI):
                     req.raise_for_status()
 
                     page = req.json()
+                    self.meta = page['meta']
                     cursor = page['meta']['next_cursor']
                     self.logger.info(f'Retrieved {n_works:,} / {page["meta"]["count"]:,} | currently on page {n_pages:,}')
 

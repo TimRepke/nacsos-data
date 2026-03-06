@@ -1,4 +1,7 @@
-from .shared import FIELDS_API, FIELDS_META, FIELDS_CUSTOM, FIELDS_SOLR, FIELDS_REDUNDANT, NESTED_FIELDS
+from .shared import (
+    FIELDS_API, FIELDS_META, FIELDS_CUSTOM, FIELDS_SOLR, FIELDS_REDUNDANT, NESTED_FIELDS, translate_work_to_solr, translate_work_to_item,
+    translate_authorship,
+)
 from .solr import OpenAlexSolrAPI, wildcards
 from .api import OpenAlexAPI
 
@@ -12,8 +15,10 @@ __all__ = [
     'OpenAlexAPI',
     'OpenAlexSolrAPI',
     'wildcards',
+    'translate_work_to_solr',
+    'translate_work_to_item',
+    'translate_authorship',
 ]
-
 
 # if __name__ == '__main__':
 #     import typer
