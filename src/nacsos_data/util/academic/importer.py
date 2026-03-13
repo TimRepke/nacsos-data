@@ -618,7 +618,9 @@ async def import_wos_files(
     logger = logging.getLogger('import_wos_file') if logger is None else logger
 
     def from_sources() -> Generator[AcademicItemModel, None, None]:
+        logger.info(f'Proceeding to read from {len(sources)} files!')
         for source in sources:
+            logger.info(f'Reading from file: {source}')
             for itm in read_wos_file(filepath=str(source), project_id=project_id):
                 itm.item_id = uuid.uuid4()
                 yield itm
@@ -683,7 +685,9 @@ async def import_scopus_csv_file(
     logger = logging.getLogger('import_scopus_csv') if logger is None else logger
 
     def from_sources() -> Generator[AcademicItemModel, None, None]:
+        logger.info(f'Proceeding to read from {len(sources)} files!')
         for source in sources:
+            logger.info(f'Reading from file: {source}')
             for itm in read_scopus_csv_file(filepath=str(source), project_id=project_id):
                 itm.item_id = uuid.uuid4()
                 yield itm
@@ -745,7 +749,9 @@ async def import_academic_db(
     logger = logging.getLogger('import_academic_file') if logger is None else logger
 
     def from_sources() -> Generator[AcademicItemModel, None, None]:
+        logger.info(f'Proceeding to read from {len(sources)} files!')
         for source in sources:
+            logger.info(f'Reading from file: {source}')
             with open(source, 'r') as f:
                 for line in f:
                     itm = AcademicItemModel.model_validate_json(line)
@@ -896,7 +902,9 @@ async def import_openalex_files(
     logger = logging.getLogger('import_openalex_files') if logger is None else logger
 
     def from_sources() -> Generator[AcademicItemModel, None, None]:
+        logger.info(f'Proceeding to read from {len(sources)} files!')
         for source in sources:
+            logger.info(f'Reading from file: {source}')
             yield from OpenAlexSolrAPI.read_translated(source=source, project_id=project_id)
 
     logger.info(f'Importing articles (WorkSolr-formatted) from files: {sources}')
