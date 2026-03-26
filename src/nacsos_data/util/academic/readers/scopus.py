@@ -164,7 +164,7 @@ def read_scopus_csv_file(filepath: str, project_id: str | uuid.UUID | None = Non
                 title_slug=title_slug,
                 source=_get(row, 'Source title'),
                 authors=authors,
-                meta=clear_empty(meta_info),
+                meta={'scopus-csv': clear_empty(meta_info)},
             )
             yield doc
 

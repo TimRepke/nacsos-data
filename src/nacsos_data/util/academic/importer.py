@@ -318,7 +318,7 @@ async def import_academic_items(
     max_slop: float = 0.05,
     min_text_len: int = 300,
     batch_size: int = 2000,
-    max_features: int = 5000,
+    max_features: int = 10000,
     dry_run: bool = True,
     logger: logging.Logger | None = None,
     allow_empty_text: bool = False,

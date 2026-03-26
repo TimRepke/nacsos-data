@@ -72,6 +72,6 @@ def read_wos_file(filepath: str, project_id: str | uuid.UUID | None = None) -> G
                 pass
         item.authors = list(authors.values())
 
-        item.meta = {'wos': dict(record)}
+        item.meta = {'wos-txt': dict(record)}
 
         yield item
