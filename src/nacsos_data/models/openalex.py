@@ -62,8 +62,10 @@ def invert_abstract(abstract_inverted_index: dict[str, list[int]] | None) -> str
 
     return ' '.join(abstract)
 
-def title_abstract(title: str|None, abstract: str | None) -> str:
+
+def title_abstract(title: str | None, abstract: str | None) -> str:
     return NON_ALPHA.sub(' ', f'{title or ""} {abstract or ""}')
+
 
 class MetaSchema(BaseModel, extra='allow'):
     count: int | None = None
