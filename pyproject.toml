@@ -1,6 +1,6 @@
 [project]
 name = "nacsos_data"
-version = "0.24.34"
+version = "0.24.35"
 description = "Core data models and utilities for the NACSOS platform"
 author = "Tim Repke / ECS@PIK"
 license = { file = "LICENSE" }
@@ -13,8 +13,8 @@ dependencies = [
     "psycopg2-binary==2.9.11",
     "pydantic==2.12.5",
     "pydantic-settings==2.13.1",
-    "python-dotenv==1.2.1",
-    "SQLAlchemy==2.0.47",
+    "python-dotenv==1.2.2",
+    "SQLAlchemy==2.0.48",
     "sqlalchemy-json==0.7.0",
     "typer==0.24.1",
 ]
@@ -29,7 +29,7 @@ utils = [
     "markdownify==1.2.2",
     "lxml==6.0.2",
     "bibtexparser==1.4.4",
-    "pymilvus==2.6.9",
+    "pymilvus==2.6.11",
     "pandas[excel]==3.0.1",
 ]
 priority = [
@@ -45,13 +45,13 @@ scripts = [
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.2",
+    "ruff>=0.15.8",
 #    "tox==4.32.0",
 #    "pytest==9.0.1",
 #    "pytest-cov==7.0.0",
     "mypy[faster-cache]==1.19.1",
     "types-passlib==1.7.7.20260211",
-    "types-requests==2.32.4.20260107",
+    "types-requests==2.33.0.20260327",
     "nacsos_data[utils,scripts]",
 ]
 mldev = [
