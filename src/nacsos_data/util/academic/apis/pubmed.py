@@ -79,6 +79,7 @@ class PubmedAPI(AbstractAPI):
             max_retries=self.max_retries,
             proxy=self.proxy,
         ) as request_client:
+            self.logger.info(f'Running query: {query}')
             search_page = request_client.post(
                 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi',
                 data={
