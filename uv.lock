@@ -1320,6 +1320,7 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "sqlalchemy-json" },
     { name = "typer" },
+    { name = "types-requests" },
 ]
 
 [package.optional-dependencies]
@@ -1386,6 +1387,7 @@ requires-dist = [
     { name = "tqdm", marker = "extra == 'scripts'", specifier = "==4.67.3" },
     { name = "transformers", extras = ["torch"], marker = "extra == 'priority'", specifier = "==5.2.0" },
     { name = "typer", specifier = "==0.24.1" },
+    { name = "types-requests", specifier = ">=2.33.0.20260327" },
 ]
 provides-extras = ["utils", "priority", "scripts"]
 
