@@ -82,7 +82,7 @@ def distribute_assignments(
 
     assignments = []
 
-    for overlap, item_count in overlaps.items():
+    for overlap, item_count in sorted(overlaps.items(), key=lambda entry: entry[0], reverse=True):
         logger.info(f'> overlap: {overlap} / item_count: {item_count} | user_pool: {len(user_pool)} / item_pool: {len(item_pool)}')
         logger.debug(f'{user_pool}')
 
