@@ -220,7 +220,7 @@ class Authentication:
         fulfill_all: bool = True,
     ) -> UserPermissions:
         if type(required_permissions) is str:
-            required_permissions = [required_permissions]
+            required_permissions = [required_permissions]  # type: ignore[unreachable]
 
         if not user:
             user = await self.get_user(user_id=user_id, username=username)

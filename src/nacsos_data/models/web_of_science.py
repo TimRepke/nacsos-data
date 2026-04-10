@@ -106,6 +106,7 @@ def str_to_int_lst(v: str | int | list[int] | None) -> list[int] | None:
         return None
     return [v]  # type: ignore[list-item]
 
+
 def str_to_int_or_lst(v: str | int | list[int] | None) -> int | list[int] | None:
     if type(v) is str:
         if ' ' in v:
@@ -120,6 +121,7 @@ def str_to_int_or_lst(v: str | int | list[int] | None) -> int | list[int] | None
     if v is None:
         return None
     return [v]  # type: ignore[list-item]
+
 
 def assert_empty(v: str) -> str | None:
     if v == '':
@@ -207,7 +209,7 @@ class NameItem(BaseModel):
     claim_status: bool | None = None
     full_name: Annotated[str | None, BeforeValidator(fix_name)] = None
     addr_no: Annotated[int | list[int] | None, BeforeValidator(str_to_int_or_lst)] | None = None
-    #addr_no: int | None = None
+    # addr_no: int | None = None
     reprint: str | None = None
     last_name: Annotated[str | None, BeforeValidator(fix_name)] = None
     display_name: Annotated[str | None, BeforeValidator(fix_name)] = None

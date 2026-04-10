@@ -22,7 +22,7 @@ def _majority_vote_list(label_annotations: list[ItemAnnotation], field: Annotati
     if len(flat_values) == 0:
         raise EmptyAnnotationsError(f'No entries for "{label.path_key}" of type "{field}" (empty list of labels after union).')
 
-    return AnnotationValue(**{field: list(set(flat_values))})  # type: ignore[misc, arg-type]
+    return AnnotationValue(**{field: list(set(flat_values))})  # type: ignore[arg-type]
 
 
 def _majority_vote_scalar(label_annotations: list[ItemAnnotation], field: AnnotationScalarValueField, label: FlatLabel) -> AnnotationValue:
@@ -33,7 +33,7 @@ def _majority_vote_scalar(label_annotations: list[ItemAnnotation], field: Annota
     if len(flat_values) == 0:
         raise EmptyAnnotationsError(f'No entries for "{label.path_key}" of type "{field}".')
 
-    return AnnotationValue(**{field: Counter(flat_values).most_common()[0][0]})  # type: ignore[misc]
+    return AnnotationValue(**{field: Counter(flat_values).most_common()[0][0]})
 
 
 def _majority_vote_str(label_annotations: list[ItemAnnotation], field: AnnotationScalarValueField, label: FlatLabel) -> AnnotationValue:
@@ -46,7 +46,7 @@ def _majority_vote_str(label_annotations: list[ItemAnnotation], field: Annotatio
     if len(flat_values) == 0:
         raise EmptyAnnotationsError(f'No entries for "{label.path_key}" of type "{field}".')
 
-    return AnnotationValue(**{field: '\n----\n'.join(flat_values)})  # type: ignore[arg-type, misc]
+    return AnnotationValue(**{field: '\n----\n'.join(flat_values)})  # type: ignore[arg-type]
 
 
 def naive_majority_vote(annotation_map: ResolutionMatrix, label_map: dict[str, FlatLabel], fix_parent_references: bool = True) -> ResolutionMatrix:
