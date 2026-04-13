@@ -70,7 +70,7 @@ def get_doi(wr: WosRecord) -> str | None:
         or wr.dynamic_data.cluster_related.identifiers.IdentifierItem is None
     ):
         return None
-    identifiers = get_value(lambda: wr.dynamic_data.cluster_related.identifiers.IdentifierItem)  # type: ignore[union-attr]
+    identifiers = get_value(lambda: wr.dynamic_data.cluster_related.identifiers.identifier)  # type: ignore[union-attr]
     if identifiers is None:
         return None
     for identifier in identifiers:

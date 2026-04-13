@@ -199,7 +199,7 @@ class PreferredName(BaseModel):
 
 
 NameRole = Literal[
-    'author', 'publisher', 'editor', 'researcher_id', 'inventor', 'assignee', 'book_editor', 'book_corp', 'anon', 'corp', 'foreign', 'book', 'subject'
+    'author', 'publisher', 'editor', 'researcher_id', 'inventor', 'assignee', 'book_editor', 'book_corp', 'anon', 'corp', 'foreign', 'book', 'subject', 'translator', 'investigator'
 ]
 
 
