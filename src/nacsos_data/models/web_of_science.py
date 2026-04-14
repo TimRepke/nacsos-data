@@ -199,7 +199,21 @@ class PreferredName(BaseModel):
 
 
 NameRole = Literal[
-    'author', 'publisher', 'editor', 'researcher_id', 'inventor', 'assignee', 'book_editor', 'book_corp', 'anon', 'corp', 'foreign', 'book', 'subject', 'translator', 'investigator'
+    'author',
+    'publisher',
+    'editor',
+    'researcher_id',
+    'inventor',
+    'assignee',
+    'book_editor',
+    'book_corp',
+    'anon',
+    'corp',
+    'foreign',
+    'book',
+    'subject',
+    'translator',
+    'investigator',
 ]
 
 
@@ -588,16 +602,17 @@ class CitationRelated(BaseModel):
     tc_list: TcList | None = None
 
 
-IdentifierType = Literal['issn', 'eissn', 'doi', 'isbn']
+IdentifierType = Literal['issn', 'eissn', 'doi', 'isbn', 'xref_doi']
 
 
-class IdentifierItem(BaseModel):
+class IdentifierItemEntry(BaseModel):
     type: IdentifierType | None = None
     value: str | None = None
 
 
 class Identifiers(BaseModel):
-    IdentifierItem: Annotated[list[IdentifierItem] | None, BeforeValidator(ensure_list)] = None
+    IdentifierItem: Annotated[list[IdentifierItemEntry] | None, BeforeValidator(ensure_list)] = None
+    identifier: Annotated[list[IdentifierItemEntry] | None, BeforeValidator(ensure_list)] = None
 
 
 class ClusterRelated(BaseModel):

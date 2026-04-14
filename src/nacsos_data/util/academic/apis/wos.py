@@ -67,7 +67,7 @@ def get_doi(wr: WosRecord) -> str | None:
     if (
         wr.dynamic_data.cluster_related is None
         or wr.dynamic_data.cluster_related.identifiers is None
-        or wr.dynamic_data.cluster_related.identifiers.IdentifierItem is None
+        or (wr.dynamic_data.cluster_related.identifiers.IdentifierItem is None and wr.dynamic_data.cluster_related.identifiers.identifier is None)
     ):
         return None
     identifiers = get_value(lambda: wr.dynamic_data.cluster_related.identifiers.identifier)  # type: ignore[union-attr]
@@ -75,6 +75,8 @@ def get_doi(wr: WosRecord) -> str | None:
         return None
     for identifier in identifiers:
         if identifier.type == 'doi':
+            return identifier.value
+        if identifier.type == 'xref_doi':
             return identifier.value
     return None
 
