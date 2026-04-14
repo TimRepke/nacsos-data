@@ -197,7 +197,7 @@ class WoSAPI(AbstractAPI):
                 return {}
 
             request_client.on(http_status.INTERNAL_SERVER_ERROR, skip_on_error)
-            page = request_client.get('https://api.clarivate.com/api/wos')
+            page = request_client.post('https://api.clarivate.com/api/wos')   # can be GET or POST
 
             # FIXME: deal with HTTPStatusError: Client error '429 Too Many Requests' for url
 
@@ -218,6 +218,8 @@ class WoSAPI(AbstractAPI):
                     # next_page = page.headers.get('x-paginate-by-query-id')
                     self.api_feedback = {
                         'remaining_year': page.headers.get('x-rec-amtperyear-remaining'),
+                        'remaining_month': page.headers.get('x-rec-amtpermonth-remaining'),
+                        'remaining_day': page.headers.get('x-rec-reqperday-remaining'),
                         'remaining_sec': page.headers.get('x-req-reqpersec-remaining'),
                     }
 
