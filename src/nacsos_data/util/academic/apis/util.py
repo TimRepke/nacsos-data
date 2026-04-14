@@ -120,6 +120,9 @@ class RequestClient(Client):
                 return response
 
             except HTTPError as e:
+                logging.warning(f'Encountered HTTP error: {e.response.status_code}')  # type: ignore[attr-defined]
+                logging.warning(e.response.text)  # type: ignore[attr-defined]
+
                 if e.response.status_code in self.callbacks:  # type: ignore[attr-defined]
                     logging.debug(f'Found status handler for {e.response.status_code}')  # type: ignore[attr-defined]
                     update = self.callbacks[e.response.status_code](e.response)  # type: ignore[attr-defined]
@@ -145,12 +148,11 @@ class RequestClient(Client):
 
                 # if this error is not on the list, pass on error right away; otherwise log and retry
                 elif e.response.status_code not in self.retry_on_status and len(self.retry_on_status) > 0:  # type: ignore[attr-defined]
-                    logging.warning(e.response.text)  # type: ignore[attr-defined]
+                    logging.warning('No handler found for error, raising.')
                     raise e
 
                 else:
                     logging.warning(f'Retry {retry} after failing to retrieve from {url}: {e}')
-                    logging.warning(e.response.text)  # type: ignore[attr-defined]
                     logging.exception(e)
 
                     # grow the sleep time between requests

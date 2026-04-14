@@ -164,26 +164,50 @@ class WoSAPI(AbstractAPI):
         https://webofscience.help.clarivate.com/en-us/Content/advanced-search.html
         https://webofscience.help.clarivate.com/en-us/Content/wos-core-collection/woscc-search-field-tags.htm
 
+        ```bash
+        curl -X 'POST' -i \
+          'https://wos-api.clarivate.com/api/wos/' \
+          -H 'accept: application/json' \
+          -H 'X-ApiKey: xxx' \
+          -H 'Content-Type: application/json' \
+          -d '{
+              "databaseId": "WOK",
+              "usrQuery": "DO=(\"10.2307/212895\" OR \"10.1016/j.sdcat.2017.02.001\" OR \"10.1002/zfch.19820220314\")",
+              "count": 20,
+              "firstRecord": 1,
+              "sortField": "LD+A"
+            }'
+        ```
+        Other fields:
+            "edition": "string",
+            "publishTimeSpan": "string",
+            "loadTimeSpan": "string",
+            "createdTimeSpan": "string",
+            "modifiedTimeSpan": "string",
+            "tcModifiedTimeSpan": "string",
+            "viewField": "string",
+            "optionView": "string",
+            "optionOther": "string"
+            "lang": "string",
+
         :return:
         """
         if self.api_key is None:
             raise AssertionError('Missing API key!')
 
         skip_step = int(self.page_size / self.max_retries) + 2
-
+        params_base = {
+            'count': self.page_size,
+            'databaseId': self.database,
+            'optionView': 'FR',
+            'sortField': 'LD+A',
+            'firstRecord': 1,
+        } | (params or {})
         with RequestClient(
             backoff_rate=self.backoff_rate,
             max_req_per_sec=self.max_req_per_sec,
             max_retries=self.max_retries,
             proxy=self.proxy,
-            params={
-                'usrQuery': query,
-                'count': self.page_size,
-                'databaseId': self.database,
-                'optionView': 'FR',
-                'firstRecord': 1,
-            }
-            | (params or {}),
             headers={
                 'X-ApiKey': self.api_key,
             },
@@ -192,12 +216,18 @@ class WoSAPI(AbstractAPI):
 
             def skip_on_error(_response: Any) -> dict[str, Any]:
                 state.n_records += skip_step
+                if 'params' in request_client.kwargs:
+                    request_client.kwargs['params'] = params_base
                 request_client.kwargs['params']['firstRecord'] += skip_step
                 request_client.time_per_request = 1 / request_client.max_req_per_sec
                 return {}
 
             request_client.on(http_status.INTERNAL_SERVER_ERROR, skip_on_error)
-            page = request_client.get('https://api.clarivate.com/api/wos')   # can be GET or POST
+            page = request_client.post(
+                'https://wos-api.clarivate.com/api/wos/',
+                json=params_base | {'usrQuery': query},
+            )
+            request_client.kwargs['params'] = params_base
 
             # FIXME: deal with HTTPStatusError: Client error '429 Too Many Requests' for url
 
@@ -249,7 +279,7 @@ class WoSAPI(AbstractAPI):
                         'optionView': 'FR',
                         'firstRecord': state.n_records + 1,
                     }
-                    page = request_client.get(f'https://api.clarivate.com/api/wos/query/{query_id}')
+                    page = request_client.get(f'https://wos-api.clarivate.com/api/wos/query/{query_id}')
 
                 except Exception as e:
                     logging.warning(f'Failed: {e}')
