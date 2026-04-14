@@ -197,7 +197,7 @@ class WoSAPI(AbstractAPI):
                 return {}
 
             request_client.on(http_status.INTERNAL_SERVER_ERROR, skip_on_error)
-            page = request_client.post('https://api.clarivate.com/api/wos')   # can be GET or POST
+            page = request_client.get('https://api.clarivate.com/api/wos')   # can be GET or POST
 
             # FIXME: deal with HTTPStatusError: Client error '429 Too Many Requests' for url
 
