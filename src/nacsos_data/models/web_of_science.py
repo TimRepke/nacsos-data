@@ -602,7 +602,7 @@ class CitationRelated(BaseModel):
     tc_list: TcList | None = None
 
 
-IdentifierType = Literal['issn', 'eissn', 'doi', 'isbn', 'xref_doi', 'pissn', 'pmid']
+IdentifierType = Literal['issn', 'eissn', 'doi', 'isbn', 'xref_doi', 'pissn', 'pmid', 'art_no']
 
 
 class IdentifierItemEntry(BaseModel):
