@@ -60,7 +60,7 @@ def fix_title(v: str | list[str]) -> str | None:
     if type(v) is str:
         return v
     if type(v) is list:
-        return ' '.join(v)
+        return ' '.join([str(vi) for vi in v])
     return None
 
 
