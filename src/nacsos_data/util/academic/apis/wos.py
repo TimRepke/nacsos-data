@@ -199,6 +199,7 @@ class WoSAPI(AbstractAPI):
         params_base = {
             'count': self.page_size,
             'databaseId': self.database,
+            'editions': 'AHCI,CCR,IC,ISSHP,ISTP,SCI,SSCI,BHCI,BSCI,ESCI',
             'optionView': 'FR',
             'sortField': 'LD+A',
             'firstRecord': 1,
