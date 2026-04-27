@@ -1,6 +1,6 @@
 [project]
 name = "nacsos_data"
-version = "0.24.36"
+version = "0.24.37"
 description = "Core data models and utilities for the NACSOS platform"
 author = "Tim Repke / ECS@PIK"
 license = { file = "LICENSE" }
@@ -10,9 +10,9 @@ dependencies = [
     "email-validator==2.3.0",
     "lark==1.3.1",
     "psycopg[binary]==3.3.3",
-    "psycopg2-binary==2.9.11",
+    "psycopg2-binary==2.9.12",
     "pydantic==2.13.1",
-    "pydantic-settings==2.13.1",
+    "pydantic-settings==2.14.0",
     "python-dotenv==1.2.2",
     "SQLAlchemy==2.0.49",
     "sqlalchemy-json==0.7.0",
@@ -45,7 +45,7 @@ scripts = [
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.10",
+    "ruff>=0.15.11",
 #    "tox==4.32.0",
 #    "pytest==9.0.1",
 #    "pytest-cov==7.0.0",
