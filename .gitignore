@@ -9,4 +9,5 @@ scripts/scratch/
 build/
 venv/
 backups/
+config/
 alembic.secret.ini

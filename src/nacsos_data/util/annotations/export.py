@@ -473,13 +473,13 @@ async def wide_export_table(
                 'py': r.get('publication_year'),
                 **{
                     f'res|{prefix.get(k, "")}{key}': val
-                    for resolution in get(r, 'labels_resolved', [])  # type: ignore[arg-type]
+                    for resolution in get(r, 'labels_resolved', default=[])  # type: ignore[arg-type]
                     for k, v in resolution.items()
                     for key, val in _generate_keys(k, v)
                 },
                 **{
                     f'{usr}|{prefix.get(k, "")}{key}': val
-                    for usr, annotation in get(r, 'labels_unresolved', {}).items()  # type: ignore[ arg-type]
+                    for usr, annotation in get(r, 'labels_unresolved', default={}).items()  # type: ignore[ arg-type]
                     for k, v in annotation.items()
                     for key, val in _generate_keys(k, v)
                 },
@@ -487,11 +487,11 @@ async def wide_export_table(
             for r in rslt
         ],
     )
-    base_cols = ['scope_order', 'item_order', 'item_id', 'wos_id', 'openalex_id', 'doi', 'title', 'text', 'teaser', 'authors', 'source', 'py']
+    base_cols = ['scope_order', 'item_order', 'item_id', 'wos_id', 'openalex_id', 'scopus_id', 'doi', 'title', 'text', 'teaser', 'authors', 'source', 'py']
     if include_meta:
         base_cols += ['meta']
     else:
-        df.drop(columns=['meta'], inplace=True)
+        df.drop(columns=['meta'], inplace=True, errors='ignore')
     str_cols = [col for col in df.columns if '|STR|' in col]
     base_cols += str_cols
     label_cols = sorted(set(df.columns) - set(base_cols))

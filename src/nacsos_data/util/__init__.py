@@ -21,6 +21,7 @@ from typing import (
     Generic,
     OrderedDict,
 )
+import pandas as pd
 
 if TYPE_CHECKING:
     from nacsos_data.util.conf import Settings
@@ -29,8 +30,6 @@ if TYPE_CHECKING:
 Param = ParamSpec('Param')
 RetType = TypeVar('RetType')
 
-if TYPE_CHECKING:
-    import pandas as pd
 
 T = TypeVar('T')
 D = TypeVar('D')
@@ -199,10 +198,11 @@ def oring(arr: list[Optional['pd.Series[bool]']]) -> 'bool | pd.Series[bool]':
     if fixed_arr is None:
         return False
 
-    ret = fixed_arr[0]
-    for a in fixed_arr[1:]:
-        ret |= a
-    return ret
+    df = pd.concat(fixed_arr, axis=1)
+    res = df.any(axis=1, skipna=True)
+    all_na = df.isna().all(axis=1)
+
+    return res.where(~all_na, pd.NA).astype('boolean')
 
 
 def anding(arr: list[Optional['pd.Series[bool]']]) -> 'bool | pd.Series[bool]':
@@ -210,10 +210,11 @@ def anding(arr: list[Optional['pd.Series[bool]']]) -> 'bool | pd.Series[bool]':
     if fixed_arr is None:
         return False
 
-    ret = fixed_arr[0]
-    for a in fixed_arr[1:]:
-        ret &= a
-    return ret
+    df = pd.concat(fixed_arr, axis=1)
+    res = df.all(axis=1, skipna=True)
+    all_na = df.isna().all(axis=1)
+
+    return res.where(~all_na, pd.NA).astype('boolean')
 
 
 def get_value(val: Callable[[], T], default: D | None = None) -> T | D | None:

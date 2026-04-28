@@ -30,7 +30,12 @@ def download(
     openalex_config: Annotated[Path | None, typer.Option(help='openalex config')] = None,
     batch_size: Annotated[int, typer.Option(help='File to write results to')] = 5,
     page_size: Annotated[int, typer.Option(help='')] = 5,
-    database: Annotated[str, typer.Option(help='Web of Science database: WOS, BCI, BIOABS, BIOSIS, CABI, CCC, CSCD, DCI, DIIDW, FSTA, GRANTS, INSPEC, MEDLINE, PPRN, PQDT, RC, SCIELO, WOK, ZOOREC (WOK represents all databases)')] = 'WOK',
+    database: Annotated[
+        str,
+        typer.Option(
+            help='Web of Science database: WOS, BCI, BIOABS, BIOSIS, CABI, CCC, CSCD, DCI, DIIDW, FSTA, GRANTS, INSPEC, MEDLINE, PPRN, PQDT, RC, SCIELO, WOK, ZOOREC (WOK represents all databases)'
+        ),
+    ] = 'WOK',
     proxy: Annotated[str | None, typer.Option(help='')] = None,
     query_file: Annotated[Path | None, typer.Option(help='File containing search query')] = None,
     query: Annotated[str | None, typer.Option(help='Search query')] = None,
