@@ -111,7 +111,7 @@ def translate_work_to_solr(work: WorksSchema, source: str = 'OpenAlex', authorsh
         doc['authorships'] = doc['authorships'][:authorship_limit]
 
     return (
-        doc  # type: ignore[return-value]
+        doc
         | {
             'title_abstract': work.tiab,
             'abstract_source': source if work.abstract else None,

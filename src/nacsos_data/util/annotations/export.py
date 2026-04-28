@@ -473,13 +473,13 @@ async def wide_export_table(
                 'py': r.get('publication_year'),
                 **{
                     f'res|{prefix.get(k, "")}{key}': val
-                    for resolution in get(r, 'labels_resolved', default=[])  # type: ignore[arg-type]
+                    for resolution in get(r, 'labels_resolved', default=[])
                     for k, v in resolution.items()
                     for key, val in _generate_keys(k, v)
                 },
                 **{
                     f'{usr}|{prefix.get(k, "")}{key}': val
-                    for usr, annotation in get(r, 'labels_unresolved', default={}).items()  # type: ignore[ arg-type]
+                    for usr, annotation in get(r, 'labels_unresolved', default={}).items()
                     for k, v in annotation.items()
                     for key, val in _generate_keys(k, v)
                 },
