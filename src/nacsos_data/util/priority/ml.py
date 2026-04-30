@@ -127,7 +127,7 @@ def training(  # type: ignore[no-untyped-def]
                     predictions.append(torch.sigmoid(pred.logits).cpu())
 
         logger.info('Writing predictions to dataframe...')
-        preds = torch.concatenate(predictions)
+        preds = torch.concatenate(predictions).numpy()
         logger.info(f'  -> {preds.shape}')
 
         # create columns
@@ -136,7 +136,7 @@ def training(  # type: ignore[no-untyped-def]
         df[f'{target}:1'] = np.nan
 
         # write predictions to table
-        df.loc[mask, target] = preds.argmax(dim=1)
+        df.loc[mask, target] = preds.argmax(axis=1)
         df.loc[mask, f'{target}:0'] = preds[:, 0]
         df.loc[mask, f'{target}:1'] = preds[:, 1]
 
