@@ -128,10 +128,17 @@ def training(  # type: ignore[no-untyped-def]
         logger.info('Writing predictions to dataframe...')
         preds = torch.concatenate(predictions)
 
+        # create columns
+        df.loc[target] = np.nan
+        df.loc[f'{target}:0'] = np.nan
+        df.loc[f'{target}:1'] = np.nan
+
+        # write predictions to table
         df.loc[mask][target] = preds.argmax(dim=1)
         df.loc[mask][f'{target}:0'] = preds[:, 0]
         df.loc[mask][f'{target}:1'] = preds[:, 1]
 
+        # remember what we used for training and testing
         df.loc[df_train.index, f'{target}-train'] = 1
         df.loc[df_test.index, f'{target}-test'] = 1
 

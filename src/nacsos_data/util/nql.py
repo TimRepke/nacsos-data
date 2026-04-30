@@ -119,21 +119,14 @@ class NQLQuery:
         self.project_type = project_type
 
         self.query = query
-        self.Schema, self.Model, self._stmt = get_select_base(project_type=project_type)
+        self.Schema, self.Model, _stmt = get_select_base(project_type=project_type)
         self._project_items = sa.select(Item.item_id).where(Item.project_id == project_id).cte('project_items')
 
-        if query is None:
-            self._stmt = self._stmt.where(self._stmt.c.project_id == project_id)
-        else:
+        if query is not None:
             filter_cte = self._assemble_filters(query)
-            self._stmt = (
-                sa.select(AcademicItem)
-                .where(AcademicItem.project_id == project_id)
-                .join(self._project_items, self._project_items.c.item_id == AcademicItem.item_id)
-                .join(filter_cte, filter_cte.c.item_id == self._project_items.c.item_id)
-            )
-
-            # self._stmt = self._stmt.join(filter_cte, filter_cte.c.item_id==self._stmt.c.item_id).where(self._stmt.c.project_id==project_id)
+            self._stmt = _stmt.where(Item.project_id == project_id).join(filter_cte, filter_cte.c.item_id == Item.item_id)
+        else:
+            self._stmt = _stmt.where(Item.project_id == project_id)
 
     def __str__(self) -> str:
         return str(self.query)
@@ -163,6 +156,8 @@ class NQLQuery:
             return Item, Item.text
         if self.project_type == ItemType.academic:
             # TODO: include AcademicItemVariant
+            if field in {'pub_year', 'year', 'publication_year', 'py'}:
+                return AcademicItem, AcademicItem.publication_year
             return AcademicItem, getattr(AcademicItem, field)
         if self.project_type == ItemType.lexis:
             if field in {'pub_year', 'year', 'publication_year', 'py'}:
@@ -218,7 +213,7 @@ class NQLQuery:
             if comp is None:
                 raise InvalidNQLError(f'Missing comparator: {subquery}!')
             return (
-                sa.select(sa.distinct(self._project_items.c.item_id).label('item_id'))
+                sa.select(self._project_items.c.item_id)
                 .join(schema, schema.item_id == self._project_items.c.item_id)
                 .where(_field_cmp(comp, subquery.value, col))
                 .cte()
@@ -231,19 +226,14 @@ class NQLQuery:
             if subquery.values is None:
                 raise InvalidNQLError('Missing values!')
             schema, col = self._get_column(subquery.field)
-            return (
-                sa.select(sa.distinct(self._project_items.c.item_id).label('item_id'))
-                .join(schema, schema.item_id == self._project_items.c.item_id)
-                .where(col.in_(subquery.values))
-                .cte()
-            )
+            return sa.select(self._project_items.c.item_id).join(schema, schema.item_id == self._project_items.c.item_id).where(col.in_(subquery.values)).cte()
 
         elif isinstance(subquery, MetaFilterBool) or isinstance(subquery, MetaFilterInt) or isinstance(subquery, MetaFilterStr):
             #     KEY _  "="      _  bool      {% (d) => ({ filter: "meta_bool", value_type: "bool", field: d[0], comp: "=",    value: d[4] }) %}
             #   | KEY _  COMP     _  uint      {% (d) => ({ filter: "meta_int",  value_type: "int",  field: d[0], comp: d[2],   value: d[4] }) %}
             #   | KEY __ "LIKE"i  __ dqstring  {% (d) => ({ filter: "meta_str",  value_type: "str",  field: d[0], comp: "LIKE", value: d[4] }) %}
             schema, col = self._get_column('meta')
-            query = sa.select(sa.distinct(self._project_items.c.item_id).label('item_id')).join(schema, schema.item_id == self._project_items.c.item_id)
+            query = sa.select(self._project_items.c.item_id).join(schema, schema.item_id == self._project_items.c.item_id)
             if isinstance(subquery, MetaFilterBool):
                 return query.where(col[subquery.field].as_boolean() == bool(subquery.value)).cte()
             if isinstance(subquery, MetaFilterInt):
@@ -263,15 +253,13 @@ class NQLQuery:
             #   | "IS ASSIGNED WITH"i         __ UUID   {% (d) => ({ filter: "assignment", mode: 6, scheme: d[2] }) %}
             #   | "IS ASSIGNED BUT NOT WITH"i __ UUID   {% (d) => ({ filter: "assignment", mode: 7, scheme: d[2] }) %}
             if subquery.mode == 1:
-                return (
-                    sa.select(sa.distinct(self._project_items.c.item_id).label('item_id')).join(Assignment, Assignment.item_id == self._project_items.c.item_id)
-                ).cte()
+                return (sa.select(self._project_items.c.item_id).join(Assignment, Assignment.item_id == self._project_items.c.item_id)).cte()
 
             if subquery.mode == 1:
                 if subquery.scopes is None:
                     raise InvalidNQLError('No scopes defined!')
                 return (
-                    sa.select(sa.distinct(self._project_items.c.item_id).label('item_id')).join(
+                    sa.select(self._project_items.c.item_id).join(
                         Assignment,
                         sa.and_(Assignment.item_id == self._project_items.c.item_id, Assignment.assignment_scope_id.in_(subquery.scopes)),
                     )
@@ -284,7 +272,7 @@ class NQLQuery:
 
             if subquery.mode == 4:
                 return (
-                    sa.select(sa.distinct(self._project_items.c.item_id).label('item_id'))
+                    sa.select(self._project_items.c.item_id)
                     .join(Assignment, Assignment.item_id == self._project_items.c.item_id, isouter=True)
                     .where(Assignment.item_id.is_(None))  # noqa: E711
                 ).cte()
@@ -293,7 +281,7 @@ class NQLQuery:
                 if subquery.scopes is None:
                     raise InvalidNQLError('No scopes defined!')
                 return (
-                    sa.select(sa.distinct(self._project_items.c.item_id).label('item_id'))
+                    sa.select(self._project_items.c.item_id)
                     .join(Assignment, sa.and_(Assignment.item_id == self._project_items.c.item_id, Assignment.assignment_scope_id.notin_(subquery.scopes)))
                     .where(Assignment.item_id.is_(None))  # noqa: E711
                 ).cte()
@@ -302,7 +290,7 @@ class NQLQuery:
                 if subquery.scheme is None:
                     raise InvalidNQLError('No scheme defined!')
                 return (
-                    sa.select(sa.distinct(self._project_items.c.item_id).label('item_id')).join(
+                    sa.select(self._project_items.c.item_id).join(
                         Assignment,
                         sa.and_(Assignment.item_id == self._project_items.c.item_id, Assignment.annotation_scheme_id == subquery.scheme),
                     )
@@ -312,7 +300,7 @@ class NQLQuery:
                 if subquery.scheme is None:
                     raise InvalidNQLError('No scheme defined!')
                 return (
-                    sa.select(sa.distinct(self._project_items.c.item_id).label('item_id')).join(
+                    sa.select(self._project_items.c.item_id).join(
                         Assignment,
                         sa.and_(Assignment.item_id == self._project_items.c.item_id, Assignment.annotation_scheme_id != subquery.scheme),
                     )
@@ -321,17 +309,17 @@ class NQLQuery:
         elif isinstance(subquery, AnnotationFilter):
             if subquery.scheme is not None:
                 query = (
-                    sa.select(sa.distinct(self._project_items.c.item_id).label('item_id'))
+                    sa.select(self._project_items.c.item_id)
                     .join(
                         Assignment,
                         sa.and_(Assignment.annotation_scheme_id == subquery.scheme, Assignment.item_id == self._project_items.c.item_id),
                         isouter=True,
                     )
-                    .join(Annotation, Annotation.assignment_id == Annotation.assignment_id, isouter=True)
+                    .join(Annotation, Assignment.assignment_id == Annotation.assignment_id, isouter=True)
                 )
             elif subquery.scopes is not None:
                 query = (
-                    sa.select(sa.distinct(self._project_items.c.item_id).label('item_id'))
+                    sa.select(self._project_items.c.item_id)
                     .join(
                         Assignment,
                         sa.and_(Assignment.assignment_scope_id.in_(subquery.scopes), Assignment.item_id == self._project_items.c.item_id),
@@ -340,7 +328,7 @@ class NQLQuery:
                     .join(Annotation, Annotation.assignment_id == Assignment.assignment_id, isouter=True)
                 )
             else:
-                query = sa.select(sa.distinct(self._project_items.c.item_id).label('item_id')).join(
+                query = sa.select(self._project_items.c.item_id).join(
                     Annotation,
                     Annotation.item_id == self._project_items.c.item_id,
                     isouter=True,
@@ -360,17 +348,17 @@ class NQLQuery:
 
         elif isinstance(subquery, ImportFilter):
             includes = (
-                sa.select(sa.distinct(m2m_import_item_table.c.item_id).label('item_id'))
+                sa.select(m2m_import_item_table.c.item_id)
                 .where(m2m_import_item_table.c.import_id.in_([iid.uuid for iid in subquery.import_ids if iid.incl]))
                 .alias()
             )
             excludes = (
-                sa.select(sa.distinct(m2m_import_item_table.c.item_id).label('item_id'))
+                sa.select(m2m_import_item_table.c.item_id)
                 .where(m2m_import_item_table.c.import_id.in_([iid.uuid for iid in subquery.import_ids if not iid.incl]))
                 .alias()
             )
             return (
-                sa.select(sa.distinct(self._project_items.c.item_id).label('item_id'))
+                sa.select(self._project_items.c.item_id)
                 .join(includes, includes.c.item_id == self._project_items.c.item_id, isouter=True)
                 .join(excludes, excludes.c.item_id == self._project_items.c.item_id, isouter=True)
                 .where(sa.and_(includes.c.item_id.isnot(None), excludes.c.item_id.is_(None)))  # noqa: E711
@@ -400,7 +388,7 @@ class NQLQuery:
             if subquery.users is not None:
                 raise InvalidNQLError('You cannot filter by users for BotAnnotations!')
             query = (
-                sa.select(sa.distinct(self._project_items.c.item_id).label('item_id'))
+                sa.select(self._project_items.c.item_id)
                 .join(
                     BotAnnotation,
                     sa.and_(BotAnnotation.item_id == self._project_items.c.item_id, BotAnnotation.key == subquery.key, _value_where(BotAnnotation)),
@@ -424,7 +412,7 @@ class NQLQuery:
 
             def _annotation() -> sa.Select:  # type: ignore[type-arg]
                 _query = (
-                    sa.select(sa.distinct(Annotation.item_id).label('item_id'))
+                    sa.select(Annotation.item_id)
                     .join(self._project_items, Annotation.item_id == self._project_items.c.item_id)
                     .where(sa.and_(Annotation.key == subquery.key, _value_where(Annotation)))
                 )
@@ -441,7 +429,7 @@ class NQLQuery:
             if subquery.users is not None and subquery.users.mode == 'ANY':
                 return _annotation().where(Annotation.user_id.in_(subquery.users.user_ids)).cte()
             if subquery.users is not None and subquery.users.mode == 'ALL':
-                query = sa.select(sa.distinct(self._project_items.c.item_id).label('item_id'))
+                query = sa.select(self._project_items.c.item_id)
                 for user in subquery.users.user_ids:
                     user_annotations = _annotation().where(Annotation.user_id == user).alias()
                     query = query.join(user_annotations, user_annotations.c.item_id == self._project_items.c.item_id, isouter=True).where(
