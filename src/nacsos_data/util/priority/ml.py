@@ -113,6 +113,7 @@ def training(  # type: ignore[no-untyped-def]
         logger.info('Predicting...')
         predictions = []
         mask = df.index.notna() if predict_all else df[source].isna()
+        logger.info(f'  -> mask: {mask.sum()}')
         with torch.no_grad():
             ds = Dataset.from_pandas(df[mask])
             ds = ds.map(lambda x: tokenizer(x[text], padding='max_length', truncation=True), batched=True)
@@ -125,13 +126,14 @@ def training(  # type: ignore[no-untyped-def]
                 else:
                     predictions.append(pred.logits.cpu())
 
-        logger.info('Writing predictions to dataframe...')
+        logger.info(f'Writing predictions to dataframe...')
         preds = torch.concatenate(predictions)
+        logger.info(f'  -> {preds.shape}')
 
         # create columns
-        df.loc[target] = np.nan
-        df.loc[f'{target}:0'] = np.nan
-        df.loc[f'{target}:1'] = np.nan
+        df[target] = np.nan
+        df[f'{target}:0'] = np.nan
+        df[f'{target}:1'] = np.nan
 
         # write predictions to table
         df.loc[mask][target] = preds.argmax(dim=1)
