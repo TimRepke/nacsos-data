@@ -126,7 +126,7 @@ def training(  # type: ignore[no-untyped-def]
                 else:
                     predictions.append(pred.logits.cpu())
 
-        logger.info(f'Writing predictions to dataframe...')
+        logger.info('Writing predictions to dataframe...')
         preds = torch.concatenate(predictions)
         logger.info(f'  -> {preds.shape}')
 
