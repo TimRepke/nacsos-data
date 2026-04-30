@@ -39,6 +39,8 @@ def training(  # type: ignore[no-untyped-def]
     logging_steps: int = 10,
     eval_strategy='steps',
     eval_steps: int = 50,
+    predict_all: bool = False,
+    predict_softmax: bool = False,
 ) -> 'pd.DataFrame':
     import torch
     from tqdm import tqdm
@@ -62,11 +64,14 @@ def training(  # type: ignore[no-untyped-def]
     logger.info(f'Training data has {df_train.shape[0]:,} entries / {df_test.shape[0]:,} for testing')
     logger.info(f'Training labels: {df_train["label"].value_counts()} / Testing labels: {df_test["label"].value_counts()}')
 
+    logger.info('Loading tokenizer...')
     tokenizer = AutoTokenizer.from_pretrained(model_name, max_length=max_len, model_max_length=max_len)  # type: ignore[no-untyped-call,unused-ignore]
 
+    logger.info('Preparing training data...')
     train_dataset = Dataset.from_pandas(df_train)
     train_dataset = train_dataset.map(lambda rows: tokenizer(rows[text], padding='max_length', truncation=True), batched=True)
 
+    logger.info('Preparing evaluation data...')
     eval_dataset = Dataset.from_pandas(df_test)
     eval_dataset = eval_dataset.map(lambda rows: tokenizer(rows[text], padding='max_length', truncation=True), batched=True)
 
@@ -74,6 +79,8 @@ def training(  # type: ignore[no-untyped-def]
     model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=len(labels))
 
     with tempfile.TemporaryDirectory() as tmp_dir:
+        logger.info(f'Temporary file location: {tmp_dir}')
+
         # Define training arguments
         logger.info('Setting up training arguments...')
         training_args = TrainingArguments(
@@ -87,6 +94,7 @@ def training(  # type: ignore[no-untyped-def]
             logging_steps=logging_steps,
             eval_strategy=eval_strategy,
             eval_steps=eval_steps,
+            save_strategy='no',
         )
 
         logger.info('Initialising trainer...')
@@ -104,21 +112,25 @@ def training(  # type: ignore[no-untyped-def]
 
         logger.info('Predicting...')
         predictions = []
+        mask = df.index.notna() if predict_all else df[source].isna()
         with torch.no_grad():
-            ds = Dataset.from_pandas(df)
+            ds = Dataset.from_pandas(df[mask])
             ds = ds.map(lambda x: tokenizer(x[text], padding='max_length', truncation=True), batched=True)
             ds.set_format('torch')
 
             for batch in tqdm(ds.iter(batch_size=batch_size_predict)):
                 pred = model(input_ids=batch['input_ids'].to(device), attention_mask=batch['attention_mask'].to(device))
-                predictions.append(torch.softmax(pred.logits, dim=1).cpu())
+                if predict_softmax:
+                    predictions.append(torch.softmax(pred.logits, dim=1).cpu())
+                else:
+                    predictions.append(pred.logits.cpu())
 
         logger.info('Writing predictions to dataframe...')
         preds = torch.concatenate(predictions)
 
-        df[target] = preds.argmax(dim=1)
-        df[f'{target}:0'] = preds[:, 0]
-        df[f'{target}:1'] = preds[:, 1]
+        df.loc[mask][target] = preds.argmax(dim=1)
+        df.loc[mask][f'{target}:0'] = preds[:, 0]
+        df.loc[mask][f'{target}:1'] = preds[:, 1]
 
         df.loc[df_train.index, f'{target}-train'] = 1
         df.loc[df_test.index, f'{target}-test'] = 1
