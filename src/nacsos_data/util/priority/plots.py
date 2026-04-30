@@ -154,7 +154,8 @@ def buscar_workload(
     data = df[[source, f'{target}:1']].copy().rename(columns={source: 'incl', f'{target}:1': 'prediction'})
 
     # Create random incl/excl annotations biased by prediction scores
-    data['oracle'] = np.random.binomial(1, data['prediction'], num_total)
+    data['oracle'] = np.random.binomial(1, data['prediction'].fillna(0), num_total)
+
     # Create coalesce column that always has a label (preferred human)
     data['incl'] = data['incl'].astype('Int8')
     data['label'] = data['incl'].combine_first(data['oracle'])
