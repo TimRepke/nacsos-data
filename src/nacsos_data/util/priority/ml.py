@@ -17,7 +17,7 @@ def compute_metrics(p: tuple[np.ndarray, np.ndarray]) -> dict[str, np.ndarray]:
     return {
         'recall': evaluate.load('recall').compute(predictions=predictions, references=labels, zero_division=0, average='weighted')['recall'],
         'precision': evaluate.load('precision').compute(predictions=predictions, references=labels, zero_division=0, average='weighted')['precision'],
-        'f1': evaluate.load('f1').compute(predictions=predictions, references=labels, labels=np.arange(len(labels)), average='weighted')['f1'],
+        'f1': evaluate.load('f1').compute(predictions=predictions, references=labels, labels=np.arange(len(labels)), zero_division=0, average='weighted')['f1'],
         'accuracy': evaluate.load('accuracy').compute(predictions=predictions, references=labels, normalize=False)['accuracy'],
     }
 
@@ -50,7 +50,7 @@ def training(  # type: ignore[no-untyped-def]
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create a copy of labelled data so we don't mess up the global dataframe
-    dfi = df[~df[source].isna()][[text, source]].copy()
+    dfi = df[df[source].notna() & df[text].notna()][[text, source]].copy()
     dfi['label'] = dfi[source]
     labels = list(dfi['label'].unique())
 
@@ -112,7 +112,7 @@ def training(  # type: ignore[no-untyped-def]
 
         logger.info('Predicting...')
         predictions = []
-        mask = df.index.notna() if predict_all else df[source].isna()
+        mask = (df.index.notna() if predict_all else df[source].isna()) & df[text].notna()
         logger.info(f'  -> mask: {mask.sum()}')
         with torch.no_grad():
             ds = Dataset.from_pandas(df[mask])
