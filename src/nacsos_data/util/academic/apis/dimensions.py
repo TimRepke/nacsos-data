@@ -98,7 +98,7 @@ def get_int(obj: dict[str, Any], k: str) -> int | None:
 def get_source(obj: dict[str, Any]) -> str | None:
     v = obj.get('journal', {}).get('title')
     if v is not None and type(v) is str:
-        return v  # type: ignore[no-any-return]
+        return v
     v = obj.get('source_title', {}).get('title')
     return v if type(v) is str else None
 
