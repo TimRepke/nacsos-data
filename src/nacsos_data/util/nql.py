@@ -255,7 +255,7 @@ class NQLQuery:
             if subquery.mode == 1:
                 return (sa.select(self._project_items.c.item_id).join(Assignment, Assignment.item_id == self._project_items.c.item_id)).cte()
 
-            if subquery.mode == 1:
+            if subquery.mode == 2:
                 if subquery.scopes is None:
                     raise InvalidNQLError('No scopes defined!')
                 return (
