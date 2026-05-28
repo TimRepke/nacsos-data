@@ -230,6 +230,7 @@ async def duplicate_insertion(  # noqa: C901
     import_id: str | uuid.UUID | None,
     import_revision: int | None,
     session: AsyncSession,
+    allow_field_overwrites: bool = False,
     log: logging.Logger | None = None,
 ) -> bool:
     """
@@ -240,6 +241,8 @@ async def duplicate_insertion(  # noqa: C901
     :param import_id:
     :param session:
     :param new_item:
+    :param allow_field_overwrites: when we get new values, and we already had one in the reference item, use the new value instead;
+                                   Going to write new values to previously empty fields in any case
     :param orig_item_id: id in academic_item of which the `new_item` is a duplicate
     :return: Return True if we ended up creating a new variant.
     """
@@ -317,6 +320,9 @@ async def duplicate_insertion(  # noqa: C901
         if getattr(new_item, field) is None:
             continue
 
+        if not allow_field_overwrites and getattr(orig_item, field) is not None:
+            continue
+
         # Cleaned value from the new item for `field`
         new_value = getattr(new_item, field).strip()
         # Get all non-empty values for the field across variants
@@ -336,14 +342,14 @@ async def duplicate_insertion(  # noqa: C901
                     setattr(orig_item_orm, field, candidates[-1])
             else:
                 # This was new, so keep track of it in our variant
-                new_variant[field] = new_value
+                new_variant[field] = new_value  # fixme: shouldn't this be the old value (getattr(orig_item_orm, field))?
                 if editable:
                     # We always like new IDs, so update the reference item
                     setattr(orig_item_orm, field, new_value)
 
     # Check publication year field
     new_pub_year = getattr(new_item, 'publication_year')
-    if new_pub_year is not None:
+    if new_pub_year is not None and (allow_field_overwrites or orig_item.publication_year is None):
         # Get all non-empty publication_year across variants
         pub_yrs = {var['publication_year'] for var in variants if var['publication_year'] is not None}
 
@@ -357,7 +363,7 @@ async def duplicate_insertion(  # noqa: C901
 
     # Check publication year field
     new_keywords = getattr(new_item, 'keywords')
-    if new_keywords is not None and len(new_keywords) > 0:
+    if new_keywords is not None and len(new_keywords) > 0 and (allow_field_overwrites or orig_item.keywords is None):
         # Get all keywords across variants
         keywords = {kw for var in variants if var['keywords'] is not None for kw in var['keywords']}
 
@@ -371,10 +377,10 @@ async def duplicate_insertion(  # noqa: C901
 
     # Checking metadata field
     # only keep track of unique meta objects in variants
-    # always apply deep-fuzed meta objects when encountering new meta object
+    # always apply deep-fuzed meta objects when encountering new meta object (even when overwrite option is False)
     new_meta = getattr(new_item, 'meta')
     if new_meta is not None and len(new_meta) > 0:
-        # Get all non-empty publication_year across variants
+        # Get all non-empty meta fields across variants
         metas = [var['meta'] for var in variants if var['meta'] is not None and len(var['meta']) > 0]
 
         # Check if we have seen this value before
@@ -389,8 +395,8 @@ async def duplicate_insertion(  # noqa: C901
     # only keep track of unique list of authors (or variations thereof) in variants
     # always keep last valid list of authors
     new_authors = getattr(new_item, 'authors')
-    if new_authors is not None and len(new_authors) > 0:
-        # Get all non-empty publication_year across variants
+    if new_authors is not None and len(new_authors) > 0 and (allow_field_overwrites or orig_item.authors is None):
+        # Get all non-empty authors across variants
         authors = [var['authors'] for var in variants if var['authors'] is not None and len(var['authors']) > 0]
 
         # Check if we have seen this value before

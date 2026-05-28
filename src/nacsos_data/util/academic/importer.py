@@ -161,6 +161,7 @@ async def _insert_item(
     dry_run: bool,
     logger: logging.Logger,
     existing_id: str | None = None,
+    allow_field_overwrites: bool = False,
 ) -> tuple[str, bool]:
     """
     Returns the item_id of the item that was inserted. This might be the existing ID or a new one.
@@ -197,7 +198,14 @@ async def _insert_item(
         return existing_id, True
 
     logger.debug(f'  -> Creating variant for item_id {existing_id} with variant_id {item.item_id}!')
-    has_changes = await duplicate_insertion(orig_item_id=existing_id, import_id=import_id, import_revision=import_revision, new_item=item, session=session)
+    has_changes = await duplicate_insertion(
+        orig_item_id=existing_id,
+        import_id=import_id,
+        import_revision=import_revision,
+        new_item=item,
+        session=session,
+        allow_field_overwrites=allow_field_overwrites,
+    )
     return existing_id, has_changes
 
 
@@ -224,6 +232,7 @@ async def import_academic_items_nodedup_forced(
     user_id: str | uuid.UUID,
     name: str | uuid.UUID,
     description: str,
+    allow_field_overwrites: bool = False,
     logger: logging.Logger | None = None,
 ) -> tuple[str, int | None]:
     if logger is None:
@@ -272,6 +281,7 @@ async def import_academic_items_nodedup_forced(
                             import_revision=1,
                             dry_run=False,
                             logger=logger,
+                            allow_field_overwrites=allow_field_overwrites,
                         )
 
                         # UPSERT m2m
@@ -321,6 +331,7 @@ async def import_academic_items(
     max_features: int = 20000,
     dry_run: bool = True,
     logger: logging.Logger | None = None,
+    allow_field_overwrites: bool = False,
     allow_empty_text: bool = False,
 ) -> tuple[str, int | None]:
     """
@@ -387,6 +398,7 @@ async def import_academic_items(
     :param logger:
     :param pipeline_task_id:
     :param allow_empty_text:
+    :param allow_field_overwrites:
     :return: import_id, latest_revision_num (or None if no action taken)
     """
     if logger is None:
@@ -545,6 +557,7 @@ async def import_academic_items(
                                 import_revision=latest_revision,
                                 dry_run=dry_run,
                                 logger=logger,
+                                allow_field_overwrites=allow_field_overwrites,
                             )
                             num_updated += has_changes
 

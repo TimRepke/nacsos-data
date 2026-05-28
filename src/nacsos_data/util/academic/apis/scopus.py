@@ -94,10 +94,9 @@ class ScopusAPI(AbstractAPI):
             while True:
                 self.logger.info(f'Fetching page {n_pages}...')
 
-                page = request_client.get(
+                page = request_client.post(
                     'https://api.elsevier.com/content/search/scopus',
                     params={
-                        'query': query,
                         'cursor': next_cursor,
                         # https://dev.elsevier.com/sc_search_views.html
                         'view': 'COMPLETE',
@@ -106,6 +105,9 @@ class ScopusAPI(AbstractAPI):
                     headers={
                         'Accept': 'application/json',
                         'X-ELS-APIKey': self.api_key,
+                    },
+                    data={
+                        'query': query,
                     },
                 )
 
