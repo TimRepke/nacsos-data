@@ -209,6 +209,7 @@ class WoSAPI(AbstractAPI):
             max_req_per_sec=self.max_req_per_sec,
             max_retries=self.max_retries,
             proxy=self.proxy,
+            timeout=120,
             headers={
                 'X-ApiKey': self.api_key,
             },

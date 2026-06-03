@@ -93,25 +93,25 @@ class RequestClient(Client):
             if timeout == USE_CLIENT_DEFAULT:
                 timeout = None
 
-            # Log latest request
-            self.last_request = perf_counter()
-            response = super().request(
-                method=method or self.kwargs.get('method'),  # type: ignore[arg-type]
-                url=url or self.kwargs.get('url'),  # type: ignore[arg-type]
-                content=content or self.kwargs.get('content'),
-                data=data or self.kwargs.get('data'),
-                files=files or self.kwargs.get('files'),
-                json=json or self.kwargs.get('json'),
-                params=params or self.kwargs.get('params'),
-                headers=self.kwargs.get('headers', {}) | (headers or {}),
-                cookies=self.kwargs.get('cookies', {}) | (cookies or {}),
-                auth=auth or self.kwargs.get('auth', USE_CLIENT_DEFAULT),
-                follow_redirects=follow_redirects or self.kwargs.get('follow_redirects', True),
-                timeout=timeout or self.kwargs.get('timeout', 120),
-                extensions=extensions or self.kwargs.get('extensions'),
-            )
-
             try:
+                # Log latest request
+                self.last_request = perf_counter()
+                response = super().request(
+                    method=method or self.kwargs.get('method'),  # type: ignore[arg-type]
+                    url=url or self.kwargs.get('url'),  # type: ignore[arg-type]
+                    content=content or self.kwargs.get('content'),
+                    data=data or self.kwargs.get('data'),
+                    files=files or self.kwargs.get('files'),
+                    json=json or self.kwargs.get('json'),
+                    params=params or self.kwargs.get('params'),
+                    headers=self.kwargs.get('headers', {}) | (headers or {}),
+                    cookies=self.kwargs.get('cookies', {}) | (cookies or {}),
+                    auth=auth or self.kwargs.get('auth', USE_CLIENT_DEFAULT),
+                    follow_redirects=follow_redirects or self.kwargs.get('follow_redirects', True),
+                    timeout=timeout or self.kwargs.get('timeout', 120),
+                    extensions=extensions or self.kwargs.get('extensions'),
+                )
+
                 response.raise_for_status()
 
                 # reset counters after successful request

@@ -1351,7 +1351,7 @@ wheels = [
 
 [[package]]
 name = "nacsos-data"
-version = "0.24.46"
+version = "0.24.48"
 source = { editable = "." }
 dependencies = [
     { name = "email-validator" },
