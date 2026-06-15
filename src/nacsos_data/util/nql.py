@@ -347,23 +347,19 @@ class NQLQuery:
                 return query.where(sa.and_(Item.text.isnot(None))).cte()
 
         elif isinstance(subquery, ImportFilter):
-            includes = (
-                sa.select(m2m_import_item_table.c.item_id)
-                .where(m2m_import_item_table.c.import_id.in_([iid.uuid for iid in subquery.import_ids if iid.incl]))
-                .alias()
-            )
-            excludes = (
-                sa.select(m2m_import_item_table.c.item_id)
-                .where(m2m_import_item_table.c.import_id.in_([iid.uuid for iid in subquery.import_ids if not iid.incl]))
-                .alias()
-            )
-            return (
-                sa.select(self._project_items.c.item_id)
-                .join(includes, includes.c.item_id == self._project_items.c.item_id, isouter=True)
-                .join(excludes, excludes.c.item_id == self._project_items.c.item_id, isouter=True)
-                .where(sa.and_(includes.c.item_id.isnot(None), excludes.c.item_id.is_(None)))  # noqa: E711
-                .cte()
-            )
+            stmt = sa.select(self._project_items.c.item_id)
+
+            include_ids = [iid.uuid for iid in subquery.import_ids if iid.incl]
+            if len(include_ids) > 0:
+                stmt_incl = sa.select(m2m_import_item_table.c.item_id).where(m2m_import_item_table.c.import_id.in_(include_ids)).alias()
+                stmt = stmt.join(stmt_incl, stmt_incl.c.item_id == self._project_items.c.item_id, isouter=True).where(stmt_incl.c.item_id.isnot(None))
+
+            exclude_ids = [iid.uuid for iid in subquery.import_ids if not iid.incl]
+            if len(exclude_ids) > 0:
+                stmt_excl = sa.select(m2m_import_item_table.c.item_id).where(m2m_import_item_table.c.import_id.in_(exclude_ids)).alias()
+                stmt = stmt.join(stmt_excl, stmt_excl.c.item_id == self._project_items.c.item_id, isouter=True).where(stmt_excl.c.item_id.is_(None))
+
+            return stmt.cte()
 
         raise InvalidNQLError(f'Not sure what to do with this: {subquery}!')
 

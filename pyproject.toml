@@ -1,6 +1,6 @@
 [project]
 name = "nacsos_data"
-version = "0.24.48"
+version = "0.24.49"
 description = "Core data models and utilities for the NACSOS platform"
 author = "Tim Repke / ECS@PIK"
 license = { file = "LICENSE" }
@@ -16,7 +16,7 @@ dependencies = [
     "python-dotenv==1.2.2",
     "SQLAlchemy==2.0.50",
     "sqlalchemy-json==0.7.0",
-    "typer==0.26.2",
+    "typer==0.26.7",
 ]
 
 [project.optional-dependencies]
@@ -25,7 +25,7 @@ utils = [
     "bcrypt==5.0.0",
     "rispy==0.10.0",
     "scipy==1.17.1",
-    "scikit-learn==1.8.0",
+    "scikit-learn==1.9.0",
     "markdownify==1.2.2",
     "lxml==6.1.1",
     "bibtexparser==1.4.4",
@@ -39,13 +39,13 @@ priority = [
     "evaluate==0.4.6",
 ]
 scripts = [
-    "tqdm==4.67.3",
+    "tqdm==4.68.2",
     "alembic==1.18.4",
 ]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.14",
+    "ruff>=0.15.17",
 #    "tox==4.32.0",
 #    "pytest==9.0.1",
 #    "pytest-cov==7.0.0",
