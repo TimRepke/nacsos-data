@@ -236,14 +236,13 @@ def importer(
         elif kind == ImportTypeEnum.GENERIC:
             logger.info('Proceeding for Generic project import...')
             sources = _sources(source, extension='jsonl')
+            import_id_ = await _ensure_committed_import()
             await _ensure_project_type(db_engine=db_engine, project_id=project_id, expected_type=ItemType.generic)
             await import_generic(
                 sources=sources,
-                import_id=import_id,
                 project_id=project_id,
                 user_id=user_id,
-                name=name,
-                description=description,
+                import_id=import_id_,
                 db_engine=db_engine,
                 logger=logger,
             )

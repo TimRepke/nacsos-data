@@ -16,8 +16,8 @@ async def import_generic(
     db_engine: DatabaseEngineAsync,
     logger: logging.Logger,
     project_id: str,  # Project ID
-    name: str,  # Name of this import
-    description: str,  # Description of this import
+    name: str|None=None,  # Name of this import
+    description: str|None=None,  # Description of this import
     import_id: str | None = None,  # Project ID
     user_id: str = 'fd641232-bada-466e-9a3b-fb12038f5508',  # User ID used for import (default: Tim)
 ) -> None:
@@ -29,7 +29,7 @@ async def import_generic(
                 num_items += 1
 
     async with db_engine.session() as session:
-        if import_id is None:
+        if import_id is None and name is not None and description is not None:
             logger.info('Creating new import')
             import_id = str(uuid.uuid4())
 
@@ -43,6 +43,8 @@ async def import_generic(
             )
             session.add(imp)
             await session.flush()
+        elif import_id is None:
+            raise RuntimeError('name or description not set and no import_id provided')
         else:
             logger.info('Using existing import by ID provided')
 
