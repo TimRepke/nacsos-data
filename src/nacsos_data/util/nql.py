@@ -187,16 +187,14 @@ class NQLQuery:
             else:
                 raise InvalidNQLError('Missing subquery!')
 
-            query = sa.select(self._project_items)
-            for child in children:
-                query = query.join(child, self._project_items.c.item_id == child.c.item_id, isouter=True)
+            query = sa.select(self._project_items.c.item_id)
 
             if subquery.not_ is not None:
-                query = query.where(children[0].c.item_id.is_(None))
+                query = query.where(~sa.exists(sa.select(1).where(children[0].c.item_id == self._project_items.c.item_id)))
             elif subquery.and_ is not None:
-                query = query.where(sa.and_(*(child.c.item_id.isnot(None) for child in children)))
+                query = query.where(sa.and_(*(sa.exists(sa.select(1).where(child.c.item_id == self._project_items.c.item_id)) for child in children)))
             elif subquery.or_ is not None:
-                query = query.where(sa.or_(*(child.c.item_id.isnot(None) for child in children)))
+                query = query.where(sa.or_(*(sa.exists(sa.select(1).where(child.c.item_id == self._project_items.c.item_id)) for child in children)))
 
             return query.cte()
 
@@ -271,20 +269,22 @@ class NQLQuery:
                 raise NotImplementedError('"IS ASSIGNED BUT NOT IN" filter not implemented yet')
 
             if subquery.mode == 4:
-                return (
-                    sa.select(self._project_items.c.item_id)
-                    .join(Assignment, Assignment.item_id == self._project_items.c.item_id, isouter=True)
-                    .where(Assignment.item_id.is_(None))  # noqa: E711
-                ).cte()
+                return sa.select(self._project_items.c.item_id).where(~sa.exists(sa.select(1).where(Assignment.item_id == self._project_items.c.item_id))).cte()
 
             if subquery.mode == 5:
                 if subquery.scopes is None:
                     raise InvalidNQLError('No scopes defined!')
                 return (
                     sa.select(self._project_items.c.item_id)
-                    .join(Assignment, sa.and_(Assignment.item_id == self._project_items.c.item_id, Assignment.assignment_scope_id.notin_(subquery.scopes)))
-                    .where(Assignment.item_id.is_(None))  # noqa: E711
-                ).cte()
+                    .where(
+                        ~sa.exists(
+                            sa.select(1).where(
+                                sa.and_(Assignment.item_id == self._project_items.c.item_id, Assignment.assignment_scope_id.notin_(subquery.scopes))
+                            )
+                        )
+                    )
+                    .cte()
+                )
 
             if subquery.mode == 6:
                 if subquery.scheme is None:
@@ -308,34 +308,26 @@ class NQLQuery:
 
         elif isinstance(subquery, AnnotationFilter):
             if subquery.scheme is not None:
-                query = (
-                    sa.select(self._project_items.c.item_id)
-                    .join(
-                        Assignment,
-                        sa.and_(Assignment.annotation_scheme_id == subquery.scheme, Assignment.item_id == self._project_items.c.item_id),
-                        isouter=True,
-                    )
-                    .join(Annotation, Assignment.assignment_id == Annotation.assignment_id, isouter=True)
+                exists_stmt = (
+                    sa.select(1)
+                    .select_from(Assignment)
+                    .join(Annotation, Assignment.assignment_id == Annotation.assignment_id)
+                    .where(sa.and_(Assignment.annotation_scheme_id == subquery.scheme, Assignment.item_id == self._project_items.c.item_id))
                 )
             elif subquery.scopes is not None:
-                query = (
-                    sa.select(self._project_items.c.item_id)
-                    .join(
-                        Assignment,
-                        sa.and_(Assignment.assignment_scope_id.in_(subquery.scopes), Assignment.item_id == self._project_items.c.item_id),
-                        isouter=True,
-                    )
-                    .join(Annotation, Annotation.assignment_id == Assignment.assignment_id, isouter=True)
+                exists_stmt = (
+                    sa.select(1)
+                    .select_from(Assignment)
+                    .join(Annotation, Annotation.assignment_id == Assignment.assignment_id)
+                    .where(sa.and_(Assignment.assignment_scope_id.in_(subquery.scopes), Assignment.item_id == self._project_items.c.item_id))
                 )
             else:
-                query = sa.select(self._project_items.c.item_id).join(
-                    Annotation,
-                    Annotation.item_id == self._project_items.c.item_id,
-                    isouter=True,
-                )
+                exists_stmt = sa.select(1).select_from(Annotation).where(Annotation.item_id == self._project_items.c.item_id)
+
+            query = sa.select(self._project_items.c.item_id)
             if subquery.incl:
-                return query.where(Annotation.item_id.isnot(None)).cte()  # noqa: E711
-            return query.where(Annotation.item_id.is_(None)).cte()  # noqa: E711
+                return query.where(sa.exists(exists_stmt)).cte()
+            return query.where(~sa.exists(exists_stmt)).cte()
 
         elif isinstance(subquery, AbstractFilter):
             query = sa.select(Item.item_id).where(Item.project_id == self.project_id)
@@ -351,13 +343,23 @@ class NQLQuery:
 
             include_ids = [iid.uuid for iid in subquery.import_ids if iid.incl]
             if len(include_ids) > 0:
-                stmt_incl = sa.select(m2m_import_item_table.c.item_id).where(m2m_import_item_table.c.import_id.in_(include_ids)).alias()
-                stmt = stmt.join(stmt_incl, stmt_incl.c.item_id == self._project_items.c.item_id, isouter=True).where(stmt_incl.c.item_id.isnot(None))
+                stmt = stmt.where(
+                    sa.exists(
+                        sa.select(1).where(
+                            sa.and_(m2m_import_item_table.c.item_id == self._project_items.c.item_id, m2m_import_item_table.c.import_id.in_(include_ids))
+                        )
+                    )
+                )
 
             exclude_ids = [iid.uuid for iid in subquery.import_ids if not iid.incl]
             if len(exclude_ids) > 0:
-                stmt_excl = sa.select(m2m_import_item_table.c.item_id).where(m2m_import_item_table.c.import_id.in_(exclude_ids)).alias()
-                stmt = stmt.join(stmt_excl, stmt_excl.c.item_id == self._project_items.c.item_id, isouter=True).where(stmt_excl.c.item_id.is_(None))
+                stmt = stmt.where(
+                    ~sa.exists(
+                        sa.select(1).where(
+                            sa.and_(m2m_import_item_table.c.item_id == self._project_items.c.item_id, m2m_import_item_table.c.import_id.in_(exclude_ids))
+                        )
+                    )
+                )
 
             return stmt.cte()
 
@@ -428,9 +430,10 @@ class NQLQuery:
                 query = sa.select(self._project_items.c.item_id)
                 for user in subquery.users.user_ids:
                     user_annotations = _annotation().where(Annotation.user_id == user).alias()
-                    query = query.join(user_annotations, user_annotations.c.item_id == self._project_items.c.item_id, isouter=True).where(
-                        user_annotations.c.item_id.isnot(None)
-                    )
+                    query = query.where(sa.exists(sa.select(1).where(user_annotations.c.item_id == self._project_items.c.item_id)))
+                    # query = query
+                    #      .join(user_annotations, user_annotations.c.item_id == self._project_items.c.item_id, isouter=True)
+                    #      .where(user_annotations.c.item_id.isnot(None)
                 return query.cte()
             return _annotation().cte()
 
