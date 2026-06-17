@@ -300,7 +300,7 @@ async def prepare_export_table(
     labels: list[LabelOptions],
     ignore_hierarchy: bool,
     ignore_repeat: bool,
-    max_results: int|None = None,
+    max_results: int | None = None,
 ) -> list[dict[str, bool | int | str | None]]:
     project_type = await session.scalar(sa.select(Project.type).where(Project.project_id == project_id))
 

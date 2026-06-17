@@ -16,8 +16,8 @@ async def import_generic(
     db_engine: DatabaseEngineAsync,
     logger: logging.Logger,
     project_id: str,  # Project ID
-    name: str|None=None,  # Name of this import
-    description: str|None=None,  # Description of this import
+    name: str | None = None,  # Name of this import
+    description: str | None = None,  # Description of this import
     import_id: str | None = None,  # Project ID
     user_id: str = 'fd641232-bada-466e-9a3b-fb12038f5508',  # User ID used for import (default: Tim)
 ) -> None:
