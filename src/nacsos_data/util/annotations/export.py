@@ -300,6 +300,7 @@ async def prepare_export_table(
     labels: list[LabelOptions],
     ignore_hierarchy: bool,
     ignore_repeat: bool,
+    max_results: int|None = None,
 ) -> list[dict[str, bool | int | str | None]]:
     project_type = await session.scalar(sa.select(Project.type).where(Project.project_id == project_id))
 
@@ -307,6 +308,14 @@ async def prepare_export_table(
         raise NotFoundError(f'No project with id={project_id}!')
 
     nql_query = NQLQuery(query=nql_filter, project_id=str(project_id), project_type=project_type)
+
+    if max_results is not None and max_results > 0:
+        stmt = nql_query.stmt.subquery()
+        cnt_stmt = sa.func.count(stmt.c.item_id)
+        count = (await session.execute(cnt_stmt)).scalar() or 0
+        logger.info(f'Found {count:,} items for query')
+        if count > max_results or count < 1:
+            raise RuntimeError(f'Found {count:,} items for query (0 > count > {max_results:,})')
 
     labels_map = {lab.key: lab for lab in labels}
     stmt_labels_base = _labels_subquery(
