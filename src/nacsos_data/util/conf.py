@@ -16,6 +16,7 @@ class DatabaseConfig(BaseSettings):
     USER: str = 'nacsos'  # username for the database
     PASSWORD: str = 'secr€t_passvvord'  # password for the database user
     DATABASE: str = 'nacsos_core'  # name of the database
+    STMT_TIMEOUT: int = 0  # max runtim in ms // 0=no timeout // https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-STATEMENT-TIMEOUT
 
     CONNECTION_STR: PostgresDsn | None = None
 
