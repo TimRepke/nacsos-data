@@ -1,6 +1,6 @@
 [project]
 name = "nacsos_data"
-version = "0.24.51"
+version = "0.24.52"
 description = "Core data models and utilities for the NACSOS platform"
 author = "Tim Repke / ECS@PIK"
 license = { file = "LICENSE" }
@@ -26,7 +26,7 @@ utils = [
     "rispy==0.10.0",
     "scipy==1.18.0",
     "scikit-learn==1.9.0",
-    "markdownify==1.2.2",
+    "markdownify==1.2.3",
     "lxml==6.1.1",
     "bibtexparser==1.4.4",
     "pymilvus==2.6.12",
@@ -90,7 +90,7 @@ testpaths = [
 line-length = 160
 indent-width = 4
 target-version = "py313"
-include = ["pyproject.toml", "src/nacsos_data/**/*.py"]
+include = ["pyproject.toml", "src/nacsos_data/**/*.py", "tests/**/*.py"]
 exclude = ["src/nacsos_data/scripts/migrations/","src/nacsos_data/scripts/dummy_data/"]
 
 [tool.ruff.lint]

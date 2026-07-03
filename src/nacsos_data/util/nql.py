@@ -178,25 +178,19 @@ class NQLQuery:
             #  | query __ AND __ query             {% (d) => ({ filter: "sub", "and_": [d[0], d[4]]            }) %}
             #  | query __ OR  __ query             {% (d) => ({ filter: "sub", "or_":  [d[0], d[4]]            }) %}
             #  | "NOT" __ query                    {% (d) => ({ filter: "sub", "not_": d[2]                    }) %}
+            #
+            # Set algebra is expressed via INTERSECT/UNION/EXCEPT over the child item_id streams.
             if subquery.not_ is not None:
-                children = [self._assemble_filters(subquery.not_)]
+                child = self._assemble_filters(subquery.not_)
+                query = sa.except_(sa.select(self._project_items.c.item_id), sa.select(child.c.item_id))
             elif subquery.and_ is not None:
-                children = [self._assemble_filters(child) for child in subquery.and_]
+                children = [self._assemble_filters(c) for c in subquery.and_]
+                query = sa.intersect(*(sa.select(child.c.item_id) for child in children))
             elif subquery.or_ is not None:
-                children = [self._assemble_filters(child) for child in subquery.or_]
+                children = [self._assemble_filters(c) for c in subquery.or_]
+                query = sa.union(*(sa.select(child.c.item_id) for child in children))
             else:
                 raise InvalidNQLError('Missing subquery!')
-
-            query = sa.select(self._project_items)
-            for child in children:
-                query = query.join(child, self._project_items.c.item_id == child.c.item_id, isouter=True)
-
-            if subquery.not_ is not None:
-                query = query.where(children[0].c.item_id.is_(None))
-            elif subquery.and_ is not None:
-                query = query.where(sa.and_(*(child.c.item_id.isnot(None) for child in children)))
-            elif subquery.or_ is not None:
-                query = query.where(sa.or_(*(child.c.item_id.isnot(None) for child in children)))
 
             return query.cte()
 
@@ -369,7 +363,7 @@ class NQLQuery:
             if isinstance(subquery, LabelFilterBool):
                 if subquery.value_bool is None:
                     raise InvalidNQLError('Missing value!')
-                return annotation.value_bool == subquery.value_bool
+                return sa.and_(annotation.value_bool == subquery.value_bool, annotation.value_bool.isnot(None))
             if isinstance(subquery, LabelFilterInt):
                 if subquery.value_int is None:
                     raise InvalidNQLError('Missing value!')
