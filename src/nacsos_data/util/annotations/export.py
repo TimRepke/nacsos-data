@@ -341,9 +341,9 @@ async def prepare_export_table(
         stmt_items_columns = [c for c in stmt_items.columns if c.key not in ('item_id_1', 'project_id_1')]
         stmt_labels_columns = [c for c in stmt_labels.columns if c.key != 'item_id']
 
-        stmt = (
+        result_stmt = (
             sa.select(
-                *stmt_items_columns,  # type: ignore[call-overload]
+                *stmt_items_columns,
                 *stmt_labels_columns,
                 sa.func.coalesce(User.username, 'RESOLVED').label('username'),
             )
@@ -355,7 +355,7 @@ async def prepare_export_table(
     else:
         raise NotImplementedError('This is a bit more tricky, coming up soon.')
 
-    result = (await session.execute(stmt)).mappings().all()
+    result = (await session.execute(result_stmt)).mappings().all()
 
     return [dict(r) for r in result]
 
