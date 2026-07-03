@@ -338,10 +338,13 @@ async def prepare_export_table(
         )
         stmt_items = nql_query.stmt.subquery('items')
 
+        stmt_items_columns = [c for c in stmt_items.columns if c.key not in ('item_id_1', 'project_id_1')]
+        stmt_labels_columns = [c for c in stmt_labels.columns if c.key != 'item_id']
+
         stmt = (
             sa.select(
-                stmt_items.columns,  # type: ignore[call-overload]
-                stmt_labels.columns,
+                *stmt_items_columns,  # type: ignore[call-overload]
+                *stmt_labels_columns,
                 sa.func.coalesce(User.username, 'RESOLVED').label('username'),
             )
             .select_from(stmt_items)
