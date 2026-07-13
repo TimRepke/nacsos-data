@@ -46,9 +46,6 @@ scripts = [
 [dependency-groups]
 dev = [
     "ruff>=0.15.20",
-    #    "tox==4.32.0",
-    #    "pytest==9.0.1",
-    #    "pytest-cov==7.0.0",
     "mypy[faster-cache]==2.1.0",
     "types-passlib==1.7.7.20260211",
     "types-requests>=2.33.0.20260518",

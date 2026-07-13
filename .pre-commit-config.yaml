@@ -1,15 +1,35 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.20
+  - repo: local
     hooks:
-      - id: ruff-check
-      - id: ruff-format
+        - id: ruff-check
+          name: ruff check
+          description: "Run 'ruff check' for Python linting"
+          entry: uv run ruff check --fix
+          language: python
+          types_or: [python, pyi, jupyter]
+          args: []
+          require_serial: true
+          additional_dependencies: []
+          minimum_pre_commit_version: '2.9.2'
+    
+        - id: ruff-format
+          name: ruff format
+          description: "Run 'ruff format' for Python formatting"
+          entry: uv run ruff format
+          language: python
+          types_or: [python, pyi, jupyter]
+          args: []
+          require_serial: true
+          additional_dependencies: []
+          minimum_pre_commit_version: '2.9.2'
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.1.0
-    hooks:
-      - id: mypy
-        additional_dependencies:
-          - 'pydantic'
-          - 'sqlalchemy'  # or whatever else you need
-        # args: [--ignore-missing-imports]
+        - id: mypy
+          name: mypy
+          description: ''
+          entry: uv run --active mypy
+          language: python
+          'types_or': [python, pyi]
+          args: []
+          require_serial: true
+          additional_dependencies: []
+          minimum_pre_commit_version: '2.9.2'
