@@ -26,9 +26,9 @@ repos:
         - id: mypy
           name: mypy
           description: ''
-          entry: uv run --active mypy
+          entry: uv run mypy
           language: python
-          'types_or': [python, pyi]
+          types_or: [python, pyi]
           args: []
           require_serial: true
           additional_dependencies: []
