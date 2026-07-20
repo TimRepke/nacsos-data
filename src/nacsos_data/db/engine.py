@@ -12,6 +12,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine, text, URL
 from contextlib import contextmanager, asynccontextmanager
 from datetime import datetime
+from uuid import UUID
+from enum import Enum
 
 # unused import required so the engine sees the models!
 from . import schemas  # noqa F401
@@ -33,7 +35,34 @@ class DictLikeEncoder(JSONEncoder):
         if isinstance(o, BaseModel):
             return o.model_dump()
 
+        # todo: test this doesnt break db usages
+        # Translate UUID to str
+        if isinstance(o, UUID):
+            return str(o)
+
+        # Translate Enum to str
+        if isinstance(o, Enum):
+            return o.value
+
         return json.JSONEncoder.default(self, o)
+
+    def excel_encode(self, o: Any) -> Any:
+        # Translate datetime into a string
+        if isinstance(o, datetime):
+            return o.strftime('%Y-%m-%dT%H:%M:%S')
+
+        # Translate UUID to str
+        if isinstance(o, UUID):
+            return str(o)
+
+        # Translate Enum to str
+        if isinstance(o, Enum):
+            return o.value
+
+        if isinstance(o, list) or isinstance(o, dict):
+            return json.dumps(o)
+
+        return o
 
 
 class DatabaseEngineAsync:
