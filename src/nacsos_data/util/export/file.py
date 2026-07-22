@@ -3,12 +3,15 @@ import tempfile
 import rispy
 import xlsxwriter
 
-from nacsos_data.db.engine import DictLikeEncoder
-from nacsos_data.util.annotations.export import LabelOptions
 from typing import Any
+
+from nacsos_data.db.engine import DictLikeEncoder
+from nacsos_data.util.export.util import LabelOptions, encode_excel
 
 
 def get_author_names(authors: Any) -> list[str]:
+    """Works within a single row from output of from nacsos_data.util.export.dict prepare_export_table"""
+
     if not isinstance(authors, list) or not authors:
         return []
 
@@ -32,9 +35,6 @@ def write_csv(result: list[dict[str, Any]]) -> str:
 
 
 def write_excel(result: list[dict[str, Any]]) -> str:
-    # encoder for type conversions required for excel
-    encoder = DictLikeEncoder()
-
     # Create a temporary file
     with tempfile.NamedTemporaryFile(suffix='.xlsx', mode='wb', delete=False) as fp:
         temp_path = fp.name
@@ -50,7 +50,7 @@ def write_excel(result: list[dict[str, Any]]) -> str:
 
     # Write data rows
     for row_idx, row in enumerate(result, start=1):
-        ws.write_row(row_idx, 0, [encoder.excel_encode(row.get(h)) for h in headers])
+        ws.write_row(row_idx, 0, [encode_excel(row.get(h)) for h in headers])
 
     # Set column widths
     for col_idx, header in enumerate(headers):
@@ -100,7 +100,7 @@ def write_ris(result: list[dict[str, Any]], labels: list[LabelOptions]) -> str:
                 }
                 for row in result
             ],
-            fp,
+            fp,  # pyright: ignore[reportArgumentType]
         )
 
         return fp.name

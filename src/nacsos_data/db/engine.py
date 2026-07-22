@@ -35,7 +35,6 @@ class DictLikeEncoder(JSONEncoder):
         if isinstance(o, BaseModel):
             return o.model_dump()
 
-        # todo: test this doesnt break db usages
         # Translate UUID to str
         if isinstance(o, UUID):
             return str(o)
@@ -45,24 +44,6 @@ class DictLikeEncoder(JSONEncoder):
             return o.value
 
         return json.JSONEncoder.default(self, o)
-
-    def excel_encode(self, o: Any) -> Any:
-        # Translate datetime into a string
-        if isinstance(o, datetime):
-            return o.strftime('%Y-%m-%dT%H:%M:%S')
-
-        # Translate UUID to str
-        if isinstance(o, UUID):
-            return str(o)
-
-        # Translate Enum to str
-        if isinstance(o, Enum):
-            return o.value
-
-        if isinstance(o, list) or isinstance(o, dict):
-            return json.dumps(o)
-
-        return o
 
 
 class DatabaseEngineAsync:
