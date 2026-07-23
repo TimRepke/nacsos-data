@@ -342,7 +342,10 @@ async def prepare_export_table(
             sa.select(
                 stmt_items.columns,  # type: ignore[call-overload]
                 stmt_labels.columns,
-                sa.func.coalesce(User.username, 'RESOLVED').label('username'),
+                sa.case(
+                    (stmt_labels.c.item_id.isnot(None), sa.func.coalesce(User.username, 'RESOLVED')),
+                    else_=sa.null(),
+                ).label('username'),
             )
             .select_from(stmt_items)
             .join(stmt_labels, stmt_labels.c.item_id == stmt_items.c.item_id, isouter=True)
