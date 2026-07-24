@@ -1,6 +1,6 @@
 [project]
 name = "nacsos_data"
-version = "0.24.53"
+version = "0.24.54"
 description = "Core data models and utilities for the NACSOS platform"
 author = "Tim Repke / ECS@PIK"
 license = { file = "LICENSE" }
@@ -17,6 +17,8 @@ dependencies = [
     "SQLAlchemy==2.0.51",
     "sqlalchemy-json==0.7.0",
     "typer==0.27.0",
+    "xlsxwriter>=3.2.9",
+    "rispy>=0.10.0",
 ]
 
 [project.optional-dependencies]
