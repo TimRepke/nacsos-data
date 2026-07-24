@@ -65,43 +65,35 @@ def write_excel(result: list[dict[str, Any]]) -> str:
 
 
 def write_ris(result: list[dict[str, Any]], labels: list[LabelOptions]) -> str:
-    with tempfile.NamedTemporaryFile(suffix='.ris', mode='w', delete=False) as fp:
-        rispy.dump(
-            [
-                {  # In prod academic_items; up to 2.5M out of 8M missing for these columns; so to make it error prone, default to empty string
-                    'abstract': row.get('text'),
-                    'title': row.get('title'),
-                    'doi': f'https://doi.org/{row.get("doi")}',
-                    'custom1': row.get('openalex_id'),
-                    'custom2': str(row.get('item_id')),
-                    'year': row.get('publication_year'),
-                    'journal_name': row.get('source'),
-                    'authors': row.get('authors', []),
-                    'keywords': row.get('keywords')
-                    if row.get('keywords')
-                    else []
-                    + [f'{l.key}|{li}' for l in labels if l.options_int is not None for li in l.options_int if row[f'{l.key}|{li}'] == 1]
-                    + [f'{l.key}|{li}' for l in labels if l.options_multi is not None for li in l.options_multi if row[f'{l.key}|{li}'] == 1]
-                    + [f'{l.key}|{li}' for l in labels if l.options_bool is not None for li in [0, 1] if row[f'{l.key}|{li}'] == 1],
-                    'label': [f'{l.key}|{li}' for l in labels if l.options_int is not None for li in l.options_int if row[f'{l.key}|{li}'] == 1]
-                    + [f'{l.key}|{li}' for l in labels if l.options_multi is not None for li in l.options_multi if row[f'{l.key}|{li}'] == 1]
-                    + [f'{l.key}|{li}' for l in labels if l.options_bool is not None for li in [0, 1] if row[f'{l.key}|{li}'] == 1],
-                    'notes': [
-                        f'openalex: {row.get("openalex_id")}\n'
-                        f'nacsos: {row.get("item_id")}\n'
-                        f'annotated by: {row.get("username")}\n'
-                        f'Annotations: '
-                        + ', '.join(
-                            [f'{l.key}|{li}' for l in labels if l.options_int is not None for li in l.options_int if row[f'{l.key}|{li}'] == 1]
-                            + [f'{l.key}|{li}' for l in labels if l.options_multi is not None for li in l.options_multi if row[f'{l.key}|{li}'] == 1]
-                            + [f'{l.key}|{li}' for l in labels if l.options_bool is not None for li in [0, 1] if row[f'{l.key}|{li}'] == 1]
-                        )
-                    ],
-                }
-                for row in result
-            ],
-            fp,  # pyright: ignore[reportArgumentType]
+    def _prepare_record(row: dict[str, Any]) -> dict[str, Any]:
+        label_tags = (
+            [f'{l.key}|{li}' for l in labels if l.options_int is not None for li in l.options_int if row[f'{l.key}|{li}'] == 1]
+            + [f'{l.key}|{li}' for l in labels if l.options_multi is not None for li in l.options_multi if row[f'{l.key}|{li}'] == 1]
+            + [f'{l.key}|{li}' for l in labels if l.options_bool is not None for li in [0, 1] if row[f'{l.key}|{li}'] == 1]
         )
+        keywords = label_tags
+        if row.get('keywords') is not None and len(row.get('keywords', [])) > 0:
+            keywords += row.get('keywords', [])
+
+        return {
+            # In prod academic_items; up to 2.5M out of 8M missing for these columns; so to make it error prone, default to empty string
+            'abstract': row.get('text'),
+            'title': row.get('title'),
+            'doi': f'https://doi.org/{row.get("doi")}',
+            'custom1': row.get('openalex_id'),
+            'custom2': str(row.get('item_id')),
+            'year': row.get('publication_year'),
+            'journal_name': row.get('source'),
+            'authors': row.get('authors', []),
+            'keywords': keywords,
+            'label': label_tags,
+            'notes': [
+                f'openalex: {row.get("openalex_id")}\nnacsos: {row.get("item_id")}\nannotated by: {row.get("username")}\nAnnotations: ' + ', '.join(label_tags)
+            ],
+        }
+
+    with tempfile.NamedTemporaryFile(suffix='.ris', mode='w', delete=False) as fp:
+        rispy.dump(references=[_prepare_record(row) for row in result], file=fp)  # pyright: ignore[reportArgumentType]
 
         return fp.name
 
