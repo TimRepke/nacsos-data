@@ -29,7 +29,7 @@ def write_csv(result: list[dict[str, Any]]) -> str:
     with tempfile.NamedTemporaryFile(suffix='.csv', mode='w', newline='', delete=False) as fp:
         writer = csv.DictWriter(fp, fieldnames=list(result[0].keys()))
         writer.writeheader()
-        [writer.writerow(lab) for lab in result]
+        [writer.writerow(row) for row in result]
 
     return fp.name
 

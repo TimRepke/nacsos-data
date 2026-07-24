@@ -269,9 +269,14 @@ async def read_assignment_scope(session: DBSession, assignment_scope_id: str | u
 
 @ensure_session_async
 async def read_annotation_scheme(
-    session: DBSession, assignment_id: str | uuid.UUID | None = None, assignment_scope_id: str | uuid.UUID | None = None
+    session: DBSession,
+    assignment_id: str | uuid.UUID | None = None,
+    assignment_scope_id: str | uuid.UUID | None = None,
+    annotation_scheme_id: str | uuid.UUID | None = None,
 ) -> AnnotationSchemeModel | None:
-    if assignment_id is not None:
+    if annotation_scheme_id is not None:
+        stmt = select(AnnotationScheme).where(AnnotationScheme.annotation_scheme_id == annotation_scheme_id)
+    elif assignment_id is not None:
         stmt = (
             select(AnnotationScheme)
             .join(Assignment, AnnotationScheme.annotation_scheme_id == Assignment.annotation_scheme_id)

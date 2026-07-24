@@ -2,6 +2,7 @@ import uuid
 import logging
 
 import sqlalchemy as sa
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.connection import DatabaseEngineAsync
@@ -18,18 +19,35 @@ from ..nql import NQLQuery
 logger = logging.getLogger('nacsos_data.util.annotations.export')
 
 
-async def get_project_bot_scopes(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[dict[str, str]]:
+class BaseInfo(BaseModel):
+    id: str | uuid.UUID
+    name: str
+
+
+class BaseInfoWithScheme(BaseInfo):
+    scheme_id: str | uuid.UUID
+    scheme_name: str
+
+
+async def get_project_bot_scopes(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[BaseInfoWithScheme]:
     session: AsyncSession
     async with db_engine.session() as session:
         stmt = (
-            sa.select(BotAnnotationMetaData.bot_annotation_metadata_id.cast(type_=sa.String).label('id'), BotAnnotationMetaData.name)
+            sa.select(
+                BotAnnotationMetaData.bot_annotation_metadata_id.cast(type_=sa.String).label('id'),
+                BotAnnotationMetaData.name,
+                AnnotationScheme.annotation_scheme_id.cast(type_=sa.String).label('scheme_id'),
+                AnnotationScheme.name.label('scheme_name'),
+            )
+            .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == BotAnnotationMetaData.annotation_scheme_id, isouter=True)
             .where(BotAnnotationMetaData.project_id == project_id)
             .order_by(BotAnnotationMetaData.time_created)
         )
-        return [dict(r) for r in (await session.execute(stmt)).mappings().all()]
+        # FIXME: technically, we need to allow for scheme_id and scheme_name to be empty
+        return [BaseInfoWithScheme.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
 
 
-async def get_project_scopes(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[dict[str, str]]:
+async def get_project_scopes(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[BaseInfoWithScheme]:
     session: AsyncSession
     async with db_engine.session() as session:
         stmt = (
@@ -43,10 +61,10 @@ async def get_project_scopes(project_id: str | uuid.UUID, db_engine: DatabaseEng
             .where(AnnotationScheme.project_id == project_id)
             .order_by(AssignmentScope.time_created)
         )
-        return [dict(r) for r in (await session.execute(stmt)).mappings().all()]
+        return [BaseInfoWithScheme.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
 
 
-async def get_project_users(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[dict[str, str]]:
+async def get_project_users(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[BaseInfo]:
     session: AsyncSession
     async with db_engine.session() as session:
         stmt = (
@@ -55,7 +73,7 @@ async def get_project_users(project_id: str | uuid.UUID, db_engine: DatabaseEngi
             .where(ProjectPermissions.project_id == project_id)
             .order_by(User.username)
         )
-        return [dict(r) for r in (await session.execute(stmt)).mappings().all()]
+        return [BaseInfo.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
 
 
 async def get_labels(stmt_labels: sa.CTE, db_engine: DatabaseEngineAsync) -> dict[str, LabelOptions]:
@@ -102,9 +120,9 @@ async def get_project_labels(project_id: str | uuid.UUID, db_engine: DatabaseEng
     scopes = await get_project_scopes(project_id=project_id, db_engine=db_engine)
     users = await get_project_users(project_id=project_id, db_engine=db_engine)
 
-    bot_annotation_metadata_ids = [r['id'] for r in bot_scopes]
-    assignment_scope_ids = [r['id'] for r in scopes]
-    user_ids = [r['id'] for r in users]
+    bot_annotation_metadata_ids = [str(r.id) for r in bot_scopes]
+    assignment_scope_ids = [str(r.id) for r in scopes]
+    user_ids = [str(r.id) for r in users]
 
     stmt_labels = _labels_subquery(
         bot_annotation_metadata_ids=bot_annotation_metadata_ids,

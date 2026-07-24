@@ -12,6 +12,8 @@ from datetime import datetime
 from nacsos_data.db.schemas import AcademicItem, TwitterItem, LexisNexisItem
 from nacsos_data.db.schemas.annotations import Annotation, Assignment
 from nacsos_data.db.schemas.bot_annotations import BotAnnotation
+from nacsos_data.models.annotations import AnnotationSchemeModel
+from nacsos_data.util.annotations.validation import flatten_annotation_scheme
 
 logger = logging.getLogger('nacsos_data.util.annotations.export')
 
@@ -27,6 +29,20 @@ class LabelOptions(BaseModel):
     options_bool: list[bool] | None = None
     options_multi: list[int] | None = None
     strings: bool | None = None
+
+
+def scheme_to_label_options(scheme: AnnotationSchemeModel) -> dict[str, LabelOptions]:
+    flat_scheme = flatten_annotation_scheme(scheme)
+    return {
+        label.key: LabelOptions(
+            key=label.key,
+            options_int=[choice.value for choice in label.choices] if label.choices and label.kind == 'single' else None,
+            options_multi=[choice.value for choice in label.choices] if label.choices and label.kind == 'multi' else None,
+            options_bool=[True, False] if label.kind == 'bool' else None,
+            strings=True if label.kind == 'str' else None,
+        )
+        for label in flat_scheme.labels
+    }
 
 
 def encode_excel(o: Any) -> Any:
@@ -56,7 +72,7 @@ def _bool_label_columns(key: str, repeat: int | None, cte: sa.CTE) -> list[sa.La
         label = lambda x: f'{key}({repeat})|{x}'  # noqa: E731
     return [
         sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0, sa.func.max(sa.case((sa.and_(cte.c.value_bool == vb, *conditions), 1), else_=0)))).label(
-            label(vs)  # type: ignore[no-untyped-call]
+            label(vs),  # type: ignore[no-untyped-call]
         )
         for vs, vb in [('0', False), ('1', True)]
     ]
@@ -70,7 +86,7 @@ def _single_label_columns(key: str, repeat: int | None, values: list[int], cte: 
         label = lambda x: f'{key}({repeat})|{x}'  # noqa: E731
     return [
         sa.case((sa.func.count().filter(sa.and_(*conditions)) > 0, sa.func.max(sa.case((sa.and_(cte.c.value_int == v, *conditions), 1), else_=0)))).label(
-            label(v)  # type: ignore[no-untyped-call]
+            label(v),  # type: ignore[no-untyped-call]
         )
         for v in values
     ]
@@ -84,7 +100,7 @@ def _multi_label_columns(key: str, repeat: int | None, values: list[int], cte: s
         label = lambda x: f'{key}({repeat})|{x}'  # noqa: E731
     return [
         sa.case(
-            (sa.func.count().filter(sa.and_(*conditions)) > 0, sa.func.max(sa.case((sa.and_(sa.any_(cte.c.multi_int) == v, *conditions), 1), else_=0)))
+            (sa.func.count().filter(sa.and_(*conditions)) > 0, sa.func.max(sa.case((sa.and_(sa.any_(cte.c.multi_int) == v, *conditions), 1), else_=0))),
         ).label(label(v))  # type: ignore[no-untyped-call]
         for v in values
     ]
