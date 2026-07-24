@@ -12,6 +12,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine, text, URL
 from contextlib import contextmanager, asynccontextmanager
 from datetime import datetime
+from uuid import UUID
+from enum import Enum
 
 # unused import required so the engine sees the models!
 from . import schemas  # noqa F401
@@ -32,6 +34,14 @@ class DictLikeEncoder(JSONEncoder):
         # Translate pydantic models into dict
         if isinstance(o, BaseModel):
             return o.model_dump()
+
+        # Translate UUID to str
+        if isinstance(o, UUID):
+            return str(o)
+
+        # Translate Enum to str
+        if isinstance(o, Enum):
+            return o.value
 
         return json.JSONEncoder.default(self, o)
 

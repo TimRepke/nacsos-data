@@ -1,4 +1,4 @@
-from typing import Type, Sequence
+from typing import Any, Type, Sequence
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import MappedColumn, InstrumentedAttribute, Session
@@ -182,17 +182,15 @@ class NQLQuery:
             # Set algebra is expressed via INTERSECT/UNION/EXCEPT over the child item_id streams.
             if subquery.not_ is not None:
                 child = self._assemble_filters(subquery.not_)
-                query = sa.except_(sa.select(self._project_items.c.item_id), sa.select(child.c.item_id))
+                return sa.except_(sa.select(self._project_items.c.item_id), sa.select(child.c.item_id)).cte()
             elif subquery.and_ is not None:
                 children = [self._assemble_filters(c) for c in subquery.and_]
-                query = sa.intersect(*(sa.select(child.c.item_id) for child in children))
+                return sa.intersect(*(sa.select(child.c.item_id) for child in children)).cte()
             elif subquery.or_ is not None:
                 children = [self._assemble_filters(c) for c in subquery.or_]
-                query = sa.union(*(sa.select(child.c.item_id) for child in children))
+                return sa.union(*(sa.select(child.c.item_id) for child in children)).cte()
             else:
                 raise InvalidNQLError('Missing subquery!')
-
-            return query.cte()
 
         if isinstance(subquery, FieldFilter):
             #     TITLE    ":" _ dqstring           {% (d) => ({ filter: "field", field: "title",       value:  d[3]               }) %}
@@ -227,7 +225,7 @@ class NQLQuery:
             #   | KEY _  COMP     _  uint      {% (d) => ({ filter: "meta_int",  value_type: "int",  field: d[0], comp: d[2],   value: d[4] }) %}
             #   | KEY __ "LIKE"i  __ dqstring  {% (d) => ({ filter: "meta_str",  value_type: "str",  field: d[0], comp: "LIKE", value: d[4] }) %}
             schema, col = self._get_column('meta')
-            query = sa.select(self._project_items.c.item_id).join(schema, schema.item_id == self._project_items.c.item_id)
+            query: sa.Select[Any] = sa.select(self._project_items.c.item_id).join(schema, schema.item_id == self._project_items.c.item_id)
             if isinstance(subquery, MetaFilterBool):
                 return query.where(col[subquery.field].as_boolean() == bool(subquery.value)).cte()
             if isinstance(subquery, MetaFilterInt):

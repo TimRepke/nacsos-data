@@ -9,7 +9,7 @@ from nacsos_data.util.priority.ml import training, workload_estimation, report
 
 from nacsos_data.db.schemas import Priority
 from nacsos_data.models.priority import PriorityModel
-from nacsos_data.util.annotations.export import wide_export_table
+from nacsos_data.util.export.pandas import wide_export_table
 from nacsos_data.util.errors import NotFoundError
 from nacsos_data.util.priority.mask import get_inclusion_mask
 from nacsos_data.util.priority.plots import inclusion_curve, scope_inclusions, buscar_frontiers, score_distribution, buscar_workload, roc_auc
