@@ -11,8 +11,7 @@ from nacsos_data.util.export.util import LabelOptions, encode_excel
 
 def get_author_names(authors: Any) -> list[str]:
     """Works within a single row from output of from nacsos_data.util.export.dict prepare_export_table"""
-
-    if not isinstance(authors, list) or not authors:
+    if authors is None or not authors or not isinstance(authors, list):
         return []
 
     first = authors[0]
@@ -29,7 +28,8 @@ def write_csv(result: list[dict[str, Any]]) -> str:
     with tempfile.NamedTemporaryFile(suffix='.csv', mode='w', newline='', delete=False) as fp:
         writer = csv.DictWriter(fp, fieldnames=list(result[0].keys()))
         writer.writeheader()
-        [writer.writerow(row) for row in result]
+        # FIXME: keywords might be added back in by this but be completely empty
+        [writer.writerow(row | {'authors': '; '.join((row.get('authors') or [])), 'keywords': '; '.join((row.get('keywords') or []))}) for row in result]
 
     return fp.name
 
