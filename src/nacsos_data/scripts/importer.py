@@ -129,7 +129,19 @@ async def _ensure_project_type(session: AsyncSession, expected_type: ItemType, p
     return True
 
 
-@app.command('import', help='Import data into the platform', epilog=ImportTypeEnum.help())
+PORT_FORWARDING_HELP = """
+\n\n
+If you are running nacsos import locally, make sure that you have set up port fowarding to the remote host:
+
+ssh -N -L 5432:localhost:5432 -L 19530:localhost:19530 <remote-host>
+
+If you are accessing through a jump host, run:
+
+ssh -N -L 5432:localhost:5432 -L 19530:localhost:19530 <remote-host> -J <jump-host>
+"""
+
+
+@app.command('import', help='Import data into the platform', epilog=ImportTypeEnum.help() + PORT_FORWARDING_HELP)
 def importer(
     kind: ImportTypeEnum,
     source: Annotated[Path, typer.Option(help='Data source (single file, folder with files, or txt file containing solr query)')],

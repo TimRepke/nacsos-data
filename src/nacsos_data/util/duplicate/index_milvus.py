@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger('nacsos_data.util.deduplicate.index')
 
+MILVUS_URI = 'http://localhost:19530'
+
 
 def _get_vector_rep(x: csr_matrix, i: int) -> dict[str, int | np.ndarray]:
     if x.nnz > 0:
@@ -52,11 +54,12 @@ class MilvusDuplicateIndex:
     ):
         from pymilvus import MilvusClient
 
+        self._check_milvus_availability()
         self.existing_items = existing_items
         self.new_items = new_items
         self.max_slop = max_slop
         self.batch_size = batch_size
-        self.client = MilvusClient(uri='http://localhost:19530')
+        self.client = MilvusClient(uri=MILVUS_URI)
         self.collection_name = 'default'  # will be reset in `.init()`
         self.project_id = project_id
         if vectoriser is None:
@@ -72,6 +75,16 @@ class MilvusDuplicateIndex:
         self.item_ids_nw_inv: dict[int, str] | None = None
 
         self.saved: dict[str, str] = {}
+
+    def _check_milvus_availability(self) -> None:
+        from pymilvus import MilvusClient
+
+        temp_client = MilvusClient(uri=MILVUS_URI, timeout=5)
+        try:
+            temp_client.get_server_version()
+            logger.info('Milvus server available')
+        except Exception as err:
+            raise RuntimeError(f'Milvus server is not available at {MILVUS_URI}. Please ensure Milvus is running and port is accessible.') from err
 
     async def _load_vectors_batched_async(self, generator: AsyncGenerator[list[ItemEntry], None]) -> AsyncGenerator[tuple[list[str], csr_matrix], None]:
         async for batch in generator:
