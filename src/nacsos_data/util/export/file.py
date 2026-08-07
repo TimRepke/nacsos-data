@@ -28,9 +28,18 @@ def write_csv(result: list[dict[str, Any]]) -> str:
     with tempfile.NamedTemporaryFile(suffix='.csv', mode='w', newline='', delete=False) as fp:
         writer = csv.DictWriter(fp, fieldnames=list(result[0].keys()))
         writer.writeheader()
-        # FIXME: keywords might be added back in by this but be completely empty
-        [writer.writerow(row | {'authors': '; '.join((row.get('authors') or [])), 'keywords': '; '.join((row.get('keywords') or []))}) for row in result]
-
+        for row in result:
+            writer.writerow(
+                row
+                | {
+                    k: v
+                    for k, v in {
+                        'authors': '; '.join((row.get('authors') or [])),
+                        'keywords': '; '.join((row.get('keywords') or [])),
+                    }.items()
+                    if k in row
+                }
+            )
     return fp.name
 
 
