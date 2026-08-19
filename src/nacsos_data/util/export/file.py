@@ -8,6 +8,8 @@ from typing import Any
 from nacsos_data.db.engine import DictLikeEncoder
 from nacsos_data.util.export.util import LabelOptions, encode_excel
 
+DEFAULT_COLUMNS_TO_DROP = ['type', 'time_edited', 'project_id', 'title_slug', 'keywords', 'meta']
+
 
 def get_author_names(authors: Any) -> list[str]:
     """Works within a single row from output of from nacsos_data.util.export.dict prepare_export_table"""
