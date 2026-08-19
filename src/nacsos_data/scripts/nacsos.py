@@ -8,7 +8,7 @@ from .migrations import main as migrate
 app = typer.Typer()
 app.add_typer(academic_apis_app, name='apis', help='Academic API wrappers to download and translate data')
 app.add_typer(importer_app, help='Import data into the platform')
-app.add_typer(exporter_app, help='Export annotations into file')
+app.add_typer(exporter_app, name='export', help='Export items & annotations into file')
 
 app.command('migrate', help='Run database migrations')(migrate)
 
