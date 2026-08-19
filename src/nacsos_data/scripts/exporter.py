@@ -102,6 +102,19 @@ async def _set_label_filters(
     return labels_list
 
 
+async def _require_annotation_scheme(annotation_scheme: str | None, project_id: str, db_engine: DatabaseEngineAsync) -> str:
+    # require annotation_scheme but list possible ones to help
+    if annotation_scheme is None:
+        schemes = await get_project_schemes(project_id=project_id, db_engine=db_engine)
+        schemes_msg = '\n'.join([f'name: {scheme.name}, id: {scheme.id}' for scheme in schemes])
+        msg = (
+            'Please select an annotation scheme to start exporting, re-run command with adding flag: \n'
+            '--annotation-scheme-id <scheme-id> \n Available schemes are: \n' + schemes_msg
+        )
+        raise typer.BadParameter(msg)
+    return annotation_scheme
+
+
 @app.command(
     'generate-config',
     help='Generate a config file that lists all IDs in given project. File is saved to config/export_options.env and read from this path when generating exports. Modify the config file to change the filters for the export.',
@@ -113,29 +126,18 @@ def generate_config(
     annotation_scheme: Annotated[str | None, typer.Option(help='Annotation Scheme ID')] = None,
     loglevel: Annotated[str, typer.Option(help='Log level for importing (defaults to INFO)')] = 'INFO',
 ) -> None:
-    logger, settings, db_engine = async_essentials(loglevel=loglevel, config=credentials_file, logger_name='export_config', run_log_init=True)
+    logger, _, db_engine = async_essentials(loglevel=loglevel, config=credentials_file, logger_name='export_config', run_log_init=True)
 
     async def _run() -> None:
-
-        # require annotation_scheme but list possible ones to help
-        if annotation_scheme is None:
-            schemes = await get_project_schemes(project_id=project, db_engine=db_engine)
-            schemes_msg = '\n'.join([f'name: {scheme.name}, id: {scheme.id}' for scheme in schemes])
-            msg = (
-                'Please select an annotation scheme to start exporting, re-run command with adding flag: \n'
-                '--annotation-scheme-id <scheme-id> \n Available schemes are: \n' + schemes_msg
-            )
-            raise typer.BadParameter(msg)
+        scheme = await _require_annotation_scheme(annotation_scheme=annotation_scheme, project_id=project, db_engine=db_engine)
 
         async with asyncio.TaskGroup() as tg:
             task_users = tg.create_task(_set_user_filters(export_all=True, project_id=project, db_engine=db_engine, users=None, logger=logger))
             task_scopes = tg.create_task(
-                _set_scope_filters(export_all=True, project_id=project, annotation_scheme=annotation_scheme, db_engine=db_engine, scopes=None, logger=logger)
+                _set_scope_filters(export_all=True, project_id=project, annotation_scheme=scheme, db_engine=db_engine, scopes=None, logger=logger)
             )
             task_bot_scopes = tg.create_task(
-                _set_bot_scope_filters(
-                    export_all=True, project_id=project, annotation_scheme=annotation_scheme, db_engine=db_engine, bot_scopes=None, logger=logger
-                )
+                _set_bot_scope_filters(export_all=True, project_id=project, annotation_scheme=scheme, db_engine=db_engine, bot_scopes=None, logger=logger)
             )
             task_labels = tg.create_task(_set_label_filters(export_all=True, project_id=project, db_engine=db_engine, labels=None, logger=logger))
 
@@ -218,26 +220,18 @@ def exporter(
     ] = None,
 ) -> None:
 
-    logger, settings, db_engine = async_essentials(loglevel=loglevel, config=credentials_file, logger_name='export', run_log_init=True)
+    logger, _, db_engine = async_essentials(loglevel=loglevel, config=credentials_file, logger_name='export', run_log_init=True)
 
     # Precedence: CLI flag > env var > default
 
     async def _run() -> Path:
 
-        # require annotation_scheme but list possible ones to help
-        if annotation_scheme is None:
-            schemes = await get_project_schemes(project_id=project, db_engine=db_engine)
-            schemes_msg = '\n'.join([f'name: {scheme.name}, id: {scheme.id}' for scheme in schemes])
-            msg = (
-                'Please select an annotation scheme to start exporting, re-run command with adding flag: \n'
-                '--annotation-scheme-id <scheme-id> \n Available schemes are: \n' + schemes_msg
-            )
-            raise typer.BadParameter(msg)
+        scheme = await _require_annotation_scheme(annotation_scheme=annotation_scheme, project_id=project, db_engine=db_engine)
 
         async with asyncio.TaskGroup() as tg:
             task_users = tg.create_task(_set_user_filters(export_all, project, db_engine, users, logger))
-            task_scopes = tg.create_task(_set_scope_filters(export_all, project, annotation_scheme, db_engine, scopes, logger))
-            task_bot_scopes = tg.create_task(_set_bot_scope_filters(export_all, project, annotation_scheme, db_engine, bot_scopes, logger))
+            task_scopes = tg.create_task(_set_scope_filters(export_all, project, scheme, db_engine, scopes, logger))
+            task_bot_scopes = tg.create_task(_set_bot_scope_filters(export_all, project, scheme, db_engine, bot_scopes, logger))
             task_labels = tg.create_task(_set_label_filters(export_all, project, db_engine, labels, logger))
 
         nql_filter = NQLFilterParser.validate_python({'filter': 'annotation', 'incl': True}) if has_annotation else None
