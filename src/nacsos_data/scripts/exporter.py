@@ -109,7 +109,7 @@ async def _require_annotation_scheme(annotation_scheme: str | None, project_id: 
         schemes_msg = '\n'.join([f'name: {scheme.name}, id: {scheme.id}' for scheme in schemes])
         msg = (
             'Please select an annotation scheme to start exporting, re-run command with adding flag: \n'
-            '--annotation-scheme-id <scheme-id> \n Available schemes are: \n' + schemes_msg
+            '--annotation-scheme <scheme-id> \n Available schemes are: \n' + schemes_msg
         )
         raise typer.BadParameter(msg)
     return annotation_scheme
