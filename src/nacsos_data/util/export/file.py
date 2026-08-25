@@ -86,18 +86,19 @@ def write_ris(result: list[dict[str, Any]], labels: list[LabelOptions]) -> str:
 
         return {
             # In prod academic_items; up to 2.5M out of 8M missing for these columns; so to make it error prone, default to empty string
-            'abstract': row.get('text'),
-            'title': row.get('title'),
-            'doi': f'https://doi.org/{row.get("doi")}',
-            'custom1': row.get('openalex_id'),
-            'custom2': str(row.get('item_id')),
-            'year': row.get('publication_year'),
-            'journal_name': row.get('source'),
-            'authors': row.get('authors', []),
+            'abstract': row.get('text', ''),
+            'title': row.get('title', ''),
+            'doi': f'https://doi.org/{row.get("doi", "") or ""}',
+            'custom1': row.get('openalex_id', ''),
+            'custom2': str(row.get('item_id', '')),
+            'year': row.get('publication_year', ''),
+            'journal_name': row.get('source', ''),
+            'authors': row.get('authors', ''),
             'keywords': keywords,
-            'label': label_tags,
+            'label': label_tags or '',
             'notes': [
-                f'openalex: {row.get("openalex_id")}\nnacsos: {row.get("item_id")}\nannotated by: {row.get("username")}\nAnnotations: ' + ', '.join(label_tags)
+                f'openalex: {row.get("openalex_id", "") or ""}\nnacsos: {row.get("item_id", "") or ""}\nannotated by: {row.get("username", "") or ""}\nAnnotations: '
+                + ', '.join(label_tags)
             ],
         }
 
