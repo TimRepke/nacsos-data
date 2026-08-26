@@ -79,6 +79,8 @@ class Settings(BaseSettings):
     DB: DatabaseConfig = DatabaseConfig()
     OPENALEX: OpenAlexConfig = OpenAlexConfig()
 
+    MILVUS_URI: str = 'http://localhost:19530'
+
     model_config = SettingsConfigDict(case_sensitive=True, env_prefix='NACSOS_', env_nested_delimiter='__', extra='allow')
 
 

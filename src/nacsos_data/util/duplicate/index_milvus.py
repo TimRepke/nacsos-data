@@ -1,21 +1,20 @@
 import uuid
 import logging
+from itertools import batched
 from typing import TYPE_CHECKING, Generator, AsyncGenerator
 
 import numpy as np
 from scipy.sparse import vstack, csr_matrix
 from sklearn.feature_extraction.text import CountVectorizer
 
-from .. import batched
-from ..text import preprocess_text, tokenise_text
-from ...models.items import ItemEntry
+from nacsos_data.util.conf import load_settings
+from nacsos_data.util.text import preprocess_text, tokenise_text
+from nacsos_data.models.items import ItemEntry
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession  # noqa: F401
 
 logger = logging.getLogger('nacsos_data.util.deduplicate.index')
-
-MILVUS_URI = 'http://localhost:19530'
 
 
 def _get_vector_rep(x: csr_matrix, i: int) -> dict[str, int | np.ndarray]:
@@ -54,12 +53,14 @@ class MilvusDuplicateIndex:
     ):
         from pymilvus import MilvusClient
 
+        self.settings = load_settings()
+
         self._check_milvus_availability()
         self.existing_items = existing_items
         self.new_items = new_items
         self.max_slop = max_slop
         self.batch_size = batch_size
-        self.client = MilvusClient(uri=MILVUS_URI)
+        self.client = MilvusClient(uri=self.settings.MILVUS_URI)
         self.collection_name = 'default'  # will be reset in `.init()`
         self.project_id = project_id
         if vectoriser is None:
@@ -79,12 +80,13 @@ class MilvusDuplicateIndex:
     def _check_milvus_availability(self) -> None:
         from pymilvus import MilvusClient
 
-        temp_client = MilvusClient(uri=MILVUS_URI, timeout=5)
         try:
+            temp_client = MilvusClient(uri=self.settings.MILVUS_URI, timeout=5)
             temp_client.get_server_version()
             logger.info('Milvus server available')
-        except Exception as err:
-            raise RuntimeError(f'Milvus server is not available at {MILVUS_URI}. Please ensure Milvus is running and port is accessible.') from err
+        except Exception:
+            logger.error(f'Milvus server is not available at {self.settings.MILVUS_URI}. Please ensure Milvus is running and port is accessible.')
+            exit(1)
 
     async def _load_vectors_batched_async(self, generator: AsyncGenerator[list[ItemEntry], None]) -> AsyncGenerator[tuple[list[str], csr_matrix], None]:
         async for batch in generator:
@@ -101,7 +103,7 @@ class MilvusDuplicateIndex:
             yield item_ids, vectors
 
     def _load_vectors_sync(self, generator: Generator[ItemEntry, None, None]) -> Generator[tuple[list[str], csr_matrix], None, None]:
-        for bi, batch in enumerate(batched(generator, batch_size=self.batch_size)):
+        for bi, batch in enumerate(batched(generator, self.batch_size, strict=False)):
             logger.debug(f'Received batch with {len(batch)} entries.')
             item_ids = [str(r.item_id) for r in batch]
             texts = [r.text for r in batch]

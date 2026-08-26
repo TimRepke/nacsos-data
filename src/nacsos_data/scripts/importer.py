@@ -131,13 +131,18 @@ async def _ensure_project_type(session: AsyncSession, expected_type: ItemType, p
 
 PORT_FORWARDING_HELP = """
 \n\n
-If you are running nacsos import locally, make sure that you have set up port fowarding to the remote host:
+If you are running nacsos import locally, make sure that you have set up port forwarding to the remote host:
 
+```
+# forward PG and milvus ports
 ssh -N -L 5432:localhost:5432 -L 19530:localhost:19530 <remote-host>
-
-If you are accessing through a jump host, run:
-
+# with "jump host" (tunnel through public proxy)
 ssh -N -L 5432:localhost:5432 -L 19530:localhost:19530 <remote-host> -J <jump-host>
+```
+
+5432: postgres default port
+19530: milvus default port
+left side: port on your machine, right side port server is listening on
 """
 
 
