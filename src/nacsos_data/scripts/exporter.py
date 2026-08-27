@@ -115,15 +115,21 @@ async def _require_annotation_scheme(annotation_scheme: str | None, project_id: 
     return annotation_scheme
 
 
+def _load_export_config(config_file: Path) -> Path:
+    load_dotenv(config_file)
+    return config_file
+
+
 @app.command(
     'generate-config',
-    help='Generate a config file that lists all IDs in given project. File is saved to config/export_options.env and read from this path when generating exports. Modify the config file to change the filters for the export.',
+    help='Generate a config file that lists all IDs in given project. Modify the config file to change the filters for the export.',
     epilog=ExportTypeEnum.help(),
 )
 def generate_config(
     project: Annotated[str, typer.Option(help='Project ID')],
     credentials_file: Annotated[Path, typer.Option(help='Path to credentials configuration .env')],
     annotation_scheme: Annotated[str | None, typer.Option(help='Annotation Scheme ID')] = None,
+    config_file: Annotated[Path, typer.Option(help='Path to write options config')] = Path('config/export_options.env'),
     loglevel: Annotated[str, typer.Option(help='Log level for importing (defaults to INFO)')] = 'INFO',
 ) -> None:
     logger, _, db_engine = async_essentials(loglevel=loglevel, config=credentials_file, logger_name='export_config', run_log_init=True)
@@ -146,7 +152,9 @@ def generate_config(
         bot_scopes = task_bot_scopes.result()
         labels = task_labels.result()
 
-        with open('config/export_options.env', 'w') as config:
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(config_file, 'w') as config:
             config.write(
                 '## Options configuration for exports. Lists all IDs found in project. If you want to remove an ID from results, simply remove it. All values in this file can be overwritten with CLI flags.\n\n'
             )
@@ -173,12 +181,9 @@ def generate_config(
     asyncio.run(_run())
 
 
-load_dotenv(Path('config/export_options.env'))
-
-
 @app.command(
     'run',
-    help='Export items & annotations into file. Utilizes config/export_options.env if it exists. Precedence for options: CLI flag > config file > default',
+    help='Export items & annotations into file. Can optionally utilise the config file generated through `generate-config` command. Precedence for options: CLI flag > config file > default',
     epilog=ExportTypeEnum.help(),
 )
 def exporter(
@@ -186,6 +191,14 @@ def exporter(
     project: Annotated[str, typer.Option(envvar='PROJECT', help='Project ID')],
     credentials_file: Annotated[Path, typer.Option(envvar='CREDENTIALS_FILE', help='Path to credentials configuration .env')],
     annotation_scheme: Annotated[str | None, typer.Option(envvar='ANNOTATION_SCHEME', help='Annotation Scheme ID')] = None,
+    config_file: Annotated[
+        Path | None,
+        typer.Option(
+            callback=_load_export_config,
+            is_eager=True,  # to force processing of this CLI parameter before the others
+            help='Path to options configuration .env. If not specified, only flags will be used. If specified together with flags, precedence is: flag > config file > default.',
+        ),
+    ] = None,
     out: Annotated[str | None, typer.Option(envvar='OUT', help='File name for the output file. Defaults to export_YYYYmmdd_HHMM.ext')] = None,
     export_all: Annotated[
         bool,
