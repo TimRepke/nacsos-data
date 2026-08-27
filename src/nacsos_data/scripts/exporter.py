@@ -27,10 +27,10 @@ app = typer.Typer()
 
 
 class ExportTypeEnum(str, Enum):
-    CSV = ('CSV', 'Export to csv file')
-    EXCEL = ('EXCEL', 'Export to excel file')
-    RIS = ('RIS', 'Export to RIS file')
-    JSONL = ('JSONL', 'Export to jsonl file')
+    csv = ('csv', 'Export to csv file')
+    excel = ('excel', 'Export to excel file')
+    ris = ('ris', 'Export to RIS file')
+    jsonl = ('jsonl', 'Export to jsonl file')
     description: str
 
     def __new__(cls, value: str, description: str) -> Self:
@@ -269,16 +269,14 @@ def exporter(
         ]
 
         match format:
-            case 'CSV':
+            case 'csv':
                 fp = write_csv(result)
-            case 'EXCEL':
+            case 'excel':
                 fp = write_excel(result)
-            case 'RIS':
+            case 'ris':
                 fp = write_ris(result, task_labels.result())
-            case 'JSONL':
+            case 'jsonl':
                 fp = write_jsonl(result)
-            case _:
-                raise typer.BadParameter(f"Requested export format '{format}' is not one of the recognized formats: ['CSV', 'EXCEL', 'RIS', 'JSONL']")
 
         logger.info('Got result from DB, now writing to file...')
 
