@@ -213,30 +213,22 @@ async def prepare_export_table(
 async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[str] | list[uuid.UUID]) -> dict[str, tuple[str, str]]:
 
     # get annotation_labels by scope_id
-    scope_id = scopes[0]  # all scopes passed will have the same annotation scheme based on logic
-    stmt = (
-        sa.select(
-            AssignmentScope.assignment_scope_id.cast(type_=sa.String).label('scope_id'),  # needed for join
-            AnnotationScheme.annotation_scheme_id.cast(type_=sa.String).label('scheme_id'),  # for debugging
-            AnnotationScheme.labels,
-            AnnotationScheme.name.label('scheme_name'),  # for debugging
-        )
+    sa.select(AnnotationScheme)
         .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id)
-        .where(AssignmentScope.assignment_scope_id == scope_id)
+        .where(AssignmentScope.assignment_scope_id.in_([UUID(scope_id) for scope_id in scopes]))
     )
-    scheme = (await session.execute(stmt)).all()
-    scheme_labels = scheme[0][2]
+    schemes = (await session.execute(stmt)).scalars().all()
+
+    if len(schemes) != 1:
+        raise AssertError('Found more than one or no scheme for the provided scopes.')
 
     # prepare labels with names
     label_mappings = {}
     # cols_comments = []
-    for label in scheme_labels:
+    for label in schemes[0].labels:
         # if label['kind'] == 'str':
         #     cols_comments.append(label['key'])
-        if label['kind'] == 'multi':
-            for choice in label['choices']:
-                label_mappings[f'{label["key"]}|{choice["value"]}'] = (label['name'], choice['name'])
-        elif label['kind'] == 'single':
+        if label['kind'] in {'single', 'multi'}:
             for choice in label['choices']:
                 label_mappings[f'{label["key"]}|{choice["value"]}'] = (label['name'], choice['name'])
         elif label['kind'] == 'bool':

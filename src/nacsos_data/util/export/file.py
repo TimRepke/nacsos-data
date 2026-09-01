@@ -82,8 +82,8 @@ def _get_label_tags(
     label_tags = []
 
     def add_tags(
-        label: LabelOptions,
-        options: list[int] | None,
+        label_: LabelOptions,
+        choices: list[int] | None,
         include_category: bool,
     ) -> None:
         if options is None:
@@ -101,7 +101,7 @@ def _get_label_tags(
             )
 
             if display_label_category and include_category:
-                label_tags.append(f'{label_category}:{label_name}')
+                label_tags.append(f'{label_category}: {label_name}')
             else:
                 label_tags.append(label_name)
 
