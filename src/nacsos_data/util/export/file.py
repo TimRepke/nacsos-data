@@ -73,13 +73,65 @@ def write_excel(result: list[dict[str, Any]]) -> str:
     return temp_path
 
 
-def write_ris(result: list[dict[str, Any]], labels: list[LabelOptions]) -> str:
+def _get_label_tags(
+    labels: list[LabelOptions],
+    row: dict[str, Any],
+    label_mappings: dict[str, tuple[str, str]],
+    display_label_category: bool,
+) -> list[str]:
+    label_tags = []
+
+    def add_tags(
+        label: LabelOptions,
+        options: list[int] | None,
+        include_category: bool,
+    ) -> None:
+        if options is None:
+            return
+
+        for option in options:
+            label_key = f'{label.key}|{option}'
+
+            if row.get(label_key) != 1:
+                continue
+
+            label_category, label_name = label_mappings.get(
+                label_key,
+                ('', ''),
+            )
+
+            if display_label_category and include_category:
+                label_tags.append(f'{label_category}:{label_name}')
+            else:
+                label_tags.append(label_name)
+
+    for label in labels:
+        add_tags(label, label.options_int, include_category=True)
+
+    for label in labels:
+        add_tags(label, label.options_multi, include_category=True)
+
+    for label in labels:
+        bool_options = [0, 1] if label.options_bool is not None else None
+        add_tags(label, bool_options, include_category=False)
+
+    return label_tags
+
+
+def write_ris(
+    result: list[dict[str, Any]],
+    labels: list[LabelOptions],
+    label_mappings: dict[str, tuple[str, str]],
+    display_label_category: bool = True,
+) -> str:
     def _prepare_record(row: dict[str, Any]) -> dict[str, Any]:
-        label_tags = (
-            [f'{l.key}|{li}' for l in labels if l.options_int is not None for li in l.options_int if row[f'{l.key}|{li}'] == 1]
-            + [f'{l.key}|{li}' for l in labels if l.options_multi is not None for li in l.options_multi if row[f'{l.key}|{li}'] == 1]
-            + [f'{l.key}|{li}' for l in labels if l.options_bool is not None for li in [0, 1] if row[f'{l.key}|{li}'] == 1]
+        label_tags = _get_label_tags(
+            labels=labels,
+            row=row,
+            label_mappings=label_mappings,
+            display_label_category=display_label_category,
         )
+
         keywords = label_tags
         if row.get('keywords') is not None and len(row.get('keywords', [])) > 0:
             keywords += row.get('keywords', [])
