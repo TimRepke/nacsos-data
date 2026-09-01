@@ -6,7 +6,7 @@ import xlsxwriter
 from typing import Any
 
 from nacsos_data.db.engine import DictLikeEncoder
-from nacsos_data.util.export.util import LabelOptions, encode_excel
+from nacsos_data.util.export.util import LabelOptions, RISLabelFormat, encode_excel
 from nacsos_data.util import clear_empty
 
 
@@ -78,9 +78,9 @@ def _get_label_tags(
     labels: list[LabelOptions],
     row: dict[str, Any],
     label_mappings: dict[str, tuple[str, str]],
-    display_label_category: bool,
+    label_format: RISLabelFormat,
 ) -> list[str]:
-    label_tags = []
+    label_tags: list[str] = []
 
     def add_tags(
         label_: LabelOptions,
@@ -96,12 +96,16 @@ def _get_label_tags(
             if row.get(label_key) != 1:
                 continue
 
+            if label_format is RISLabelFormat.RAW_TAGS:
+                label_tags.append(label_key)
+                continue
+
             label_category, label_name = label_mappings.get(
                 label_key,
                 ('', ''),
             )
 
-            if display_label_category and include_category:
+            if label_format is RISLabelFormat.LABEL_AND_CHOICE_NAMES and include_category:
                 label_tags.append(f'{label_category}: {label_name}')
             else:
                 label_tags.append(label_name)
@@ -123,14 +127,14 @@ def write_ris(
     result: list[dict[str, Any]],
     labels: list[LabelOptions],
     label_mappings: dict[str, tuple[str, str]],
-    display_label_category: bool = True,
+    label_format: RISLabelFormat,
 ) -> str:
     def _prepare_record(row: dict[str, Any]) -> dict[str, Any] | None:
         label_tags = _get_label_tags(
             labels=labels,
             row=row,
             label_mappings=label_mappings,
-            display_label_category=display_label_category,
+            label_format=label_format,
         )
 
         keywords = label_tags
@@ -145,7 +149,7 @@ def write_ris(
         if row.get('username'):
             note += f'Annotated by: {row.get("username")}\n'
         if label_tags:
-            note += 'Annotations: ' + ','.join(label_tags)
+            note += 'Annotations: ' + ', '.join(label_tags)
 
         out = {
             # In prod academic_items; up to 2.5M out of 8M missing for these columns; so to make it error prone, default to empty string
