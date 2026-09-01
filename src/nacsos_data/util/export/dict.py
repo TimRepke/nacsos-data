@@ -238,8 +238,8 @@ async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[
         label_mappings[key] = value
 
     for label in schemes[0]:
-        # if label['kind'] == 'str':
-        #     cols_comments.append(label['key'])
+        if label['kind'] == 'str':
+            continue
         if label['kind'] in {'single', 'multi'}:
             for choice in label['choices']:
                 add_label_mapping(f'{label["key"]}|{choice["value"]}', (label['name'], choice['name']))
