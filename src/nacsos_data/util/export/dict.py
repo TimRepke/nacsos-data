@@ -213,14 +213,21 @@ async def prepare_export_table(
 async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[str] | list[uuid.UUID]) -> dict[str, tuple[str, str]]:
 
     # get annotation_labels by scope_id
-    sa.select(AnnotationScheme)
-        .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id)
-        .where(AssignmentScope.assignment_scope_id.in_([UUID(scope_id) for scope_id in scopes]))
+
+    stmt = (
+        sa.select(AnnotationScheme)
+        .join(
+            AssignmentScope,
+            AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id,
+        )
+        .where(AssignmentScope.assignment_scope_id.in_(scopes))
+        .distinct()
     )
+
     schemes = (await session.execute(stmt)).scalars().all()
 
     if len(schemes) != 1:
-        raise AssertError('Found more than one or no scheme for the provided scopes.')
+        raise AssertionError('Found more than one or no scheme for the provided scopes.')
 
     # prepare labels with names
     label_mappings = {}

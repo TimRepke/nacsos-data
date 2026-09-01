@@ -7,6 +7,7 @@ from typing import Any
 
 from nacsos_data.db.engine import DictLikeEncoder
 from nacsos_data.util.export.util import LabelOptions, encode_excel
+from nacsos_data.util import clear_empty
 
 
 def get_author_names(authors: Any) -> list[str]:
@@ -86,11 +87,11 @@ def _get_label_tags(
         choices: list[int] | None,
         include_category: bool,
     ) -> None:
-        if options is None:
+        if choices is None:
             return
 
-        for option in options:
-            label_key = f'{label.key}|{option}'
+        for choice in choices:
+            label_key = f'{label_.key}|{choice}'
 
             if row.get(label_key) != 1:
                 continue
@@ -124,7 +125,7 @@ def write_ris(
     label_mappings: dict[str, tuple[str, str]],
     display_label_category: bool = True,
 ) -> str:
-    def _prepare_record(row: dict[str, Any]) -> dict[str, Any]:
+    def _prepare_record(row: dict[str, Any]) -> dict[str, Any] | None:
         label_tags = _get_label_tags(
             labels=labels,
             row=row,
@@ -136,23 +137,32 @@ def write_ris(
         if row.get('keywords') is not None and len(row.get('keywords', [])) > 0:
             keywords += row.get('keywords', [])
 
-        return {
+        note = ''
+        if row.get('openalex_id'):
+            note += f'OpenAlex ID: {row.get("openalex_id")}\n'
+        if row.get('item_id'):
+            note += f'NACSOS ID: {row.get("item_id")}\n'
+        if row.get('username'):
+            note += f'Annotated by: {row.get("username")}\n'
+        if label_tags:
+            note += 'Annotations: ' + ','.join(label_tags)
+
+        out = {
             # In prod academic_items; up to 2.5M out of 8M missing for these columns; so to make it error prone, default to empty string
-            'abstract': row.get('text', ''),
-            'title': row.get('title', ''),
-            'doi': f'https://doi.org/{row.get("doi", "") or ""}',
-            'custom1': row.get('openalex_id', ''),
-            'custom2': str(row.get('item_id', '')),
-            'year': row.get('publication_year', ''),
-            'journal_name': row.get('source', ''),
-            'authors': row.get('authors', ''),
+            'abstract': row.get('text'),
+            'title': row.get('title'),
+            'doi': f'https://doi.org/{row.get("doi")}',
+            'custom1': row.get('openalex_id'),
+            'custom2': str(row.get('item_id')),
+            'year': row.get('publication_year'),
+            'journal_name': row.get('source'),
+            'authors': row.get('authors', []),
             'keywords': keywords,
-            'label': label_tags or '',
-            'notes': [
-                f'openalex: {row.get("openalex_id", "") or ""}\nnacsos: {row.get("item_id", "") or ""}\nannotated by: {row.get("username", "") or ""}\nAnnotations: '
-                + ', '.join(label_tags)
-            ],
+            'label': label_tags,
+            'notes': [note.strip()],
         }
+
+        return clear_empty(out)
 
     with tempfile.NamedTemporaryFile(suffix='.ris', mode='w', delete=False) as fp:
         rispy.dump(references=[_prepare_record(row) for row in result], file=fp)  # pyright: ignore[reportArgumentType]
