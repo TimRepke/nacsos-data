@@ -214,7 +214,7 @@ async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[
 
     # get annotation_labels by scope_id
     stmt = (
-        sa.select(AnnotationScheme.labels)
+        sa.select(AnnotationScheme.annotation_scheme_id, AnnotationScheme.labels)
         .join(
             AssignmentScope,
             AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id,
@@ -223,7 +223,7 @@ async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[
         .distinct()
     )
 
-    schemes = (await session.execute(stmt)).scalars().all()
+    schemes = (await session.execute(stmt)).all()
 
     if len(schemes) != 1:
         raise AssertionError('Found more than one or no scheme for the provided scopes.')
@@ -237,7 +237,7 @@ async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[
             raise ValueError(f'Invalid annotation scheme! Duplicate label mapping {key!r}: existing={label_mappings[key]!r}, new={value!r}')
         label_mappings[key] = value
 
-    for label in schemes[0]:
+    for label in schemes[0].labels:
         if label['kind'] == 'str':
             continue
         if label['kind'] in {'single', 'multi'}:
