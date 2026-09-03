@@ -217,3 +217,46 @@ async def prepare_export_table(
     result = (await session.execute(result_stmt)).mappings().all()
 
     return [dict(r) for r in result]
+
+
+@ensure_session_async
+async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[str] | list[uuid.UUID]) -> dict[str, tuple[str, str]]:
+
+    # get annotation_labels by scope_id
+    stmt = (
+        sa.select(AnnotationScheme.annotation_scheme_id, AnnotationScheme.labels)
+        .join(
+            AssignmentScope,
+            AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id,
+        )
+        .where(AssignmentScope.assignment_scope_id.in_(scopes))
+        .distinct()
+    )
+
+    schemes = (await session.execute(stmt)).all()
+
+    if len(schemes) != 1:
+        raise AssertionError('Found more than one or no scheme for the provided scopes.')
+
+    # prepare labels with names
+    label_mappings: dict[str, tuple[str, str]] = {}
+    # cols_comments = []
+
+    def add_label_mapping(key: str, value: tuple[str, str]) -> None:
+        if key in label_mappings:
+            raise ValueError(f'Invalid annotation scheme! Duplicate label mapping {key!r}: existing={label_mappings[key]!r}, new={value!r}')
+        label_mappings[key] = value
+
+    for label in schemes[0].labels:
+        if label['kind'] == 'str':
+            continue
+        if label['kind'] in {'single', 'multi'}:
+            for choice in label['choices']:
+                add_label_mapping(f'{label["key"]}|{choice["value"]}', (label['name'], choice['name']))
+        elif label['kind'] == 'bool':
+            add_label_mapping(f'{label["key"]}|1', (label['name'], label['name']))
+            add_label_mapping(f'{label["key"]}|0', (label['name'], f'Not {label["name"]}'))
+        else:
+            raise KeyError(f'Unknown label type {label["kind"]}: {label}')
+
+    return label_mappings

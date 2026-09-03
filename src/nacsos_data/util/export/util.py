@@ -31,6 +31,12 @@ class LabelOptions(BaseModel):
     strings: bool | None = None
 
 
+class RISLabelFormat(str, enum.Enum):
+    RAW_TAGS = 'RAW_TAGS'
+    CHOICE_NAMES = 'CHOICE_NAMES'
+    LABEL_AND_CHOICE_NAMES = 'LABEL_AND_CHOICE_NAMES'
+
+
 def scheme_to_label_options(scheme: AnnotationSchemeModel) -> dict[str, LabelOptions]:
     flat_scheme = flatten_annotation_scheme(scheme)
     return {

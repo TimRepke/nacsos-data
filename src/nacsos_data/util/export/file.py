@@ -6,7 +6,8 @@ import xlsxwriter
 from typing import Any
 
 from nacsos_data.db.engine import DictLikeEncoder
-from nacsos_data.util.export.util import LabelOptions, encode_excel
+from nacsos_data.util.export.util import LabelOptions, RISLabelFormat, encode_excel
+from nacsos_data.util import clear_empty
 
 DEFAULT_COLUMNS_TO_DROP = ['type', 'time_edited', 'project_id', 'title_slug', 'keywords', 'meta']
 
@@ -75,18 +76,84 @@ def write_excel(result: list[dict[str, Any]]) -> str:
     return temp_path
 
 
-def write_ris(result: list[dict[str, Any]], labels: list[LabelOptions]) -> str:
-    def _prepare_record(row: dict[str, Any]) -> dict[str, Any]:
-        label_tags = (
-            [f'{l.key}|{li}' for l in labels if l.options_int is not None for li in l.options_int if row[f'{l.key}|{li}'] == 1]
-            + [f'{l.key}|{li}' for l in labels if l.options_multi is not None for li in l.options_multi if row[f'{l.key}|{li}'] == 1]
-            + [f'{l.key}|{li}' for l in labels if l.options_bool is not None for li in [0, 1] if row[f'{l.key}|{li}'] == 1]
+def _get_label_tags(
+    labels: list[LabelOptions],
+    row: dict[str, Any],
+    label_mappings: dict[str, tuple[str, str]],
+    label_format: RISLabelFormat,
+) -> list[str]:
+    label_tags: list[str] = []
+
+    def add_tags(
+        label_: LabelOptions,
+        choices: list[int] | None,
+        include_category: bool,
+    ) -> None:
+        if choices is None:
+            return
+
+        for choice in choices:
+            label_key = f'{label_.key}|{choice}'
+
+            if row.get(label_key) != 1:
+                continue
+
+            if label_format is RISLabelFormat.RAW_TAGS:
+                label_tags.append(label_key)
+                continue
+
+            label_category, label_name = label_mappings.get(
+                label_key,
+                ('', ''),
+            )
+
+            if label_format is RISLabelFormat.LABEL_AND_CHOICE_NAMES and include_category:
+                label_tags.append(f'{label_category}: {label_name}')
+            else:
+                label_tags.append(label_name)
+
+    for label in labels:
+        add_tags(label, label.options_int, include_category=True)
+
+    for label in labels:
+        add_tags(label, label.options_multi, include_category=True)
+
+    for label in labels:
+        bool_options = [0, 1] if label.options_bool is not None else None
+        add_tags(label, bool_options, include_category=False)
+
+    return label_tags
+
+
+def write_ris(
+    result: list[dict[str, Any]],
+    labels: list[LabelOptions],
+    label_mappings: dict[str, tuple[str, str]],
+    label_format: RISLabelFormat,
+) -> str:
+    def _prepare_record(row: dict[str, Any]) -> dict[str, Any] | None:
+        label_tags = _get_label_tags(
+            labels=labels,
+            row=row,
+            label_mappings=label_mappings,
+            label_format=label_format,
         )
+
         keywords = label_tags
         if row.get('keywords') is not None and len(row.get('keywords', [])) > 0:
             keywords += row.get('keywords', [])
 
-        return {
+        note = ''
+        if row.get('openalex_id'):
+            note += f'OpenAlex ID: {row.get("openalex_id")}\n'
+        if row.get('item_id'):
+            note += f'NACSOS ID: {row.get("item_id")}\n'
+        if row.get('username'):
+            note += f'Annotated by: {row.get("username")}\n'
+        if label_tags:
+            note += 'Annotations: ' + ', '.join(label_tags)
+
+        out = {
             # In prod academic_items; up to 2.5M out of 8M missing for these columns; so to make it error prone, default to empty string
             'abstract': row.get('text'),
             'title': row.get('title'),
@@ -98,10 +165,10 @@ def write_ris(result: list[dict[str, Any]], labels: list[LabelOptions]) -> str:
             'authors': row.get('authors', []),
             'keywords': keywords,
             'label': label_tags,
-            'notes': [
-                f'openalex: {row.get("openalex_id")}\nnacsos: {row.get("item_id")}\nannotated by: {row.get("username")}\nAnnotations: ' + ', '.join(label_tags)
-            ],
+            'notes': [note.strip()],
         }
+
+        return clear_empty(out)
 
     with tempfile.NamedTemporaryFile(suffix='.ris', mode='w', delete=False) as fp:
         rispy.dump(references=[_prepare_record(row) for row in result], file=fp)  # pyright: ignore[reportArgumentType]
