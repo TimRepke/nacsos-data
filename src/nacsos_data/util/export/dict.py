@@ -76,6 +76,16 @@ async def get_project_users(project_id: str | uuid.UUID, db_engine: DatabaseEngi
         return [BaseInfo.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
 
 
+async def get_project_schemes(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[BaseInfo]:
+    session: AsyncSession
+    async with db_engine.session() as session:
+        stmt = sa.select(
+            AnnotationScheme.annotation_scheme_id.cast(type_=sa.String).label('id'),
+            AnnotationScheme.name.label('name'),
+        ).where(AnnotationScheme.project_id == project_id)
+        return [BaseInfo.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
+
+
 async def get_labels(stmt_labels: sa.CTE, db_engine: DatabaseEngineAsync) -> dict[str, LabelOptions]:
     stmt_labels_ = sa.union(
         sa.select(
