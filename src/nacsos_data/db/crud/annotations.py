@@ -381,7 +381,7 @@ async def read_resolution_scopes_for_project_info(session: DBSession, project_id
             AnnotationScheme.annotation_scheme_id.cast(type_=sa.String).label('scheme_id'),
             AnnotationScheme.name.label('scheme_name'),
         )
-        .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id==BotAnnotationMetaData.annotation_scheme_id)
+        .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == BotAnnotationMetaData.annotation_scheme_id)
         .where(AnnotationScheme.project_id == project_id, BotAnnotationMetaData.kind == BotKind.RESOLVE)
         .order_by(BotAnnotationMetaData.time_created)
     )
