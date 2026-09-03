@@ -2,88 +2,21 @@ import uuid
 import logging
 
 import sqlalchemy as sa
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.connection import DatabaseEngineAsync
 from nacsos_data.db.engine import ensure_session_async, DBSession
-from nacsos_data.db.schemas import User, ProjectPermissions, Project
+from nacsos_data.db.schemas import User, Project
 from nacsos_data.db.schemas.annotations import AssignmentScope, AnnotationScheme
-from nacsos_data.db.schemas.bot_annotations import BotAnnotationMetaData
 from nacsos_data.models.nql import NQLFilter
-
+from nacsos_data.util.errors import NotFoundError
+from nacsos_data.util.nql import NQLQuery
+from nacsos_data.util import pluck
+from nacsos_data.db.crud.users import read_users
 from .util import LabelOptions, _labels_subquery, _get_label_selects
-from ..errors import NotFoundError
-from ..nql import NQLQuery
+from nacsos_data.db.crud.annotations import read_assignment_scopes_for_project_info, read_resolution_scopes_for_project_info
 
 logger = logging.getLogger('nacsos_data.util.annotations.export')
-
-
-class BaseInfo(BaseModel):
-    id: str | uuid.UUID
-    name: str
-
-
-class BaseInfoWithScheme(BaseInfo):
-    scheme_id: str | uuid.UUID
-    scheme_name: str
-
-
-async def get_project_bot_scopes(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[BaseInfoWithScheme]:
-    session: AsyncSession
-    async with db_engine.session() as session:
-        stmt = (
-            sa.select(
-                BotAnnotationMetaData.bot_annotation_metadata_id.cast(type_=sa.String).label('id'),
-                BotAnnotationMetaData.name,
-                AnnotationScheme.annotation_scheme_id.cast(type_=sa.String).label('scheme_id'),
-                AnnotationScheme.name.label('scheme_name'),
-            )
-            .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == BotAnnotationMetaData.annotation_scheme_id, isouter=True)
-            .where(BotAnnotationMetaData.project_id == project_id)
-            .order_by(BotAnnotationMetaData.time_created)
-        )
-        # FIXME: technically, we need to allow for scheme_id and scheme_name to be empty
-        return [BaseInfoWithScheme.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
-
-
-async def get_project_scopes(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[BaseInfoWithScheme]:
-    session: AsyncSession
-    async with db_engine.session() as session:
-        stmt = (
-            sa.select(
-                AssignmentScope.assignment_scope_id.cast(type_=sa.String).label('id'),
-                AssignmentScope.name,
-                AnnotationScheme.annotation_scheme_id.cast(type_=sa.String).label('scheme_id'),
-                AnnotationScheme.name.label('scheme_name'),
-            )
-            .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id)
-            .where(AnnotationScheme.project_id == project_id)
-            .order_by(AssignmentScope.time_created)
-        )
-        return [BaseInfoWithScheme.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
-
-
-async def get_project_users(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[BaseInfo]:
-    session: AsyncSession
-    async with db_engine.session() as session:
-        stmt = (
-            sa.select(User.user_id.cast(type_=sa.String).label('id'), User.username.label('name'))
-            .join(ProjectPermissions, ProjectPermissions.user_id == User.user_id)
-            .where(ProjectPermissions.project_id == project_id)
-            .order_by(User.username)
-        )
-        return [BaseInfo.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
-
-
-async def get_project_schemes(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> list[BaseInfo]:
-    session: AsyncSession
-    async with db_engine.session() as session:
-        stmt = sa.select(
-            AnnotationScheme.annotation_scheme_id.cast(type_=sa.String).label('id'),
-            AnnotationScheme.name.label('name'),
-        ).where(AnnotationScheme.project_id == project_id)
-        return [BaseInfo.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
 
 
 async def get_labels(stmt_labels: sa.CTE, db_engine: DatabaseEngineAsync) -> dict[str, LabelOptions]:
@@ -126,13 +59,13 @@ async def get_labels(stmt_labels: sa.CTE, db_engine: DatabaseEngineAsync) -> dic
 
 
 async def get_project_labels(project_id: str | uuid.UUID, db_engine: DatabaseEngineAsync) -> dict[str, LabelOptions]:
-    bot_scopes = await get_project_bot_scopes(project_id=project_id, db_engine=db_engine)
-    scopes = await get_project_scopes(project_id=project_id, db_engine=db_engine)
-    users = await get_project_users(project_id=project_id, db_engine=db_engine)
+    project_bot_scopes = await read_resolution_scopes_for_project_info(project_id=project_id, db_engine=db_engine)
+    project_scopes = await read_assignment_scopes_for_project_info(project_id=project_id, db_engine=db_engine)
+    project_users = (await read_users(project_id=str(project_id), engine=db_engine)) or []
 
-    bot_annotation_metadata_ids = [str(r.id) for r in bot_scopes]
-    assignment_scope_ids = [str(r.id) for r in scopes]
-    user_ids = [str(r.id) for r in users]
+    bot_annotation_metadata_ids: list[str] = list(pluck(project_bot_scopes, 'scope_id'))
+    assignment_scope_ids: list[str] = list(pluck(project_scopes, 'scope_id'))
+    user_ids: list[str] = list(pluck(project_users, 'user_id'))
 
     stmt_labels = _labels_subquery(
         bot_annotation_metadata_ids=bot_annotation_metadata_ids,
@@ -221,7 +154,6 @@ async def prepare_export_table(
 
 @ensure_session_async
 async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[str] | list[uuid.UUID]) -> dict[str, tuple[str, str]]:
-
     # get annotation_labels by scope_id
     stmt = (
         sa.select(AnnotationScheme.annotation_scheme_id, AnnotationScheme.labels)
@@ -240,9 +172,8 @@ async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[
 
     # prepare labels with names
     label_mappings: dict[str, tuple[str, str]] = {}
-    # cols_comments = []
 
-    def add_label_mapping(key: str, value: tuple[str, str]) -> None:
+    def _add_label_mapping(key: str, value: tuple[str, str]) -> None:
         if key in label_mappings:
             raise ValueError(f'Invalid annotation scheme! Duplicate label mapping {key!r}: existing={label_mappings[key]!r}, new={value!r}')
         label_mappings[key] = value
@@ -252,10 +183,10 @@ async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[
             continue
         if label['kind'] in {'single', 'multi'}:
             for choice in label['choices']:
-                add_label_mapping(f'{label["key"]}|{choice["value"]}', (label['name'], choice['name']))
+                _add_label_mapping(f'{label["key"]}|{choice["value"]}', (label['name'], choice['name']))
         elif label['kind'] == 'bool':
-            add_label_mapping(f'{label["key"]}|1', (label['name'], label['name']))
-            add_label_mapping(f'{label["key"]}|0', (label['name'], f'Not {label["name"]}'))
+            _add_label_mapping(f'{label["key"]}|1', (label['name'], label['name']))
+            _add_label_mapping(f'{label["key"]}|0', (label['name'], f'Not {label["name"]}'))
         else:
             raise KeyError(f'Unknown label type {label["kind"]}: {label}')
 

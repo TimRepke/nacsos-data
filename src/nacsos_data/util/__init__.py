@@ -1,3 +1,4 @@
+import json
 import logging
 import uuid
 from collections.abc import MutableMapping
@@ -286,6 +287,14 @@ def async_essentials(
     return logger, settings, db_engine
 
 
+def pluck(objects: list[Any], field: str, skip_none: bool = True) -> Generator[Any, None, None]:
+    for obj in objects:
+        if hasattr(obj, field):
+            val = getattr(obj, field)
+            if val is not None or not skip_none:
+                yield val
+
+
 class Cached(Generic[RetType]):
     def __init__(self, func: Callable[Param, Awaitable[RetType]], max_size: int = 50, max_age: int | None = None) -> None:
         self.func: Callable[Param, Awaitable[RetType]] = func
@@ -295,7 +304,7 @@ class Cached(Generic[RetType]):
 
     # async def __call__(self, *args: Param.args, **kwargs: Param.kwargs) -> RetType:
     async def __call__(self, *args, **kwargs) -> RetType:  # type: ignore[no-untyped-def]
-        arg_hash = hash(args) + hash(kwargs)
+        arg_hash = hash(args) + hash(json.dumps(kwargs))
         if arg_hash in self.cache:
             self.cache.move_to_end(arg_hash)
             timestamp, result = self.cache[arg_hash]

@@ -1,7 +1,6 @@
 import asyncio
 import typer
 import json
-import logging
 
 from enum import Enum
 from pathlib import Path
@@ -10,18 +9,20 @@ from datetime import datetime as dt
 from dotenv import load_dotenv
 
 from nacsos_data.db.connection import DatabaseEngineAsync
+from nacsos_data.db.crud.annotations import (
+    read_assignment_scopes_for_scheme_info,
+    read_annotation_schemes_for_project_info,
+    read_resolution_scopes_for_scheme_info,
+)
+from nacsos_data.db.crud.users import read_users
 from nacsos_data.models.nql import NQLFilterParser
 from nacsos_data.util.export.dict import (
     prepare_export_table,
     get_project_labels,
-    get_project_scopes,
-    get_project_bot_scopes,
-    get_project_users,
-    get_project_schemes,
 )
 from nacsos_data.util.export.file import get_author_names, write_csv, write_excel, write_jsonl, write_ris, DEFAULT_COLUMNS_TO_DROP
 from nacsos_data.util.export.util import LabelOptions
-from nacsos_data.util import async_essentials
+from nacsos_data.util import async_essentials, pluck
 
 app = typer.Typer()
 
@@ -44,75 +45,82 @@ class ExportTypeEnum(str, Enum):
         return '\n\n'.join([f'  {getattr(ExportTypeEnum, entry).value:<10} -> {getattr(ExportTypeEnum, entry).description}' for entry in cls.__members__])
 
 
-async def _set_user_filters(export_all: bool, project_id: str, db_engine: DatabaseEngineAsync, users: str | None, logger: logging.Logger) -> list[str]:
-    if users is not None:
-        users_list = [id.strip() for id in users.split(',')]
-    elif export_all and users is None:
-        users_ = await get_project_users(project_id=project_id, db_engine=db_engine)
-        logger.info(f'User names and IDs: {users_}')
-        users_list = [str(user.id) for user in users_]
-    else:
-        users_list = []
-    logger.debug(f'User IDs: {users_list}')
-    return users_list
-
-
-async def _set_scope_filters(
-    export_all: bool, project_id: str, annotation_scheme: str, db_engine: DatabaseEngineAsync, scopes: str | None, logger: logging.Logger
+async def _prepare_user_ids(
+    db_engine: DatabaseEngineAsync,
+    export_all: bool = True,
+    user_ids: str | None = None,
+    project_id: str | None = None,
 ) -> list[str]:
-    if scopes is not None:
-        scopes_list = [id.strip() for id in scopes.split(',')]
-    elif export_all and scopes is None:
-        scopes_ = await get_project_scopes(project_id=project_id, db_engine=db_engine)
-        logger.info(f'Assignment scope names and IDs: {scopes_}')
-        scopes_list = [str(scope.id) for scope in scopes_ if scope.scheme_id == annotation_scheme]
-    else:
-        scopes_list = []
-    logger.debug(f'Assignment scope IDs: {scopes_list}')
-    return scopes_list
+    if user_ids is not None:
+        return [user_id.strip() for user_id in user_ids.split(',')]
+    if not export_all:
+        return []
+    if not project_id:
+        raise ValueError('Need to provide project_id!')
+    users = (await read_users(project_id=project_id, order_by_username=True, engine=db_engine)) or []
+    return [str(user_id) for user_id in pluck(users, 'user_id')]
 
 
-async def _set_bot_scope_filters(
-    export_all: bool, project_id: str, annotation_scheme: str, db_engine: DatabaseEngineAsync, bot_scopes: str | None, logger: logging.Logger
+async def _prepare_scope_ids(
+    db_engine: DatabaseEngineAsync,
+    export_all: bool = True,
+    annotation_scheme_id: str | None = None,
+    scope_ids: str | None = None,
 ) -> list[str]:
-    if bot_scopes is not None:
-        bot_scopes_list = [id.strip() for id in bot_scopes.split(',')]
-    elif export_all and bot_scopes is None:
-        bot_scopes_ = await get_project_bot_scopes(project_id=project_id, db_engine=db_engine)
-        logger.info(f'Bot annotation metadata names and IDs: {bot_scopes_}')
-        bot_scopes_list = [str(scope.id) for scope in bot_scopes_ if scope.scheme_id == annotation_scheme]
-    else:
-        bot_scopes_list = []
-    logger.debug(f'Bot annotation metadata IDs: {bot_scopes_list}')
-    return bot_scopes_list
+    if scope_ids is not None:
+        return [scope_id.strip() for scope_id in scope_ids.split(',')]
+    if not export_all:
+        return []
+    if not annotation_scheme_id:
+        raise ValueError('Need to provide scheme_id!')
+    assignment_scopes = await read_assignment_scopes_for_scheme_info(annotation_scheme_id=annotation_scheme_id, db_engine=db_engine)
+    return [str(scope_id) for scope_id in pluck(assignment_scopes, 'assignment_scope_id')]
 
 
-async def _set_label_filters(
-    export_all: bool, project_id: str, db_engine: DatabaseEngineAsync, labels: str | None, logger: logging.Logger
+async def _prepare_bot_scope_ids(
+    db_engine: DatabaseEngineAsync,
+    export_all: bool = True,
+    annotation_scheme_id: str | None = None,
+    scope_ids: str | None = None,
+) -> list[str]:
+    if scope_ids is not None:
+        return [scope_id.strip() for scope_id in scope_ids.split(',')]
+    if not export_all:
+        return []
+    if not annotation_scheme_id:
+        raise ValueError('Need to provide scheme_id!')
+    bot_scopes = await read_resolution_scopes_for_scheme_info(annotation_scheme_id=annotation_scheme_id, db_engine=db_engine)
+    return [str(scope_id) for scope_id in pluck(bot_scopes, 'bot_annotation_metadata_id')]
+
+
+async def _prepare_labels(
+    db_engine: DatabaseEngineAsync,
+    export_all: bool = True,
+    project_id: str | None = None,
+    labels: str | None = None,
 ) -> list[LabelOptions]:
     if labels is not None:
-        labels_list = json.loads(labels)
-        labels_list = [LabelOptions(**label) for label in labels_list]
-    elif export_all and labels is None:
-        labels_list = await get_project_labels(project_id=project_id, db_engine=db_engine)
-        labels_list = list(labels_list.values())
-    else:
-        labels_list = []
-    logger.info(f'Labels: {labels_list}')
-    return labels_list
+        return [LabelOptions(**label) for label in json.loads(labels)]
+    if not export_all:
+        return []
+    if not project_id:
+        raise ValueError('Need to provide project_id!')
+    return list((await get_project_labels(project_id=project_id, db_engine=db_engine)).values())
 
 
-async def _require_annotation_scheme(annotation_scheme: str | None, project_id: str, db_engine: DatabaseEngineAsync) -> str:
+async def _prepare_annotation_scheme_id(db_engine: DatabaseEngineAsync, annotation_scheme_id: str | None = None, project_id: str | None = None) -> str:
     # require annotation_scheme but list possible ones to help
-    if annotation_scheme is None:
-        schemes = await get_project_schemes(project_id=project_id, db_engine=db_engine)
-        schemes_msg = '\n'.join([f'name: {scheme.name}, id: {scheme.id}' for scheme in schemes])
+    if annotation_scheme_id is None:
+        if not project_id:
+            raise ValueError('Need to provide project_id!')
+        schemes = await read_annotation_schemes_for_project_info(project_id=project_id, db_engine=db_engine)
+        schemes_msg = '\n'.join([f'name: {scheme.name}, scheme_id: {scheme.annotation_scheme_id}' for scheme in schemes])
         msg = (
             'Please select an annotation scheme to start exporting, re-run command with adding flag: \n'
             '--annotation-scheme <scheme-id> \n Available schemes are: \n' + schemes_msg
         )
         raise typer.BadParameter(msg)
-    return annotation_scheme
+    return annotation_scheme_id
 
 
 def _load_export_config(config_file: Path) -> Path:
@@ -126,26 +134,22 @@ def _load_export_config(config_file: Path) -> Path:
     epilog=ExportTypeEnum.help(),
 )
 def generate_config(
-    project: Annotated[str, typer.Option(help='Project ID')],
+    project_id: Annotated[str, typer.Option(help='Project ID')],
     credentials_file: Annotated[Path, typer.Option(help='Path to credentials configuration .env')],
-    annotation_scheme: Annotated[str | None, typer.Option(help='Annotation Scheme ID')] = None,
+    scheme_id: Annotated[str | None, typer.Option(help='Annotation Scheme ID')] = None,
     config_file: Annotated[Path, typer.Option(help='Path to write options config')] = Path('config/export_options.env'),
     loglevel: Annotated[str, typer.Option(help='Log level for importing (defaults to INFO)')] = 'INFO',
 ) -> None:
     logger, _, db_engine = async_essentials(loglevel=loglevel, config=credentials_file, logger_name='export_config', run_log_init=True)
 
     async def _run() -> None:
-        scheme = await _require_annotation_scheme(annotation_scheme=annotation_scheme, project_id=project, db_engine=db_engine)
+        annotation_scheme_id = await _prepare_annotation_scheme_id(annotation_scheme_id=scheme_id, project_id=project_id, db_engine=db_engine)
 
         async with asyncio.TaskGroup() as tg:
-            task_users = tg.create_task(_set_user_filters(export_all=True, project_id=project, db_engine=db_engine, users=None, logger=logger))
-            task_scopes = tg.create_task(
-                _set_scope_filters(export_all=True, project_id=project, annotation_scheme=scheme, db_engine=db_engine, scopes=None, logger=logger)
-            )
-            task_bot_scopes = tg.create_task(
-                _set_bot_scope_filters(export_all=True, project_id=project, annotation_scheme=scheme, db_engine=db_engine, bot_scopes=None, logger=logger)
-            )
-            task_labels = tg.create_task(_set_label_filters(export_all=True, project_id=project, db_engine=db_engine, labels=None, logger=logger))
+            task_users = tg.create_task(_prepare_user_ids(export_all=True, project_id=project_id, db_engine=db_engine))
+            task_scopes = tg.create_task(_prepare_scope_ids(export_all=True, annotation_scheme_id=annotation_scheme_id, db_engine=db_engine))
+            task_bot_scopes = tg.create_task(_prepare_bot_scope_ids(export_all=True, annotation_scheme_id=annotation_scheme_id, db_engine=db_engine))
+            task_labels = tg.create_task(_prepare_labels(export_all=True, project_id=project_id, db_engine=db_engine))
 
         users = task_users.result()
         scopes = task_scopes.result()
@@ -159,8 +163,8 @@ def generate_config(
                 '## Options configuration for exports. Lists all IDs found in project. If you want to remove an ID from results, simply remove it. All values in this file can be overwritten with CLI flags.\n\n'
             )
             config.write('### Options\n')
-            config.write(f'PROJECT = {project}\n')
-            config.write(f'ANNOTATION_SCHEME = {annotation_scheme}\n')
+            config.write(f'PROJECT = {project_id}\n')
+            config.write(f'ANNOTATION_SCHEME = {annotation_scheme_id}\n')
             config.write(f'CREDENTIALS_FILE = {credentials_file}\n')
             config.write('# OUT = export_YYYYmmdd_HHMM.ext\n')
             config.write('EXPORT_ALL = False\n')
@@ -187,10 +191,10 @@ def generate_config(
     epilog=ExportTypeEnum.help(),
 )
 def exporter(
-    format: ExportTypeEnum,
-    project: Annotated[str, typer.Option(envvar='PROJECT', help='Project ID')],
+    export_format: ExportTypeEnum,
+    project_id: Annotated[str, typer.Option(envvar='PROJECT', help='Project ID')],
     credentials_file: Annotated[Path, typer.Option(envvar='CREDENTIALS_FILE', help='Path to credentials configuration .env')],
-    annotation_scheme: Annotated[str | None, typer.Option(envvar='ANNOTATION_SCHEME', help='Annotation Scheme ID')] = None,
+    scheme_id: Annotated[str | None, typer.Option(envvar='ANNOTATION_SCHEME', help='Annotation Scheme ID')] = None,
     config_file: Annotated[
         Path | None,
         typer.Option(
@@ -218,11 +222,11 @@ def exporter(
     max_results: Annotated[
         int, typer.Option(envvar='MAX_RESULTS', help='Max results', rich_help_panel='Secondary Options', show_default=False, hidden=True)
     ] = 15000,
-    scopes: Annotated[str | None, typer.Option(envvar='SCOPES', help='Comma separated Assignment Scope IDs', rich_help_panel='Secondary Options')] = None,
-    bot_scopes: Annotated[
+    scope_ids: Annotated[str | None, typer.Option(envvar='SCOPES', help='Comma separated Assignment Scope IDs', rich_help_panel='Secondary Options')] = None,
+    bot_scope_ids: Annotated[
         str | None, typer.Option(envvar='BOT_SCOPES', help='Comma separated Bot Annotation Metadata IDs', rich_help_panel='Secondary Options')
     ] = None,
-    users: Annotated[str | None, typer.Option(envvar='USERS', help='Comma separated User IDs', rich_help_panel='Secondary Options')] = None,
+    user_ids: Annotated[str | None, typer.Option(envvar='USERS', help='Comma separated User IDs', rich_help_panel='Secondary Options')] = None,
     labels: Annotated[
         str | None,
         typer.Option(
@@ -239,13 +243,17 @@ def exporter(
 
     async def _run() -> Path:
 
-        scheme = await _require_annotation_scheme(annotation_scheme=annotation_scheme, project_id=project, db_engine=db_engine)
+        annotation_scheme_id = await _prepare_annotation_scheme_id(annotation_scheme_id=scheme_id, project_id=project_id, db_engine=db_engine)
 
         async with asyncio.TaskGroup() as tg:
-            task_users = tg.create_task(_set_user_filters(export_all, project, db_engine, users, logger))
-            task_scopes = tg.create_task(_set_scope_filters(export_all, project, scheme, db_engine, scopes, logger))
-            task_bot_scopes = tg.create_task(_set_bot_scope_filters(export_all, project, scheme, db_engine, bot_scopes, logger))
-            task_labels = tg.create_task(_set_label_filters(export_all, project, db_engine, labels, logger))
+            task_users = tg.create_task(_prepare_user_ids(export_all=export_all, project_id=project_id, user_ids=user_ids, db_engine=db_engine))
+            task_scopes = tg.create_task(
+                _prepare_scope_ids(export_all=export_all, annotation_scheme_id=annotation_scheme_id, scope_ids=scope_ids, db_engine=db_engine)
+            )
+            task_bot_scopes = tg.create_task(
+                _prepare_bot_scope_ids(export_all=export_all, annotation_scheme_id=annotation_scheme_id, scope_ids=bot_scope_ids, db_engine=db_engine)
+            )
+            task_labels = tg.create_task(_prepare_labels(export_all=export_all, project_id=project_id, labels=labels, db_engine=db_engine))
 
         nql_filter = NQLFilterParser.validate_python({'filter': 'annotation', 'incl': True}) if has_annotation else None
 
@@ -253,7 +261,7 @@ def exporter(
             bot_annotation_metadata_ids=task_bot_scopes.result(),
             assignment_scope_ids=task_scopes.result(),
             user_ids=task_users.result(),
-            project_id=project,
+            project_id=project_id,
             labels=task_labels.result(),
             nql_filter=nql_filter,
             ignore_repeat=ignore_repeat,
@@ -268,7 +276,7 @@ def exporter(
             for row in result
         ]
 
-        match format:
+        match export_format:
             case 'csv':
                 fp = write_csv(result)
             case 'excel':

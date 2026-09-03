@@ -55,6 +55,7 @@ dev = [
     "types-passlib==1.7.7.20260211",
     "types-requests>=2.33.0.20260712",
     "nacsos_data[utils,scripts]",
+    "pre-commit>=4.6.1",
 ]
 mldev = [
     "nacsos_data[utils,scripts,priority]",

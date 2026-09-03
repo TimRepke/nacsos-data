@@ -102,18 +102,20 @@ class FlattenedAnnotationSchemeLabel(BaseModel):
     parent_choice: int | None = None
 
 
-class AnnotationSchemeInfo(BaseModel):
-    model_config = ConfigDict(extra='ignore')
-
+class DehydratedAnnotationSchemeInfo(BaseModel):
     # Unique identifier for this scheme.
     annotation_scheme_id: str | UUID | None = None
-
-    # Reference to the project this AnnotationScheme belongs to.
-    project_id: str | UUID | None = None
 
     # A short descriptive title / name for this AnnotationScheme.
     # This may be displayed to the annotators.
     name: str
+
+
+class AnnotationSchemeInfo(DehydratedAnnotationSchemeInfo):
+    model_config = ConfigDict(extra='ignore')
+
+    # Reference to the project this AnnotationScheme belongs to.
+    project_id: str | UUID | None = None
 
     # An (optional) slightly longer description of the AnnotationScheme.
     # This may be displayed to the annotators as an instruction or background information.
@@ -195,7 +197,7 @@ class AssignmentConfigLegacy(BaseModel):
 AssignmentConfig = Annotated[AssignmentConfigRandom | AssignmentConfigPriority | AssignmentConfigLegacy, Field(discriminator='config_type')]
 
 
-class AssignmentScopeModel(BaseModel):
+class AssignmentScopeModelInfo(BaseModel):
     """
     AssignmentScope can be used to logically group a set of Assignments.
     For example, one may wish to re-use the same AnnotationScheme several times within a project
@@ -218,6 +220,9 @@ class AssignmentScopeModel(BaseModel):
     # An (optional) slightly longer description of the scope.
     # This may be displayed to the annotators as refined instruction or background information.
     description: str | None = None
+
+
+class AssignmentScopeModel(AssignmentScopeModelInfo):
     # Config for the assignment (for reference, optional)
     config: AssignmentConfig | None = None
 
