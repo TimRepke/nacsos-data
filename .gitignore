@@ -11,3 +11,4 @@ venv/
 backups/
 config/
 alembic.secret.ini
+.exports/
