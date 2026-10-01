@@ -10,6 +10,7 @@ from nacsos_data.db.connection import DatabaseEngineAsync
 from nacsos_data.db.engine import ensure_session_async, DBSession
 from nacsos_data.db.schemas import User, Project, BotAnnotationMetaData
 from nacsos_data.db.schemas.annotations import AssignmentScope, AnnotationScheme
+from nacsos_data.db.schemas.bot_annotations import BotAnnotationMetaData
 from nacsos_data.models.nql import NQLFilter
 from nacsos_data.util.errors import NotFoundError
 from nacsos_data.util.nql import NQLQuery
@@ -155,27 +156,30 @@ async def prepare_export_table(
 
 
 @ensure_session_async
-async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[str] | list[uuid.UUID]) -> dict[str, tuple[str, str]]:
-    # get annotation_labels by scope_id
-    stmt = (
-        sa.select(AnnotationScheme.annotation_scheme_id, AnnotationScheme.labels)
-        .join(
-            AssignmentScope,
-            AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id,
-            isouter=True,
+async def get_labels_with_names(
+    session: DBSession | AsyncSession, scopes: list[str] | list[uuid.UUID], bot_scopes: list[str] | list[uuid.UUID]
+) -> dict[str, tuple[str, str]]:
+    # get annotation_labels by scope or bot_scope id
+    assignment_scope_exists = sa.exists().where(
+        AssignmentScope.annotation_scheme_id == AnnotationScheme.annotation_scheme_id,
+        AssignmentScope.assignment_scope_id.in_(scopes),
+    )
+
+    bot_scope_exists = sa.exists().where(
+        sa.and_(
+            BotAnnotationMetaData.annotation_scheme_id == AnnotationScheme.annotation_scheme_id,
+            BotAnnotationMetaData.bot_annotation_metadata_id.in_(bot_scopes),
         )
-        .join(
-            BotAnnotationMetaData,
-            AnnotationScheme.annotation_scheme_id == BotAnnotationMetaData.annotation_scheme_id,
-            isouter=True,
+    )
+
+    stmt = sa.select(
+        AnnotationScheme.annotation_scheme_id,
+        AnnotationScheme.labels,
+    ).where(
+        sa.or_(
+            assignment_scope_exists,
+            bot_scope_exists,
         )
-        .where(
-            sa.or_(
-                AssignmentScope.assignment_scope_id.in_(scopes),
-                BotAnnotationMetaData.bot_annotation_metadata_id.in_(scopes),
-            )
-        )
-        .ext(distinct_on(AnnotationScheme.annotation_scheme_id))
     )
 
     schemes = (await session.execute(stmt)).all()
