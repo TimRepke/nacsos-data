@@ -16,12 +16,9 @@ from nacsos_data.db.crud.annotations import (
 )
 from nacsos_data.db.crud.users import read_users
 from nacsos_data.models.nql import NQLFilterParser
-from nacsos_data.util.export.dict import (
-    prepare_export_table,
-    get_project_labels,
-)
+from nacsos_data.util.export.dict import prepare_export_table, get_project_labels, get_labels_with_names
 from nacsos_data.util.export.file import get_author_names, write_csv, write_excel, write_jsonl, write_ris, DEFAULT_COLUMNS_TO_DROP
-from nacsos_data.util.export.util import LabelOptions
+from nacsos_data.util.export.util import LabelOptions, RISLabelFormat
 from nacsos_data.util import async_essentials, pluck
 
 app = typer.Typer()
@@ -181,6 +178,7 @@ def generate_config(
             config.write(f'SCOPES = {",".join(scopes)}\n')
             config.write(f'BOT_SCOPES = {",".join(bot_scopes)}\n')
             config.write(f'LABELS = {json.dumps([l.model_dump() for l in labels])}\n')
+            config.write('RIS_LABEL_FORMAT = RAW_TAGS\n')
 
     asyncio.run(_run())
 
@@ -235,6 +233,7 @@ def exporter(
             rich_help_panel='Secondary Options',
         ),
     ] = None,
+    ris_label_format: Annotated[RISLabelFormat, typer.Option(envvar='RIS_LABEL_FORMAT', rich_help_panel='Secondary Options')] = RISLabelFormat.RAW_TAGS,
 ) -> None:
 
     logger, _, db_engine = async_essentials(loglevel=loglevel, config=credentials_file, logger_name='export', run_log_init=True)
@@ -282,7 +281,8 @@ def exporter(
             case 'excel':
                 fp = write_excel(result)
             case 'ris':
-                fp = write_ris(result, task_labels.result())
+                label_mappings = await get_labels_with_names(scopes=task_scopes.result(), bot_scopes=task_bot_scopes.result(), db_engine=db_engine)
+                fp = write_ris(result, task_labels.result(), label_mappings, ris_label_format)
             case 'jsonl':
                 fp = write_jsonl(result)
 
