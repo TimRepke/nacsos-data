@@ -16,7 +16,6 @@ from nacsos_data.models.annotations import (
     AssignmentStatus,
     DehydratedAnnotationSchemeInfo,
     AnnotationSchemeInfo,
-    AssignmentScopeModelInfo,
 )
 from nacsos_data.models.bot_annotations import (
     BotMetaResolve,
@@ -26,7 +25,6 @@ from nacsos_data.models.bot_annotations import (
     BotAnnotationResolution,
     ResolutionProposal,
     ResolutionMatrix,
-    BotAnnotationMetaDataBaseModel,
 )
 from nacsos_data.db.engine import ensure_session_async, DBSession, DatabaseEngineAsync, ensure_connection_async
 from nacsos_data.models import ScopeInfo
@@ -328,8 +326,8 @@ async def read_annotation_schemes_for_project(session: DBSession, project_id: st
 @ensure_session_async
 async def read_annotation_schemes_for_project_info(session: DBSession, project_id: str | uuid.UUID) -> list[AnnotationSchemeInfo]:
     stmt = select_except(AnnotationScheme, AnnotationScheme.labels).filter_by(project_id=project_id)
-    result = (await session.execute(stmt)).scalars().all()
-    return [AnnotationSchemeInfo(**res.__dict__) for res in result]
+    result = (await session.execute(stmt)).mappings().all()
+    return [AnnotationSchemeInfo.model_validate(res) for res in result]
 
 
 @ensure_session_async
@@ -366,10 +364,19 @@ async def read_assignment_scopes_for_project_info(session: DBSession, project_id
 
 
 @ensure_session_async
-async def read_assignment_scopes_for_scheme_info(session: DBSession, annotation_scheme_id: str | uuid.UUID) -> list[AssignmentScopeModelInfo]:
-    stmt = select_except(AnnotationScheme, AnnotationScheme.labels).where(AssignmentScope.annotation_scheme_id == annotation_scheme_id)
-    result = (await session.execute(stmt)).scalars().all()
-    return [AssignmentScopeModelInfo(**res.__dict__) for res in result]
+async def read_assignment_scopes_for_scheme_info(session: DBSession, annotation_scheme_id: str | uuid.UUID) -> list[ScopeInfo]:
+    stmt = (
+        select(
+            AssignmentScope.assignment_scope_id.cast(type_=sa.String).label('scope_id'),
+            AssignmentScope.name.label('scope_name'),
+            AnnotationScheme.annotation_scheme_id.cast(type_=sa.String).label('scheme_id'),
+            AnnotationScheme.name.label('scheme_name'),
+        )
+        .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id)
+        .where(AssignmentScope.annotation_scheme_id == annotation_scheme_id)
+        .order_by(AssignmentScope.time_created)
+    )
+    return [ScopeInfo.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
 
 
 @ensure_session_async
@@ -389,16 +396,19 @@ async def read_resolution_scopes_for_project_info(session: DBSession, project_id
 
 
 @ensure_session_async
-async def read_resolution_scopes_for_scheme_info(session: DBSession, annotation_scheme_id: str | uuid.UUID) -> list[BotAnnotationMetaDataBaseModel]:
+async def read_resolution_scopes_for_scheme_info(session: DBSession, annotation_scheme_id: str | uuid.UUID) -> list[ScopeInfo]:
     stmt = (
         select(
             BotAnnotationMetaData.bot_annotation_metadata_id.cast(type_=sa.String).label('scope_id'),
             BotAnnotationMetaData.name.label('scope_name'),
+            AnnotationScheme.annotation_scheme_id.cast(type_=sa.String).label('scheme_id'),
+            AnnotationScheme.name.label('scheme_name'),
         )
-        .where(BotAnnotationMetaData.annotation_scheme_id == annotation_scheme_id)
+        .join(AnnotationScheme, AnnotationScheme.annotation_scheme_id == BotAnnotationMetaData.annotation_scheme_id)
+        .where(BotAnnotationMetaData.annotation_scheme_id == annotation_scheme_id, BotAnnotationMetaData.kind == BotKind.RESOLVE)
         .order_by(BotAnnotationMetaData.time_created)
     )
-    return [BotAnnotationMetaDataBaseModel.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
+    return [ScopeInfo.model_validate(r) for r in (await session.execute(stmt)).mappings().all()]
 
 
 @ensure_session_async
