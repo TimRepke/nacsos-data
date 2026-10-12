@@ -1,5 +1,6 @@
 import uuid
 import logging
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -173,7 +174,7 @@ async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[
                 BotAnnotationMetaData.bot_annotation_metadata_id.in_(scopes),
             )
         )
-        .distinct()
+        .distinct(AnnotationScheme.annotation_scheme_id)
     )
 
     schemes = (await session.execute(stmt)).all()
@@ -189,16 +190,23 @@ async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[
             raise ValueError(f'Invalid annotation scheme! Duplicate label mapping {key!r}: existing={label_mappings[key]!r}, new={value!r}')
         label_mappings[key] = value
 
-    for label in schemes[0].labels:
-        if label['kind'] == 'str':
-            continue
-        if label['kind'] in {'single', 'multi'}:
-            for choice in label['choices']:
-                _add_label_mapping(f'{label["key"]}|{choice["value"]}', (label['name'], choice['name']))
-        elif label['kind'] == 'bool':
-            _add_label_mapping(f'{label["key"]}|1', (label['name'], label['name']))
-            _add_label_mapping(f'{label["key"]}|0', (label['name'], f'Not {label["name"]}'))
-        else:
-            raise KeyError(f'Unknown label type {label["kind"]}: {label}')
+    def _recurse(labels: list[dict[str, Any]]):
+        for label in labels:
+            if label['kind'] == 'str':
+                continue
+            if label['kind'] in {'single', 'multi'}:
+                for choice in label['choices']:
+                    _add_label_mapping(f'{label["key"]}|{choice["value"]}', (label['name'], choice['name']))
+
+                    if choice.get('children'):
+                        _recurse(choice['children'])
+
+            elif label['kind'] == 'bool':
+                _add_label_mapping(f'{label["key"]}|1', (label['name'], label['name']))
+                _add_label_mapping(f'{label["key"]}|0', (label['name'], f'Not {label["name"]}'))
+            else:
+                raise KeyError(f'Unknown label type {label["kind"]}: {label}')
+
+    _recurse(schemes[0].labels)
 
     return label_mappings
