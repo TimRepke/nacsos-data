@@ -151,13 +151,13 @@ def write_ris(
         if row.get('username'):
             note += f'Annotated by: {row.get("username")}\n'
         if label_tags:
-            note += 'Annotations: ' + ', '.join(label_tags)
+            note += '\nAnnotations: ' + ', '.join(label_tags)
 
         out = {
             # In prod academic_items; up to 2.5M out of 8M missing for these columns; so to make it error prone, default to empty string
             'abstract': row.get('text'),
             'title': row.get('title'),
-            'doi': f'https://doi.org/{row.get("doi")}',
+            'doi': f'https://doi.org/{row.get("doi")}' if row.get("doi") else None,
             'custom1': row.get('openalex_id'),
             'custom2': str(row.get('item_id')),
             'year': row.get('publication_year'),
