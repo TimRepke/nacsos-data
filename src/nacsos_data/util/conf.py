@@ -31,7 +31,7 @@ class DatabaseConfig(BaseSettings):
             scheme=info.data.get('SCHEME', 'postgresql'),
             username=info.data.get('USER'),
             password=quote(info.data.get('PASSWORD')),  # type: ignore[arg-type]
-            host=info.data.get('HOST'),
+            host=info.data.get('HOST') or 'localhost',
             port=info.data.get('PORT'),
             path=f'{info.data.get("DATABASE", "")}',
         )

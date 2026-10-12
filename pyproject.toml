@@ -51,7 +51,7 @@ dev = [
 #    "tox==4.32.0",
 #    "pytest==9.0.1",
 #    "pytest-cov==7.0.0",
-    "mypy[faster-cache]==2.3.0",
+    "mypy[faster-cache]==2.4.0",
     "types-passlib==1.7.7.20260211",
     "types-requests>=2.33.0.20260712",
     "nacsos_data[utils,scripts]",
@@ -142,7 +142,7 @@ docstring-code-line-length = "dynamic"
 docstring-quotes = "double"
 
 [tool.mypy]
-plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+plugins = ["pydantic.mypy"]#, "sqlalchemy.ext.mypy.plugin"
 strict = true
 follow_imports = "silent"
 check_untyped_defs = true
