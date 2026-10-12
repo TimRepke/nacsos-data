@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.connection import DatabaseEngineAsync
 from nacsos_data.db.engine import ensure_session_async, DBSession
-from nacsos_data.db.schemas import User, Project
+from nacsos_data.db.schemas import User, Project, BotAnnotationMetaData
 from nacsos_data.db.schemas.annotations import AssignmentScope, AnnotationScheme
 from nacsos_data.models.nql import NQLFilter
 from nacsos_data.util.errors import NotFoundError
@@ -160,8 +160,19 @@ async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[
         .join(
             AssignmentScope,
             AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id,
+            isouter=True,
         )
-        .where(AssignmentScope.assignment_scope_id.in_(scopes))
+        .join(
+            BotAnnotationMetaData,
+            AnnotationScheme.annotation_scheme_id == BotAnnotationMetaData.annotation_scheme_id,
+            isouter=True,
+        )
+        .where(
+            sa.or_(
+                AssignmentScope.assignment_scope_id.in_(scopes),
+                BotAnnotationMetaData.bot_annotation_metadata_id.in_(scopes),
+            )
+        )
         .distinct()
     )
 
