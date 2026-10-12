@@ -1,5 +1,7 @@
 import csv
 import tempfile
+from collections import defaultdict
+
 import rispy
 import xlsxwriter
 
@@ -41,7 +43,7 @@ def write_csv(result: list[dict[str, Any]]) -> str:
                         'keywords': '; '.join((row.get('keywords') or [])),
                     }.items()
                     if k in row
-                }
+                },
             )
     return fp.name
 
@@ -125,53 +127,85 @@ def _get_label_tags(
     return label_tags
 
 
-def write_ris(
+def write_ris(  # noqa: C901
     result: list[dict[str, Any]],
     labels: list[LabelOptions],
     label_mappings: dict[str, tuple[str, str]],
     label_format: RISLabelFormat,
 ) -> str:
-    def _prepare_record(row: dict[str, Any]) -> dict[str, Any] | None:
-        label_tags = _get_label_tags(
-            labels=labels,
-            row=row,
-            label_mappings=label_mappings,
-            label_format=label_format,
-        )
+    grouped_results = defaultdict(list)
+    for row in result:
+        grouped_results[row['item_id']].append(row)
 
-        keywords = label_tags
-        if row.get('keywords') is not None and len(row.get('keywords', [])) > 0:
-            keywords += row.get('keywords', [])
+    def _prepare_record(records: list[dict[str, Any]]) -> dict[str, Any]:  # noqa: C901
+        if len(records) == 0:
+            raise AssertionError('Record group is empty, this should never happen!')
+
+        label_tags = {
+            record.get('username', 'RESOLVED'): _get_label_tags(
+                labels=labels,
+                row=record,
+                label_mappings=label_mappings,
+                label_format=label_format,
+            )
+            for record in records
+        }
+
+        if 'RESOLVED' in label_tags:
+            flat_tags = label_tags['RESOLVED']
+        else:
+            flat_tags = list({tag for tags in label_tags.values() for tag in tags})
+
+        record = records[0]
+
+        keywords = flat_tags
+        if record.get('keywords') is not None and len(record.get('keywords', [])) > 0:
+            keywords += record.get('keywords', [])
 
         note = ''
-        if row.get('openalex_id'):
-            note += f'OpenAlex ID: {row.get("openalex_id")}\n'
-        if row.get('item_id'):
-            note += f'NACSOS ID: {row.get("item_id")}\n'
-        if row.get('username'):
-            note += f'Annotated by: {row.get("username")}\n'
-        if label_tags:
-            note += '\nAnnotations: ' + ', '.join(label_tags)
+        if record.get('openalex_id'):
+            note += f'OpenAlex ID: {record.get("openalex_id")}\n'
+        if record.get('item_id'):
+            note += f'NACSOS ID: {record.get("item_id")}\n'
+        if record.get('scopus_id'):
+            note += f'Scopus ID: {record.get("scopus_id")}\n'
+        if record.get('wos_id'):
+            note += f'WoS ID: {record.get("wos_id")}\n'
+        if record.get('pubmed_id'):
+            note += f'pubmed ID: {record.get("pubmed_id")}\n'
+        if record.get('dimensions_id'):
+            note += f'Dimensions ID: {record.get("dimensions_id")}\n'
+
+        if len(label_tags) > 0:
+            for user, annotations in label_tags.items():
+                note += f'\nAnnotation by {user}: {", ".join(annotations)}\n'
 
         out = {
             # In prod academic_items; up to 2.5M out of 8M missing for these columns; so to make it error prone, default to empty string
-            'abstract': row.get('text'),
-            'title': row.get('title'),
-            'doi': f'https://doi.org/{row.get("doi")}' if row.get("doi") else None,
-            'custom1': row.get('openalex_id'),
-            'custom2': str(row.get('item_id')),
-            'year': row.get('publication_year'),
-            'journal_name': row.get('source'),
-            'authors': row.get('authors', []),
+            'abstract': record.get('text'),
+            'title': record.get('title'),
+            'doi': f'https://doi.org/{record.get("doi")}' if record.get('doi') else None,
+            'custom1': record.get('openalex_id'),
+            'custom2': str(record.get('item_id')),
+            'year': record.get('publication_year'),
+            'journal_name': record.get('source'),
+            'authors': record.get('authors', []),
             'keywords': keywords,
-            'label': label_tags,
+            'label': flat_tags,
             'notes': [note.strip()],
         }
 
-        return clear_empty(out)
+        res: dict[str, Any] | None = clear_empty(out)
+
+        if res is None:
+            raise AssertionError('Record is empty, this should never happen!')
+        return res
 
     with tempfile.NamedTemporaryFile(suffix='.ris', mode='w', delete=False) as fp:
-        rispy.dump(references=[_prepare_record(row) for row in result], file=fp)  # pyright: ignore[reportArgumentType]
+        rispy.dump(
+            references=[_prepare_record(group) for group in grouped_results.values()],
+            file=fp,
+        )
 
         return fp.name
 

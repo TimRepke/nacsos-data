@@ -190,7 +190,7 @@ async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[
             raise ValueError(f'Invalid annotation scheme! Duplicate label mapping {key!r}: existing={label_mappings[key]!r}, new={value!r}')
         label_mappings[key] = value
 
-    def _recurse(labels: list[dict[str, Any]]):
+    def _recurse(labels: list[dict[str, Any]]) -> None:
         for label in labels:
             if label['kind'] == 'str':
                 continue
