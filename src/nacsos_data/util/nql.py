@@ -1,5 +1,6 @@
 from typing import Any, Type, Sequence
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import MappedColumn, InstrumentedAttribute, Session
 
@@ -86,7 +87,7 @@ def get_select_base(project_type: ItemType | str = ItemType.academic) -> tuple[T
         return (  # type: ignore[return-value]
             AcademicItem,
             AcademicItemModel,
-            sa.select(AcademicItem).distinct(AcademicItem.item_id),
+            sa.select(AcademicItem).ext(distinct_on(AcademicItem.item_id)),
         )
     if project_type == ItemType.lexis:
         return (  # type: ignore[return-value]
@@ -107,7 +108,7 @@ def get_select_base(project_type: ItemType | str = ItemType.academic) -> tuple[T
         return (  # type: ignore[return-value]
             GenericItem,
             GenericItemModel,
-            sa.select(GenericItem).distinct(GenericItem.item_id),
+            sa.select(GenericItem).ext(distinct_on(GenericItem.item_id)),
         )
 
     raise NotImplementedError(f"Can't use NQL for {project_type} yet.")

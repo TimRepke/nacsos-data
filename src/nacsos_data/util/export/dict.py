@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.connection import DatabaseEngineAsync
@@ -174,7 +175,7 @@ async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[
                 BotAnnotationMetaData.bot_annotation_metadata_id.in_(scopes),
             )
         )
-        .distinct(AnnotationScheme.annotation_scheme_id)
+        .ext(distinct_on(AnnotationScheme.annotation_scheme_id))
     )
 
     schemes = (await session.execute(stmt)).all()
