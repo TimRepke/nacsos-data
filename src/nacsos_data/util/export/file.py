@@ -149,6 +149,7 @@ def write_ris(  # noqa: C901
                 label_format=label_format,
             )
             for record in records
+            if record.get('username') is not None
         }
 
         if 'RESOLVED' in label_tags:
