@@ -149,6 +149,7 @@ def write_ris(  # noqa: C901
                 label_format=label_format,
             )
             for record in records
+            if record.get('username') is not None
         }
         label_tags = {k or 'UNKNOWN': v for k, v in label_tags.items() if v is not None and len(v) > 0}
 
