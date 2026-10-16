@@ -71,7 +71,7 @@ async def _prepare_scope_ids(
     if not annotation_scheme_id:
         raise ValueError('Need to provide scheme_id!')
     assignment_scopes = await read_assignment_scopes_for_scheme_info(annotation_scheme_id=annotation_scheme_id, db_engine=db_engine)
-    return [str(scope_id) for scope_id in pluck(assignment_scopes, 'assignment_scope_id')]
+    return [str(scope_id) for scope_id in pluck(assignment_scopes, 'scope_id')]
 
 
 async def _prepare_bot_scope_ids(
@@ -87,7 +87,7 @@ async def _prepare_bot_scope_ids(
     if not annotation_scheme_id:
         raise ValueError('Need to provide scheme_id!')
     bot_scopes = await read_resolution_scopes_for_scheme_info(annotation_scheme_id=annotation_scheme_id, db_engine=db_engine)
-    return [str(scope_id) for scope_id in pluck(bot_scopes, 'bot_annotation_metadata_id')]
+    return [str(scope_id) for scope_id in pluck(bot_scopes, 'scope_id')]
 
 
 async def _prepare_labels(
@@ -114,7 +114,7 @@ async def _prepare_annotation_scheme_id(db_engine: DatabaseEngineAsync, annotati
         schemes_msg = '\n'.join([f'name: {scheme.name}, scheme_id: {scheme.annotation_scheme_id}' for scheme in schemes])
         msg = (
             'Please select an annotation scheme to start exporting, re-run command with adding flag: \n'
-            '--annotation-scheme <scheme-id> \n Available schemes are: \n' + schemes_msg
+            '--scheme-id <scheme-id> \n Available schemes are: \n' + schemes_msg
         )
         raise typer.BadParameter(msg)
     return annotation_scheme_id
