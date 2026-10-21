@@ -150,6 +150,7 @@ def write_ris(  # noqa: C901
             )
             for record in records
         }
+        label_tags = {k or 'UNKNOWN': v for k, v in label_tags.items() if v is not None and len(v) > 0}
 
         if 'RESOLVED' in label_tags:
             flat_tags = label_tags['RESOLVED']
