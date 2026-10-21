@@ -11,40 +11,6 @@ from nacsos_data.util.academic.apis.util import RequestClient, AbstractAPI
 from .shared import FIELDS_API, translate_work_to_item
 
 
-# TODO: https://developers.openalex.org/api-reference/errors#retry-logic
-# import time
-# import requests
-#
-# def fetch_with_retry(url, max_retries=5):
-#     for attempt in range(max_retries):
-#         try:
-#             response = requests.get(url, timeout=30)
-#
-#             if response.status_code == 200:
-#                 return response.json()
-#
-#             if response.status_code == 429:
-#                 # Rate limited - wait longer
-#                 wait_time = 2 ** attempt
-#                 time.sleep(wait_time)
-#                 continue
-#
-#             if response.status_code >= 500:
-#                 # Server error - retry
-#                 wait_time = 2 ** attempt
-#                 time.sleep(wait_time)
-#                 continue
-#
-#             # Client error - don't retry
-#             response.raise_for_status()
-#
-#         except requests.exceptions.Timeout:
-#             if attempt < max_retries - 1:
-#                 time.sleep(2 ** attempt)
-#             else:
-#                 raise
-#
-#     raise Exception(f"Failed after {max_retries} retries")
 class OpenAlexAPI(AbstractAPI):
     PAGE_MAX = 50
 
@@ -113,6 +79,27 @@ class OpenAlexAPI(AbstractAPI):
             else:
                 yield from self._fetch_raw(query, params)
 
+    @staticmethod
+    def _payload(query: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """
+        Construct payload for request body (used in POST requests).
+        Supports:
+          - `oql`: OpenAlex Query Language string
+          - `search`: Standard full-text search string
+          - `filter`: Standard filter parameter or filters passed via `query`
+        """
+        payload = (params or {}).copy()
+
+        if query is not None and len(query.strip()) > 0:
+            query_str = query.strip()
+            # If query is OQL syntax, route to 'oql' key
+            if query_str.startswith('oql:'):
+                payload['oql'] = query_str.lstrip('oql:')
+            else:
+                payload['search'] = query_str
+        print(payload)
+        return payload
+
     def _fetch_raw(
         self,
         query: str,
@@ -131,7 +118,13 @@ class OpenAlexAPI(AbstractAPI):
         cursor = '*'
         n_pages = 0
         n_works = 0
+
         headers = {'api_key': self.api_key} if self.api_key else None
+        payload = {
+            'select': ','.join(FIELDS_API),
+            'per_page': self.page_size,
+        } | self._payload(query, params)
+
         with RequestClient(
             backoff_rate=self.backoff_rate,
             max_req_per_sec=self.max_req_per_sec,
@@ -140,18 +133,18 @@ class OpenAlexAPI(AbstractAPI):
         ) as request_client:
             while cursor is not None:
                 n_pages += 1
-
-                req = request_client.get(
-                    'https://api.openalex.org/works',
-                    params={  # type: ignore[arg-type]
-                        'filter': query,
-                        'select': ','.join(FIELDS_API),
-                        'cursor': cursor,
-                        'per-page': self.page_size,
-                    }
-                    | (params or {}),
-                    headers=headers,
-                )
+                if payload.get('oql'):
+                    req = request_client.post(
+                        'https://api.openalex.org/',
+                        json={'cursor': cursor} | payload,
+                        headers=headers,
+                    )
+                else:
+                    req = request_client.get(
+                        'https://api.openalex.org/works',
+                        params={'cursor': cursor} | payload,
+                        headers=headers,
+                    )
                 try:
                     req.raise_for_status()
 
@@ -182,17 +175,23 @@ class OpenAlexAPI(AbstractAPI):
 
     def get_count(self, query: str, params: dict[str, Any] | None = None) -> int | None:
         headers = {'api_key': self.api_key} if self.api_key else None
+        payload = {  # type: ignore[arg-type]
+            'select': 'id',
+            'per_page': 1,
+        } | self._payload(query, params)
+        if payload.get('oql'):
+            page = httpx.post(
+                'https://api.openalex.org/',
+                json=payload,
+                headers=headers,
+            )
+        else:
+            page = httpx.get(
+                'https://api.openalex.org/works',
+                params=payload,
+                headers=headers,
+            )
 
-        page = httpx.get(
-            'https://api.openalex.org/works',
-            params={  # type: ignore[arg-type]
-                'filter': query,
-                'select': 'id',
-                'per-page': 1,
-            }
-            | (params or {}),
-            headers=headers,
-        )
         try:
             page.raise_for_status()
         except HTTPStatusError as e:
@@ -200,3 +199,39 @@ class OpenAlexAPI(AbstractAPI):
             raise e
 
         return page.json().get('meta', {}).get('count', None)  # type: ignore [no-any-return]
+
+
+# TODO: https://developers.openalex.org/api-reference/errors#retry-logic
+# import time
+# import requests
+#
+# def fetch_with_retry(url, max_retries=5):
+#     for attempt in range(max_retries):
+#         try:
+#             response = requests.get(url, timeout=30)
+#
+#             if response.status_code == 200:
+#                 return response.json()
+#
+#             if response.status_code == 429:
+#                 # Rate limited - wait longer
+#                 wait_time = 2 ** attempt
+#                 time.sleep(wait_time)
+#                 continue
+#
+#             if response.status_code >= 500:
+#                 # Server error - retry
+#                 wait_time = 2 ** attempt
+#                 time.sleep(wait_time)
+#                 continue
+#
+#             # Client error - don't retry
+#             response.raise_for_status()
+#
+#         except requests.exceptions.Timeout:
+#             if attempt < max_retries - 1:
+#                 time.sleep(2 ** attempt)
+#             else:
+#                 raise
+#
+#     raise Exception(f"Failed after {max_retries} retries")
