@@ -182,7 +182,7 @@ class OpenAlexAPI(AbstractAPI):
         if payload.get('oql'):
             page = httpx.post(
                 'https://api.openalex.org/',
-                json=payload,  # type: ignore[arg-type]
+                json=payload,
                 headers=headers,
             )
         else:
