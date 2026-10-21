@@ -142,7 +142,7 @@ class OpenAlexAPI(AbstractAPI):
                 else:
                     req = request_client.get(
                         'https://api.openalex.org/works',
-                        params={'cursor': cursor} | payload,
+                        params={'cursor': cursor} | payload,  # type: ignore[arg-type]
                         headers=headers,
                     )
                 try:
@@ -175,20 +175,20 @@ class OpenAlexAPI(AbstractAPI):
 
     def get_count(self, query: str, params: dict[str, Any] | None = None) -> int | None:
         headers = {'api_key': self.api_key} if self.api_key else None
-        payload = {  # type: ignore[arg-type]
+        payload = {
             'select': 'id',
             'per_page': 1,
         } | self._payload(query, params)
         if payload.get('oql'):
             page = httpx.post(
                 'https://api.openalex.org/',
-                json=payload,
+                json=payload,  # type: ignore[arg-type]
                 headers=headers,
             )
         else:
             page = httpx.get(
                 'https://api.openalex.org/works',
-                params=payload,
+                params=payload,  # type: ignore[arg-type]
                 headers=headers,
             )
 
