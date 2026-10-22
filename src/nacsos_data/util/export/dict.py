@@ -3,14 +3,12 @@ import logging
 from typing import Any
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.connection import DatabaseEngineAsync
 from nacsos_data.db.engine import ensure_session_async, DBSession
 from nacsos_data.db.schemas import User, Project, BotAnnotationMetaData
 from nacsos_data.db.schemas.annotations import AssignmentScope, AnnotationScheme
-from nacsos_data.db.schemas.bot_annotations import BotAnnotationMetaData
 from nacsos_data.models.nql import NQLFilter
 from nacsos_data.util.errors import NotFoundError
 from nacsos_data.util.nql import NQLQuery
