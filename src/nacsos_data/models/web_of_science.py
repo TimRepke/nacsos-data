@@ -96,6 +96,28 @@ def ensure_list(v: list[str] | str | None) -> list[str] | None:
     return [v]  # type: ignore[list-item]
 
 
+def parse_lang_item(item: Any) -> str | None:
+    if isinstance(item, dict):
+        return item.get('content')
+    if isinstance(item, str):
+        return item
+    return None
+
+
+def ensure_keyword_list(v: Any) -> list[str] | None:
+    if v is None:
+        return None
+
+    # Standardize input into a list
+    items = v if isinstance(v, list) else [v]
+
+    # Process items and filter out None / empty values
+    parsed = [parse_lang_item(item) for item in items]
+    result = [item for item in parsed if item is not None]
+
+    return result if result else None
+
+
 def str_to_int_lst(v: str | int | list[int] | None) -> list[int] | None:
     if type(v) is str:
         if ' ' in v:
@@ -214,6 +236,8 @@ NameRole = Literal[
     'subject',
     'translator',
     'investigator',
+    'principal_investigator',
+    'co_principal_investigator',
 ]
 
 
@@ -297,7 +321,19 @@ class EWUIDT(BaseModel):
 
 
 TitleType = Literal[
-    'source', 'source_abbrev', 'abbrev_11', 'abbrev_29', 'abbrev_iso', 'item', 'book_series', 'series', 'foreign', 'book_seriessub', 'book', 'book_subtitle'
+    'source',
+    'source_abbrev',
+    'abbrev_11',
+    'abbrev_29',
+    'abbrev_iso',
+    'item',
+    'book_series',
+    'series',
+    'foreign',
+    'book_seriessub',
+    'book',
+    'book_subtitle',
+    'grant_source',
 ]
 
 
@@ -507,7 +543,7 @@ class Languages(BaseModel):
 
 class Keywords(BaseModel):
     count: int | None = None
-    keyword: Annotated[list[str] | None, BeforeValidator(ensure_list)] = None
+    keyword: Annotated[list[str] | None, BeforeValidator(ensure_keyword_list)] = None
 
 
 class Refs(BaseModel):
@@ -618,6 +654,9 @@ IdentifierType = Literal[
     'parent_book_doi',
     'pii',
     'series_issn',
+    'pan',
+    'patent_no',
+    'preprint_familyId',
 ]
 
 
