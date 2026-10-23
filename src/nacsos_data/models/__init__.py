@@ -1,4 +1,4 @@
-from nacsos_data.models.web_of_science import BaseModel
+from pydantic import BaseModel
 
 
 class ScopeInfo(BaseModel):

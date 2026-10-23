@@ -16,12 +16,9 @@ from nacsos_data.db.crud.annotations import (
 )
 from nacsos_data.db.crud.users import read_users
 from nacsos_data.models.nql import NQLFilterParser
-from nacsos_data.util.export.dict import (
-    prepare_export_table,
-    get_project_labels,
-)
+from nacsos_data.util.export.dict import prepare_export_table, get_project_labels, get_labels_with_names
 from nacsos_data.util.export.file import get_author_names, write_csv, write_excel, write_jsonl, write_ris, DEFAULT_COLUMNS_TO_DROP
-from nacsos_data.util.export.util import LabelOptions
+from nacsos_data.util.export.util import LabelOptions, RISLabelFormat
 from nacsos_data.util import async_essentials, pluck
 
 app = typer.Typer()
@@ -74,7 +71,7 @@ async def _prepare_scope_ids(
     if not annotation_scheme_id:
         raise ValueError('Need to provide scheme_id!')
     assignment_scopes = await read_assignment_scopes_for_scheme_info(annotation_scheme_id=annotation_scheme_id, db_engine=db_engine)
-    return [str(scope_id) for scope_id in pluck(assignment_scopes, 'assignment_scope_id')]
+    return [str(scope_id) for scope_id in pluck(assignment_scopes, 'scope_id')]
 
 
 async def _prepare_bot_scope_ids(
@@ -90,7 +87,7 @@ async def _prepare_bot_scope_ids(
     if not annotation_scheme_id:
         raise ValueError('Need to provide scheme_id!')
     bot_scopes = await read_resolution_scopes_for_scheme_info(annotation_scheme_id=annotation_scheme_id, db_engine=db_engine)
-    return [str(scope_id) for scope_id in pluck(bot_scopes, 'bot_annotation_metadata_id')]
+    return [str(scope_id) for scope_id in pluck(bot_scopes, 'scope_id')]
 
 
 async def _prepare_labels(
@@ -117,7 +114,7 @@ async def _prepare_annotation_scheme_id(db_engine: DatabaseEngineAsync, annotati
         schemes_msg = '\n'.join([f'name: {scheme.name}, scheme_id: {scheme.annotation_scheme_id}' for scheme in schemes])
         msg = (
             'Please select an annotation scheme to start exporting, re-run command with adding flag: \n'
-            '--annotation-scheme <scheme-id> \n Available schemes are: \n' + schemes_msg
+            '--scheme-id <scheme-id> \n Available schemes are: \n' + schemes_msg
         )
         raise typer.BadParameter(msg)
     return annotation_scheme_id
@@ -181,6 +178,7 @@ def generate_config(
             config.write(f'SCOPES = {",".join(scopes)}\n')
             config.write(f'BOT_SCOPES = {",".join(bot_scopes)}\n')
             config.write(f'LABELS = {json.dumps([l.model_dump() for l in labels])}\n')
+            config.write('RIS_LABEL_FORMAT = RAW_TAGS\n')
 
     asyncio.run(_run())
 
@@ -235,6 +233,7 @@ def exporter(
             rich_help_panel='Secondary Options',
         ),
     ] = None,
+    ris_label_format: Annotated[RISLabelFormat, typer.Option(envvar='RIS_LABEL_FORMAT', rich_help_panel='Secondary Options')] = RISLabelFormat.RAW_TAGS,
 ) -> None:
 
     logger, _, db_engine = async_essentials(loglevel=loglevel, config=credentials_file, logger_name='export', run_log_init=True)
@@ -282,7 +281,8 @@ def exporter(
             case 'excel':
                 fp = write_excel(result)
             case 'ris':
-                fp = write_ris(result, task_labels.result())
+                label_mappings = await get_labels_with_names(scopes=task_scopes.result(), bot_scopes=task_bot_scopes.result(), db_engine=db_engine)
+                fp = write_ris(result, task_labels.result(), label_mappings, ris_label_format)
             case 'jsonl':
                 fp = write_jsonl(result)
 

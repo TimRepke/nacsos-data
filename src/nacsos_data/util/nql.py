@@ -311,7 +311,7 @@ class NQLQuery:
                     .join(Annotation, Assignment.assignment_id == Annotation.assignment_id, isouter=True)
                 )
             elif subquery.scopes is not None:
-                query = (
+                scope_query = (
                     sa.select(self._project_items.c.item_id)
                     .join(
                         Assignment,
@@ -320,6 +320,23 @@ class NQLQuery:
                     )
                     .join(Annotation, Annotation.assignment_id == Assignment.assignment_id, isouter=True)
                 )
+                if subquery.incl:
+                    scope_query = scope_query.where(Annotation.item_id.isnot(None))
+                else:
+                    scope_query = scope_query.where(Annotation.item_id.is_(None))
+
+                bot_scope_query = sa.select(self._project_items.c.item_id).join(
+                    BotAnnotation,
+                    sa.and_(BotAnnotation.bot_annotation_metadata_id.in_(subquery.scopes), BotAnnotation.item_id == self._project_items.c.item_id),
+                    isouter=True,
+                )
+                if subquery.incl:
+                    bot_scope_query = bot_scope_query.where(BotAnnotation.item_id.isnot(None))
+                else:
+                    bot_scope_query = bot_scope_query.where(BotAnnotation.item_id.is_(None))
+
+                combined_query = scope_query.union(bot_scope_query)  # noqa: E711
+                return combined_query.cte()
             else:
                 query = sa.select(self._project_items.c.item_id).join(
                     Annotation,
