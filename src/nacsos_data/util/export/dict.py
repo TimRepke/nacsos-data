@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nacsos_data.db.connection import DatabaseEngineAsync
@@ -154,30 +155,27 @@ async def prepare_export_table(
 
 
 @ensure_session_async
-async def get_labels_with_names(
-    session: DBSession | AsyncSession, scopes: list[str] | list[uuid.UUID], bot_scopes: list[str] | list[uuid.UUID]
-) -> dict[str, tuple[str, str]]:
-    # get annotation_labels by scope or bot_scope id
-    assignment_scope_exists = sa.exists().where(
-        AssignmentScope.annotation_scheme_id == AnnotationScheme.annotation_scheme_id,
-        AssignmentScope.assignment_scope_id.in_(scopes),
-    )
-
-    bot_scope_exists = sa.exists().where(
-        sa.and_(
-            BotAnnotationMetaData.annotation_scheme_id == AnnotationScheme.annotation_scheme_id,
-            BotAnnotationMetaData.bot_annotation_metadata_id.in_(bot_scopes),
+async def get_labels_with_names(session: DBSession | AsyncSession, scopes: list[str] | list[uuid.UUID]) -> dict[str, tuple[str, str]]:
+    # get annotation_labels by scope_id
+    stmt = (
+        sa.select(AnnotationScheme.annotation_scheme_id, AnnotationScheme.labels)
+        .join(
+            AssignmentScope,
+            AnnotationScheme.annotation_scheme_id == AssignmentScope.annotation_scheme_id,
+            isouter=True,
         )
-    )
-
-    stmt = sa.select(
-        AnnotationScheme.annotation_scheme_id,
-        AnnotationScheme.labels,
-    ).where(
-        sa.or_(
-            assignment_scope_exists,
-            bot_scope_exists,
+        .join(
+            BotAnnotationMetaData,
+            AnnotationScheme.annotation_scheme_id == BotAnnotationMetaData.annotation_scheme_id,
+            isouter=True,
         )
+        .where(
+            sa.or_(
+                AssignmentScope.assignment_scope_id.in_(scopes),
+                BotAnnotationMetaData.bot_annotation_metadata_id.in_(scopes),
+            )
+        )
+        .ext(distinct_on(AnnotationScheme.annotation_scheme_id))
     )
 
     schemes = (await session.execute(stmt)).all()
