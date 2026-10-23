@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Iterable, Generator, Annotated, Type
 from pathlib import Path
 from time import perf_counter, sleep
+
+from pydantic import ValidationError
 from typing_extensions import override
 from httpx import Client, URL, USE_CLIENT_DEFAULT, Response, codes, HTTPError
 from httpx._client import UseClientDefault
@@ -244,6 +246,8 @@ class AbstractAPI(ABC):
                 except json.decoder.JSONDecodeError as e:
                     logging.error(f'Failed to decode record in line {li}')
                     logging.error(f'Error message: {e}')
+                except ValidationError as e:
+                    raise Exception(f"Failed in line {li}") from e
 
     @classmethod
     def convert_file(cls, source: Path, target: Path, project_id: str | uuid.UUID | None = None) -> None:

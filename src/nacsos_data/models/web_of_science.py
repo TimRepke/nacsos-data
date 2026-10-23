@@ -151,6 +151,32 @@ def assert_empty(v: str) -> str | None:
     return v
 
 
+def normalise_grant_items(v: Any) -> list[Any] | None:
+    if v is None:
+        return None
+
+    # Wrap a single string or dict into a list
+    items = v if isinstance(v, list) else [v]
+
+    # Convert strings into dict format with 'content'
+    normalized = []
+    for item in items:
+        if isinstance(item, str):
+            normalized.append({'content': item})
+        else:
+            normalized.append(item)
+
+    return normalized
+
+
+def normalise_grant_agency(v: Any) -> dict[str, str]|None:
+    if v is None:
+        return None
+    if isinstance(v, str):
+        return {'content': v}
+    return v
+
+
 class BaseModel(PydanticBaseModel):
     model_config = ConfigDict(coerce_numbers_to_str=True, strict=False)
 
@@ -410,9 +436,14 @@ class GrantAgencyName(BaseModel):
     content: str | None = None
 
 
+class GrantItem(BaseModel):
+    scheme: str | None = None
+    content: str | None = None
+
+
 class GrantIds(BaseModel):
     count: int | None = None
-    grant_id: Annotated[list[str] | None, BeforeValidator(ensure_list)] = None
+    grant_id: Annotated[list[GrantItem] | None, BeforeValidator(normalise_grant_items)] = None
 
 
 class PrincipalInvestigatorInstitution1(BaseModel):
@@ -468,12 +499,18 @@ class GrantData(BaseModel):
     grantDataItem: Annotated[list[GrantDataItem] | None, BeforeValidator(ensure_list)] = None
 
 
+class GrantAgency(BaseModel):
+    country: str | None = None
+    lang_id: str | None = None
+    content: str | None = None
+
+
 class Grant(BaseModel):
     grant_agency_names: Annotated[list[GrantAgencyName] | None, BeforeValidator(ensure_list)] = None
     grant_ids: GrantIds | None = None
     grant_source: str | None = None
     grant_data: GrantData | None = None
-    grant_agency: str | None = None
+    grant_agency: Annotated[GrantAgency | None, BeforeValidator(normalise_grant_agency)] = None
 
 
 class Grants(BaseModel):
