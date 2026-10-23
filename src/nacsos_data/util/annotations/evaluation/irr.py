@@ -195,9 +195,9 @@ def compute_fleiss(annotations: dict[str, list[int | None]], method: Literal['fl
     if method == 'fleiss':
         p_mean_exp = (p_cat * p_cat).sum()
     elif method == 'randolph':
-        p_mean_exp = 1 / n_cat
+        p_mean_exp = np.float64(1 / n_cat)
     else:
-        p_mean_exp = 0  # type: ignore[unreachable]
+        p_mean_exp = np.float64(0)  # type: ignore[unreachable]
 
     if p_mean_exp == 1:
         return 1.0

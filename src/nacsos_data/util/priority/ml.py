@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 import tempfile
 from typing import TYPE_CHECKING
@@ -5,15 +6,24 @@ import numpy as np
 
 if TYPE_CHECKING:
     import pandas as pd
+    from transformers import EvalPrediction
 
 logger = logging.getLogger('nacsos_data.util.priority.labels')
 
 
-def compute_metrics(p: tuple[np.ndarray, np.ndarray]) -> dict[str, np.ndarray]:
+def compute_metrics(p: EvalPrediction | tuple[np.ndarray, np.ndarray]) -> dict[str, float]:
     import evaluate
+    from transformers import EvalPrediction
 
-    logits, labels = p
-    predictions = np.argmax(logits, axis=-1)
+    if type(p) is tuple:
+        logits, labels = p
+        predictions = np.argmax(logits, axis=-1)
+    elif isinstance(p, EvalPrediction):
+        predictions = np.argmax(p.predictions, axis=-1)
+        labels = p.label_ids
+    else:
+        raise RuntimeError(f'Invalid prediction type: {type(p)}')
+
     return {
         'recall': evaluate.load('recall').compute(predictions=predictions, references=labels, zero_division=0, average='weighted')['recall'],
         'precision': evaluate.load('precision').compute(predictions=predictions, references=labels, zero_division=0, average='weighted')['precision'],

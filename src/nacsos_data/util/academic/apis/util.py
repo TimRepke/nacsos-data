@@ -247,7 +247,7 @@ class AbstractAPI(ABC):
                     logging.error(f'Failed to decode record in line {li}')
                     logging.error(f'Error message: {e}')
                 except ValidationError as e:
-                    raise Exception(f"Failed in line {li}") from e
+                    raise Exception(f'Failed in line {li}') from e
 
     @classmethod
     def convert_file(cls, source: Path, target: Path, project_id: str | uuid.UUID | None = None) -> None:

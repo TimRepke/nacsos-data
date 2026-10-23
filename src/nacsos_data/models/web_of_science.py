@@ -24,7 +24,7 @@
 from __future__ import annotations
 import re
 from enum import Enum
-from typing import Annotated, Literal, Any
+from typing import Annotated, Literal, Any, cast
 
 from pydantic import BaseModel as PydanticBaseModel, Field, field_validator, ConfigDict, BeforeValidator
 
@@ -169,12 +169,12 @@ def normalise_grant_items(v: Any) -> list[Any] | None:
     return normalized
 
 
-def normalise_grant_agency(v: Any) -> dict[str, str]|None:
+def normalise_grant_agency(v: Any) -> dict[str, str] | None:
     if v is None:
         return None
     if isinstance(v, str):
         return {'content': v}
-    return v
+    return cast(dict[str, str], v)
 
 
 class BaseModel(PydanticBaseModel):
