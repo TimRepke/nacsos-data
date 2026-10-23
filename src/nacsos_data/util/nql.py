@@ -336,7 +336,7 @@ class NQLQuery:
                     bot_scope_query = bot_scope_query.where(BotAnnotation.item_id.is_(None))
 
                 combined_query = scope_query.union(bot_scope_query)  # noqa: E711
-                return combined_query.cte('combined_scopes')
+                return combined_query.cte()
             else:
                 query = sa.select(self._project_items.c.item_id).join(
                     Annotation,
