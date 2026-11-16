@@ -15,12 +15,14 @@ def compute_metrics(p: EvalPrediction | tuple[np.ndarray, np.ndarray]) -> dict[s
     import evaluate
     from transformers import EvalPrediction
 
+    predictions: np.ndarray
+    labels: np.ndarray | tuple[np.ndarray, ...]
     if type(p) is tuple:
         logits, labels = p
         predictions = np.argmax(logits, axis=-1)
     elif isinstance(p, EvalPrediction):
         predictions = np.argmax(p.predictions, axis=-1)
-        labels = p.label_ids  # type: ignore[assignment]
+        labels = p.label_ids
     else:
         raise RuntimeError(f'Invalid prediction type: {type(p)}')
 

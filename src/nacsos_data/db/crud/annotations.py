@@ -1,5 +1,6 @@
 import uuid
 import logging
+from typing import cast
 
 from pydantic import BaseModel
 from sqlalchemy import select, delete, asc, desc
@@ -692,7 +693,8 @@ async def update_resolved_bot_annotations(session: DBSession, bot_annotation_met
     new_meta = BotMetaResolve.model_validate(bot_meta.meta)
     new_meta.snapshot = dehydrate_user_annotations(matrix)
     new_meta.resolutions = resolutions
-    bot_meta.meta = new_meta.model_dump()
+    # The `meta` column is a JSONB column holding the serialized `BotMetaResolve`, i.e. a plain (mutable) dict
+    bot_meta.meta = cast(BotMetaResolve, new_meta.model_dump())
     await session.flush()
 
     # Get ids of existing annotations in for this resolution
