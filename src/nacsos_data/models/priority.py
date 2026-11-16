@@ -11,6 +11,9 @@ from nacsos_data.models.nql import NQLFilter
 class _MLConfig(BaseModel):
     model_config = ConfigDict(extra='ignore')
 
+    predict_all: bool = True
+    predict_softmax: bool = False
+
 
 class _BERTModel(_MLConfig):
     max_len: int = 512

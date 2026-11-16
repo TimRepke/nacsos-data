@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from nacsos_data.util.priority.ml import training, workload_estimation, report
 
 from nacsos_data.db.schemas import Priority
-from nacsos_data.models.priority import PriorityModel
+from nacsos_data.models.priority import PriorityModel, _BERTModel
 from nacsos_data.util.export.pandas import wide_export_table
 from nacsos_data.util.errors import NotFoundError
 from nacsos_data.util.priority.mask import get_inclusion_mask
@@ -127,7 +127,7 @@ async def main(
     # -----------------------------------------------------------------------------------------
     logger.info('Proceeding with model training and predictions...')
 
-    if config.conf == 'SCIBERT' or config.conf == 'CLIMBERT':
+    if isinstance(config, _BERTModel):
         df = training(
             df=df,
             text='text',
@@ -145,6 +145,8 @@ async def main(
             logging_steps=config.logging_steps,
             eval_strategy=config.eval_strategy,
             eval_steps=config.eval_steps,
+            predict_all=config.predict_all,
+            predict_softmax=config.predict_softmax,
         )
     elif config.conf == 'SVM':
         raise NotImplementedError()
