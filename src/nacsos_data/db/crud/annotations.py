@@ -689,8 +689,10 @@ async def update_resolved_bot_annotations(session: DBSession, bot_annotation_met
     resolutions = dehydrate_resolutions(matrix)
     # Update the bot_meta
     bot_meta.name = name
-    bot_meta.meta.snapshot = dehydrate_user_annotations(matrix)
-    bot_meta.meta.resolutions = resolutions
+    new_meta = BotMetaResolve.model_validate(bot_meta.meta)
+    new_meta.snapshot = dehydrate_user_annotations(matrix)
+    new_meta.resolutions = resolutions
+    bot_meta.meta = new_meta.model_dump()
     await session.flush()
 
     # Get ids of existing annotations in for this resolution
