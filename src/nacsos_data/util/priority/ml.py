@@ -20,7 +20,7 @@ def compute_metrics(p: EvalPrediction | tuple[np.ndarray, np.ndarray]) -> dict[s
         predictions = np.argmax(logits, axis=-1)
     elif isinstance(p, EvalPrediction):
         predictions = np.argmax(p.predictions, axis=-1)
-        labels = p.label_ids
+        labels = p.label_ids  # type: ignore[assignment]
     else:
         raise RuntimeError(f'Invalid prediction type: {type(p)}')
 
